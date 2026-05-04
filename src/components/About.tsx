@@ -14,7 +14,7 @@ export function About() {
         <div className="relative">
           <img
             src={cottage}
-            alt="Rose Hill Cottage exterior"
+            alt="Bleaf Mud House exterior"
             width={1280}
             height={960}
             loading="lazy"
@@ -41,7 +41,7 @@ export function About() {
             A quiet retreat among the strawberry farms
           </h2>
           <p className="mt-5 text-muted-foreground leading-relaxed">
-            Tucked into the misty hills of Vattavada, Rose Hill Cottage is a family-run
+            Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run
             homestead surrounded by strawberry farms and rolling tea plantations. Wake to
             birdsong, walk through the plantations with our host Raju, and gather around the
             bonfire as the mountains turn gold.

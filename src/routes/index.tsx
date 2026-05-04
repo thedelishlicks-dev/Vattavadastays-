@@ -11,13 +11,13 @@ export const Route = createFileRoute("/")({
   component: Index,
   head: () => ({
     meta: [
-      { title: "Rose Hill Cottage · Organic Farm Stay in Vattavada, Kerala" },
+      { title: "Bleaf Mud House · Organic Farm Stay in Vattavada, Kerala" },
       {
         name: "description",
         content:
-          "Book Rose Hill Cottage — a 2-bedroom organic farm stay in Upper Vattavada, Munnar. Strawberry farms, plantation walks, bonfire nights. ₹2000/night.",
+          "Book Bleaf Mud House — a 2-bedroom organic farm stay in Upper Vattavada, Munnar. Strawberry farms, plantation walks, bonfire nights. ₹2000/night.",
       },
-      { property: "og:title", content: "Rose Hill Cottage · Vattavada Farm Stay" },
+      { property: "og:title", content: "Bleaf Mud House · Vattavada Farm Stay" },
       {
         property: "og:description",
         content: "Organic farm stay in the Western Ghats. Hosted by Raju Thomas.",

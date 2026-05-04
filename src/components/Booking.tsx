@@ -71,7 +71,7 @@ export function Booking() {
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
             Reserve your stay
           </span>
-          <h2 className="mt-3 text-3xl md:text-5xl font-semibold">Book Rose Hill Cottage</h2>
+          <h2 className="mt-3 text-3xl md:text-5xl font-semibold">Book Bleaf Mud House</h2>
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6 lg:gap-8">

@@ -29,10 +29,10 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Rose Hill Cottage" },
+      { title: "Bleaf Mud House" },
       { name: "description", content: "Organic farm stay in Vattavada, Kerala." },
-      { name: "author", content: "Rose Hill Cottage" },
-      { property: "og:title", content: "Rose Hill Cottage" },
+      { name: "author", content: "Bleaf Mud House" },
+      { property: "og:title", content: "Bleaf Mud House" },
       { property: "og:description", content: "Organic farm stay in Vattavada, Kerala." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
