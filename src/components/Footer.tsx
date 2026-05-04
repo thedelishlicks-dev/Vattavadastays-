@@ -62,7 +62,7 @@ export function Footer() {
 
         <div className="mt-12 border-t border-background/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
           <span>© {new Date().getFullYear()} Bleaf Mud House. All rights reserved.</span>
-          <span>Hosted by Raju Thomas</span>
+          <span>Hosted by Deepak</span>
         </div>
       </div>
     </footer>

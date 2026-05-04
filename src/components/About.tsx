@@ -26,7 +26,7 @@ export function About() {
                 R
               </div>
               <div>
-                <div className="font-medium text-sm">Raju Thomas</div>
+                <div className="font-medium text-sm">Deepak</div>
                 <div className="text-xs text-muted-foreground">Your host</div>
               </div>
             </div>
@@ -43,7 +43,7 @@ export function About() {
           <p className="mt-5 text-muted-foreground leading-relaxed">
             Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run
             homestead surrounded by strawberry farms and rolling tea plantations. Wake to
-            birdsong, walk through the plantations with our host Raju, and gather around the
+            birdsong, walk through the plantations with our host Deepak, and gather around the
             bonfire as the mountains turn gold.
           </p>
 
