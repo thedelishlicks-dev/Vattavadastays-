@@ -21,10 +21,10 @@ export function Header() {
           </span>
           <div className="leading-tight">
             <div className="font-display text-base md:text-lg font-semibold text-foreground">
-              Rose Hill Cottage
+              Bleaf Mud House
             </div>
             <div className="font-malayalam text-xs md:text-sm text-muted-foreground">
-              റോസ് ഹിൽ കോട്ടേജ്
+              ബ്ലീഫ് മഡ് ഹൗസ്
             </div>
           </div>
         </a>

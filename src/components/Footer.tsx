@@ -11,8 +11,8 @@ export function Footer() {
                 <Leaf className="h-5 w-5" />
               </span>
               <div>
-                <div className="font-display text-lg font-semibold">Rose Hill Cottage</div>
-                <div className="font-malayalam text-sm opacity-70">റോസ് ഹിൽ കോട്ടേജ്</div>
+                <div className="font-display text-lg font-semibold">Bleaf Mud House</div>
+                <div className="font-malayalam text-sm opacity-70">ബ്ലീഫ് മഡ് ഹൗസ്</div>
               </div>
             </div>
             <p className="mt-5 text-sm opacity-70 leading-relaxed">
@@ -61,7 +61,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 border-t border-background/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <span>© {new Date().getFullYear()} Rose Hill Cottage. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Bleaf Mud House. All rights reserved.</span>
           <span>Hosted by Raju Thomas</span>
         </div>
       </div>

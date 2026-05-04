@@ -17,10 +17,10 @@ export function Hero() {
           Vattavada · Kerala
         </span>
         <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-semibold leading-[1.05] max-w-3xl">
-          Rose Hill Cottage
+          Bleaf Mud House
         </h1>
         <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">
-          റോസ് ഹിൽ കോട്ടേജ്
+          ബ്ലീഫ് മഡ് ഹൗസ്
         </div>
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
           Organic farm stay in the Western Ghats
