@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Bleaf Mud House · Vattavada Farm Stay" },
       {
         property: "og:description",
-        content: "Organic farm stay in the Western Ghats. Hosted by Raju Thomas.",
+        content: "Organic farm stay in the Western Ghats. Hosted by Deepak.",
       },
     ],
   }),
