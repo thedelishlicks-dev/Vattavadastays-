@@ -23,7 +23,7 @@ export function About() {
           <div className="absolute -bottom-6 -right-4 md:-right-6 bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-soft)] max-w-[220px]">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display text-lg font-semibold">
-                R
+                D
               </div>
               <div>
                 <div className="font-medium text-sm">Deepak</div>
