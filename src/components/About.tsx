@@ -2,9 +2,9 @@ import { Users, BedDouble, Bath } from "lucide-react";
 import cottage from "@/assets/cottage.jpg";
 
 const stats = [
-  { icon: Users, label: "Guests", value: "6" },
-  { icon: BedDouble, label: "Bedrooms", value: "2" },
-  { icon: Bath, label: "Bathrooms", value: "2" },
+  { icon: BedDouble, label: "Rooms", value: "12" },
+  { icon: Users, label: "Farm Stay", value: "Organic" },
+  { icon: Bath, label: "Meals", value: "Included" },
 ];
 
 export function About() {
@@ -38,13 +38,14 @@ export function About() {
             About the stay
           </span>
           <h2 className="mt-3 text-3xl md:text-5xl font-semibold text-foreground">
-            A quiet retreat among the strawberry farms
+            A 12-room mountain retreat among the strawberry farms
           </h2>
           <p className="mt-5 text-muted-foreground leading-relaxed">
             Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run
-            homestead surrounded by strawberry farms and rolling tea plantations. Wake to
-            birdsong, walk through the plantations with our host Deepak, and gather around the
-            bonfire as the mountains turn gold.
+            mountain retreat with 12 rooms surrounded by strawberry farms and rolling tea
+            plantations. Wake to birdsong, walk through the plantations with our host Deepak,
+            enjoy home-cooked organic meals, and gather around the bonfire as the mountains
+            turn gold.
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-3">

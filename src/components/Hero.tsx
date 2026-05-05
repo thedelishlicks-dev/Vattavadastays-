@@ -23,10 +23,10 @@ export function Hero() {
           ബ്ലീഫ് മഡ് ഹൗസ്
         </div>
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
-          Organic farm stay in the Western Ghats
+          12-room mountain retreat in organic Vattavada
         </p>
         <a
-          href="#booking"
+          href="#availability"
           className="mt-9 inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-sm md:text-base font-medium text-primary-foreground shadow-[var(--shadow-elevated)] hover:scale-[1.03] transition-transform"
         >
           Check Availability
