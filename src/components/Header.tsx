@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Menu, X, Leaf } from "lucide-react";
 
 const links = [
+  { href: "#availability", label: "Dates" },
+  { href: "#rooms", label: "Rooms" },
+  { href: "#booking", label: "Book" },
   { href: "#about", label: "About" },
   { href: "#amenities", label: "Amenities" },
-  { href: "#gallery", label: "Gallery" },
-  { href: "#booking", label: "Booking" },
   { href: "#contact", label: "Contact" },
 ];
 
