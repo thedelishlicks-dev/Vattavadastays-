@@ -17,7 +17,14 @@ import {
 } from "lucide-react";
 import { logout, MOCK_OWNER } from "./auth";
 
-const NAV = [
+type NavItemDef = {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
+};
+
+const NAV: NavItemDef[] = [
   { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
@@ -28,7 +35,7 @@ const NAV = [
   { to: "/admin/policies", label: "Policies", icon: ScrollText, disabled: true },
   { to: "/admin/payments", label: "Payments", icon: Wallet, disabled: true },
   { to: "/admin/settings", label: "Settings", icon: Settings, disabled: true },
-] as const;
+];
 
 export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
