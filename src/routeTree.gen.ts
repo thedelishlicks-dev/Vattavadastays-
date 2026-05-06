@@ -12,11 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminRoomsRouteImport } from './routes/admin.rooms'
+import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
+import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
+import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
+import { Route as AdminMealsRouteImport } from './routes/admin.meals'
 import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
+import { Route as AdminAmenitiesRouteImport } from './routes/admin.amenities'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -33,9 +39,34 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminRoomsRoute = AdminRoomsRouteImport.update({
   id: '/rooms',
   path: '/rooms',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPricingRoute = AdminPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPoliciesRoute = AdminPoliciesRouteImport.update({
+  id: '/policies',
+  path: '/policies',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPaymentsRoute = AdminPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMealsRoute = AdminMealsRouteImport.update({
+  id: '/meals',
+  path: '/meals',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminLoginRoute = AdminLoginRouteImport.update({
@@ -58,35 +89,58 @@ const AdminBookingsRoute = AdminBookingsRouteImport.update({
   path: '/bookings',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAmenitiesRoute = AdminAmenitiesRouteImport.update({
+  id: '/amenities',
+  path: '/amenities',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/meals': typeof AdminMealsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/policies': typeof AdminPoliciesRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/meals': typeof AdminMealsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/policies': typeof AdminPoliciesRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/login': typeof AdminLoginRoute
+  '/admin/meals': typeof AdminMealsRoute
+  '/admin/payments': typeof AdminPaymentsRoute
+  '/admin/policies': typeof AdminPoliciesRoute
+  '/admin/pricing': typeof AdminPricingRoute
   '/admin/rooms': typeof AdminRoomsRoute
+  '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
@@ -94,30 +148,48 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
     | '/admin/login'
+    | '/admin/meals'
+    | '/admin/payments'
+    | '/admin/policies'
+    | '/admin/pricing'
     | '/admin/rooms'
+    | '/admin/settings'
     | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
     | '/admin/login'
+    | '/admin/meals'
+    | '/admin/payments'
+    | '/admin/policies'
+    | '/admin/pricing'
     | '/admin/rooms'
+    | '/admin/settings'
     | '/admin'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
     | '/admin/login'
+    | '/admin/meals'
+    | '/admin/payments'
+    | '/admin/policies'
+    | '/admin/pricing'
     | '/admin/rooms'
+    | '/admin/settings'
     | '/admin/'
   fileRoutesById: FileRoutesById
 }
@@ -149,11 +221,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/rooms': {
       id: '/admin/rooms'
       path: '/rooms'
       fullPath: '/admin/rooms'
       preLoaderRoute: typeof AdminRoomsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/pricing': {
+      id: '/admin/pricing'
+      path: '/pricing'
+      fullPath: '/admin/pricing'
+      preLoaderRoute: typeof AdminPricingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/policies': {
+      id: '/admin/policies'
+      path: '/policies'
+      fullPath: '/admin/policies'
+      preLoaderRoute: typeof AdminPoliciesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/payments': {
+      id: '/admin/payments'
+      path: '/payments'
+      fullPath: '/admin/payments'
+      preLoaderRoute: typeof AdminPaymentsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/meals': {
+      id: '/admin/meals'
+      path: '/meals'
+      fullPath: '/admin/meals'
+      preLoaderRoute: typeof AdminMealsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/login': {
@@ -184,24 +291,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminBookingsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/amenities': {
+      id: '/admin/amenities'
+      path: '/amenities'
+      fullPath: '/admin/amenities'
+      preLoaderRoute: typeof AdminAmenitiesRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAmenitiesRoute: typeof AdminAmenitiesRoute
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCalendarRoute: typeof AdminCalendarRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  AdminMealsRoute: typeof AdminMealsRoute
+  AdminPaymentsRoute: typeof AdminPaymentsRoute
+  AdminPoliciesRoute: typeof AdminPoliciesRoute
+  AdminPricingRoute: typeof AdminPricingRoute
   AdminRoomsRoute: typeof AdminRoomsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAmenitiesRoute: AdminAmenitiesRoute,
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCalendarRoute: AdminCalendarRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminLoginRoute: AdminLoginRoute,
+  AdminMealsRoute: AdminMealsRoute,
+  AdminPaymentsRoute: AdminPaymentsRoute,
+  AdminPoliciesRoute: AdminPoliciesRoute,
+  AdminPricingRoute: AdminPricingRoute,
   AdminRoomsRoute: AdminRoomsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
