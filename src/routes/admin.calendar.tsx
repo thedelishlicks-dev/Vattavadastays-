@@ -90,7 +90,10 @@ function CalendarAdmin() {
                   Room
                 </th>
                 {days.map((d) => (
-                  <th key={d.toISOString()} className="px-1 py-2 font-medium text-center w-8 text-muted-foreground">
+                  <th
+                    key={d.toISOString()}
+                    className="px-1 py-2 font-medium text-center w-8 text-muted-foreground"
+                  >
                     <div>{format(d, "EEEEE")}</div>
                     <div className="font-semibold text-foreground">{format(d, "d")}</div>
                   </th>

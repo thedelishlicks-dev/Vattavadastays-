@@ -8,7 +8,9 @@ export function StatusPill({ status }: { status: BookingStatus }) {
     cancelled: "bg-destructive/10 text-destructive",
   };
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${map[status]}`}>
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${map[status]}`}
+    >
       {status}
     </span>
   );
@@ -21,7 +23,9 @@ export function PaymentPill({ status }: { status: PaymentStatus }) {
     paid: "bg-primary-light text-primary",
   };
   return (
-    <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${map[status]}`}>
+    <span
+      className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium capitalize ${map[status]}`}
+    >
       {status}
     </span>
   );

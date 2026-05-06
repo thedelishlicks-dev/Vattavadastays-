@@ -59,8 +59,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
     return isSameDay(d, checkIn);
   };
 
-  const nights =
-    checkIn && checkOut ? Math.max(0, differenceInCalendarDays(checkOut, checkIn)) : 0;
+  const nights = checkIn && checkOut ? Math.max(0, differenceInCalendarDays(checkOut, checkIn)) : 0;
 
   return (
     <section id="availability" className="py-16 md:py-24 bg-background">
@@ -94,7 +93,9 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground mb-2">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                <div key={d} className="py-2">{d}</div>
+                <div key={d} className="py-2">
+                  {d}
+                </div>
               ))}
             </div>
 
@@ -116,9 +117,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                         ? "text-muted-foreground/40 cursor-not-allowed"
                         : "hover:bg-primary-light",
                       selected && !isStart && !isEnd ? "bg-primary-light text-primary" : "",
-                      isStart || isEnd
-                        ? "bg-primary text-primary-foreground hover:bg-primary"
-                        : "",
+                      isStart || isEnd ? "bg-primary text-primary-foreground hover:bg-primary" : "",
                     ].join(" ")}
                   >
                     {format(d, "d")}
@@ -131,13 +130,17 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
           <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-5 md:p-7 shadow-[var(--shadow-soft)]">
             <div className="grid grid-cols-2 rounded-xl border border-border overflow-hidden">
               <div className="p-3 border-r border-border">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Check-in
+                </div>
                 <div className="mt-1 text-sm font-medium">
                   {checkIn ? format(checkIn, "MMM d, yyyy") : "Select date"}
                 </div>
               </div>
               <div className="p-3">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Check-out
+                </div>
                 <div className="mt-1 text-sm font-medium">
                   {checkOut ? format(checkOut, "MMM d, yyyy") : "Select date"}
                 </div>

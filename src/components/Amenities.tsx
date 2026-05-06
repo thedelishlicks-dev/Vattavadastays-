@@ -31,9 +31,7 @@ export function Amenities() {
               <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
                 <Icon className="h-6 w-6" />
               </div>
-              <span className="text-sm font-medium text-foreground text-center">
-                {label}
-              </span>
+              <span className="text-sm font-medium text-foreground text-center">{label}</span>
             </div>
           ))}
         </div>

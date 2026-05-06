@@ -30,7 +30,9 @@ export function Rooms({ onSelect }: Props) {
     <section id="rooms" className="py-16 md:py-24 bg-primary-light/30">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="text-center max-w-2xl mx-auto mb-10">
-          <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">Step 2</span>
+          <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
+            Step 2
+          </span>
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Choose your room</h2>
         </div>
 
@@ -51,7 +53,9 @@ export function Rooms({ onSelect }: Props) {
                 className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
               >
                 {ROOM_TYPES.map((t) => (
-                  <option key={t} value={t}>{t}</option>
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
                 ))}
               </select>
             </div>
@@ -117,7 +121,10 @@ export function Rooms({ onSelect }: Props) {
                 </div>
                 <div className="mt-1 font-display text-2xl font-semibold text-primary">
                   ₹{room.price.toLocaleString("en-IN")}
-                  <span className="text-sm text-muted-foreground font-body font-normal"> /night</span>
+                  <span className="text-sm text-muted-foreground font-body font-normal">
+                    {" "}
+                    /night
+                  </span>
                 </div>
 
                 <ul className="mt-4 space-y-1.5 text-sm text-muted-foreground">

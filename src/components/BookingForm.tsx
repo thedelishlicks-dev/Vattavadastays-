@@ -25,7 +25,9 @@ export function BookingForm({ selection }: Props) {
     <section id="booking" className="py-16 md:py-24 bg-background">
       <div className="mx-auto max-w-3xl px-4 md:px-8">
         <div className="text-center mb-10">
-          <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">Step 3</span>
+          <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
+            Step 3
+          </span>
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
         </div>
 
@@ -40,7 +42,8 @@ export function BookingForm({ selection }: Props) {
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 text-sm">
               <div className="font-medium">{selection.room.name}</div>
               <div className="text-muted-foreground text-xs mt-0.5">
-                {selection.nights} night{selection.nights > 1 ? "s" : ""} · {selection.adults} adults
+                {selection.nights} night{selection.nights > 1 ? "s" : ""} · {selection.adults}{" "}
+                adults
                 {selection.children ? ` · ${selection.children} children` : ""}
                 {selection.meal !== "None" ? ` · ${selection.meal}` : ""}
               </div>
