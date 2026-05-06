@@ -29,12 +29,12 @@ const NAV: NavItemDef[] = [
   { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
-  { to: "/admin/pricing", label: "Pricing", icon: Tag, disabled: true },
-  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed, disabled: true },
-  { to: "/admin/amenities", label: "Amenities", icon: Sparkles, disabled: true },
-  { to: "/admin/policies", label: "Policies", icon: ScrollText, disabled: true },
-  { to: "/admin/payments", label: "Payments", icon: Wallet, disabled: true },
-  { to: "/admin/settings", label: "Settings", icon: Settings, disabled: true },
+  { to: "/admin/pricing", label: "Pricing", icon: Tag },
+  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
+  { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
+  { to: "/admin/policies", label: "Policies", icon: ScrollText },
+  { to: "/admin/payments", label: "Payments", icon: Wallet },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export function AdminLayout() {
