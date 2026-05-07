@@ -41,7 +41,11 @@ function PoliciesPage() {
   const [dirty, setDirty] = useState(false);
   const mark = () => setDirty(true);
 
-  const choosePolicy = (p: CancelPolicy) => { setPolicy(p); setRefunds(refundPresets[p]); mark(); };
+  const choosePolicy = (p: CancelPolicy) => {
+    setPolicy(p);
+    setRefunds(refundPresets[p]);
+    mark();
+  };
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -49,16 +53,45 @@ function PoliciesPage() {
 
       <Section title="Check-in / Check-out">
         <div className="grid grid-cols-2 gap-3 max-w-md">
-          <Field label="Check-in time"><input type="time" value={checkIn} onChange={(e) => { setCheckIn(e.target.value); mark(); }} className={inputCls} /></Field>
-          <Field label="Check-out time"><input type="time" value={checkOut} onChange={(e) => { setCheckOut(e.target.value); mark(); }} className={inputCls} /></Field>
+          <Field label="Check-in time">
+            <input
+              type="time"
+              value={checkIn}
+              onChange={(e) => {
+                setCheckIn(e.target.value);
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Check-out time">
+            <input
+              type="time"
+              value={checkOut}
+              onChange={(e) => {
+                setCheckOut(e.target.value);
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
         </div>
       </Section>
 
       <Section title="Cancellation policy">
         <div className="grid grid-cols-3 gap-2 max-w-md">
           {(["Flexible", "Medium", "Strict"] as CancelPolicy[]).map((p) => (
-            <label key={p} className={`text-sm text-center border rounded-md py-2 cursor-pointer ${policy === p ? "border-primary bg-primary-light text-primary font-medium" : "border-border hover:bg-muted"}`}>
-              <input type="radio" name="cancel" className="hidden" checked={policy === p} onChange={() => choosePolicy(p)} />
+            <label
+              key={p}
+              className={`text-sm text-center border rounded-md py-2 cursor-pointer ${policy === p ? "border-primary bg-primary-light text-primary font-medium" : "border-border hover:bg-muted"}`}
+            >
+              <input
+                type="radio"
+                name="cancel"
+                className="hidden"
+                checked={policy === p}
+                onChange={() => choosePolicy(p)}
+              />
               {p}
             </label>
           ))}
@@ -66,9 +99,41 @@ function PoliciesPage() {
 
         <div className="space-y-2 pt-2">
           {refunds.map((r, i) => (
-            <div key={i} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-border rounded-lg p-3">
-              <div className="md:col-span-9"><Field label="Timeframe"><input value={r.label} onChange={(e) => { const next = [...refunds]; next[i] = { ...r, label: e.target.value }; setRefunds(next); mark(); }} className={inputCls} /></Field></div>
-              <div className="md:col-span-3"><Field label="Refund %"><input type="number" min={0} max={100} value={r.pct} onChange={(e) => { const next = [...refunds]; next[i] = { ...r, pct: +e.target.value }; setRefunds(next); mark(); }} className={inputCls} /></Field></div>
+            <div
+              key={i}
+              className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-border rounded-lg p-3"
+            >
+              <div className="md:col-span-9">
+                <Field label="Timeframe">
+                  <input
+                    value={r.label}
+                    onChange={(e) => {
+                      const next = [...refunds];
+                      next[i] = { ...r, label: e.target.value };
+                      setRefunds(next);
+                      mark();
+                    }}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
+              <div className="md:col-span-3">
+                <Field label="Refund %">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={r.pct}
+                    onChange={(e) => {
+                      const next = [...refunds];
+                      next[i] = { ...r, pct: +e.target.value };
+                      setRefunds(next);
+                      mark();
+                    }}
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
             </div>
           ))}
         </div>
@@ -77,8 +142,19 @@ function PoliciesPage() {
       <Section title="House rules">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {Object.entries(rules).map(([k, v]) => (
-            <label key={k} className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-2 cursor-pointer hover:bg-muted">
-              <input type="checkbox" checked={v} onChange={(e) => { setRules({ ...rules, [k]: e.target.checked }); mark(); }} className="h-4 w-4 accent-primary" />
+            <label
+              key={k}
+              className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-2 cursor-pointer hover:bg-muted"
+            >
+              <input
+                type="checkbox"
+                checked={v}
+                onChange={(e) => {
+                  setRules({ ...rules, [k]: e.target.checked });
+                  mark();
+                }}
+                className="h-4 w-4 accent-primary"
+              />
               {k}
             </label>
           ))}
@@ -88,8 +164,20 @@ function PoliciesPage() {
       <Section title="Advance payment" description="Required to confirm a booking.">
         <Field label="Advance %" hint="Remainder collected at check-in.">
           <div className="relative max-w-[160px]">
-            <input type="number" min={0} max={100} value={advance} onChange={(e) => { setAdvance(+e.target.value); mark(); }} className={`${inputCls} pr-8`} />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={advance}
+              onChange={(e) => {
+                setAdvance(+e.target.value);
+                mark();
+              }}
+              className={`${inputCls} pr-8`}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+              %
+            </span>
           </div>
         </Field>
       </Section>

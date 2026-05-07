@@ -41,11 +41,10 @@ export function About() {
             A 12-room mountain retreat among the strawberry farms
           </h2>
           <p className="mt-5 text-muted-foreground leading-relaxed">
-            Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run
-            mountain retreat with 12 rooms surrounded by strawberry farms and rolling tea
-            plantations. Wake to birdsong, walk through the plantations with our host Deepak,
-            enjoy home-cooked organic meals, and gather around the bonfire as the mountains
-            turn gold.
+            Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run mountain
+            retreat with 12 rooms surrounded by strawberry farms and rolling tea plantations. Wake
+            to birdsong, walk through the plantations with our host Deepak, enjoy home-cooked
+            organic meals, and gather around the bonfire as the mountains turn gold.
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-3">

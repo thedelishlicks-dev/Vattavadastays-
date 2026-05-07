@@ -8,21 +8,19 @@ export const Route = createFileRoute("/admin/rooms")({
 });
 
 function RoomsAdmin() {
-  const [rooms, setRooms] = useState(
-    ROOMS.map((r) => ({ ...r, active: true })),
-  );
+  const [rooms, setRooms] = useState(ROOMS.map((r) => ({ ...r, active: true })));
 
   const toggle = (id: string) =>
-    setRooms((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)),
-    );
+    setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)));
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms</h1>
-          <p className="text-sm text-muted-foreground">Manage room types, pricing, and availability.</p>
+          <p className="text-sm text-muted-foreground">
+            Manage room types, pricing, and availability.
+          </p>
         </div>
         <button className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
           <Plus className="h-4 w-4" /> Add room
@@ -49,7 +47,9 @@ function RoomAdminCard({
     <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
       <div className="relative">
         <img src={room.image} alt={room.name} className="h-40 w-full object-cover" />
-        <span className={`absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${room.active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+        <span
+          className={`absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${room.active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+        >
           {room.active ? "Active" : "Inactive"}
         </span>
       </div>
@@ -66,15 +66,26 @@ function RoomAdminCard({
         </div>
 
         <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-          <li className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> {room.capacity} guests</li>
-          <li className="flex items-center gap-1.5"><BedDouble className="h-3.5 w-3.5" /> {room.bedType}</li>
-          <li className="flex items-center gap-1.5"><Bath className="h-3.5 w-3.5" /> {room.bathType}</li>
+          <li className="flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" /> {room.capacity} guests
+          </li>
+          <li className="flex items-center gap-1.5">
+            <BedDouble className="h-3.5 w-3.5" /> {room.bedType}
+          </li>
+          <li className="flex items-center gap-1.5">
+            <Bath className="h-3.5 w-3.5" /> {room.bathType}
+          </li>
         </ul>
 
         {room.amenities.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
             {room.amenities.map((a) => (
-              <span key={a} className="text-[10px] rounded-full bg-secondary text-secondary-foreground px-2 py-0.5">{a}</span>
+              <span
+                key={a}
+                className="text-[10px] rounded-full bg-secondary text-secondary-foreground px-2 py-0.5"
+              >
+                {a}
+              </span>
             ))}
           </div>
         )}

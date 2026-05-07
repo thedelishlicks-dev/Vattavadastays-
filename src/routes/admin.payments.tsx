@@ -27,30 +27,88 @@ function PaymentsPage() {
 
       <Section title="UPI">
         <Field label="UPI ID" hint="Shown on the booking confirmation page.">
-          <input value={upi} onChange={(e) => { setUpi(e.target.value); mark(); }} className={`${inputCls} max-w-md`} />
+          <input
+            value={upi}
+            onChange={(e) => {
+              setUpi(e.target.value);
+              mark();
+            }}
+            className={`${inputCls} max-w-md`}
+          />
         </Field>
       </Section>
 
       <Section title="Bank account">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Field label="Account holder name"><input value={bank.accountName} onChange={(e) => { setBank({ ...bank, accountName: e.target.value }); mark(); }} className={inputCls} /></Field>
-          <Field label="Account number"><input value={bank.accountNumber} onChange={(e) => { setBank({ ...bank, accountNumber: e.target.value }); mark(); }} className={inputCls} /></Field>
-          <Field label="IFSC code"><input value={bank.ifsc} onChange={(e) => { setBank({ ...bank, ifsc: e.target.value }); mark(); }} className={inputCls} /></Field>
-          <Field label="Bank name & branch"><input value={bank.bankName} onChange={(e) => { setBank({ ...bank, bankName: e.target.value }); mark(); }} className={inputCls} /></Field>
+          <Field label="Account holder name">
+            <input
+              value={bank.accountName}
+              onChange={(e) => {
+                setBank({ ...bank, accountName: e.target.value });
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Account number">
+            <input
+              value={bank.accountNumber}
+              onChange={(e) => {
+                setBank({ ...bank, accountNumber: e.target.value });
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="IFSC code">
+            <input
+              value={bank.ifsc}
+              onChange={(e) => {
+                setBank({ ...bank, ifsc: e.target.value });
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Bank name & branch">
+            <input
+              value={bank.bankName}
+              onChange={(e) => {
+                setBank({ ...bank, bankName: e.target.value });
+                mark();
+              }}
+              className={inputCls}
+            />
+          </Field>
         </div>
       </Section>
 
       <Section title="Cash on arrival">
         <label className="flex items-center gap-3 text-sm cursor-pointer">
-          <input type="checkbox" checked={cashOnArrival} onChange={(e) => { setCashOnArrival(e.target.checked); mark(); }} className="h-4 w-4 accent-primary" />
-          <span>{cashOnArrival ? "Allow guests to pay in cash on arrival" : "Disabled — advance payment required"}</span>
+          <input
+            type="checkbox"
+            checked={cashOnArrival}
+            onChange={(e) => {
+              setCashOnArrival(e.target.checked);
+              mark();
+            }}
+            className="h-4 w-4 accent-primary"
+          />
+          <span>
+            {cashOnArrival
+              ? "Allow guests to pay in cash on arrival"
+              : "Disabled — advance payment required"}
+          </span>
         </label>
       </Section>
 
       <Section title="Payment terms">
         <textarea
           value={terms}
-          onChange={(e) => { setTerms(e.target.value); mark(); }}
+          onChange={(e) => {
+            setTerms(e.target.value);
+            mark();
+          }}
           rows={4}
           className="w-full rounded-md border border-border bg-background p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
         />
@@ -73,9 +131,15 @@ function PaymentsPage() {
                 <tr key={b.id} className="border-t border-border">
                   <td className="px-4 py-3 font-mono text-xs">{b.id}</td>
                   <td className="px-4 py-3">{b.guest}</td>
-                  <td className="px-4 py-3"><StatusPill status={b.status} /></td>
-                  <td className="px-4 py-3"><PaymentPill status={b.payment} /></td>
-                  <td className="px-4 py-3 text-right font-medium">₹{b.amount.toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={b.status} />
+                  </td>
+                  <td className="px-4 py-3">
+                    <PaymentPill status={b.payment} />
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    ₹{b.amount.toLocaleString("en-IN")}
+                  </td>
                 </tr>
               ))}
             </tbody>

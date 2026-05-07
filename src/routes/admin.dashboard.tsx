@@ -14,19 +14,27 @@ function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Snapshot of bookings, revenue, and inquiries.</p>
+        <p className="text-sm text-muted-foreground">
+          Snapshot of bookings, revenue, and inquiries.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard icon={CalendarDays} label="Upcoming bookings" value={STATS.upcomingBookings} />
-        <StatCard icon={IndianRupee} label="Monthly revenue" value={`₹${STATS.monthlyRevenue.toLocaleString("en-IN")}`} />
+        <StatCard
+          icon={IndianRupee}
+          label="Monthly revenue"
+          value={`₹${STATS.monthlyRevenue.toLocaleString("en-IN")}`}
+        />
         <StatCard icon={Percent} label="Occupancy rate" value={`${STATS.occupancyRate}%`} />
         <StatCard icon={MessageSquare} label="New inquiries" value={STATS.newInquiries} />
       </div>
 
       {/* Quick actions */}
       <div className="bg-card border border-border rounded-xl p-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Quick actions</div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          Quick actions
+        </div>
         <div className="flex flex-wrap gap-2">
           <ActionBtn icon={Ban} label="Block dates" />
           <ActionBtn icon={Plus} label="Add booking" />
@@ -64,7 +72,9 @@ function DashboardPage() {
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                     {b.checkIn} → {b.checkOut}
                   </td>
-                  <td className="px-4 py-3"><StatusPill status={b.status} /></td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={b.status} />
+                  </td>
                   <td className="px-4 py-3 text-right font-medium">
                     ₹{b.amount.toLocaleString("en-IN")}
                   </td>
@@ -99,7 +109,13 @@ function StatCard({
   );
 }
 
-function ActionBtn({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
+function ActionBtn({
+  icon: Icon,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
   return (
     <button className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted">
       <Icon className="h-4 w-4 text-primary" /> {label}

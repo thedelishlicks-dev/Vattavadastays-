@@ -36,8 +36,7 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
   const [extraBeds, setExtraBeds] = useState(0);
   const [meal, setMeal] = useState<MealPlan>("None");
 
-  const nights =
-    checkIn && checkOut ? Math.max(1, differenceInCalendarDays(checkOut, checkIn)) : 1;
+  const nights = checkIn && checkOut ? Math.max(1, differenceInCalendarDays(checkOut, checkIn)) : 1;
 
   const totals = useMemo(() => {
     const roomCost = room.price * nights;
@@ -86,7 +85,9 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-border bg-background">
           <div>
             <h3 className="font-display text-xl font-semibold">{room.name}</h3>
-            <p className="text-xs text-muted-foreground">{room.type} · ₹{room.price}/night</p>
+            <p className="text-xs text-muted-foreground">
+              {room.type} · ₹{room.price}/night
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -99,7 +100,11 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
 
         <div className="p-5 space-y-6">
           <div className="grid grid-cols-3 gap-2">
-            <img src={room.image} alt={room.name} className="col-span-3 h-56 w-full object-cover rounded-xl" />
+            <img
+              src={room.image}
+              alt={room.name}
+              className="col-span-3 h-56 w-full object-cover rounded-xl"
+            />
           </div>
 
           <div>
@@ -143,10 +148,24 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
           </div>
 
           <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2 text-sm">
-            <div className="flex justify-between"><span>Room ({nights} night{nights > 1 ? "s" : ""})</span><span>₹{totals.roomCost.toLocaleString("en-IN")}</span></div>
-            <div className="flex justify-between text-muted-foreground"><span>Extra beds</span><span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span></div>
-            <div className="flex justify-between text-muted-foreground"><span>Meals</span><span>₹{totals.mealCost.toLocaleString("en-IN")}</span></div>
-            <div className="flex justify-between text-muted-foreground"><span>Cleaning fee</span><span>₹{CLEANING}</span></div>
+            <div className="flex justify-between">
+              <span>
+                Room ({nights} night{nights > 1 ? "s" : ""})
+              </span>
+              <span>₹{totals.roomCost.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Extra beds</span>
+              <span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Meals</span>
+              <span>₹{totals.mealCost.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>Cleaning fee</span>
+              <span>₹{CLEANING}</span>
+            </div>
             <div className="border-t border-border pt-2 flex justify-between font-display text-lg font-semibold">
               <span>Total</span>
               <span>₹{totals.total.toLocaleString("en-IN")}</span>

@@ -19,9 +19,7 @@ export function Hero() {
         <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-semibold leading-[1.05] max-w-3xl">
           Bleaf Mud House
         </h1>
-        <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">
-          ബ്ലീഫ് മഡ് ഹൗസ്
-        </div>
+        <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">ബ്ലീഫ് മഡ് ഹൗസ്</div>
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
           12-room mountain retreat in organic Vattavada
         </p>
