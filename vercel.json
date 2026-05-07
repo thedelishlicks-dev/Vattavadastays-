@@ -1,6 +1,6 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": ".output/public",
+  "buildCommand": "npm run build && mkdir -p dist && cp -r .output/public/* dist/ 2>/dev/null || cp -r .vercel/output/static/* dist/ 2>/dev/null || true",
+  "outputDirectory": "dist",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
