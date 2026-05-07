@@ -1,17 +1,8 @@
 {
-  "buildCommand": "npm run build && mkdir -p dist && cp -r .output/public/* dist/ 2>/dev/null || cp -r .vercel/output/static/* dist/ 2>/dev/null || true",
+  "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": null,
+  "framework": "vite",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
-      ]
-    }
   ]
 }
