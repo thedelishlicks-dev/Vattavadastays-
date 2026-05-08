@@ -25,5 +25,9 @@ export const createClient = (cookieHeader?: string) => {
         // Session cookies are written explicitly in auth.ts signIn/signOut.
       },
     },
+    auth: {
+      persistSession: true,
+      storageKey: "sb-session",
+    },
   });
 };
