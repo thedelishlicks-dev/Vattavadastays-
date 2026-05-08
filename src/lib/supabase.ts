@@ -1,5 +1,5 @@
 import { createBrowserClient, createServerClient, parseCookieHeader } from "@supabase/ssr";
-import type { Database } from "../types/supabase";
+import type { Database } from "../types/database";
 import { env } from "../utils/env";
 
 /**
@@ -15,12 +15,14 @@ export const createClient = (cookieHeader?: string) => {
   return createServerClient<Database>(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
     cookies: {
       getAll() {
-        return parseCookieHeader(cookieHeader ?? "");
+        const cookies = parseCookieHeader(cookieHeader ?? "");
+        return cookies.map((c) => ({ name: c.name, value: c.value ?? "" }));
       },
-      setAll(cookiesToSet) {
-        // In TanStack Start loaders/actions, we usually handle cookie setting
-        // via the response headers or specialized middleware.
-        // For simple data fetching, we don't always need to set cookies here.
+      setAll(_cookiesToSet) {
+        // Token refresh is handled by Supabase Auth's
+        // onAuthStateChange listener — this is intentionally
+        // a no-op at client creation time.
+        // Session cookies are written explicitly in auth.ts signIn/signOut.
       },
     },
   });
