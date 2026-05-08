@@ -1,6 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { isAuthed, login, MOCK_OWNER } from "@/admin/auth";
+import { useState } from "react";
+import { signIn } from "@/lib/auth";
+import { useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -11,20 +13,34 @@ export const Route = createFileRoute("/admin/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [phone, setPhone] = useState("");
+  const { isAuthenticated, isLoading } = useAuth();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isAuthed()) navigate({ to: "/admin/dashboard" });
-  }, [navigate]);
-
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (login(phone, password)) {
+    if (!isLoading && isAuthenticated) {
       navigate({ to: "/admin/dashboard" });
-    } else {
-      setError("Invalid phone number or password.");
+    }
+  }, [isAuthenticated, isLoading, navigate]);
+
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+
+    try {
+      const result = await signIn({ data: { email, password } });
+      if (result.error) {
+        setError(result.error);
+      } else {
+        navigate({ to: "/admin/dashboard" });
+      }
+    } catch (err) {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -32,17 +48,17 @@ function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Owner login for {MOCK_OWNER.property}</p>
+        <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Phone</span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
             <input
               required
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="9876543210"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="owner@example.com"
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
           </label>
@@ -62,14 +78,11 @@ function LoginPage() {
 
           <button
             type="submit"
-            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90"
+            disabled={isSubmitting}
+            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            Sign in
+            {isSubmitting ? "Signing in..." : "Sign in"}
           </button>
-
-          <p className="text-[11px] text-muted-foreground text-center">
-            Demo: phone <strong>9876543210</strong> · password <strong>1234</strong>
-          </p>
         </form>
       </div>
     </div>

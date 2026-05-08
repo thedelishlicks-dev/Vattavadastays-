@@ -6,12 +6,12 @@ import { SupabaseClient } from "@supabase/supabase-js";
 
 const verifyAuth = async (supabase: SupabaseClient<Database>) => {
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session) {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
     throw { code: "UNAUTHORIZED", message: "You must be logged in to access this." };
   }
-  return session.user;
+  return user;
 };
 
 export const getOwnerProperty = createServerFn({ method: "GET" })

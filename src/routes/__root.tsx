@@ -1,4 +1,5 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
+import { getSession } from "../lib/auth";
 
 import appCss from "../styles.css?url";
 
@@ -25,6 +26,9 @@ function NotFoundComponent() {
 }
 
 export const Route = createRootRoute({
+  loader: async () => {
+    return await getSession();
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

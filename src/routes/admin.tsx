@@ -1,11 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AdminLayout } from "@/admin/AdminLayout";
-import { isAuthed } from "@/admin/auth";
+import { getSession } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin")({
-  beforeLoad: ({ location }) => {
+  beforeLoad: async ({ location }) => {
     if (location.pathname === "/admin/login") return;
-    if (!isAuthed()) {
+
+    const { user } = await getSession();
+    if (!user) {
       throw redirect({ to: "/admin/login" });
     }
   },
