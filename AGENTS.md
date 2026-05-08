@@ -109,7 +109,7 @@ Valid booking statuses: `pending`, `confirmed`, `cancelled`, `completed`
 
 ### Seed data already present
 
-- Property: **Rose Hill Homestay** (`subdomain: rosehill`, owner: Thomas Kurian)
+- Property: **Bleaf Mud House** (`subdomain: rosehill`, owner: Thomas Kurian)
 - 3 rooms: Deluxe Room (₹2500), Family Cottage (₹3500), Standard Room (₹1800)
 - 90 days of availability seeded
 
