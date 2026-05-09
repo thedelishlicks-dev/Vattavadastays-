@@ -1,17 +1,10 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "../types/supabase";
-import { env } from "../utils/env";
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
-/**
- * Creates a Supabase client.
- * In TanStack Start, we use per-request clients to avoid cross-request state pollution.
- */
-export const createClient = () => {
-  return createSupabaseClient<Database>(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  });
-};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY')
+}
+
+export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
