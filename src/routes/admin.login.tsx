@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "@/lib/auth";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -29,11 +28,10 @@ function LoginPage() {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
-
     try {
-      const result = await signIn({ data: { email, password } });
-      if (result.error) {
-        setError(result.error);
+      const { error: signInError } = await signIn(email, password);
+      if (signInError) {
+        setError(signInError.message);
       } else {
         navigate({ to: "/admin/dashboard" });
       }
@@ -49,10 +47,11 @@ function LoginPage() {
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
-
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+              Email
+            </span>
             <input
               required
               type="email"
@@ -63,7 +62,9 @@ function LoginPage() {
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+              Password
+            </span>
             <input
               required
               type="password"
@@ -73,9 +74,9 @@ function LoginPage() {
               className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
             />
           </label>
-
-          {error && <p className="text-xs text-destructive">{error}</p>}
-
+          {error && (
+            <p className="text-xs text-destructive">{error}</p>
+          )}
           <button
             type="submit"
             disabled={isSubmitting}
