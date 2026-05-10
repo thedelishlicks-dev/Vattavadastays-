@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { supabase } from "@/lib/supabase";
+import { LoginForm } from "./LoginForm";
 
 type NavItemDef = {
   to: string;
@@ -47,7 +48,6 @@ export function AdminLayout() {
   const { user, isLoading, isAuthenticated } = useAuth();
   const { data: property } = useOwnerProperty();
 
-  // While auth state is resolving, show nothing (avoids flash)
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/40">
@@ -56,14 +56,13 @@ export function AdminLayout() {
     );
   }
 
-  // Not logged in — show login form inline (no redirect loop)
   if (!isAuthenticated) {
     return <LoginForm />;
   }
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/admin/login" });
+    navigate({ to: "/admin" });
   };
 
   const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
@@ -72,7 +71,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
-      {/* Sidebar (desktop) */}
+      {/* Sidebar desktop */}
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <div className="h-14 px-5 flex items-center border-b border-border">
           <span className="font-display text-lg font-semibold text-primary">Bleaf Admin</span>
@@ -123,7 +122,7 @@ export function AdminLayout() {
           <Outlet />
         </main>
 
-        {/* Bottom nav (mobile) */}
+        {/* Bottom nav mobile */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
           {NAV.slice(0, 4).map((item) => {
             const Icon = item.icon;
@@ -189,73 +188,6 @@ export function AdminLayout() {
           </aside>
         </div>
       )}
-    </div>
-  );
-}
-
-// Inline login form — rendered by AdminLayout when not authenticated
-function LoginForm() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) setError(signInError.message);
-      // on success useAuth will update → AdminLayout re-renders with the dashboard
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
-        <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
-        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
-            <input
-              required
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="owner@example.com"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
-            <input
-              required
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {isSubmitting ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
-      </div>
     </div>
   );
 }
