@@ -1,9 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { signIn } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 
-export const Route = createFileRoute("/admin/login")({
+export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [{ title: "Owner login — Bleaf Mud House" }],
   }),
@@ -29,13 +29,16 @@ function LoginPage() {
     setError("");
     setIsSubmitting(true);
     try {
-      const { error: signInError } = await signIn(email, password);
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
       if (signInError) {
         setError(signInError.message);
       } else {
         navigate({ to: "/admin/dashboard" });
       }
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -49,40 +52,36 @@ function LoginPage() {
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">
-              Email
-            </span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
             <input
               required
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@example.com"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+              autoComplete="email"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">
-              Password
-            </span>
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
             <input
               required
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm"
+              placeholder="••••••••"
+              autoComplete="current-password"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </label>
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
-          )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             type="submit"
             disabled={isSubmitting}
             className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            {isSubmitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </div>
