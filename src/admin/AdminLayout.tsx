@@ -1,4 +1,4 @@
-import { useState } from "react";
+ import { useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -14,12 +14,10 @@ import {
   LogOut,
   Menu,
   X,
-  Loader2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { supabase } from "@/lib/supabase";
-import { LoginForm } from "./LoginForm";
 
 type NavItemDef = {
   to: string;
@@ -45,24 +43,12 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { data: property } = useOwnerProperty();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/40">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <LoginForm />;
-  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/admin" });
+    navigate({ to: "/admin/login" });
   };
 
   const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
@@ -97,7 +83,6 @@ export function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="h-14 bg-card border-b border-border flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
           <button
             className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted"
@@ -122,7 +107,6 @@ export function AdminLayout() {
           <Outlet />
         </main>
 
-        {/* Bottom nav mobile */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
           {NAV.slice(0, 4).map((item) => {
             const Icon = item.icon;
@@ -151,7 +135,6 @@ export function AdminLayout() {
         </nav>
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
