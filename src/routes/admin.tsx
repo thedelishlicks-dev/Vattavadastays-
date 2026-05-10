@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { AdminLayout } from "@/admin/AdminLayout";
@@ -14,7 +14,7 @@ function AdminGuard() {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate({ to: "/admin/login" });
+      navigate({ to: "/login" });
     }
   }, [isAuthenticated, isLoading, navigate]);
 
