@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
@@ -11,8 +11,8 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -20,6 +20,8 @@ function LoginPage() {
     e.preventDefault();
     setError("");
     setIsSubmitting(true);
+    const email = emailRef.current?.value ?? "";
+    const password = passwordRef.current?.value ?? "";
     try {
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -51,15 +53,15 @@ function LoginPage() {
               Email
             </label>
             <input
+              ref={emailRef}
               id="email"
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              defaultValue=""
               placeholder="owner@example.com"
               autoComplete="email"
               autoCorrect="off"
               autoCapitalize="off"
-              spellCheck="false"
+              spellCheck={false}
               required
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
@@ -72,10 +74,10 @@ function LoginPage() {
               Password
             </label>
             <input
+              ref={passwordRef}
               id="password"
               type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              defaultValue=""
               placeholder="••••••••"
               autoComplete="current-password"
               required
