@@ -8,8 +8,19 @@ interface RoomsProps {
   onSelect: (room: Room) => void
 }
 
+// For the Vercel preview domain, fall back to the env var or hardcoded subdomain
+function getSubdomain(): string {
+  const hostname = window.location.hostname
+  // Real production: bleafmudhouse.vattavadastays.com → "bleafmudhouse"
+  if (hostname.endsWith('.vattavadastays.com')) {
+    return hostname.split('.')[0]
+  }
+  // Vercel preview or localhost — use env var, else hardcode seed subdomain
+  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? 'bleafmudhouse'
+}
+
 export function Rooms({ onSelect }: RoomsProps) {
-  const subdomain = window.location.hostname.split('.')[0]
+  const subdomain = getSubdomain()
   const { data: property, isLoading, error } = useProperty(subdomain)
 
   if (isLoading) {
