@@ -14,8 +14,11 @@ import {
   LogOut,
   Menu,
   X,
+  Loader2,
 } from "lucide-react";
-import { logout, MOCK_OWNER } from "./auth";
+import { useAuth } from "@/hooks/useAuth";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { supabase } from "@/lib/supabase";
 
 type NavItemDef = {
   to: string;
@@ -29,11 +32,11 @@ const NAV: NavItemDef[] = [
   { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
-  { to: "/admin/pricing", label: "Pricing", icon: Tag },
-  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
-  { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
-  { to: "/admin/policies", label: "Policies", icon: ScrollText },
-  { to: "/admin/payments", label: "Payments", icon: Wallet },
+  { to: "/admin/pricing", label: "Pricing", icon: Tag, disabled: true },
+  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed, disabled: true },
+  { to: "/admin/amenities", label: "Amenities", icon: Sparkles, disabled: true },
+  { to: "/admin/policies", label: "Policies", icon: ScrollText, disabled: true },
+  { to: "/admin/payments", label: "Payments", icon: Wallet, disabled: true },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
@@ -41,11 +44,31 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const { data: property } = useOwnerProperty();
 
-  const handleLogout = () => {
-    logout();
+  // While auth state is resolving, show nothing (avoids flash)
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/40">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Not logged in — show login form inline (no redirect loop)
+  if (!isAuthenticated) {
+    return <LoginForm />;
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     navigate({ to: "/admin/login" });
   };
+
+  const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
+  const ownerEmail = user?.email ?? "";
+  const propertyName = property?.name ?? "Bleaf Mud House";
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
@@ -84,14 +107,14 @@ export function AdminLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="font-medium text-sm md:text-base truncate">{MOCK_OWNER.property}</div>
+          <div className="font-medium text-sm md:text-base truncate">{propertyName}</div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:flex flex-col items-end leading-tight">
-              <span className="text-sm font-medium">{MOCK_OWNER.name}</span>
+              <span className="text-sm font-medium">{ownerEmail}</span>
               <span className="text-[11px] text-muted-foreground">Owner</span>
             </div>
             <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-              R
+              {ownerInitial}
             </div>
           </div>
         </header>
@@ -166,6 +189,73 @@ export function AdminLayout() {
           </aside>
         </div>
       )}
+    </div>
+  );
+}
+
+// Inline login form — rendered by AdminLayout when not authenticated
+function LoginForm() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) setError(signInError.message);
+      // on success useAuth will update → AdminLayout re-renders with the dashboard
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
+        <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
+            <input
+              required
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="owner@example.com"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
+            <input
+              required
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </label>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {isSubmitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
