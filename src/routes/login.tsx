@@ -1,7 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -12,17 +11,10 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigate({ to: "/admin/dashboard" });
-    }
-  }, [isAuthenticated, isLoading, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,30 +43,45 @@ function LoginPage() {
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-xs uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Email
+            </label>
             <input
-              required
+              id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@example.com"
               autoComplete="email"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </label>
-          <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
-            <input
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck="false"
               required
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-xs uppercase tracking-wider text-muted-foreground mb-1"
+            >
+              Password
+            </label>
+            <input
+              id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              required
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
             />
-          </label>
+          </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             type="submit"
