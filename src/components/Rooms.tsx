@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { useProperty } from '@/hooks/useProperty'
-import RoomDetail from './RoomDetail'
-import { Loader2 } from 'lucide-react'
+import { RoomDetail, type BookingDetails } from './RoomDetail'
+import { Loader2, BedDouble, Users } from 'lucide-react'
+import type { Room } from '@/types/database'
 
 interface RoomsProps {
-  subdomain: string
+  onSelect: (room: Room) => void
 }
 
-export default function Rooms({ subdomain }: RoomsProps) {
+export function Rooms({ onSelect }: RoomsProps) {
+  const subdomain = window.location.hostname.split('.')[0]
   const { data: property, isLoading, error } = useProperty(subdomain)
 
   if (isLoading) {
@@ -25,7 +28,7 @@ export default function Rooms({ subdomain }: RoomsProps) {
     )
   }
 
-  const activeRooms = (property.rooms ?? []).filter((r) => r.is_active)
+  const activeRooms = (property.rooms ?? []).filter((r: Room) => r.is_active)
 
   if (activeRooms.length === 0) {
     return (
@@ -38,9 +41,66 @@ export default function Rooms({ subdomain }: RoomsProps) {
   return (
     <section className="py-12 px-4 max-w-6xl mx-auto">
       <h2 className="text-2xl font-bold text-stone-900 mb-8">Our Rooms</h2>
-      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-        {activeRooms.map((room) => (
-          <RoomDetail key={room.id} room={room} property={property} />
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {activeRooms.map((room: Room) => (
+          <div
+            key={room.id}
+            className="rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => onSelect(room)}
+          >
+            {room.images?.[0] && (
+              <img
+                src={room.images[0]}
+                alt={room.name}
+                className="h-48 w-full object-cover"
+              />
+            )}
+            <div className="p-4 space-y-3">
+              <div>
+                <h3 className="font-semibold text-stone-900">{room.name}</h3>
+                <p className="text-sm text-stone-500">{room.room_type}</p>
+              </div>
+              <div className="flex items-center gap-4 text-sm text-stone-600">
+                <span className="flex items-center gap-1">
+                  <BedDouble className="h-4 w-4" />
+                  {room.bed_type}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Users className="h-4 w-4" />
+                  Up to {room.max_guests}
+                </span>
+              </div>
+              {room.room_amenities?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {room.room_amenities.slice(0, 3).map((a) => (
+                    <span
+                      key={a}
+                      className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
+                    >
+                      {a}
+                    </span>
+                  ))}
+                  {room.room_amenities.length > 3 && (
+                    <span className="text-xs text-stone-400">
+                      +{room.room_amenities.length - 3} more
+                    </span>
+                  )}
+                </div>
+              )}
+              <div className="pt-1 flex items-center justify-between">
+                <span className="font-semibold text-stone-900">
+                  ₹{room.base_price.toLocaleString('en-IN')}
+                  <span className="text-sm font-normal text-stone-500">/night</span>
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onSelect(room) }}
+                  className="text-sm bg-green-700 text-white px-4 py-1.5 rounded-full hover:bg-green-800 transition-colors"
+                >
+                  Select
+                </button>
+              </div>
+            </div>
+          </div>
         ))}
       </div>
     </section>
