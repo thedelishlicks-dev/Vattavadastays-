@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
-import { useAvailability } from '@/hooks/useAvailability'
+import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'  // ← changed
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -13,11 +13,9 @@ function AdminCalendar() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [viewDate, setViewDate] = useState(new Date())
 
-  // pick first room by default once loaded
   const rooms = property?.rooms ?? []
   const activeRoomId = selectedRoomId ?? rooms[0]?.id ?? null
 
-  // build date range: start of current month → +60 days
   const startDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1)
     .toISOString()
     .split('T')[0]
@@ -25,7 +23,7 @@ function AdminCalendar() {
     .toISOString()
     .split('T')[0]
 
-  const { data: availability, isLoading: availLoading } = useAvailability(
+  const { data: availability, isLoading: availLoading } = useAvailabilityRange(  // ← changed
     activeRoomId ?? '',
     startDate,
     endDate
@@ -47,7 +45,6 @@ function AdminCalendar() {
     )
   }
 
-  // Build calendar days for the current month
   const year = viewDate.getFullYear()
   const month = viewDate.getMonth()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -63,10 +60,8 @@ function AdminCalendar() {
     }
   }
 
-  const prevMonth = () =>
-    setViewDate(new Date(year, month - 1, 1))
-  const nextMonth = () =>
-    setViewDate(new Date(year, month + 1, 1))
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1))
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1))
 
   const monthLabel = viewDate.toLocaleString('default', {
     month: 'long',
@@ -77,7 +72,6 @@ function AdminCalendar() {
     <div className="max-w-4xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Availability Calendar</h1>
 
-      {/* Room selector */}
       <div className="flex gap-2 mb-6 flex-wrap">
         {rooms.map((room) => (
           <button
@@ -94,45 +88,31 @@ function AdminCalendar() {
         ))}
       </div>
 
-      {/* Month navigation */}
       <div className="flex items-center justify-between mb-4">
-        <button
-          onClick={prevMonth}
-          className="p-2 rounded-lg hover:bg-stone-100"
-        >
+        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-stone-100">
           <ChevronLeft className="h-5 w-5" />
         </button>
         <span className="font-semibold text-stone-900">{monthLabel}</span>
-        <button
-          onClick={nextMonth}
-          className="p-2 rounded-lg hover:bg-stone-100"
-        >
+        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-stone-100">
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
-      {/* Calendar grid */}
       {availLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-green-700" />
         </div>
       ) : (
         <div className="rounded-xl border border-stone-200 overflow-hidden bg-white">
-          {/* Day headers */}
           <div className="grid grid-cols-7 bg-stone-50 border-b border-stone-200">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div
-                key={d}
-                className="py-2 text-center text-xs font-medium text-stone-500"
-              >
+              <div key={d} className="py-2 text-center text-xs font-medium text-stone-500">
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Day cells */}
           <div className="grid grid-cols-7">
-            {/* Empty cells before month start */}
             {Array.from({ length: firstWeekday }).map((_, i) => (
               <div key={`empty-${i}`} className="h-16 border-b border-r border-stone-100" />
             ))}
@@ -152,16 +132,10 @@ function AdminCalendar() {
                   }`}
                 >
                   <div className="font-medium text-stone-700">{day}</div>
-                  <div
-                    className={`mt-0.5 ${
-                      isAvailable ? 'text-green-700' : 'text-red-500'
-                    }`}
-                  >
+                  <div className={`mt-0.5 ${isAvailable ? 'text-green-700' : 'text-red-500'}`}>
                     {isAvailable ? 'Open' : 'Closed'}
                   </div>
-                  {price && (
-                    <div className="text-amber-600">₹{price}</div>
-                  )}
+                  {price && <div className="text-amber-600">₹{price}</div>}
                 </div>
               )
             })}
@@ -169,7 +143,6 @@ function AdminCalendar() {
         </div>
       )}
 
-      {/* Legend */}
       <div className="flex gap-4 mt-4 text-sm text-stone-600">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-300" />
