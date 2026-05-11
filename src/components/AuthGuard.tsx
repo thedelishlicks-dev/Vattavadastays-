@@ -12,7 +12,7 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      navigate({ to: "/admin/login" });
+      navigate({ to: "/login" });
     }
   }, [isAuthenticated, isLoading, navigate]);
 

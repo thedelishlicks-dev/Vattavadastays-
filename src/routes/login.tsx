@@ -37,7 +37,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
+    <div className="relative min-h-screen flex items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8">
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>

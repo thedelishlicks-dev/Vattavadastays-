@@ -48,7 +48,7 @@ export function AdminLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/admin/login" });
+    navigate({ to: "/login" });
   };
 
   const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";

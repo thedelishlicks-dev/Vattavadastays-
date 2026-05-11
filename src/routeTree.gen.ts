@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -18,12 +19,16 @@ import { Route as AdminPricingRouteImport } from './routes/admin.pricing'
 import { Route as AdminPoliciesRouteImport } from './routes/admin.policies'
 import { Route as AdminPaymentsRouteImport } from './routes/admin.payments'
 import { Route as AdminMealsRouteImport } from './routes/admin.meals'
-import { Route as AdminLoginRouteImport } from './routes/admin.login'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as AdminAmenitiesRouteImport } from './routes/admin.amenities'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -69,11 +74,6 @@ const AdminMealsRoute = AdminMealsRouteImport.update({
   path: '/meals',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminLoginRoute = AdminLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -98,11 +98,11 @@ const AdminAmenitiesRoute = AdminAmenitiesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/meals': typeof AdminMealsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/policies': typeof AdminPoliciesRoute
@@ -113,11 +113,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/meals': typeof AdminMealsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/policies': typeof AdminPoliciesRoute
@@ -130,11 +130,11 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
   '/admin/dashboard': typeof AdminDashboardRoute
-  '/admin/login': typeof AdminLoginRoute
   '/admin/meals': typeof AdminMealsRoute
   '/admin/payments': typeof AdminPaymentsRoute
   '/admin/policies': typeof AdminPoliciesRoute
@@ -148,11 +148,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/login'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/meals'
     | '/admin/payments'
     | '/admin/policies'
@@ -163,11 +163,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/meals'
     | '/admin/payments'
     | '/admin/policies'
@@ -179,11 +179,11 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/login'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
     | '/admin/dashboard'
-    | '/admin/login'
     | '/admin/meals'
     | '/admin/payments'
     | '/admin/policies'
@@ -196,10 +196,18 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -263,13 +271,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMealsRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/login': {
-      id: '/admin/login'
-      path: '/login'
-      fullPath: '/admin/login'
-      preLoaderRoute: typeof AdminLoginRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/dashboard'
@@ -306,7 +307,6 @@ interface AdminRouteChildren {
   AdminBookingsRoute: typeof AdminBookingsRoute
   AdminCalendarRoute: typeof AdminCalendarRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
-  AdminLoginRoute: typeof AdminLoginRoute
   AdminMealsRoute: typeof AdminMealsRoute
   AdminPaymentsRoute: typeof AdminPaymentsRoute
   AdminPoliciesRoute: typeof AdminPoliciesRoute
@@ -321,7 +321,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminBookingsRoute: AdminBookingsRoute,
   AdminCalendarRoute: AdminCalendarRoute,
   AdminDashboardRoute: AdminDashboardRoute,
-  AdminLoginRoute: AdminLoginRoute,
   AdminMealsRoute: AdminMealsRoute,
   AdminPaymentsRoute: AdminPaymentsRoute,
   AdminPoliciesRoute: AdminPoliciesRoute,
@@ -336,6 +335,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
