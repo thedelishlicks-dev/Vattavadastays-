@@ -1,144 +1,158 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { ROOMS } from "@/data/rooms";
-import { BOOKINGS } from "@/admin/mockData";
+import { createFileRoute } from '@tanstack/react-router'
+import { useState } from 'react'
+import { useOwnerProperty } from '@/hooks/useOwnerProperty'
+import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'  // ← changed
+import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
-export const Route = createFileRoute("/admin/calendar")({
-  component: CalendarAdmin,
-});
+export const Route = createFileRoute('/admin/calendar')({
+  component: AdminCalendar,
+})
 
-type Cell = "available" | "booked" | "blocked";
+function AdminCalendar() {
+  const { data: property, isLoading: propLoading } = useOwnerProperty()
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [viewDate, setViewDate] = useState(new Date())
 
-function CalendarAdmin() {
-  const [cursor, setCursor] = useState(new Date(2026, 4, 1)); // May 2026
-  const [blocked, setBlocked] = useState<Record<string, true>>({});
+  const rooms = property?.rooms ?? []
+  const activeRoomId = selectedRoomId ?? rooms[0]?.id ?? null
 
-  const days = useMemo(
-    () => eachDayOfInterval({ start: startOfMonth(cursor), end: endOfMonth(cursor) }),
-    [cursor],
-  );
+  const startDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1)
+    .toISOString()
+    .split('T')[0]
+  const endDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 2, 0)
+    .toISOString()
+    .split('T')[0]
 
-  const isBookedFor = (roomName: string, date: Date) => {
-    const t = date.getTime();
-    return BOOKINGS.some(
-      (b) =>
-        b.room === roomName &&
-        b.status !== "cancelled" &&
-        new Date(b.checkIn).getTime() <= t &&
-        new Date(b.checkOut).getTime() > t,
-    );
-  };
+  const { data: availability, isLoading: availLoading } = useAvailabilityRange(  // ← changed
+    activeRoomId ?? '',
+    startDate,
+    endDate
+  )
 
-  const cellState = (roomId: string, roomName: string, date: Date): Cell => {
-    const key = `${roomId}-${format(date, "yyyy-MM-dd")}`;
-    if (blocked[key]) return "blocked";
-    if (isBookedFor(roomName, date)) return "booked";
-    return "available";
-  };
+  if (propLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-green-700" />
+      </div>
+    )
+  }
 
-  const onCellClick = (roomId: string, date: Date, state: Cell) => {
-    if (state === "booked") return;
-    const key = `${roomId}-${format(date, "yyyy-MM-dd")}`;
-    setBlocked((prev) => {
-      const next = { ...prev };
-      if (next[key]) delete next[key];
-      else next[key] = true;
-      return next;
-    });
-  };
+  if (!property) {
+    return (
+      <div className="text-center py-16 text-stone-500">
+        Could not load property data.
+      </div>
+    )
+  }
+
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstWeekday = new Date(year, month, 1).getDay()
+
+  const availMap: Record<string, { is_available: boolean; price_override: number | null }> = {}
+  if (availability) {
+    for (const slot of availability) {
+      availMap[slot.date] = {
+        is_available: slot.is_available,
+        price_override: slot.price_override,
+      }
+    }
+  }
+
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1))
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1))
+
+  const monthLabel = viewDate.toLocaleString('default', {
+    month: 'long',
+    year: 'numeric',
+  })
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
-          <p className="text-sm text-muted-foreground">Tap a cell to block / unblock dates.</p>
-        </div>
-        <div className="flex items-center gap-2">
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      <h1 className="text-2xl font-bold text-stone-900 mb-6">Availability Calendar</h1>
+
+      <div className="flex gap-2 mb-6 flex-wrap">
+        {rooms.map((room) => (
           <button
-            onClick={() => setCursor(addMonths(cursor, -1))}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted"
-            aria-label="Previous month"
+            key={room.id}
+            onClick={() => setSelectedRoomId(room.id)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+              activeRoomId === room.id
+                ? 'bg-green-700 text-white border-green-700'
+                : 'bg-white text-stone-700 border-stone-300 hover:border-green-600'
+            }`}
           >
-            <ChevronLeft className="h-4 w-4" />
+            {room.name}
           </button>
-          <div className="font-medium min-w-[140px] text-center">{format(cursor, "MMMM yyyy")}</div>
-          <button
-            onClick={() => setCursor(addMonths(cursor, 1))}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted"
-            aria-label="Next month"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+        ))}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <Legend color="bg-emerald-200" label="Available" />
-        <Legend color="bg-rose-300" label="Booked" />
-        <Legend color="bg-amber-200" label="Blocked" />
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-stone-100">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <span className="font-semibold text-stone-900">{monthLabel}</span>
+        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-stone-100">
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="text-xs border-collapse">
-            <thead>
-              <tr>
-                <th className="sticky left-0 z-10 bg-muted/70 text-left px-3 py-2 font-medium min-w-[160px]">
-                  Room
-                </th>
-                {days.map((d) => (
-                  <th
-                    key={d.toISOString()}
-                    className="px-1 py-2 font-medium text-center w-8 text-muted-foreground"
-                  >
-                    <div>{format(d, "EEEEE")}</div>
-                    <div className="font-semibold text-foreground">{format(d, "d")}</div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {ROOMS.map((r) => (
-                <tr key={r.id} className="border-t border-border">
-                  <td className="sticky left-0 z-10 bg-card px-3 py-1.5 font-medium whitespace-nowrap">
-                    {r.name}
-                  </td>
-                  {days.map((d) => {
-                    const state = cellState(r.id, r.name, d);
-                    const cls =
-                      state === "booked"
-                        ? "bg-rose-300"
-                        : state === "blocked"
-                          ? "bg-amber-200"
-                          : "bg-emerald-200/60 hover:bg-emerald-300";
-                    return (
-                      <td key={d.toISOString()} className="p-0.5">
-                        <button
-                          disabled={state === "booked"}
-                          onClick={() => onCellClick(r.id, d, state)}
-                          title={`${r.name} · ${format(d, "PP")} · ${state}`}
-                          className={`h-7 w-7 rounded-sm ${cls} ${state === "booked" ? "cursor-not-allowed" : "cursor-pointer"}`}
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {availLoading ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-green-700" />
         </div>
+      ) : (
+        <div className="rounded-xl border border-stone-200 overflow-hidden bg-white">
+          <div className="grid grid-cols-7 bg-stone-50 border-b border-stone-200">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+              <div key={d} className="py-2 text-center text-xs font-medium text-stone-500">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {Array.from({ length: firstWeekday }).map((_, i) => (
+              <div key={`empty-${i}`} className="h-16 border-b border-r border-stone-100" />
+            ))}
+
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1
+              const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+              const slot = availMap[dateStr]
+              const isAvailable = slot?.is_available ?? true
+              const price = slot?.price_override
+
+              return (
+                <div
+                  key={dateStr}
+                  className={`h-16 border-b border-r border-stone-100 p-1.5 text-xs ${
+                    isAvailable ? 'bg-green-50' : 'bg-red-50'
+                  }`}
+                >
+                  <div className="font-medium text-stone-700">{day}</div>
+                  <div className={`mt-0.5 ${isAvailable ? 'text-green-700' : 'text-red-500'}`}>
+                    {isAvailable ? 'Open' : 'Closed'}
+                  </div>
+                  {price && <div className="text-amber-600">₹{price}</div>}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-4 mt-4 text-sm text-stone-600">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-300" />
+          Available
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300" />
+          Unavailable
+        </span>
       </div>
     </div>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={`h-3 w-3 rounded-sm ${color}`} /> {label}
-    </span>
-  );
+  )
 }

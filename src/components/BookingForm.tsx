@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { useCreateBooking } from "@/hooks/useCreateBooking";
 import type { BookingDetails } from "@/components/RoomDetail";
 
 type Payment = "UPI" | "Bank Transfer" | "Cash on Arrival";
@@ -8,6 +9,9 @@ type Props = {
   selection: BookingDetails | null;
 };
 
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+
 export function BookingForm({ selection }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -15,10 +19,34 @@ export function BookingForm({ selection }: Props) {
   const [requests, setRequests] = useState("");
   const [payment, setPayment] = useState<Payment>("UPI");
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const { mutateAsync: createBooking, isPending } = useCreateBooking();
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (!selection) return;
+    setError("");
+
+    try {
+      await createBooking({
+        property_id: selection.room.property_id,
+        room_id: selection.room.id,
+        guest_name: name,
+        guest_phone: phone,
+        guest_email: email || undefined,
+        guest_count: selection.adults + (selection.children ?? 0),
+        check_in: selection.checkIn,
+        check_out: selection.checkOut,
+        room_price: selection.room.base_price,
+        extra_guest_charge: selection.extraGuestCharge ?? 0,
+        total_amount: selection.total,
+        payment_method: payment,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    }
   };
 
   return (
@@ -28,7 +56,9 @@ export function BookingForm({ selection }: Props) {
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
             Step 3
           </span>
-          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">
+            Confirm your booking
+          </h2>
         </div>
 
         {!selection && (
@@ -42,10 +72,9 @@ export function BookingForm({ selection }: Props) {
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 text-sm">
               <div className="font-medium">{selection.room.name}</div>
               <div className="text-muted-foreground text-xs mt-0.5">
-                {selection.nights} night{selection.nights > 1 ? "s" : ""} · {selection.adults}{" "}
-                adults
+                {selection.nights} night{selection.nights > 1 ? "s" : ""} ·{" "}
+                {selection.adults} adults
                 {selection.children ? ` · ${selection.children} children` : ""}
-                {selection.meal !== "None" ? ` · ${selection.meal}` : ""}
               </div>
               <div className="mt-2 font-display text-xl font-semibold text-primary">
                 ₹{selection.total.toLocaleString("en-IN")}
@@ -57,9 +86,12 @@ export function BookingForm({ selection }: Props) {
                 <div className="mx-auto h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                   <Check className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 font-display text-xl font-semibold">Request sent!</h3>
+                <h3 className="mt-4 font-display text-xl font-semibold">
+                  Request sent!
+                </h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Deepak will reach out on WhatsApp shortly to confirm your booking.
+                  Deepak will reach out on WhatsApp shortly to confirm your
+                  booking.
                 </p>
               </div>
             ) : (
@@ -70,7 +102,8 @@ export function BookingForm({ selection }: Props) {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="input"
+                      className={inputCls}
+                      placeholder="Your full name"
                     />
                   </Field>
                   <Field label="Phone" required>
@@ -79,75 +112,78 @@ export function BookingForm({ selection }: Props) {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="input"
+                      className={inputCls}
+                      placeholder="+91 98765 43210"
                     />
                   </Field>
                 </div>
+
                 <Field label="Email">
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="input"
+                    className={inputCls}
+                    placeholder="optional"
                   />
                 </Field>
+
                 <Field label="Special requests">
                   <textarea
                     rows={3}
                     value={requests}
                     onChange={(e) => setRequests(e.target.value)}
-                    className="input"
+                    className={inputCls}
                     placeholder="Arrival time, dietary needs, etc."
                   />
                 </Field>
+
                 <Field label="Payment method">
                   <div className="grid grid-cols-3 gap-2">
-                    {(["UPI", "Bank Transfer", "Cash on Arrival"] as Payment[]).map((p) => (
-                      <button
-                        type="button"
-                        key={p}
-                        onClick={() => setPayment(p)}
-                        className={[
-                          "rounded-lg border px-3 py-2 text-xs md:text-sm font-medium transition-colors",
-                          payment === p
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:bg-accent",
-                        ].join(" ")}
-                      >
-                        {p}
-                      </button>
-                    ))}
+                    {(["UPI", "Bank Transfer", "Cash on Arrival"] as Payment[]).map(
+                      (p) => (
+                        <button
+                          type="button"
+                          key={p}
+                          onClick={() => setPayment(p)}
+                          className={[
+                            "rounded-lg border px-3 py-2 text-xs md:text-sm font-medium transition-colors",
+                            payment === p
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border hover:bg-accent",
+                          ].join(" ")}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {payment === "UPI" && "Pay 25% via UPI to confirm. Details shared on WhatsApp."}
-                    {payment === "Bank Transfer" && "Bank details will be shared after request."}
-                    {payment === "Cash on Arrival" && "Pay in cash on arrival at the property."}
+                    {payment === "UPI" &&
+                      "Pay 25% via UPI to confirm. Details shared on WhatsApp."}
+                    {payment === "Bank Transfer" &&
+                      "Bank details will be shared after request."}
+                    {payment === "Cash on Arrival" &&
+                      "Pay in cash on arrival at the property."}
                   </p>
                 </Field>
 
+                {error && (
+                  <p className="text-xs text-destructive">{error}</p>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+                  disabled={isPending}
+                  className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
                 >
-                  Confirm Request
+                  {isPending ? "Submitting..." : "Confirm Request"}
                 </button>
               </form>
             )}
           </div>
         )}
       </div>
-
-      <style>{`
-        .input {
-          width: 100%;
-          border-radius: 0.625rem;
-          border: 1px solid var(--border);
-          background: var(--background);
-          padding: 0.625rem 0.875rem;
-          font-size: 0.875rem;
-        }
-        .input:focus { outline: 2px solid var(--ring); outline-offset: 1px; }
-      `}</style>
     </section>
   );
 }

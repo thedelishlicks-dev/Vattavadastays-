@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import { X, Minus, Plus } from "lucide-react";
-import type { Room } from "@/data/rooms";
+import type { Room } from "@/types/database";
 
 type MealPlan = "None" | "Breakfast" | "Half Board" | "Full Board";
 const MEAL_PRICES: Record<MealPlan, number> = {
@@ -28,6 +28,9 @@ export type BookingDetails = {
   meal: MealPlan;
   nights: number;
   total: number;
+  checkIn: string;
+  checkOut: string;
+  extraGuestCharge: number;
 };
 
 export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Props) {
@@ -36,14 +39,19 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
   const [extraBeds, setExtraBeds] = useState(0);
   const [meal, setMeal] = useState<MealPlan>("None");
 
-  const nights = checkIn && checkOut ? Math.max(1, differenceInCalendarDays(checkOut, checkIn)) : 1;
+  const nights =
+    checkIn && checkOut
+      ? Math.max(1, differenceInCalendarDays(checkOut, checkIn))
+      : 1;
 
   const totals = useMemo(() => {
-    const roomCost = room.price * nights;
-    const extraBedCost = extraBeds * room.extraBedPrice * nights;
+    const roomCost = room.base_price * nights;
+    const extraGuestCharge =
+      Math.max(0, adults - 2) * (room.extra_guest_price ?? 0) * nights;
+    const extraBedCost = extraBeds * (room.extra_guest_price ?? 0) * nights;
     const mealCost = MEAL_PRICES[meal] * (adults + children) * nights;
-    const total = roomCost + extraBedCost + mealCost + CLEANING;
-    return { roomCost, extraBedCost, mealCost, total };
+    const total = roomCost + extraGuestCharge + extraBedCost + mealCost + CLEANING;
+    return { roomCost, extraGuestCharge, extraBedCost, mealCost, total };
   }, [room, nights, extraBeds, meal, adults, children]);
 
   const Stepper = ({
@@ -86,7 +94,7 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
           <div>
             <h3 className="font-display text-xl font-semibold">{room.name}</h3>
             <p className="text-xs text-muted-foreground">
-              {room.type} · ₹{room.price}/night
+              {room.room_type} · ₹{room.base_price}/night
             </p>
           </div>
           <button
@@ -99,18 +107,18 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
         </div>
 
         <div className="p-5 space-y-6">
-          <div className="grid grid-cols-3 gap-2">
+          {room.images?.[0] && (
             <img
-              src={room.image}
+              src={room.images[0]}
               alt={room.name}
-              className="col-span-3 h-56 w-full object-cover rounded-xl"
+              className="h-56 w-full object-cover rounded-xl"
             />
-          </div>
+          )}
 
           <div>
             <h4 className="font-medium text-sm mb-2">Amenities</h4>
             <div className="flex flex-wrap gap-1.5">
-              {[room.bathType + " bathroom", room.bedType, ...room.amenities].map((a) => (
+              {[room.bed_type, ...(room.room_amenities ?? [])].map((a) => (
                 <span
                   key={a}
                   className="text-xs rounded-full bg-secondary text-secondary-foreground px-2.5 py-1"
@@ -123,13 +131,19 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
 
           <div className="rounded-xl border border-border p-4 space-y-3">
             <h4 className="font-medium text-sm">Guests & meals</h4>
-            <Stepper value={adults} set={setAdults} min={1} max={room.capacity} label="Adults" />
+            <Stepper
+              value={adults}
+              set={setAdults}
+              min={1}
+              max={room.max_guests}
+              label="Adults"
+            />
             <Stepper value={children} set={setChildren} max={4} label="Children" />
             <Stepper
               value={extraBeds}
               set={setExtraBeds}
-              max={room.extraBedPrice ? 3 : 0}
-              label={`Extra beds (₹${room.extraBedPrice}/night)`}
+              max={3}
+              label={`Extra beds (₹${room.extra_guest_price ?? 0}/night)`}
             />
             <div className="flex items-center justify-between pt-1">
               <span className="text-sm">Meal plan</span>
@@ -149,19 +163,27 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
 
           <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2 text-sm">
             <div className="flex justify-between">
-              <span>
-                Room ({nights} night{nights > 1 ? "s" : ""})
-              </span>
+              <span>Room ({nights} night{nights > 1 ? "s" : ""})</span>
               <span>₹{totals.roomCost.toLocaleString("en-IN")}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Extra beds</span>
-              <span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Meals</span>
-              <span>₹{totals.mealCost.toLocaleString("en-IN")}</span>
-            </div>
+            {totals.extraGuestCharge > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Extra guest charge</span>
+                <span>₹{totals.extraGuestCharge.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {totals.extraBedCost > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Extra beds</span>
+                <span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {totals.mealCost > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Meals</span>
+                <span>₹{totals.mealCost.toLocaleString("en-IN")}</span>
+              </div>
+            )}
             <div className="flex justify-between text-muted-foreground">
               <span>Cleaning fee</span>
               <span>₹{CLEANING}</span>
@@ -172,14 +194,31 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
             </div>
           </div>
 
-          <button
-            onClick={() =>
-              onConfirm({ room, adults, children, extraBeds, meal, nights, total: totals.total })
-            }
-            className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground hover:opacity-90"
-          >
-            Continue to booking
-          </button>
+          {!checkIn || !checkOut ? (
+            <p className="text-center text-sm text-muted-foreground">
+              Go back and select dates to continue.
+            </p>
+          ) : (
+            <button
+              onClick={() =>
+                onConfirm({
+                  room,
+                  adults,
+                  children,
+                  extraBeds,
+                  meal,
+                  nights,
+                  total: totals.total,
+                  checkIn: format(checkIn, "yyyy-MM-dd"),
+                  checkOut: format(checkOut, "yyyy-MM-dd"),
+                  extraGuestCharge: totals.extraGuestCharge,
+                })
+              }
+              className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            >
+              Continue to booking
+            </button>
+          )}
         </div>
       </div>
     </div>

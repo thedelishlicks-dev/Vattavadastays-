@@ -1,110 +1,89 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { Plus, Pencil, Users, BedDouble, Bath } from "lucide-react";
-import { ROOMS, type Room } from "@/data/rooms";
+import { createFileRoute } from '@tanstack/react-router'
+import { useOwnerProperty } from '@/hooks/useOwnerProperty'
+import { Loader2, BedDouble } from 'lucide-react'
 
-export const Route = createFileRoute("/admin/rooms")({
-  component: RoomsAdmin,
-});
+export const Route = createFileRoute('/admin/rooms')({
+  component: AdminRooms,
+})
 
-function RoomsAdmin() {
-  const [rooms, setRooms] = useState(ROOMS.map((r) => ({ ...r, active: true })));
+function AdminRooms() {
+  const { data: property, isLoading, error } = useOwnerProperty()
 
-  const toggle = (id: string) =>
-    setRooms((prev) => prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)));
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-green-700" />
+      </div>
+    )
+  }
+
+  if (error || !property) {
+    return (
+      <div className="text-center py-16 text-stone-500">
+        Could not load property data.
+      </div>
+    )
+  }
+
+  const rooms = property.rooms ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage room types, pricing, and availability.
-          </p>
-        </div>
-        <button className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
-          <Plus className="h-4 w-4" /> Add room
-        </button>
-      </div>
+    <div className="max-w-4xl mx-auto py-8 px-4">
+      <h1 className="text-2xl font-bold text-stone-900 mb-6">Rooms</h1>
 
-      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {rooms.map((r) => (
-          <RoomAdminCard key={r.id} room={r} onToggle={() => toggle(r.id)} />
-        ))}
-      </div>
+      {rooms.length === 0 ? (
+        <p className="text-stone-500">No rooms found for your property.</p>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {rooms.map((room) => (
+            <div
+              key={room.id}
+              className="rounded-xl border border-stone-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <BedDouble className="h-5 w-5 text-green-700" />
+                <h2 className="font-semibold text-stone-900">{room.name}</h2>
+                <span
+                  className={`ml-auto text-xs px-2 py-0.5 rounded-full ${
+                    room.is_active
+                      ? 'bg-green-100 text-green-700'
+                      : 'bg-stone-100 text-stone-500'
+                  }`}
+                >
+                  {room.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+              <div className="text-sm text-stone-600 space-y-1">
+                <p>Type: <span className="font-medium">{room.room_type}</span></p>
+                <p>Max guests: <span className="font-medium">{room.max_guests}</span></p>
+                <p>Bed: <span className="font-medium">{room.bed_type}</span></p>
+                <p>
+                  Base price:{' '}
+                  <span className="font-medium">₹{room.base_price}/night</span>
+                </p>
+                {room.extra_guest_price > 0 && (
+                  <p>
+                    Extra guest:{' '}
+                    <span className="font-medium">₹{room.extra_guest_price}/person</span>
+                  </p>
+                )}
+              </div>
+              {room.room_amenities && room.room_amenities.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1">
+                  {room.room_amenities.map((a) => (
+                    <span
+                      key={a}
+                      className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
+                    >
+                      {a}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  );
-}
-
-function RoomAdminCard({
-  room,
-  onToggle,
-}: {
-  room: Room & { active: boolean };
-  onToggle: () => void;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden flex flex-col">
-      <div className="relative">
-        <img src={room.image} alt={room.name} className="h-40 w-full object-cover" />
-        <span
-          className={`absolute top-2 left-2 text-[10px] font-medium px-2 py-0.5 rounded-full ${room.active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
-        >
-          {room.active ? "Active" : "Inactive"}
-        </span>
-      </div>
-      <div className="p-4 flex-1 flex flex-col">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h3 className="font-medium">{room.name}</h3>
-            <span className="text-xs text-muted-foreground">{room.type}</span>
-          </div>
-          <div className="font-display text-lg font-semibold text-primary">
-            ₹{room.price.toLocaleString("en-IN")}
-            <span className="text-xs text-muted-foreground font-normal">/night</span>
-          </div>
-        </div>
-
-        <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-          <li className="flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5" /> {room.capacity} guests
-          </li>
-          <li className="flex items-center gap-1.5">
-            <BedDouble className="h-3.5 w-3.5" /> {room.bedType}
-          </li>
-          <li className="flex items-center gap-1.5">
-            <Bath className="h-3.5 w-3.5" /> {room.bathType}
-          </li>
-        </ul>
-
-        {room.amenities.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {room.amenities.map((a) => (
-              <span
-                key={a}
-                className="text-[10px] rounded-full bg-secondary text-secondary-foreground px-2 py-0.5"
-              >
-                {a}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-border">
-          <label className="flex items-center gap-2 text-xs cursor-pointer">
-            <input
-              type="checkbox"
-              checked={room.active}
-              onChange={onToggle}
-              className="h-4 w-4 accent-primary"
-            />
-            <span className="text-muted-foreground">Bookable</span>
-          </label>
-          <button className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs hover:bg-muted">
-            <Pencil className="h-3.5 w-3.5" /> Edit
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  )
 }

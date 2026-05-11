@@ -1,16 +1,41 @@
 import { useQuery } from "@tanstack/react-query";
-import { getPropertyBookings } from "../server/owner";
+import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
+
+interface BookingFilters {
+  status?: string;
+  from?: string;
+  to?: string;
+}
 
 export const useBookings = (
   propertyId: string,
-  filters?: { status?: string; from?: string; to?: string },
+  filters?: BookingFilters
 ) => {
   const { isAuthenticated } = useAuth();
-
   return useQuery({
     queryKey: ["bookings", propertyId, filters],
-    queryFn: () => getPropertyBookings({ data: { propertyId, filters } }),
+    queryFn: async () => {
+      let query = supabase
+        .from("bookings")
+        .select("*")
+        .eq("property_id", propertyId)
+        .order("check_in", { ascending: false });
+
+      if (filters?.status) {
+        query = query.eq("status", filters.status);
+      }
+      if (filters?.from) {
+        query = query.gte("check_in", filters.from);
+      }
+      if (filters?.to) {
+        query = query.lte("check_in", filters.to);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
     enabled: !!propertyId && isAuthenticated,
   });
 };

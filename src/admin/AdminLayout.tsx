@@ -15,7 +15,9 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import { logout, MOCK_OWNER } from "./auth";
+import { useAuth } from "@/hooks/useAuth";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { supabase } from "@/lib/supabase";
 
 type NavItemDef = {
   to: string;
@@ -29,11 +31,11 @@ const NAV: NavItemDef[] = [
   { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
   { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
   { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
-  { to: "/admin/pricing", label: "Pricing", icon: Tag },
-  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
-  { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
-  { to: "/admin/policies", label: "Policies", icon: ScrollText },
-  { to: "/admin/payments", label: "Payments", icon: Wallet },
+  { to: "/admin/pricing", label: "Pricing", icon: Tag, disabled: true },
+  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed, disabled: true },
+  { to: "/admin/amenities", label: "Amenities", icon: Sparkles, disabled: true },
+  { to: "/admin/policies", label: "Policies", icon: ScrollText, disabled: true },
+  { to: "/admin/payments", label: "Payments", icon: Wallet, disabled: true },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
@@ -41,15 +43,20 @@ export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  const { user } = useAuth();
+  const { data: property } = useOwnerProperty();
 
-  const handleLogout = () => {
-    logout();
-    navigate({ to: "/admin/login" });
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/login" });
   };
+
+  const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
+  const ownerEmail = user?.email ?? "";
+  const propertyName = property?.name ?? "Bleaf Mud House";
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
-      {/* Sidebar (desktop) */}
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <div className="h-14 px-5 flex items-center border-b border-border">
           <span className="font-display text-lg font-semibold text-primary">Bleaf Admin</span>
@@ -75,7 +82,6 @@ export function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top bar */}
         <header className="h-14 bg-card border-b border-border flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
           <button
             className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted"
@@ -84,14 +90,14 @@ export function AdminLayout() {
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="font-medium text-sm md:text-base truncate">{MOCK_OWNER.property}</div>
+          <div className="font-medium text-sm md:text-base truncate">{propertyName}</div>
           <div className="ml-auto flex items-center gap-3">
             <div className="hidden sm:flex flex-col items-end leading-tight">
-              <span className="text-sm font-medium">{MOCK_OWNER.name}</span>
+              <span className="text-sm font-medium">{ownerEmail}</span>
               <span className="text-[11px] text-muted-foreground">Owner</span>
             </div>
             <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-              R
+              {ownerInitial}
             </div>
           </div>
         </header>
@@ -100,7 +106,6 @@ export function AdminLayout() {
           <Outlet />
         </main>
 
-        {/* Bottom nav (mobile) */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
           {NAV.slice(0, 4).map((item) => {
             const Icon = item.icon;
@@ -129,7 +134,6 @@ export function AdminLayout() {
         </nav>
       </div>
 
-      {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />

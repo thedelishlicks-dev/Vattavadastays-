@@ -9,7 +9,7 @@ import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
 import { Footer } from "@/components/Footer";
-import type { Room } from "@/data/rooms";
+import type { Room } from "@/types/database";
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -53,7 +53,6 @@ function Index() {
         <Amenities />
       </main>
       <Footer />
-
       {openRoom && (
         <RoomDetail
           room={openRoom}

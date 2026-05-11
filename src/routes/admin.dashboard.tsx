@@ -1,14 +1,48 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarDays, IndianRupee, Percent, MessageSquare, Ban, Plus, Send } from "lucide-react";
-import { BOOKINGS, STATS } from "@/admin/mockData";
 import { StatusPill } from "@/admin/components";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { useBookings } from "@/hooks/useBookings";
+import { useMemo } from "react";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: DashboardPage,
 });
 
 function DashboardPage() {
-  const recent = BOOKINGS.slice(0, 6);
+  const { data: property, isLoading: propLoading } = useOwnerProperty();
+  const { data: bookings = [], isLoading: bookLoading } = useBookings(
+    property?.id ?? "",
+  );
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const stats = useMemo(() => {
+    const upcoming = bookings.filter(
+      (b) => b.check_in >= today && b.status !== "cancelled"
+    ).length;
+    const monthlyRevenue = bookings
+      .filter((b) => {
+        const d = b.created_at?.slice(0, 7);
+        const thisMonth = new Date().toISOString().slice(0, 7);
+        return d === thisMonth && b.status !== "cancelled";
+      })
+      .reduce((sum, b) => sum + Number(b.total_amount), 0);
+    return { upcoming, monthlyRevenue };
+  }, [bookings, today]);
+
+  const recent = bookings.slice(0, 6);
+  const isLoading = propLoading || bookLoading;
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -20,17 +54,16 @@ function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <StatCard icon={CalendarDays} label="Upcoming bookings" value={STATS.upcomingBookings} />
+        <StatCard icon={CalendarDays} label="Upcoming bookings" value={stats.upcoming} />
         <StatCard
           icon={IndianRupee}
           label="Monthly revenue"
-          value={`₹${STATS.monthlyRevenue.toLocaleString("en-IN")}`}
+          value={`₹${stats.monthlyRevenue.toLocaleString("en-IN")}`}
         />
-        <StatCard icon={Percent} label="Occupancy rate" value={`${STATS.occupancyRate}%`} />
-        <StatCard icon={MessageSquare} label="New inquiries" value={STATS.newInquiries} />
+        <StatCard icon={Percent} label="Occupancy rate" value="—" />
+        <StatCard icon={MessageSquare} label="Total bookings" value={bookings.length} />
       </div>
 
-      {/* Quick actions */}
       <div className="bg-card border border-border rounded-xl p-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Quick actions
@@ -42,7 +75,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent bookings */}
       <div className="bg-card border border-border rounded-xl">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-medium">Recent bookings</h2>
@@ -62,21 +94,28 @@ function DashboardPage() {
               </tr>
             </thead>
             <tbody>
+              {recent.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                    No bookings yet.
+                  </td>
+                </tr>
+              )}
               {recent.map((b) => (
                 <tr key={b.id} className="border-t border-border">
                   <td className="px-4 py-3">
-                    <div className="font-medium">{b.guest}</div>
-                    <div className="text-xs text-muted-foreground">{b.id}</div>
+                    <div className="font-medium">{b.guest_name}</div>
+                    <div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{b.room}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{b.room_id}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {b.checkIn} → {b.checkOut}
+                    {b.check_in} → {b.check_out}
                   </td>
                   <td className="px-4 py-3">
                     <StatusPill status={b.status} />
                   </td>
                   <td className="px-4 py-3 text-right font-medium">
-                    ₹{b.amount.toLocaleString("en-IN")}
+                    ₹{Number(b.total_amount).toLocaleString("en-IN")}
                   </td>
                 </tr>
               ))}
@@ -89,9 +128,7 @@ function DashboardPage() {
 }
 
 function StatCard({
-  icon: Icon,
-  label,
-  value,
+  icon: Icon, label, value,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -110,8 +147,7 @@ function StatCard({
 }
 
 function ActionBtn({
-  icon: Icon,
-  label,
+  icon: Icon, label,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;

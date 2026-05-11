@@ -1,13 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
-import { getOwnerProperty } from "../server/owner";
+import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
 
 export const useOwnerProperty = () => {
   const { user, isAuthenticated } = useAuth();
-
   return useQuery({
-    queryKey: ["ownerProperty"],
-    queryFn: () => getOwnerProperty({ data: user?.id ?? "" }),
+    queryKey: ["ownerProperty", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select(`*, rooms(*)`)
+        .eq("owner_id", user!.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
     enabled: isAuthenticated && !!user?.id,
   });
 };
