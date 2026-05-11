@@ -1,5 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
@@ -7,86 +6,57 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const navigate = useNavigate();
-  const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const onSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setError("");
-    setIsSubmitting(true);
-    const email = emailRef.current?.value ?? "";
-    const password = passwordRef.current?.value ?? "";
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      if (signInError) {
-        setError(signInError.message);
-      } else {
-        navigate({ to: "/admin/dashboard" });
-      }
-    } catch {
-      setError("An unexpected error occurred. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+    const form = e.currentTarget;
+    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
+    const errEl = document.getElementById("loginerr");
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (errEl) errEl.textContent = error.message;
+    } else {
+      window.location.href = "/admin/dashboard";
     }
-  };
+  }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8">
-        <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
-              Email
-            </label>
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f5f4", padding: "16px" }}>
+      <div style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "380px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+        <h1 style={{ color: "#166534", fontSize: "24px", fontWeight: 700, marginBottom: "4px" }}>Bleaf Admin</h1>
+        <p style={{ color: "#78716c", fontSize: "14px", marginBottom: "24px" }}>Owner login</p>
+        <p id="loginerr" style={{ color: "#dc2626", fontSize: "13px", marginBottom: "12px" }}></p>
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: "16px" }}>
+            <label htmlFor="email" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#78716c", marginBottom: "6px" }}>Email</label>
             <input
-              ref={emailRef}
               id="email"
               name="email"
-              type="text"
-              inputMode="email"
-              defaultValue=""
+              type="email"
               placeholder="owner@example.com"
               autoComplete="email"
-              autoCorrect="off"
-              autoCapitalize="off"
-              spellCheck={false}
               required
-              style={{ fontSize: "16px", WebkitAppearance: "none" }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary"
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d4d4d0", borderRadius: "8px", fontSize: "16px", background: "white", color: "#1c1917", WebkitAppearance: "none", appearance: "none" as any }}
             />
           </div>
-          <div>
-            <label htmlFor="password" className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
-              Password
-            </label>
+          <div style={{ marginBottom: "16px" }}>
+            <label htmlFor="password" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#78716c", marginBottom: "6px" }}>Password</label>
             <input
-              ref={passwordRef}
               id="password"
               name="password"
               type="password"
-              defaultValue=""
               placeholder="••••••••"
               autoComplete="current-password"
               required
-              style={{ fontSize: "16px", WebkitAppearance: "none" }}
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary"
+              style={{ width: "100%", padding: "10px 12px", border: "1px solid #d4d4d0", borderRadius: "8px", fontSize: "16px", background: "white", color: "#1c1917", WebkitAppearance: "none", appearance: "none" as any }}
             />
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            style={{ width: "100%", padding: "14px", background: "#166534", color: "white", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: 600, cursor: "pointer", marginTop: "8px" }}
           >
-            {isSubmitting ? "Signing in..." : "Sign in"}
+            Sign in
           </button>
         </form>
       </div>
