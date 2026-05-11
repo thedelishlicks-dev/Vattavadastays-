@@ -1,4 +1,4 @@
- import { useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -48,7 +48,7 @@ export function AdminLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate({ to: "/admin/login" });
+    navigate({ to: "/login" });
   };
 
   const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
@@ -57,7 +57,6 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
-      {/* Sidebar desktop */}
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <div className="h-14 px-5 flex items-center border-b border-border">
           <span className="font-display text-lg font-semibold text-primary">Bleaf Admin</span>
