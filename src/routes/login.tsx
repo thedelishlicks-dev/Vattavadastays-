@@ -3,9 +3,6 @@ import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({
-    meta: [{ title: "Owner login — Bleaf Mud House" }],
-  }),
   component: LoginPage,
 });
 
@@ -41,21 +38,20 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
+      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8">
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div>
-            <label
-              htmlFor="email"
-              className="block text-xs uppercase tracking-wider text-muted-foreground mb-1"
-            >
+            <label htmlFor="email" className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
               Email
             </label>
             <input
               ref={emailRef}
               id="email"
-              type="email"
+              name="email"
+              type="text"
+              inputMode="email"
               defaultValue=""
               placeholder="owner@example.com"
               autoComplete="email"
@@ -63,25 +59,25 @@ function LoginPage() {
               autoCapitalize="off"
               spellCheck={false}
               required
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              style={{ fontSize: "16px", WebkitAppearance: "none" }}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           <div>
-            <label
-              htmlFor="password"
-              className="block text-xs uppercase tracking-wider text-muted-foreground mb-1"
-            >
+            <label htmlFor="password" className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
               Password
             </label>
             <input
               ref={passwordRef}
               id="password"
+              name="password"
               type="password"
               defaultValue=""
               placeholder="••••••••"
               autoComplete="current-password"
               required
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              style={{ fontSize: "16px", WebkitAppearance: "none" }}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
@@ -90,7 +86,7 @@ function LoginPage() {
             disabled={isSubmitting}
             className="w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
-            {isSubmitting ? "Signing in…" : "Sign in"}
+            {isSubmitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
       </div>
