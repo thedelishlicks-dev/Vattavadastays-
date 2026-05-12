@@ -23,7 +23,6 @@ function AdminSettings() {
     check_out_time: '',
   })
 
-  // Populate form once data arrives
   useEffect(() => {
     if (property) {
       setForm({
@@ -48,8 +47,7 @@ function AdminSettings() {
       if (error) throw error
     },
     onSuccess: () => {
-      // Invalidate so useOwnerProperty refetches fresh data
-      queryClient.invalidateQueries({ queryKey: ['owner-property'] })
+      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
     },
   })
 
