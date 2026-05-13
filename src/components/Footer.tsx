@@ -1,68 +1,111 @@
 import { Phone, MapPin, MessageCircle, Leaf } from "lucide-react";
+import { useProperty } from "@/hooks/useProperty";
 
-export function Footer() {
+export function Footer({ subdomain }: { subdomain: string }) {
+  const { data: property } = useProperty(subdomain);
+
+  const phone = property?.owner_phone ?? "";
+  const whatsapp = property?.owner_whatsapp ?? phone;
+  const lat = property?.location_lat;
+  const lng = property?.location_lng;
+  const propertyName = property?.name ?? "Bleaf Mud House";
+  const ownerName = property?.owner_name ?? "the host";
+
+  const mapsUrl =
+    lat && lng
+      ? `https://maps.google.com/?q=${lat},${lng}`
+      : "https://maps.google.com/?q=Upper+Vattavada+Munnar";
+
+  const cleanPhone = (p: string) => {
+    const d = p.replace(/\D/g, "");
+    if (d.startsWith("91") && d.length === 12) return d;
+    if (d.length === 10) return `91${d}`;
+    return d;
+  };
+
   return (
     <footer id="contact" className="bg-foreground text-background">
       <div className="mx-auto max-w-6xl px-4 md:px-8 py-16 md:py-20">
         <div className="grid md:grid-cols-3 gap-10">
+          {/* Brand */}
           <div>
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <Leaf className="h-5 w-5" />
               </span>
               <div>
-                <div className="font-display text-lg font-semibold">Bleaf Mud House</div>
-                <div className="font-malayalam text-sm opacity-70">ബ്ലീഫ് മഡ് ഹൗസ്</div>
+                <div className="font-display text-lg font-semibold">{propertyName}</div>
+                {property?.name_ml && (
+                  <div className="font-malayalam text-sm opacity-70">{property.name_ml}</div>
+                )}
               </div>
             </div>
-            <p className="mt-5 text-sm opacity-70 leading-relaxed">
-              An organic farm stay nestled in the misty hills of Vattavada, Kerala.
-            </p>
+            {property?.description && (
+              <p className="mt-5 text-sm opacity-70 leading-relaxed line-clamp-3">
+                {property.description}
+              </p>
+            )}
           </div>
 
+          {/* Location */}
           <div>
             <h3 className="font-display text-lg font-semibold mb-4">Visit us</h3>
-            <a
-              href="https://maps.google.com/?q=Upper+Vattavada+Munnar"
+            
+              href={mapsUrl}
               target="_blank"
               rel="noreferrer"
               className="flex items-start gap-3 text-sm opacity-80 hover:opacity-100"
             >
               <MapPin className="h-5 w-5 mt-0.5 text-primary shrink-0" />
               <span>
-                Upper Vattavada
+                {property?.area ?? "Upper Vattavada"}
                 <br />
                 Munnar Road, Kerala
               </span>
             </a>
+            {lat && lng && (
+              
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex items-center gap-2 text-xs opacity-60 hover:opacity-100"
+              >
+                Open in Google Maps →
+              </a>
+            )}
           </div>
 
+          {/* Contact */}
           <div>
             <h3 className="font-display text-lg font-semibold mb-4">Get in touch</h3>
             <div className="space-y-3">
-              <a
-                href="tel:+919999999999"
-                className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
-              >
-                <Phone className="h-4 w-4" />
-                Call host
-              </a>
-              <a
-                href="https://wa.me/919999999999"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 rounded-full bg-whatsapp text-primary-foreground hover:opacity-90 px-5 py-3 text-sm font-medium transition-opacity"
-              >
-                <MessageCircle className="h-4 w-4" />
-                WhatsApp
-              </a>
+              {phone && (
+                
+                  href={`tel:+${cleanPhone(phone)}`}
+                  className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
+                >
+                  <Phone className="h-4 w-4" />
+                  Call {ownerName}
+                </a>
+              )}
+              {whatsapp && (
+                
+                  href={`https://wa.me/${cleanPhone(whatsapp)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 rounded-full bg-[#25D366] text-white hover:opacity-90 px-5 py-3 text-sm font-medium transition-opacity"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  WhatsApp
+                </a>
+              )}
             </div>
           </div>
         </div>
 
         <div className="mt-12 border-t border-background/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <span>© {new Date().getFullYear()} Bleaf Mud House. All rights reserved.</span>
-          <span>Hosted by Deepak</span>
+          <span>© {new Date().getFullYear()} {propertyName}. All rights reserved.</span>
+          {ownerName && <span>Hosted by {ownerName}</span>}
         </div>
       </div>
     </footer>
