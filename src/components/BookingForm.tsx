@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, MessageCircle } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
+import { useProperty } from "@/hooks/useProperty";
+import { bookingInquiryLink } from "@/lib/whatsapp";
 import type { BookingDetails } from "@/components/RoomDetail";
 
 type Payment = "UPI" | "Bank Transfer" | "Cash on Arrival";
 
 type Props = {
   selection: BookingDetails | null;
+  subdomain: string;
 };
 
 const inputCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
-export function BookingForm({ selection }: Props) {
+export function BookingForm({ selection, subdomain }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -21,13 +24,13 @@ export function BookingForm({ selection }: Props) {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
 
+  const { data: property } = useProperty(subdomain);
   const { mutateAsync: createBooking, isPending } = useCreateBooking();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selection) return;
     setError("");
-
     try {
       await createBooking({
         property_id: selection.room.property_id,
@@ -44,10 +47,22 @@ export function BookingForm({ selection }: Props) {
         payment_method: payment,
       });
       setSubmitted(true);
-    } catch (err) {
+    } catch {
       setError("Something went wrong. Please try again.");
     }
   };
+
+  const whatsappBookingLink =
+    property?.owner_whatsapp && selection
+      ? bookingInquiryLink({
+          ownerWhatsapp: property.owner_whatsapp,
+          propertyName: property.name,
+          roomName: selection.room.name,
+          checkIn: selection.checkIn,
+          checkOut: selection.checkOut,
+          guests: selection.adults + (selection.children ?? 0),
+        })
+      : null;
 
   return (
     <section id="booking" className="py-16 md:py-24 bg-background">
@@ -69,6 +84,7 @@ export function BookingForm({ selection }: Props) {
 
         {selection && (
           <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
+            {/* Room summary */}
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 text-sm">
               <div className="font-medium">{selection.room.name}</div>
               <div className="text-muted-foreground text-xs mt-0.5">
@@ -82,16 +98,34 @@ export function BookingForm({ selection }: Props) {
             </div>
 
             {submitted ? (
-              <div className="text-center py-6">
+              <div className="text-center py-6 space-y-4">
                 <div className="mx-auto h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                   <Check className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 font-display text-xl font-semibold">
-                  Request sent!
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Deepak will reach out on WhatsApp shortly to confirm your
-                  booking.
+                <div>
+                  <h3 className="font-display text-xl font-semibold">
+                    Request sent!
+                  </h3>
+                  <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">
+                    {property?.owner_name ?? "The host"} will confirm your
+                    booking on WhatsApp shortly.
+                  </p>
+                </div>
+
+                {whatsappBookingLink && (
+                  
+                    href={whatsappBookingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-6 py-3 text-sm font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Message on WhatsApp
+                  </a>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Check-in: {selection.checkIn} · Check-out: {selection.checkOut}
                 </p>
               </div>
             ) : (
@@ -168,9 +202,24 @@ export function BookingForm({ selection }: Props) {
                   </p>
                 </Field>
 
-                {error && (
-                  <p className="text-xs text-destructive">{error}</p>
+                {whatsappBookingLink && (
+                  <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Prefer to book directly?
+                    </p>
+                    
+                      href={whatsappBookingLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-[#25D366] text-[#128C7E] px-4 py-2 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      Book via WhatsApp
+                    </a>
+                  </div>
                 )}
+
+                {error && <p className="text-xs text-destructive">{error}</p>}
 
                 <button
                   type="submit"
