@@ -1,11 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Search, Phone, MessageCircle, Check, X, Plus, Loader2 } from "lucide-react";
+import { useMemo, useState, useRef, useEffect } from "react";
+import { Search, Phone, MessageCircle, Check, X, Plus, Loader2, ChevronDown } from "lucide-react";
 import { StatusPill, PaymentPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings } from "@/hooks/useBookings";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  confirmationLink,
+  directionsLink,
+  paymentReminderLink,
+  dayBeforeReminderLink,
+} from "@/lib/whatsapp";
+import type { Booking } from "@/types/database";
 
 export const Route = createFileRoute("/admin/bookings")({
   component: BookingsAdmin,
@@ -362,9 +369,7 @@ function BookingsAdmin() {
                       <IconBtn title="Call" onClick={() => window.open(`tel:${b.guest_phone}`)}>
                         <Phone className="h-3.5 w-3.5" />
                       </IconBtn>
-                      <IconBtn title="WhatsApp" onClick={() => window.open(`https://wa.me/${b.guest_phone.replace(/\D/g, "")}`)}>
-                        <MessageCircle className="h-3.5 w-3.5" />
-                      </IconBtn>
+                      <WhatsAppMenu booking={b} property={property} roomName={roomNameMap[b.room_id] ?? b.room_id} />
                     </div>
                   </td>
                 </tr>
@@ -405,5 +410,100 @@ function IconBtn({
       className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs">
       {children}
     </button>
+  );
+}
+
+function WhatsAppMenu({
+  booking: b,
+  property,
+  roomName,
+}: {
+  booking: Booking;
+  property: ReturnType<typeof useOwnerProperty>["data"];
+  roomName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const ownerPhone = property?.owner_phone ?? "";
+  const lat = property?.location_lat;
+  const lng = property?.location_lng;
+
+  const templates = [
+    {
+      label: "✅ Booking confirmed",
+      href: confirmationLink({
+        guestPhone: b.guest_phone,
+        guestName: b.guest_name,
+        propertyName: property?.name ?? "",
+        roomName,
+        checkIn: b.check_in,
+        checkOut: b.check_out,
+        ownerPhone,
+      }),
+    },
+    ...(lat && lng
+      ? [{
+          label: "📍 Send directions",
+          href: directionsLink({
+            guestPhone: b.guest_phone,
+            guestName: b.guest_name,
+            propertyName: property?.name ?? "",
+            lat,
+            lng,
+            ownerPhone,
+          }),
+        }]
+      : []),
+    {
+      label: "💰 Payment reminder",
+      href: paymentReminderLink({
+        guestPhone: b.guest_phone,
+        guestName: b.guest_name,
+        amount: Number(b.total_amount),
+        checkIn: b.check_in,
+        propertyName: property?.name ?? "",
+      }),
+    },
+    {
+      label: "🌿 Day-before reminder",
+      href: dayBeforeReminderLink({
+        guestPhone: b.guest_phone,
+        guestName: b.guest_name,
+        propertyName: property?.name ?? "",
+        checkInTime: property?.check_in_time ?? "2:00 PM",
+        ownerPhone,
+      }),
+    },
+  ];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button title="WhatsApp" onClick={() => setOpen((o) => !o)}
+        className="h-8 inline-flex items-center gap-0.5 justify-center rounded-md border border-border hover:bg-muted px-2 text-xs">
+        <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" />
+        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 bottom-9 z-20 w-52 bg-card border border-border rounded-xl shadow-lg py-1 text-sm">
+          {templates.map((t) => (
+            <a key={t.label} href={t.href} target="_blank" rel="noreferrer"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2 hover:bg-muted truncate">
+              {t.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
