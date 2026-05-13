@@ -36,7 +36,9 @@ function DashboardPage() {
 
   const roomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => { map[r.id] = r.name; });
+    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => {
+      map[r.id] = r.name;
+    });
     return map;
   }, [property]);
 
@@ -136,7 +138,9 @@ function DashboardPage() {
 }
 
 function StatCard({
-  icon: Icon, label, value,
+  icon: Icon,
+  label,
+  value,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -155,7 +159,8 @@ function StatCard({
 }
 
 function ActionBtn({
-  icon: Icon, label,
+  icon: Icon,
+  label,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
