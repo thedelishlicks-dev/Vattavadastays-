@@ -34,6 +34,14 @@ function DashboardPage() {
   const recent = bookings.slice(0, 6);
   const isLoading = propLoading || bookLoading;
 
+  const roomNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => {
+      map[r.id] = r.name;
+    });
+    return map;
+  }, [property]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -107,7 +115,9 @@ function DashboardPage() {
                     <div className="font-medium">{b.guest_name}</div>
                     <div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{b.room_id}</td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {roomNameMap[b.room_id] ?? b.room_id.slice(0, 8)}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                     {b.check_in} → {b.check_out}
                   </td>
@@ -128,7 +138,9 @@ function DashboardPage() {
 }
 
 function StatCard({
-  icon: Icon, label, value,
+  icon: Icon,
+  label,
+  value,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
@@ -147,7 +159,8 @@ function StatCard({
 }
 
 function ActionBtn({
-  icon: Icon, label,
+  icon: Icon,
+  label,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;

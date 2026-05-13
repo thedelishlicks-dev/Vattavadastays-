@@ -11,26 +11,18 @@ import { Amenities } from "@/components/Amenities";
 import { Footer } from "@/components/Footer";
 import type { Room } from "@/types/database";
 
+function getSubdomain(): string {
+  const hostname = window.location.hostname;
+  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
+  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
+}
+
 export const Route = createFileRoute("/")({
   component: Index,
-  head: () => ({
-    meta: [
-      { title: "Bleaf Mud House · 12-room Mountain Retreat in Vattavada, Kerala" },
-      {
-        name: "description",
-        content:
-          "Book Bleaf Mud House — a 12-room organic mountain retreat in Upper Vattavada, Munnar. Deluxe, Family, Standard rooms & dormitory from ₹800/night.",
-      },
-      { property: "og:title", content: "Bleaf Mud House · Vattavada Mountain Retreat" },
-      {
-        property: "og:description",
-        content: "12-room mountain retreat in organic Vattavada. Hosted by Deepak.",
-      },
-    ],
-  }),
 });
 
 function Index() {
+  const subdomain = getSubdomain();
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [openRoom, setOpenRoom] = useState<Room | null>(null);
@@ -48,11 +40,11 @@ function Index() {
           setCheckOut={setCheckOut}
         />
         <Rooms onSelect={setOpenRoom} />
-        <BookingForm selection={selection} />
+        <BookingForm selection={selection} subdomain={subdomain} />
         <About />
         <Amenities />
       </main>
-      <Footer />
+      <Footer subdomain={subdomain} />
       {openRoom && (
         <RoomDetail
           room={openRoom}
