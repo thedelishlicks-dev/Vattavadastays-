@@ -20,6 +20,7 @@ function SetupPage() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>("validating");
+  const [propertyId, setPropertyId] = useState("");
   const [propertyName, setPropertyName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +29,6 @@ function SetupPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
 
-  // Validate the token on mount
   useEffect(() => {
     if (!token) {
       setStep("invalid");
@@ -37,9 +37,6 @@ function SetupPage() {
 
     async function validate() {
       try {
-        // Look up the invite token — RLS blocks direct reads,
-        // so we use the RPC that superadmin uses, or a public lookup function.
-        // We call a lightweight RPC: get_invite_by_token(token)
         const { data, error: rpcErr } = await supabase.rpc(
           "get_invite_by_token",
           { p_token: token }
@@ -50,7 +47,6 @@ function SetupPage() {
           return;
         }
 
-        // Check expiry
         if (data.used_at) {
           setStep("invalid");
           return;
@@ -62,21 +58,7 @@ function SetupPage() {
 
         setOwnerEmail(data.email);
         setPropertyName(data.property_name ?? "your property");
-
-        // Sign in with magic link flow:
-        // We need the user to be authenticated before calling updateUser.
-        // Use signInWithOtp (passwordless) to create a session for this email,
-        // but since this is an invite we instead use signUp to create the account
-        // if it doesn't exist yet, then they set their password.
-        // Simplest approach: use the Supabase Admin flow isn't available client-side,
-        // so we sign the user up silently then let updateUser set the password.
-        // If the user already exists (re-visiting link), signInWithOtp and prompt.
-
-        // Try to sign up — if already exists, this is a no-op on the auth side
-        // and we need them to verify via the token magic link instead.
-        // Best client-side pattern: use signInWithPassword after they set a password
-        // via the invite. We'll use a two-step: signUp → updateUser.
-
+        setPropertyId(data.property_id);
         setStep("ready");
       } catch {
         setStep("invalid");
@@ -113,22 +95,17 @@ function SetupPage() {
     setStep("saving");
 
     try {
-      // Step 1: Sign up the user with email + password.
-      // If account already exists this will error — handle gracefully.
-      const { error: signUpErr } = await supabase.auth.signUp({
-        email: ownerEmail,
-        password,
-        options: {
-          // Skip email confirmation — superadmin already verified this email
-          data: { invite_token: token },
-        },
+      // Create auth user + link property + consume token — all server-side
+      const { error: rpcErr } = await supabase.rpc("create_owner_auth_user", {
+        p_email: ownerEmail,
+        p_password: password,
+        p_property_id: propertyId,
+        p_token: token,
       });
 
-      if (signUpErr && !signUpErr.message.includes("already registered")) {
-        throw signUpErr;
-      }
+      if (rpcErr) throw rpcErr;
 
-      // Step 2: Sign in with the new password to get a session
+      // Sign in with the freshly created credentials
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: ownerEmail,
         password,
@@ -136,12 +113,8 @@ function SetupPage() {
 
       if (signInErr) throw signInErr;
 
-      // Step 3: Mark the invite token as used
-      await supabase.rpc("consume_invite_token", { p_token: token });
-
       setStep("done");
 
-      // Redirect to dashboard after brief confirmation
       setTimeout(() => {
         navigate({ to: "/admin/dashboard" });
       }, 1800);
@@ -151,7 +124,6 @@ function SetupPage() {
     }
   };
 
-  // ── Validating ──────────────────────────────────────────────────────────────
   if (step === "validating") {
     return (
       <Shell>
@@ -163,7 +135,6 @@ function SetupPage() {
     );
   }
 
-  // ── Invalid / expired ───────────────────────────────────────────────────────
   if (step === "invalid") {
     return (
       <Shell>
@@ -178,7 +149,6 @@ function SetupPage() {
     );
   }
 
-  // ── Done ────────────────────────────────────────────────────────────────────
   if (step === "done") {
     return (
       <Shell>
@@ -194,7 +164,6 @@ function SetupPage() {
     );
   }
 
-  // ── Ready / saving ──────────────────────────────────────────────────────────
   return (
     <Shell>
       <div className="space-y-1 mb-6">
@@ -206,7 +175,6 @@ function SetupPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Password */}
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">
             Password
@@ -229,7 +197,6 @@ function SetupPage() {
             </button>
           </div>
 
-          {/* Strength bar */}
           {password.length > 0 && (
             <div className="mt-2 space-y-1">
               <div className="flex gap-1">
@@ -248,7 +215,6 @@ function SetupPage() {
           )}
         </div>
 
-        {/* Confirm password */}
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">
             Confirm password
