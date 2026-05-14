@@ -1,188 +1,282 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { PageHeader, Section, Field, inputCls, SaveBar } from "@/admin/formKit";
+import { useState, useEffect } from "react";
+import { ScrollText, Loader2 } from "lucide-react";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
-export const Route = createFileRoute("/admin/policies")({ component: PoliciesPage });
+export const Route = createFileRoute("/admin/policies")({
+  component: AdminPolicies,
+});
 
-type CancelPolicy = "Flexible" | "Medium" | "Strict";
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
+const textareaCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 resize-none";
 
-function PoliciesPage() {
-  const [checkIn, setCheckIn] = useState("13:00");
-  const [checkOut, setCheckOut] = useState("11:00");
-  const [policy, setPolicy] = useState<CancelPolicy>("Medium");
-  const refundPresets: Record<CancelPolicy, { label: string; pct: number }[]> = {
-    Flexible: [
-      { label: "More than 24h before check-in", pct: 100 },
-      { label: "Within 24h of check-in", pct: 50 },
-      { label: "After check-in", pct: 0 },
-    ],
-    Medium: [
-      { label: "More than 7 days before", pct: 100 },
-      { label: "3–7 days before", pct: 50 },
-      { label: "Less than 3 days", pct: 0 },
-    ],
-    Strict: [
-      { label: "More than 30 days before", pct: 100 },
-      { label: "14–30 days before", pct: 50 },
-      { label: "Less than 14 days", pct: 0 },
-    ],
+// Cancellation policy presets
+const CANCELLATION_PRESETS = [
+  { label: "Flexible", value: "Full refund if cancelled 24 hours before check-in. No refund for no-shows." },
+  { label: "Moderate", value: "Full refund if cancelled 5 days before check-in. 50% refund if cancelled within 5 days. No refund for no-shows." },
+  { label: "Strict", value: "50% refund if cancelled 7 days before check-in. No refund within 7 days of check-in." },
+  { label: "Non-refundable", value: "This booking is non-refundable. No cancellations or modifications accepted." },
+];
+
+// House rules presets
+const HOUSE_RULE_PRESETS = [
+  "No smoking inside the property",
+  "No loud music after 10 PM",
+  "Pets not allowed",
+  "Outside guests not permitted without prior permission",
+  "Please conserve water and electricity",
+  "Campfire only in designated areas",
+  "Respect local wildlife — do not feed animals",
+  "No single-use plastics inside the property",
+];
+
+type PoliciesForm = {
+  check_in_time: string;
+  check_out_time: string;
+  cancellation_policy: string;
+  house_rules: string;
+};
+
+// We store cancellation_policy and house_rules in shared_amenities as sentinels
+// since they aren't columns — consistent with meals approach
+function parsePolicies(
+  check_in_time: string | null,
+  check_out_time: string | null,
+  shared_amenities: string[] | null
+): PoliciesForm {
+  const get = (prefix: string) => {
+    const entry = (shared_amenities ?? []).find((a) => a.startsWith(prefix));
+    return entry ? decodeURIComponent(entry.slice(prefix.length)) : "";
   };
-  const [refunds, setRefunds] = useState(refundPresets["Medium"]);
-  const [advance, setAdvance] = useState(50);
-  const [rules, setRules] = useState<Record<string, boolean>>({
-    "No smoking inside rooms": true,
-    "No loud music after 10 PM": true,
-    "Pets allowed": false,
-    "Outside food allowed": true,
-    "Couples welcome (valid ID required)": true,
-    "Children under 5 stay free": true,
-    "No firearms or illegal substances": true,
+  return {
+    check_in_time: check_in_time ?? "2:00 PM",
+    check_out_time: check_out_time ?? "11:00 AM",
+    cancellation_policy: get("__cancel:"),
+    house_rules: get("__rules:"),
+  };
+}
+
+function encodePolicies(form: PoliciesForm, existing: string[]): string[] {
+  const filtered = existing.filter(
+    (a) => !a.startsWith("__cancel:") && !a.startsWith("__rules:")
+  );
+  const entries: string[] = [];
+  if (form.cancellation_policy)
+    entries.push(`__cancel:${encodeURIComponent(form.cancellation_policy)}`);
+  if (form.house_rules)
+    entries.push(`__rules:${encodeURIComponent(form.house_rules)}`);
+  return [...filtered, ...entries];
+}
+
+function AdminPolicies() {
+  const { data: property, isLoading } = useOwnerProperty();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [form, setForm] = useState<PoliciesForm>({
+    check_in_time: "2:00 PM",
+    check_out_time: "11:00 AM",
+    cancellation_policy: "",
+    house_rules: "",
   });
-  const [dirty, setDirty] = useState(false);
-  const mark = () => setDirty(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
 
-  const choosePolicy = (p: CancelPolicy) => {
-    setPolicy(p);
-    setRefunds(refundPresets[p]);
-    mark();
+  useEffect(() => {
+    if (property) {
+      setForm(parsePolicies(
+        property.check_in_time,
+        property.check_out_time,
+        property.shared_amenities ?? []
+      ));
+    }
+  }, [property?.id]);
+
+  const set = <K extends keyof PoliciesForm>(k: K, v: string) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const toggleRule = (rule: string) => {
+    const lines = form.house_rules
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const exists = lines.some((l) => l === rule);
+    const updated = exists
+      ? lines.filter((l) => l !== rule)
+      : [...lines, rule];
+    set("house_rules", updated.join("\n"));
   };
+
+  const ruleLines = form.house_rules
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const handleSave = async () => {
+    if (!property) return;
+    setSaving(true);
+    setError("");
+    try {
+      const updatedAmenities = encodePolicies(form, property.shared_amenities ?? []);
+      const { error: err } = await supabase
+        .from("properties")
+        .update({
+          check_in_time: form.check_in_time,
+          check_out_time: form.check_out_time,
+          shared_amenities: updatedAmenities,
+        })
+        .eq("id", property.id);
+      if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
+  }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <PageHeader title="Policies" subtitle="Check-in times, cancellations, and house rules." />
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Policies</h1>
+        <p className="text-sm text-muted-foreground">
+          Check-in times, cancellation policy, and house rules shown to guests.
+        </p>
+      </div>
 
-      <Section title="Check-in / Check-out">
-        <div className="grid grid-cols-2 gap-3 max-w-md">
-          <Field label="Check-in time">
+      {/* Check-in / Check-out */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h2 className="font-semibold text-sm">Check-in & Check-out</h2>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className={labelCls}>Check-in time</label>
             <input
-              type="time"
-              value={checkIn}
-              onChange={(e) => {
-                setCheckIn(e.target.value);
-                mark();
-              }}
+              value={form.check_in_time}
+              onChange={(e) => set("check_in_time", e.target.value)}
               className={inputCls}
+              placeholder="e.g. 2:00 PM"
             />
-          </Field>
-          <Field label="Check-out time">
-            <input
-              type="time"
-              value={checkOut}
-              onChange={(e) => {
-                setCheckOut(e.target.value);
-                mark();
-              }}
-              className={inputCls}
-            />
-          </Field>
-        </div>
-      </Section>
-
-      <Section title="Cancellation policy">
-        <div className="grid grid-cols-3 gap-2 max-w-md">
-          {(["Flexible", "Medium", "Strict"] as CancelPolicy[]).map((p) => (
-            <label
-              key={p}
-              className={`text-sm text-center border rounded-md py-2 cursor-pointer ${policy === p ? "border-primary bg-primary-light text-primary font-medium" : "border-border hover:bg-muted"}`}
-            >
-              <input
-                type="radio"
-                name="cancel"
-                className="hidden"
-                checked={policy === p}
-                onChange={() => choosePolicy(p)}
-              />
-              {p}
-            </label>
-          ))}
-        </div>
-
-        <div className="space-y-2 pt-2">
-          {refunds.map((r, i) => (
-            <div
-              key={i}
-              className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-border rounded-lg p-3"
-            >
-              <div className="md:col-span-9">
-                <Field label="Timeframe">
-                  <input
-                    value={r.label}
-                    onChange={(e) => {
-                      const next = [...refunds];
-                      next[i] = { ...r, label: e.target.value };
-                      setRefunds(next);
-                      mark();
-                    }}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
-                <Field label="Refund %">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={r.pct}
-                    onChange={(e) => {
-                      const next = [...refunds];
-                      next[i] = { ...r, pct: +e.target.value };
-                      setRefunds(next);
-                      mark();
-                    }}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="House rules">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {Object.entries(rules).map(([k, v]) => (
-            <label
-              key={k}
-              className="flex items-center gap-2 text-sm border border-border rounded-md px-3 py-2 cursor-pointer hover:bg-muted"
-            >
-              <input
-                type="checkbox"
-                checked={v}
-                onChange={(e) => {
-                  setRules({ ...rules, [k]: e.target.checked });
-                  mark();
-                }}
-                className="h-4 w-4 accent-primary"
-              />
-              {k}
-            </label>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Advance payment" description="Required to confirm a booking.">
-        <Field label="Advance %" hint="Remainder collected at check-in.">
-          <div className="relative max-w-[160px]">
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={advance}
-              onChange={(e) => {
-                setAdvance(+e.target.value);
-                mark();
-              }}
-              className={`${inputCls} pr-8`}
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-              %
-            </span>
           </div>
-        </Field>
-      </Section>
+          <div>
+            <label className={labelCls}>Check-out time</label>
+            <input
+              value={form.check_out_time}
+              onChange={(e) => set("check_out_time", e.target.value)}
+              className={inputCls}
+              placeholder="e.g. 11:00 AM"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          These appear in WhatsApp booking confirmation messages and the guest page.
+        </p>
+      </div>
 
-      <SaveBar dirty={dirty} onSave={() => setDirty(false)} />
+      {/* Cancellation policy */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h2 className="font-semibold text-sm">Cancellation Policy</h2>
+
+        <div className="flex flex-wrap gap-2">
+          {CANCELLATION_PRESETS.map((p) => (
+            <button
+              key={p.label}
+              onClick={() => set("cancellation_policy", p.value)}
+              className={[
+                "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                form.cancellation_policy === p.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:bg-muted",
+              ].join(" ")}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <label className={labelCls}>Policy text (editable)</label>
+          <textarea
+            value={form.cancellation_policy}
+            onChange={(e) => set("cancellation_policy", e.target.value)}
+            rows={4}
+            className={textareaCls}
+            placeholder="Describe your cancellation and refund policy..."
+          />
+        </div>
+      </div>
+
+      {/* House rules */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h2 className="font-semibold text-sm">House Rules</h2>
+
+        <div className="flex flex-wrap gap-2">
+          {HOUSE_RULE_PRESETS.map((rule) => {
+            const active = ruleLines.includes(rule);
+            return (
+              <button
+                key={rule}
+                onClick={() => toggleRule(rule)}
+                className={[
+                  "text-xs px-3 py-1.5 rounded-full border transition-colors text-left",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-muted",
+                ].join(" ")}
+              >
+                {rule}
+              </button>
+            );
+          })}
+        </div>
+
+        <div>
+          <label className={labelCls}>Rules (one per line, editable)</label>
+          <textarea
+            value={form.house_rules}
+            onChange={(e) => set("house_rules", e.target.value)}
+            rows={6}
+            className={textareaCls}
+            placeholder={"No smoking inside\nNo loud music after 10 PM\n..."}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Click presets above to toggle, or type your own rules below.
+          </p>
+        </div>
+
+        {ruleLines.length > 0 && (
+          <div className="rounded-lg bg-muted/40 p-3 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Preview</p>
+            {ruleLines.map((r, i) => (
+              <p key={i} className="text-sm text-foreground">• {r}</p>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={handleSave} disabled={saving}
+          className="rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          Save policies
+        </button>
+        {saved && <span className="text-sm text-primary font-medium">Saved ✓</span>}
+        {error && <span className="text-sm text-destructive">{error}</span>}
+      </div>
     </div>
   );
 }

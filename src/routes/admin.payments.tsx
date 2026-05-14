@@ -1,153 +1,270 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { PageHeader, Section, Field, inputCls, SaveBar } from "@/admin/formKit";
-import { BOOKINGS } from "@/admin/mockData";
-import { PaymentPill, StatusPill } from "@/admin/components";
+import { useState, useEffect, useMemo } from "react";
+import { Wallet, Loader2, Check, IndianRupee } from "lucide-react";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { useAuth } from "@/hooks/useAuth";
+import { useBookings } from "@/hooks/useBookings";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
 
-export const Route = createFileRoute("/admin/payments")({ component: PaymentsPage });
+export const Route = createFileRoute("/admin/payments")({
+  component: AdminPayments,
+});
 
-function PaymentsPage() {
-  const [upi, setUpi] = useState("rajuthomas@okicici");
-  const [bank, setBank] = useState({
-    accountName: "Raju Thomas",
-    accountNumber: "0123456789012",
-    ifsc: "SBIN0001234",
-    bankName: "State Bank of India, Munnar",
-  });
-  const [cashOnArrival, setCashOnArrival] = useState(true);
-  const [terms, setTerms] = useState(
-    "50% advance via UPI/bank to confirm booking. Balance payable in cash or UPI on arrival. Refunds processed within 7 working days as per cancellation policy.",
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
+
+const PAYMENT_METHODS = ["UPI", "Bank Transfer", "Cash on Arrival"];
+
+// UPI ID stored as a sentinel in shared_amenities
+function parseUpiId(shared_amenities: string[] | null): string {
+  const entry = (shared_amenities ?? []).find((a) => a.startsWith("__upi:"));
+  return entry ? decodeURIComponent(entry.slice("__upi:".length)) : "";
+}
+
+function encodeUpiId(upiId: string, existing: string[]): string[] {
+  const filtered = existing.filter((a) => !a.startsWith("__upi:"));
+  if (!upiId.trim()) return filtered;
+  return [...filtered, `__upi:${encodeURIComponent(upiId.trim())}`];
+}
+
+function AdminPayments() {
+  const { data: property, isLoading } = useOwnerProperty();
+  const { user } = useAuth();
+  const { data: bookings = [] } = useBookings(property?.id ?? "");
+  const queryClient = useQueryClient();
+
+  const [upiId, setUpiId] = useState("");
+  const [acceptedMethods, setAcceptedMethods] = useState<string[]>(["UPI", "Cash on Arrival"]);
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [savedConfig, setSavedConfig] = useState(false);
+  const [configError, setConfigError] = useState("");
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (property) {
+      setUpiId(parseUpiId(property.shared_amenities ?? []));
+      const methodEntry = (property.shared_amenities ?? []).find((a) =>
+        a.startsWith("__pmethods:")
+      );
+      if (methodEntry) {
+        try {
+          setAcceptedMethods(
+            JSON.parse(decodeURIComponent(methodEntry.slice("__pmethods:".length)))
+          );
+        } catch {
+          // keep default
+        }
+      }
+    }
+  }, [property?.id]);
+
+  const toggleMethod = (m: string) =>
+    setAcceptedMethods((prev) =>
+      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
+    );
+
+  const handleSaveConfig = async () => {
+    if (!property) return;
+    setSavingConfig(true);
+    setConfigError("");
+    try {
+      const base = encodeUpiId(upiId, property.shared_amenities ?? []);
+      const withMethods = [
+        ...base.filter((a) => !a.startsWith("__pmethods:")),
+        `__pmethods:${encodeURIComponent(JSON.stringify(acceptedMethods))}`,
+      ];
+      const { error: err } = await supabase
+        .from("properties")
+        .update({ shared_amenities: withMethods })
+        .eq("id", property.id);
+      if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
+      setSavedConfig(true);
+      setTimeout(() => setSavedConfig(false), 2500);
+    } catch (e: unknown) {
+      setConfigError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSavingConfig(false);
+    }
+  };
+
+  const togglePaid = async (bookingId: string, currentlyPaid: boolean) => {
+    setTogglingId(bookingId);
+    await supabase
+      .from("bookings")
+      .update({ is_paid: !currentlyPaid })
+      .eq("id", bookingId);
+    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+    setTogglingId(null);
+  };
+
+  const unpaidBookings = useMemo(
+    () =>
+      bookings
+        .filter((b) => !b.is_paid && b.status !== "cancelled")
+        .sort(
+          (a, b) =>
+            new Date(a.check_in).getTime() - new Date(b.check_in).getTime()
+        ),
+    [bookings]
   );
-  const [dirty, setDirty] = useState(false);
-  const mark = () => setDirty(true);
+
+  const stats = useMemo(() => {
+    const confirmed = bookings.filter(
+      (b) => b.status !== "cancelled"
+    );
+    const paid = confirmed.filter((b) => b.is_paid);
+    const unpaid = confirmed.filter((b) => !b.is_paid);
+    return {
+      totalCollected: paid.reduce((s, b) => s + Number(b.total_amount), 0),
+      totalOutstanding: unpaid.reduce((s, b) => s + Number(b.total_amount), 0),
+      paidCount: paid.length,
+      unpaidCount: unpaid.length,
+    };
+  }, [bookings]);
+
+  if (isLoading) {
+    return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
+  }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <PageHeader title="Payments" subtitle="Where guests should pay you, and what they've paid." />
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Payments</h1>
+        <p className="text-sm text-muted-foreground">
+          Configure payment methods and track outstanding balances.
+        </p>
+      </div>
 
-      <Section title="UPI">
-        <Field label="UPI ID" hint="Shown on the booking confirmation page.">
-          <input
-            value={upi}
-            onChange={(e) => {
-              setUpi(e.target.value);
-              mark();
-            }}
-            className={`${inputCls} max-w-md`}
-          />
-        </Field>
-      </Section>
-
-      <Section title="Bank account">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <Field label="Account holder name">
-            <input
-              value={bank.accountName}
-              onChange={(e) => {
-                setBank({ ...bank, accountName: e.target.value });
-                mark();
-              }}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Account number">
-            <input
-              value={bank.accountNumber}
-              onChange={(e) => {
-                setBank({ ...bank, accountNumber: e.target.value });
-                mark();
-              }}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="IFSC code">
-            <input
-              value={bank.ifsc}
-              onChange={(e) => {
-                setBank({ ...bank, ifsc: e.target.value });
-                mark();
-              }}
-              className={inputCls}
-            />
-          </Field>
-          <Field label="Bank name & branch">
-            <input
-              value={bank.bankName}
-              onChange={(e) => {
-                setBank({ ...bank, bankName: e.target.value });
-                mark();
-              }}
-              className={inputCls}
-            />
-          </Field>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs text-muted-foreground mb-1">Collected</p>
+          <p className="font-display text-2xl font-semibold text-primary">
+            ₹{stats.totalCollected.toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{stats.paidCount} bookings</p>
         </div>
-      </Section>
+        <div className="bg-card border border-border rounded-xl p-4">
+          <p className="text-xs text-muted-foreground mb-1">Outstanding</p>
+          <p className="font-display text-2xl font-semibold text-destructive">
+            ₹{stats.totalOutstanding.toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{stats.unpaidCount} bookings</p>
+        </div>
+      </div>
 
-      <Section title="Cash on arrival">
-        <label className="flex items-center gap-3 text-sm cursor-pointer">
+      {/* Payment config */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <h2 className="font-semibold text-sm">Payment Settings</h2>
+
+        <div>
+          <label className={labelCls}>UPI ID</label>
           <input
-            type="checkbox"
-            checked={cashOnArrival}
-            onChange={(e) => {
-              setCashOnArrival(e.target.checked);
-              mark();
-            }}
-            className="h-4 w-4 accent-primary"
+            value={upiId}
+            onChange={(e) => setUpiId(e.target.value)}
+            className={inputCls}
+            placeholder="yourname@upi"
           />
-          <span>
-            {cashOnArrival
-              ? "Allow guests to pay in cash on arrival"
-              : "Disabled — advance payment required"}
-          </span>
-        </label>
-      </Section>
+          <p className="text-xs text-muted-foreground mt-1">
+            Shown to guests in payment reminder messages.
+          </p>
+        </div>
 
-      <Section title="Payment terms">
-        <textarea
-          value={terms}
-          onChange={(e) => {
-            setTerms(e.target.value);
-            mark();
-          }}
-          rows={4}
-          className="w-full rounded-md border border-border bg-background p-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-        />
-      </Section>
+        <div>
+          <label className={labelCls}>Accepted payment methods</label>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {PAYMENT_METHODS.map((m) => {
+              const active = acceptedMethods.includes(m);
+              return (
+                <button
+                  key={m}
+                  onClick={() => toggleMethod(m)}
+                  className={[
+                    "text-sm px-3 py-1.5 rounded-full border transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border hover:bg-muted",
+                  ].join(" ")}
+                >
+                  {active && <Check className="inline h-3 w-3 mr-1" />}
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-      <Section title="Payment history" description="From recent bookings.">
-        <div className="overflow-x-auto -mx-4 md:mx-0">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Booking</th>
-                <th className="px-4 py-2.5 font-medium">Guest</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Payment</th>
-                <th className="px-4 py-2.5 font-medium text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {BOOKINGS.map((b) => (
-                <tr key={b.id} className="border-t border-border">
-                  <td className="px-4 py-3 font-mono text-xs">{b.id}</td>
-                  <td className="px-4 py-3">{b.guest}</td>
-                  <td className="px-4 py-3">
-                    <StatusPill status={b.status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <PaymentPill status={b.payment} />
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    ₹{b.amount.toLocaleString("en-IN")}
-                  </td>
+        <div className="flex items-center gap-3 pt-1">
+          <button
+            onClick={handleSaveConfig} disabled={savingConfig}
+            className="rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+          >
+            {savingConfig && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Save settings
+          </button>
+          {savedConfig && <span className="text-sm text-primary font-medium">Saved ✓</span>}
+          {configError && <span className="text-sm text-destructive">{configError}</span>}
+        </div>
+      </div>
+
+      {/* Outstanding bookings */}
+      <div className="space-y-3">
+        <h2 className="font-semibold text-sm">Outstanding Payments</h2>
+
+        {unpaidBookings.length === 0 ? (
+          <div className="bg-card border border-border rounded-xl p-8 text-center">
+            <IndianRupee className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
+            <p className="text-xs text-muted-foreground mt-0.5">No outstanding payments.</p>
+          </div>
+        ) : (
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Guest</th>
+                  <th className="px-4 py-2.5 font-medium">Check-in</th>
+                  <th className="px-4 py-2.5 font-medium">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Method</th>
+                  <th className="px-4 py-2.5 font-medium text-right">Mark paid</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Section>
-
-      <SaveBar dirty={dirty} onSave={() => setDirty(false)} />
+              </thead>
+              <tbody>
+                {unpaidBookings.map((b) => (
+                  <tr key={b.id} className="border-t border-border">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{b.guest_name}</div>
+                      <div className="text-xs text-muted-foreground">{b.guest_phone}</div>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{b.check_in}</td>
+                    <td className="px-4 py-3 font-semibold">
+                      ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
+                      {b.payment_method ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => togglePaid(b.id, b.is_paid)}
+                        disabled={togglingId === b.id}
+                        className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                      >
+                        {togglingId === b.id
+                          ? <Loader2 className="h-3 w-3 animate-spin" />
+                          : <Check className="h-3 w-3" />}
+                        Paid
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
