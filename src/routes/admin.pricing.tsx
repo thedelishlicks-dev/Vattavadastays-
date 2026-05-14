@@ -1,234 +1,262 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
-import { PageHeader, Section, Field, inputCls, SaveBar } from "@/admin/formKit";
+import { Tag, Pencil, X, Loader2, Check } from "lucide-react";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import type { Room } from "@/types/database";
 
 export const Route = createFileRoute("/admin/pricing")({
-  component: PricingPage,
+  component: AdminPricing,
 });
 
-type RoomTypeKey = "Deluxe" | "Standard" | "Family" | "Dormitory";
-type SeasonalRule = { id: string; label: string; from: string; to: string; multiplier: number };
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
-function PricingPage() {
-  const [base, setBase] = useState<Record<RoomTypeKey, number>>({
-    Deluxe: 2500,
-    Standard: 1800,
-    Family: 3500,
-    Dormitory: 800,
+type PricingForm = {
+  base_price: number;
+  extra_guest_price: number;
+  weekend_multiplier: number;
+};
+
+function PricingDrawer({
+  room,
+  onClose,
+  onSaved,
+}: {
+  room: Room;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState<PricingForm>({
+    base_price: room.base_price,
+    extra_guest_price: room.extra_guest_price,
+    weekend_multiplier: room.weekend_multiplier ?? 1,
   });
-  const [extraBed, setExtraBed] = useState<Record<RoomTypeKey, number>>({
-    Deluxe: 600,
-    Standard: 500,
-    Family: 700,
-    Dormitory: 0,
-  });
-  const [weekend, setWeekend] = useState(1.25);
-  const [adultExtra, setAdultExtra] = useState(500);
-  const [childExtra, setChildExtra] = useState(300);
-  const [cleaning, setCleaning] = useState(300);
-  const [rules, setRules] = useState<SeasonalRule[]>([
-    {
-      id: "r1",
-      label: "Christmas / New Year",
-      from: "2026-12-20",
-      to: "2027-01-05",
-      multiplier: 1.5,
-    },
-    { id: "r2", label: "Onam", from: "2026-09-01", to: "2026-09-10", multiplier: 1.3 },
-  ]);
-  const [dirty, setDirty] = useState(false);
-  const mark = () => setDirty(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
-  const addRule = () => {
-    setRules((r) => [
-      ...r,
-      { id: crypto.randomUUID(), label: "New season", from: "", to: "", multiplier: 1.2 },
-    ]);
-    mark();
-  };
-  const removeRule = (id: string) => {
-    setRules((r) => r.filter((x) => x.id !== id));
-    mark();
-  };
-  const updateRule = (id: string, patch: Partial<SeasonalRule>) => {
-    setRules((r) => r.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-    mark();
+  const set = (k: keyof PricingForm, v: number) =>
+    setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (form.base_price <= 0) { setError("Base price must be greater than 0"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("rooms")
+        .update({
+          base_price: form.base_price,
+          extra_guest_price: form.extra_guest_price,
+          weekend_multiplier: form.weekend_multiplier,
+        })
+        .eq("id", room.id);
+      if (err) throw err;
+      onSaved();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const types: RoomTypeKey[] = ["Deluxe", "Standard", "Family", "Dormitory"];
+  const weekendPrice = Math.round(form.base_price * form.weekend_multiplier);
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <PageHeader title="Pricing" subtitle="Base rates, multipliers, and extra charges." />
-
-      <Section title="Base price per room type" description="Per night, before any multipliers.">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {types.map((t) => (
-            <Field key={t} label={t}>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  ₹
-                </span>
-                <input
-                  type="number"
-                  value={base[t]}
-                  onChange={(e) => {
-                    setBase({ ...base, [t]: +e.target.value });
-                    mark();
-                  }}
-                  className={`${inputCls} pl-7`}
-                />
-              </div>
-            </Field>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Multipliers">
-        <Field label="Weekend multiplier (Fri–Sat)" hint="Applied on top of base price.">
-          <input
-            type="number"
-            step="0.05"
-            value={weekend}
-            onChange={(e) => {
-              setWeekend(+e.target.value);
-              mark();
-            }}
-            className={`${inputCls} max-w-[160px]`}
-          />
-        </Field>
-      </Section>
-
-      <Section
-        title="Seasonal rules"
-        description="Date ranges that override the weekend multiplier."
-      >
-        <div className="space-y-3">
-          {rules.map((r) => (
-            <div
-              key={r.id}
-              className="grid grid-cols-1 md:grid-cols-12 gap-2 items-end border border-border rounded-lg p-3"
-            >
-              <div className="md:col-span-4">
-                <Field label="Label">
-                  <input
-                    value={r.label}
-                    onChange={(e) => updateRule(r.id, { label: e.target.value })}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
-                <Field label="From">
-                  <input
-                    type="date"
-                    value={r.from}
-                    onChange={(e) => updateRule(r.id, { from: e.target.value })}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="md:col-span-3">
-                <Field label="To">
-                  <input
-                    type="date"
-                    value={r.to}
-                    onChange={(e) => updateRule(r.id, { to: e.target.value })}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="md:col-span-1">
-                <Field label="×">
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={r.multiplier}
-                    onChange={(e) => updateRule(r.id, { multiplier: +e.target.value })}
-                    className={inputCls}
-                  />
-                </Field>
-              </div>
-              <div className="md:col-span-1 flex md:justify-end">
-                <button
-                  onClick={() => removeRule(r.id)}
-                  className="h-10 w-10 rounded-md border border-border text-destructive hover:bg-destructive/10 inline-flex items-center justify-center"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={addRule}
-            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-          >
-            <Plus className="h-4 w-4" /> Add seasonal rule
+    <div className="fixed inset-0 z-50 flex">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card shadow-xl flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Edit Pricing</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{room.name}</p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
+            <X className="h-4 w-4" />
           </button>
         </div>
-      </Section>
 
-      <Section title="Extra guest charges" description="Per night, on top of room price.">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Adult">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          <div>
+            <label className={labelCls}>Base price / night (₹) *</label>
             <input
-              type="number"
-              value={adultExtra}
-              onChange={(e) => {
-                setAdultExtra(+e.target.value);
-                mark();
-              }}
+              type="number" min={0} value={form.base_price}
+              onChange={(e) => set("base_price", parseInt(e.target.value) || 0)}
               className={inputCls}
             />
-          </Field>
-          <Field label="Child">
+            <p className="text-xs text-muted-foreground mt-1">
+              Weekday rate — applies Sun to Thu
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Extra guest charge / night (₹)</label>
             <input
-              type="number"
-              value={childExtra}
-              onChange={(e) => {
-                setChildExtra(+e.target.value);
-                mark();
-              }}
+              type="number" min={0} value={form.extra_guest_price}
+              onChange={(e) => set("extra_guest_price", parseInt(e.target.value) || 0)}
               className={inputCls}
             />
-          </Field>
+            <p className="text-xs text-muted-foreground mt-1">
+              Applied per guest beyond 2. Set 0 to disable.
+            </p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Weekend multiplier (Fri – Sat)</label>
+            <input
+              type="number" min={1} max={5} step={0.05} value={form.weekend_multiplier}
+              onChange={(e) => set("weekend_multiplier", parseFloat(e.target.value) || 1)}
+              className={`${inputCls} max-w-[160px]`}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              e.g. 1.25 = 25% higher on Fri–Sat
+            </p>
+          </div>
+
+          {/* Live preview */}
+          <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2 text-sm">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Price preview</p>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Weekday (Sun–Thu)</span>
+              <span className="font-semibold">₹{form.base_price.toLocaleString("en-IN")}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Weekend (Fri–Sat)</span>
+              <span className="font-semibold">₹{weekendPrice.toLocaleString("en-IN")}</span>
+            </div>
+            {form.extra_guest_price > 0 && (
+              <div className="flex justify-between border-t border-border pt-2 mt-2">
+                <span className="text-muted-foreground">Per extra guest / night</span>
+                <span className="font-semibold">+₹{form.extra_guest_price.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+          </div>
         </div>
-      </Section>
 
-      <Section title="Extra bed price per room type">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {types.map((t) => (
-            <Field key={t} label={t}>
-              <input
-                type="number"
-                value={extraBed[t]}
-                onChange={(e) => {
-                  setExtraBed({ ...extraBed, [t]: +e.target.value });
-                  mark();
-                }}
-                className={inputCls}
-              />
-            </Field>
-          ))}
+        <div className="px-5 py-4 border-t border-border space-y-2">
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={onClose}
+              className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
+              Cancel
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Save pricing
+            </button>
+          </div>
         </div>
-      </Section>
+      </div>
+    </div>
+  );
+}
 
-      <Section title="Cleaning fee">
-        <Field label="Per booking" hint="Charged once per stay.">
-          <input
-            type="number"
-            value={cleaning}
-            onChange={(e) => {
-              setCleaning(+e.target.value);
-              mark();
-            }}
-            className={`${inputCls} max-w-[160px]`}
-          />
-        </Field>
-      </Section>
+function AdminPricing() {
+  const { data: property, isLoading } = useOwnerProperty();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
 
-      <SaveBar dirty={dirty} onSave={() => setDirty(false)} />
+  const handleSaved = () => {
+    queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
+    setEditingRoom(null);
+  };
+
+  if (isLoading) {
+    return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
+  }
+
+  const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Pricing</h1>
+        <p className="text-sm text-muted-foreground">
+          Set base rates, extra guest charges, and weekend premiums per room.
+        </p>
+      </div>
+
+      {rooms.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-12 text-center">
+          <Tag className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
+          <p className="text-muted-foreground font-medium">No active rooms</p>
+          <p className="text-sm text-muted-foreground mt-1">Add rooms first from the Rooms section.</p>
+        </div>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+              <tr>
+                <th className="px-4 py-3 font-medium">Room</th>
+                <th className="px-4 py-3 font-medium">Base / night</th>
+                <th className="px-4 py-3 font-medium">Weekend</th>
+                <th className="px-4 py-3 font-medium">Extra guest</th>
+                <th className="px-4 py-3 font-medium text-right">Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rooms.map((room) => {
+                const weekendPrice = Math.round(room.base_price * (room.weekend_multiplier ?? 1));
+                const hasMultiplier = (room.weekend_multiplier ?? 1) > 1;
+                return (
+                  <tr key={room.id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{room.name}</div>
+                      <div className="text-xs text-muted-foreground capitalize">{room.room_type}</div>
+                    </td>
+                    <td className="px-4 py-3 font-semibold">
+                      ₹{room.base_price.toLocaleString("en-IN")}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="font-semibold">₹{weekendPrice.toLocaleString("en-IN")}</span>
+                      {hasMultiplier && (
+                        <span className="ml-1.5 text-xs text-primary bg-primary-light/60 px-1.5 py-0.5 rounded-full">
+                          ×{room.weekend_multiplier}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {room.extra_guest_price > 0
+                        ? <span>₹{room.extra_guest_price.toLocaleString("en-IN")}/person</span>
+                        : <span className="text-muted-foreground text-xs">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => setEditingRoom(room as Room)}
+                        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted"
+                        title="Edit pricing"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <div className="rounded-xl bg-muted/40 border border-border p-4 text-sm text-muted-foreground space-y-1">
+        <p className="font-medium text-foreground text-xs uppercase tracking-wider mb-2">How pricing works</p>
+        <p>• <strong>Base price</strong> applies Sun–Thu nights.</p>
+        <p>• <strong>Weekend multiplier</strong> auto-applies on Fri–Sat bookings.</p>
+        <p>• <strong>Extra guest</strong> charge kicks in for guests beyond 2.</p>
+        <p>• Override specific dates from the <strong>Calendar</strong> tab.</p>
+      </div>
+
+      {editingRoom && (
+        <PricingDrawer
+          room={editingRoom}
+          onClose={() => setEditingRoom(null)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 }
