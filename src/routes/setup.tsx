@@ -42,23 +42,27 @@ function SetupPage() {
           { p_token: token }
         );
 
-        if (rpcErr || !data) {
+        // RPC returns a table — it comes back as an array
+        const row = Array.isArray(data) ? data[0] : data;
+
+        if (rpcErr || !row) {
           setStep("invalid");
           return;
         }
 
-        if (data.used_at) {
-          setStep("invalid");
-          return;
-        }
-        if (new Date(data.expires_at) < new Date()) {
+        if (row.used_at) {
           setStep("invalid");
           return;
         }
 
-        setOwnerEmail(data.email);
-        setPropertyName(data.property_name ?? "your property");
-        setPropertyId(data.property_id);
+        if (new Date(row.expires_at) < new Date()) {
+          setStep("invalid");
+          return;
+        }
+
+        setOwnerEmail(row.email);
+        setPropertyName(row.property_name ?? "your property");
+        setPropertyId(row.property_id);
         setStep("ready");
       } catch {
         setStep("invalid");
@@ -78,7 +82,13 @@ function SetupPage() {
   })();
 
   const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"][strengthScore];
-  const strengthColor = ["", "bg-destructive", "bg-yellow-400", "bg-blue-400", "bg-primary"][strengthScore];
+  const strengthColor = [
+    "",
+    "bg-destructive",
+    "bg-yellow-400",
+    "bg-blue-400",
+    "bg-primary",
+  ][strengthScore];
 
   const handleSetPassword = async () => {
     setError("");
@@ -119,7 +129,9 @@ function SetupPage() {
         navigate({ to: "/admin/dashboard" });
       }, 1800);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      setError(
+        e instanceof Error ? e.message : "Something went wrong. Please try again."
+      );
       setStep("ready");
     }
   };
@@ -142,7 +154,8 @@ function SetupPage() {
           <XCircle className="h-10 w-10 text-destructive" />
           <h2 className="font-display text-lg font-semibold">Invalid or expired link</h2>
           <p className="text-sm text-muted-foreground max-w-xs">
-            This invite link has already been used or has expired. Ask your platform admin for a new one.
+            This invite link has already been used or has expired. Ask your
+            platform admin for a new one.
           </p>
         </div>
       </Shell>
@@ -167,14 +180,20 @@ function SetupPage() {
   return (
     <Shell>
       <div className="space-y-1 mb-6">
-        <h1 className="font-display text-2xl font-semibold">Welcome to VattavadaStays</h1>
+        <h1 className="font-display text-2xl font-semibold">
+          Welcome to VattavadaStays
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Set a password for <span className="font-medium text-foreground">{ownerEmail}</span> to access the{" "}
-          <span className="font-medium text-foreground">{propertyName}</span> dashboard.
+          Set a password for{" "}
+          <span className="font-medium text-foreground">{ownerEmail}</span> to
+          access the{" "}
+          <span className="font-medium text-foreground">{propertyName}</span>{" "}
+          dashboard.
         </p>
       </div>
 
       <div className="space-y-4">
+        {/* Password */}
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">
             Password
@@ -193,7 +212,11 @@ function SetupPage() {
               onClick={() => setShowPw((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showPw ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </div>
 
@@ -215,6 +238,7 @@ function SetupPage() {
           )}
         </div>
 
+        {/* Confirm password */}
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">
             Confirm password
@@ -233,11 +257,17 @@ function SetupPage() {
               onClick={() => setShowConfirm((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showConfirm ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
             </button>
           </div>
           {confirm.length > 0 && password !== confirm && (
-            <p className="text-xs text-destructive mt-1">Passwords don't match</p>
+            <p className="text-xs text-destructive mt-1">
+              Passwords don't match
+            </p>
           )}
         </div>
 
@@ -252,8 +282,12 @@ function SetupPage() {
           disabled={step === "saving" || !password || !confirm}
           className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {step === "saving" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {step === "saving" ? "Setting up your account…" : "Create account & continue"}
+          {step === "saving" && (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          )}
+          {step === "saving"
+            ? "Setting up your account…"
+            : "Create account & continue"}
         </button>
       </div>
     </Shell>
@@ -265,7 +299,9 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-sm p-6">
         <div className="mb-5">
-          <span className="font-display text-primary font-semibold text-lg">VattavadaStays</span>
+          <span className="font-display text-primary font-semibold text-lg">
+            VattavadaStays
+          </span>
         </div>
         {children}
       </div>
