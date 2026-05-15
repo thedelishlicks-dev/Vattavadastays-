@@ -1,21 +1,41 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    email: (search.email as string) ?? "",
+  }),
 });
 
 function LoginPage() {
+  const { email: prefilledEmail } = useSearch({ from: "/login" });
+  const [email, setEmail] = useState(prefilledEmail || "");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Sync prefilled email if it changes (e.g., navigated from setup)
+  useEffect(() => {
+    if (prefilledEmail && !email) {
+      setEmail(prefilledEmail);
+    }
+  }, [prefilledEmail, email]);
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = e.currentTarget;
-    const email = (form.elements.namedItem("email") as HTMLInputElement).value;
-    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
-    const errEl = document.getElementById("loginerr");
+    setError("");
+    setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (errEl) errEl.textContent = error.message;
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInErr) {
+      setError(signInErr.message);
+      setLoading(false);
     } else {
       window.location.href = "/admin/dashboard";
     }
@@ -24,9 +44,11 @@ function LoginPage() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f5f4", padding: "16px" }}>
       <div style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "380px", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
-        <h1 style={{ color: "#166534", fontSize: "24px", fontWeight: 700, marginBottom: "4px" }}>Bleaf Admin</h1>
+        <h1 style={{ color: "#166534", fontSize: "24px", fontWeight: 700, marginBottom: "4px" }}>VattavadaStays</h1>
         <p style={{ color: "#78716c", fontSize: "14px", marginBottom: "24px" }}>Owner login</p>
-        <p id="loginerr" style={{ color: "#dc2626", fontSize: "13px", marginBottom: "12px" }}></p>
+        {error && (
+          <p style={{ color: "#dc2626", fontSize: "13px", marginBottom: "12px" }}>{error}</p>
+        )}
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: "16px" }}>
             <label htmlFor="email" style={{ display: "block", fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", color: "#78716c", marginBottom: "6px" }}>Email</label>
@@ -34,6 +56,8 @@ function LoginPage() {
               id="email"
               name="email"
               type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@example.com"
               autoComplete="email"
               required
@@ -46,6 +70,8 @@ function LoginPage() {
               id="password"
               name="password"
               type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
               required
@@ -54,9 +80,10 @@ function LoginPage() {
           </div>
           <button
             type="submit"
-            style={{ width: "100%", padding: "14px", background: "#166534", color: "white", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: 600, cursor: "pointer", marginTop: "8px" }}
+            disabled={loading}
+            style={{ width: "100%", padding: "14px", background: "#166534", color: "white", border: "none", borderRadius: "100px", fontSize: "15px", fontWeight: 600, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, marginTop: "8px" }}
           >
-            Sign in
+            {loading ? "Signing in…" : "Sign in"}
           </button>
         </form>
       </div>
