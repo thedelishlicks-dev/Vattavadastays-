@@ -105,29 +105,38 @@ function SetupPage() {
     setStep("saving");
 
     try {
-      // Create auth user + link property + consume token — all server-side
-      const { error: rpcErr } = await supabase.rpc("create_owner_auth_user", {
-        p_email: ownerEmail,
-        p_password: password,
-        p_property_id: propertyId,
-        p_token: token,
-      });
+      // Call the Edge Function to create auth user + link property + consume token
+      const response = await fetch(
+        "https://vzzfqgqxnodlrvnaxpbw.supabase.co/functions/v1/create-owner",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: ownerEmail,
+            password: password,
+            property_id: propertyId,
+            token: token,
+          }),
+        }
+      );
 
-      if (rpcErr) throw rpcErr;
+      const result = await response.json();
 
-      // Sign in with the freshly created credentials
-      const { error: signInErr } = await supabase.auth.signInWithPassword({
-        email: ownerEmail,
-        password,
-      });
-
-      if (signInErr) throw signInErr;
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create account");
+      }
 
       setStep("done");
 
+      // Redirect to login page with email pre-filled after 2 seconds
       setTimeout(() => {
-        navigate({ to: "/admin/dashboard" });
-      }, 1800);
+        navigate({
+          to: "/login",
+          search: { email: ownerEmail },
+        });
+      }, 2000);
     } catch (e: unknown) {
       setError(
         e instanceof Error ? e.message : "Something went wrong. Please try again."
@@ -169,7 +178,7 @@ function SetupPage() {
           <CheckCircle2 className="h-10 w-10 text-primary" />
           <h2 className="font-display text-lg font-semibold">You're all set!</h2>
           <p className="text-sm text-muted-foreground">
-            Taking you to your dashboard…
+            Your account has been created. Redirecting you to login…
           </p>
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
         </div>
@@ -286,7 +295,7 @@ function SetupPage() {
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           )}
           {step === "saving"
-            ? "Setting up your account…"
+            ? "Creating your account…"
             : "Create account & continue"}
         </button>
       </div>
