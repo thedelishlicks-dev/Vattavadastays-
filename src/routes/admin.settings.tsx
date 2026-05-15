@@ -28,8 +28,8 @@ function AdminSettings() {
         owner_whatsapp: property.owner_whatsapp ?? '',
         check_in_time: property.check_in_time ?? '',
         check_out_time: property.check_out_time ?? '',
-        location_lat: property.location_lat?.toString() ?? '',
-        location_lng: property.location_lng?.toString() ?? '',
+        location_lat: property.location_lat != null ? property.location_lat.toString() : '',
+        location_lng: property.location_lng != null ? property.location_lng.toString() : '',
         landmark_description: property.landmark_description ?? '',
         static_map_image_url: property.static_map_image_url ?? '',
       })
@@ -68,7 +68,6 @@ function AdminSettings() {
     <div className="max-w-2xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Property Settings</h1>
       <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Basic fields */}
         <div><label className="block text-sm font-medium text-stone-700 mb-1">Property Name</label>
           <input type="text" name="name" value={form.name} onChange={handleChange}
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" /></div>
@@ -95,24 +94,27 @@ function AdminSettings() {
               className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" /></div>
         </div>
 
-        {/* Location & Directions section */}
         <div className="border-t border-stone-200 pt-5">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="h-4 w-4 text-green-700" />
             <h3 className="text-sm font-semibold text-stone-900">Location &amp; Directions</h3>
           </div>
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div><label className="block text-xs font-medium text-stone-500 mb-1">Latitude</label>
-              <input type="number" name="location_lat" step="any" value={form.location_lat} onChange={handleChange} placeholder="e.g. 10.1234"
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" /></div>
-            <div><label className="block text-xs font-medium text-stone-500 mb-1">Longitude</label>
-              <input type="number" name="location_lng" step="any" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.5678"
-                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" /></div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Latitude</label>
+              <input type="text" name="location_lat" inputMode="decimal" value={form.location_lat} onChange={handleChange} placeholder="e.g. 10.12"
+                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-stone-500 mb-1">Longitude</label>
+              <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.57"
+                className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" />
+            </div>
           </div>
           <div className="mb-4">
             <label className="block text-xs font-medium text-stone-500 mb-1">Landmark description</label>
             <input type="text" name="landmark_description" value={form.landmark_description} onChange={handleChange}
-              placeholder="e.g. 5km from Munnar town, near Tea Museum"
+              placeholder="e.g. 3km from Kovilloor"
               className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-900 focus:outline-none focus:ring-2 focus:ring-green-700" />
             <p className="mt-1 text-xs text-stone-400">Shown on the guest page to help visitors find you.</p>
           </div>
