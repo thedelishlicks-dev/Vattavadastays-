@@ -8,6 +8,7 @@ import { RoomDetail, type BookingDetails } from "@/components/RoomDetail";
 import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
+import { MapSection } from "@/components/MapSection";
 import { Footer } from "@/components/Footer";
 import type { Room } from "@/types/database";
 
@@ -33,16 +34,12 @@ function Index() {
       <Header />
       <main>
         <Hero />
-        <Availability
-          checkIn={checkIn}
-          checkOut={checkOut}
-          setCheckIn={setCheckIn}
-          setCheckOut={setCheckOut}
-        />
+        <Availability checkIn={checkIn} checkOut={checkOut} setCheckIn={setCheckIn} setCheckOut={setCheckOut} />
         <Rooms onSelect={setOpenRoom} />
         <BookingForm selection={selection} subdomain={subdomain} />
         <About />
         <Amenities />
+        <MapSection subdomain={subdomain} />
       </main>
       <Footer subdomain={subdomain} />
       {openRoom && (
