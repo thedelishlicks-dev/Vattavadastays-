@@ -1,4 +1,5 @@
-import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
+import { createFileRoute, Outlet, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdminEmail } from '@/lib/subdomain'
 import { Shield, LogOut } from 'lucide-react'
@@ -9,12 +10,25 @@ export const Route = createFileRoute('/superadmin')({
 })
 
 function SuperAdminLayout() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, isLoading } = useAuth()
+  const navigate = useNavigate()
 
-  if (!isAuthenticated) {
-    redirect({ to: '/login' })
-    return null
+  useEffect(() => {
+    if (isLoading) return
+    if (!isAuthenticated) {
+      navigate({ to: '/login' })
+    }
+  }, [isAuthenticated, isLoading, navigate])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    )
   }
+
+  if (!isAuthenticated) return null
 
   if (!isSuperAdminEmail(user?.email)) {
     return (
@@ -32,7 +46,6 @@ function SuperAdminLayout() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar */}
       <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -46,7 +59,10 @@ function SuperAdminLayout() {
         <div className="flex items-center gap-4">
           <span className="text-xs text-muted-foreground">{user?.email}</span>
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              await supabase.auth.signOut()
+              navigate({ to: '/login' })
+            }}
             className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
           >
             <LogOut className="h-3.5 w-3.5" />
@@ -55,7 +71,6 @@ function SuperAdminLayout() {
         </div>
       </header>
 
-      {/* Page content */}
       <main className="mx-auto max-w-6xl px-4 md:px-8 py-8">
         <Outlet />
       </main>
