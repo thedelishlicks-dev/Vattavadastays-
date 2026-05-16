@@ -36,7 +36,12 @@ function Index() {
       <Header />
       <main>
         <Hero />
-        <Availability checkIn={checkIn} checkOut={checkOut} setCheckIn={setCheckIn} setCheckOut={setCheckOut} />
+        <Availability
+          checkIn={checkIn}
+          checkOut={checkOut}
+          setCheckIn={setCheckIn}
+          setCheckOut={setCheckOut}
+        />
         <Rooms onSelect={setOpenRoom} />
         <BookingForm selection={selection} subdomain={subdomain} />
         <About />

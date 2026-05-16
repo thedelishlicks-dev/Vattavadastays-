@@ -8,10 +8,13 @@ interface SeoTagsProps {
 function getBaseUrl(): string {
   if (typeof window === "undefined") return "https://vattavadastays.vercel.app";
   const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) {
-    return `https://${hostname}`;
-  }
+  if (hostname.endsWith(".vattavadastays.com")) return `https://${hostname}`;
   return "https://vattavadastays.vercel.app";
+}
+
+function filterAmenities(amenities: string[]): string[] {
+  if (!amenities) return [];
+  return amenities.filter(a => !a.startsWith("__"));
 }
 
 export function SeoTags({ subdomain }: SeoTagsProps) {
@@ -21,103 +24,88 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     if (!property) return;
 
     const baseUrl = getBaseUrl();
-    const pageUrl = `${baseUrl}`;
-    const propertyName = property.name ?? "Our Property";
-    const description =
-      property.description?.slice(0, 160) ??
-      `Stay at ${propertyName} — a beautiful homestay in Vattavada, Kerala. Book your mountain retreat surrounded by strawberry farms and tea plantations.`;
-    const heroImage = property.hero_image ?? "";
+    const title = `${property.name ?? "Property"} | VattavadaStays`;
+    const description = property.description ? property.description.slice(0, 160) : `Book your stay at ${property.name ?? "this property"} in Vattavada, Kerala. Beautiful homestay experience in the mountains.`;
+    const imageUrl = property.hero_image_url || `${baseUrl}/og-default.jpg`;
+    const keywords = filterAmenities(property.amenities ?? []).join(", ");
 
-    // Title
-    document.title = `${propertyName} | VattavadaStays`;
+    document.title = title;
 
-    // Meta description
-    updateMetaTag("description", description);
+    const updateMeta = (name: string, content: string, useProperty = false) => {
+      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement("meta");
+        el.name = name;
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
 
-    // Open Graph
-    updateMetaTag("og:title", `${propertyName} | Book Your Stay in Vattavada`);
-    updateMetaTag("og:description", description);
-    updateMetaTag("og:type", "website");
-    updateMetaTag("og:url", pageUrl);
-    if (heroImage) updateMetaTag("og:image", heroImage);
-    updateMetaTag("og:site_name", "VattavadaStays");
+    const updateOg = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="og:${property}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute("property", `og:${property}`);
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
 
-    // Twitter Card
-    updateMetaTag("twitter:card", "summary_large_image");
-    updateMetaTag("twitter:title", `${propertyName} | VattavadaStays`);
-    updateMetaTag("twitter:description", description);
-    if (heroImage) updateMetaTag("twitter:image", heroImage);
+    const updateTwitter = (name: string, content: string) => {
+      let el = document.querySelector(`meta[name="twitter:${name}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement("meta");
+        el.name = `twitter:${name}`;
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
 
-    // Canonical
-    let canonical = document.querySelector('link[rel="canonical"]');
+    updateMeta("description", description);
+    if (keywords) updateMeta("keywords", keywords);
+    updateOg("title", title);
+    updateOg("description", description);
+    updateOg("image", imageUrl);
+    updateOg("url", baseUrl);
+    updateOg("type", "website");
+    updateOg("site_name", "VattavadaStays");
+    updateTwitter("card", "summary_large_image");
+    updateTwitter("title", title);
+    updateTwitter("description", description);
+    updateTwitter("image", imageUrl);
+
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
-      canonical.setAttribute("rel", "canonical");
+      canonical.rel = "canonical";
       document.head.appendChild(canonical);
     }
-    canonical.setAttribute("href", pageUrl);
+    canonical.href = baseUrl;
 
-    // Schema.org JSON-LD (LodgingBusiness)
+    const geoSchema = property.location_lat && property.location_lng ? `,"geo":{"@type":"GeoCoordinates","latitude":${property.location_lat},"longitude":${property.location_lng}}` : "";
+
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "LodgingBusiness",
-      name: propertyName,
-      description: property.description ?? description,
-      url: pageUrl,
-      image: heroImage || undefined,
-      address: {
-        "@type": "PostalAddress",
-        addressLocality: property.area ?? "Vattavada",
-        addressRegion: "Kerala",
-        addressCountry: "IN",
-      },
-      geo: {
-        "@type": "GeoCoordinates",
-        latitude: property.location_lat ?? undefined,
-        longitude: property.location_lng ?? undefined,
-      },
-      telephone: property.owner_phone ?? undefined,
-      amenityFeature: getAmenityFeatures(property.shared_amenities ?? []),
-      priceRange: "₹₹",
+      name: property.name,
+      description: property.description,
+      image: property.hero_image_url,
+      url: baseUrl,
+      telephone: property.owner_phone,
+      address: { "@type": "PostalAddress", addressLocality: "Vattavada", addressRegion: "Kerala", addressCountry: "IN" },
+     amenityFeature: filterAmenities(property.amenities ?? []).map(name => ({ "@type": "LocationFeatureSpecification", name, value: true })),
+      ...(geoSchema ? JSON.parse(`{${geoSchema}}`) : {}),
     };
 
-    const cleanJsonLd = JSON.parse(JSON.stringify(jsonLd));
-
-    let script = document.querySelector(
-      'script[type="application/ld+json"]'
-    ) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement("script");
-      script.setAttribute("type", "application/ld+json");
-      document.head.appendChild(script);
+    let scriptEl = document.querySelector('#schema-org-ld') as HTMLScriptElement | null;
+    if (!scriptEl) {
+      scriptEl = document.createElement("script");
+      scriptEl.id = "schema-org-ld";
+      scriptEl.type = "application/ld+json";
+      document.head.appendChild(scriptEl);
     }
-    script.textContent = JSON.stringify(cleanJsonLd);
+    scriptEl.textContent = JSON.stringify(jsonLd);
   }, [property]);
 
   return null;
-}
-
-function updateMetaTag(name: string, content: string) {
-  const attr = name.startsWith("og:") || name.startsWith("twitter:")
-    ? "property"
-    : "name";
-
-  let meta = document.querySelector(
-    `meta[${attr}="${name}"]`
-  ) as HTMLMetaElement | null;
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.setAttribute(attr, name);
-    document.head.appendChild(meta);
-  }
-  meta.setAttribute("content", content);
-}
-
-function getAmenityFeatures(amenities: string[]): object[] {
-  const sentinelFree = amenities.filter((a) => !a.startsWith("__"));
-  return sentinelFree.map((amenity) => ({
-    "@type": "LocationFeatureSpecification",
-    name: amenity.charAt(0).toUpperCase() + amenity.slice(1).replace(/-/g, " "),
-    value: true,
-  }));
 }
