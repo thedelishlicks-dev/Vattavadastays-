@@ -98,7 +98,16 @@ function SetupPage() {
             <input type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className={`${inputCls} pr-10`} placeholder="At least 8 characters" autoComplete="new-password" />
             <button type="button" onClick={() => setShowPw(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button>
           </div>
-          {password.length > 0 && <div className="mt-2 space-y-1"><div className="flex gap-1">{[1,2,3,4].map(i => <div key={i} className={["h-1 flex-1 rounded-full transition-colors", i <= strengthScore ? strengthColor : "bg-muted"].join(" ")} />)}</div><p className="text-xs text-muted-foreground">{strengthLabel}</p></div>}
+          {password.length > 0 && (
+            <>
+              <div className="mt-2 space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map(i => <div key={i} className={["h-1 flex-1 rounded-full transition-colors", i <= strengthScore ? strengthColor : "bg-muted"].join(" ")} />)}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">{strengthLabel}</p>
+            </>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-muted-foreground mb-1">Confirm password</label>
