@@ -9,6 +9,7 @@ import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
 import { MapSection } from "@/components/MapSection";
+import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
 import type { Room } from "@/types/database";
 
@@ -31,6 +32,7 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SeoTags subdomain={subdomain} />
       <Header />
       <main>
         <Hero />
