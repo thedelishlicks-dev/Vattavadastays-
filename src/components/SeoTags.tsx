@@ -12,9 +12,9 @@ function getBaseUrl(): string {
   return "https://vattavadastays.vercel.app";
 }
 
-function filterAmenities(amenities: string[]): string[] {
+function filterAmenities(amenities: string[] | null | undefined): string[] {
   if (!amenities) return [];
-  return amenities.filter(a => !a.startsWith("__"));
+  return amenities.filter((a) => !a.startsWith("__"));
 }
 
 export function SeoTags({ subdomain }: SeoTagsProps) {
@@ -25,14 +25,24 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
 
     const baseUrl = getBaseUrl();
     const title = `${property.name ?? "Property"} | VattavadaStays`;
-    const description = property.description ? property.description.slice(0, 160) : `Book your stay at ${property.name ?? "this property"} in Vattavada, Kerala. Beautiful homestay experience in the mountains.`;
-    const imageUrl = property.hero_image_url || `${baseUrl}/og-default.jpg`;
-    const keywords = filterAmenities(property.amenities ?? []).join(", ");
+    const description = property.description
+      ? property.description.slice(0, 160)
+      : `Book your stay at ${property.name ?? "this property"} in Vattavada, Kerala. Beautiful homestay experience in the mountains.`;
+
+    // hero_image is the correct column name
+    const imageUrl = property.hero_image
+      ? property.hero_image
+      : `${baseUrl}/og-default.jpg`;
+
+    // shared_amenities is the correct column name
+    const keywords = filterAmenities(property.shared_amenities).join(", ");
 
     document.title = title;
 
-    const updateMeta = (name: string, content: string, useProperty = false) => {
-      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+    const updateMeta = (name: string, content: string) => {
+      let el = document.querySelector(
+        `meta[name="${name}"]`
+      ) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
         el.name = name;
@@ -41,18 +51,22 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
       el.content = content;
     };
 
-    const updateOg = (property: string, content: string) => {
-      let el = document.querySelector(`meta[property="og:${property}"]`) as HTMLMetaElement | null;
+    const updateOg = (prop: string, content: string) => {
+      let el = document.querySelector(
+        `meta[property="og:${prop}"]`
+      ) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
-        el.setAttribute("property", `og:${property}`);
+        el.setAttribute("property", `og:${prop}`);
         document.head.appendChild(el);
       }
       el.content = content;
     };
 
     const updateTwitter = (name: string, content: string) => {
-      let el = document.querySelector(`meta[name="twitter:${name}"]`) as HTMLMetaElement | null;
+      let el = document.querySelector(
+        `meta[name="twitter:${name}"]`
+      ) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
         el.name = `twitter:${name}`;
@@ -74,7 +88,9 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     updateTwitter("description", description);
     updateTwitter("image", imageUrl);
 
-    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    let canonical = document.querySelector(
+      'link[rel="canonical"]'
+    ) as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
       canonical.rel = "canonical";
@@ -82,22 +98,41 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     }
     canonical.href = baseUrl;
 
-    const geoSchema = property.location_lat && property.location_lng ? `,"geo":{"@type":"GeoCoordinates","latitude":${property.location_lat},"longitude":${property.location_lng}}` : "";
-
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "LodgingBusiness",
       name: property.name,
-      description: property.description,
-      image: property.hero_image_url,
+      description: property.description ?? undefined,
+      image: property.hero_image ?? undefined,
       url: baseUrl,
-      telephone: property.owner_phone,
-      address: { "@type": "PostalAddress", addressLocality: "Vattavada", addressRegion: "Kerala", addressCountry: "IN" },
-     amenityFeature: filterAmenities(property.amenities ?? []).map(name => ({ "@type": "LocationFeatureSpecification", name, value: true })),
-      ...(geoSchema ? JSON.parse(`{${geoSchema}}`) : {}),
+      telephone: property.owner_phone ?? undefined,
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: "Vattavada",
+        addressRegion: "Kerala",
+        addressCountry: "IN",
+      },
+      amenityFeature: filterAmenities(property.shared_amenities).map(
+        (name) => ({
+          "@type": "LocationFeatureSpecification",
+          name,
+          value: true,
+        })
+      ),
+      ...(property.location_lat && property.location_lng
+        ? {
+            geo: {
+              "@type": "GeoCoordinates",
+              latitude: property.location_lat,
+              longitude: property.location_lng,
+            },
+          }
+        : {}),
     };
 
-    let scriptEl = document.querySelector('#schema-org-ld') as HTMLScriptElement | null;
+    let scriptEl = document.querySelector(
+      "#schema-org-ld"
+    ) as HTMLScriptElement | null;
     if (!scriptEl) {
       scriptEl = document.createElement("script");
       scriptEl.id = "schema-org-ld";
@@ -109,3 +144,4 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
 
   return null;
 }
+ 
