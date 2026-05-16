@@ -9,8 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as SetupRouteImport } from './routes/setup'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SuperadminIndexRouteImport } from './routes/superadmin.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminRoomsRouteImport } from './routes/admin.rooms'
@@ -24,6 +28,21 @@ import { Route as AdminCalendarRouteImport } from './routes/admin.calendar'
 import { Route as AdminBookingsRouteImport } from './routes/admin.bookings'
 import { Route as AdminAmenitiesRouteImport } from './routes/admin.amenities'
 
+const SuperadminRoute = SuperadminRouteImport.update({
+  id: '/superadmin',
+  path: '/superadmin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -33,6 +52,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SuperadminIndexRoute = SuperadminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SuperadminRoute,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
@@ -98,6 +122,9 @@ const AdminAmenitiesRoute = AdminAmenitiesRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
+  '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
@@ -110,9 +137,12 @@ export interface FileRoutesByFullPath {
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
+  '/superadmin/': typeof SuperadminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
@@ -125,11 +155,15 @@ export interface FileRoutesByTo {
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin': typeof AdminIndexRoute
+  '/superadmin': typeof SuperadminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
+  '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
@@ -142,12 +176,16 @@ export interface FileRoutesById {
   '/admin/rooms': typeof AdminRoomsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/': typeof AdminIndexRoute
+  '/superadmin/': typeof SuperadminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
+    | '/login'
+    | '/setup'
+    | '/superadmin'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
@@ -160,9 +198,12 @@ export interface FileRouteTypes {
     | '/admin/rooms'
     | '/admin/settings'
     | '/admin/'
+    | '/superadmin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
+    | '/setup'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
@@ -175,10 +216,14 @@ export interface FileRouteTypes {
     | '/admin/rooms'
     | '/admin/settings'
     | '/admin'
+    | '/superadmin'
   id:
     | '__root__'
     | '/'
     | '/admin'
+    | '/login'
+    | '/setup'
+    | '/superadmin'
     | '/admin/amenities'
     | '/admin/bookings'
     | '/admin/calendar'
@@ -191,11 +236,15 @@ export interface FileRouteTypes {
     | '/admin/rooms'
     | '/admin/settings'
     | '/admin/'
+    | '/superadmin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  SetupRoute: typeof SetupRoute
+  SuperadminRoute: typeof SuperadminRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +261,27 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/superadmin': {
+      id: '/superadmin'
+      path: '/superadmin'
+      fullPath: '/superadmin'
+      preLoaderRoute: typeof SuperadminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -298,6 +368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAmenitiesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/superadmin/': {
+      id: '/superadmin/'
+      path: '/'
+      fullPath: '/superadmin/'
+      preLoaderRoute: typeof SuperadminIndexRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
   }
 }
 
@@ -333,9 +410,22 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface SuperadminRouteChildren {
+  SuperadminIndexRoute: typeof SuperadminIndexRoute
+}
+
+const SuperadminRouteChildren: SuperadminRouteChildren = {
+  SuperadminIndexRoute: SuperadminIndexRoute,
+}
+
+const SuperadminRouteWithChildren = SuperadminRoute._addFileChildren(SuperadminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
+  LoginRoute: LoginRoute,
+  SetupRoute: SetupRoute,
+  SuperadminRoute: SuperadminRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
