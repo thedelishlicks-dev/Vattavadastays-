@@ -30,7 +30,6 @@ export function BookingForm({ selection, subdomain }: Props) {
   const { mutateAsync: createBooking, isPending } = useCreateBooking();
 
   const handlePhoneChange = (val: string) => {
-    // Always keep +91 prefix — restore it if deleted
     if (!val.startsWith("+91")) {
       setPhone("+91 ");
     } else {
@@ -68,10 +67,11 @@ export function BookingForm({ selection, subdomain }: Props) {
       setSubmittedPhone(phone);
       setSubmitted(true);
     } catch (err: unknown) {
+      // Show the real error — helps diagnose RLS or schema issues
       const msg =
-        err instanceof Error
+        err instanceof Error && err.message
           ? err.message
-          : "Something went wrong. Please try again.";
+          : "Insert failed — check Supabase logs";
       setError(msg);
     }
   };
@@ -243,9 +243,12 @@ export function BookingForm({ selection, subdomain }: Props) {
                 )}
 
                 {error && (
-                  <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-                    {error}
-                  </p>
+                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+                    <p className="text-xs text-destructive font-medium">
+                      Booking failed
+                    </p>
+                    <p className="text-xs text-destructive mt-0.5">{error}</p>
+                  </div>
                 )}
 
                 <button
