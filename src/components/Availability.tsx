@@ -180,22 +180,12 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                     title={fullyBooked && !outOfMonth ? "Fully booked" : undefined}
                     className={[
                       "aspect-square rounded-lg text-sm font-medium transition-colors",
-                      outOfMonth
-                        ? "text-muted-foreground/20 cursor-not-allowed"
-                        : "",
-                      isPast && !outOfMonth
-                        ? "text-muted-foreground/40 cursor-not-allowed line-through"
-                        : "",
-                      fullyBooked && !outOfMonth
-                        ? "bg-red-50 text-red-400 cursor-not-allowed"
-                        : "",
+                      outOfMonth ? "text-muted-foreground/20 cursor-not-allowed" : "",
+                      isPast && !outOfMonth ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
+                      fullyBooked && !outOfMonth ? "bg-red-50 text-red-400 cursor-not-allowed" : "",
                       !disabled ? "hover:bg-primary-light" : "",
-                      selected && !isStart && !isEnd
-                        ? "bg-primary-light text-primary"
-                        : "",
-                      isStart || isEnd
-                        ? "bg-primary text-primary-foreground hover:bg-primary"
-                        : "",
+                      selected && !isStart && !isEnd ? "bg-primary-light text-primary" : "",
+                      isStart || isEnd ? "bg-primary text-primary-foreground hover:bg-primary" : "",
                     ].join(" ")}
                   >
                     {format(d, "d")}
@@ -238,23 +228,14 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
 
             <div className="mt-5 rounded-xl bg-primary-light/60 border border-border p-4 text-sm">
               <div className="font-medium text-foreground">
-                {nights
-                  ? `${nights} night${nights > 1 ? "s" : ""} selected`
-                  : "No dates selected"}
+                {nights ? `${nights} night${nights > 1 ? "s" : ""} selected` : "No dates selected"}
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {nights
-                  ? "Continue below to choose a room."
-                  : "Select check-in and check-out dates to see available rooms."}
+                {nights ? "Continue below to choose a room." : "Select check-in and check-out dates to see available rooms."}
               </p>
             </div>
 
-            
-              href="#rooms"
-              className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Browse rooms
-            </a>
+            <a href="#rooms" className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Browse rooms</a>
           </div>
         </div>
       </div>
