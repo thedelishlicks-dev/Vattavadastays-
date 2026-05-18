@@ -42,7 +42,11 @@ function Index() {
           setCheckIn={setCheckIn}
           setCheckOut={setCheckOut}
         />
-        <Rooms onSelect={setOpenRoom} />
+        <Rooms
+          onSelect={setOpenRoom}
+          checkIn={checkIn}
+          checkOut={checkOut}
+        />
         <BookingForm selection={selection} subdomain={subdomain} />
         <About />
         <Amenities />
