@@ -35,7 +35,7 @@ type Props = {
 };
 
 export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Props) {
-  const [month, setMonth] = useState(new Date(2026, 4, 1));
+  const [month, setMonth] = useState(new Date());
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = new Date();
 
