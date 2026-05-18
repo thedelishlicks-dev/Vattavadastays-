@@ -13,6 +13,7 @@ import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as TestBookingRouteImport } from './routes/test-booking'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuperadminIndexRouteImport } from './routes/superadmin.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
@@ -46,6 +47,11 @@ const LoginRoute = LoginRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestBookingRoute = TestBookingRouteImport.update({
+  id: '/test-booking',
+  path: '/test-booking',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -124,6 +130,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/test-booking': typeof TestBookingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/test-booking': typeof TestBookingRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
   '/admin/calendar': typeof AdminCalendarRoute
@@ -163,6 +171,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/setup': typeof SetupRoute
+  '/test-booking': typeof TestBookingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/amenities': typeof AdminAmenitiesRoute
   '/admin/bookings': typeof AdminBookingsRoute
@@ -244,6 +253,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
   SetupRoute: typeof SetupRoute
+  TestBookingRoute: typeof TestBookingRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
 }
 
@@ -425,6 +435,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
   SetupRoute: SetupRoute,
+  TestBookingRoute: TestBookingRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
 }
 export const routeTree = rootRouteImport
