@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
-import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'  // ← changed
+import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
+import { useBookings } from '@/hooks/useBookings'
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -23,11 +24,58 @@ function AdminCalendar() {
     .toISOString()
     .split('T')[0]
 
-  const { data: availability, isLoading: availLoading } = useAvailabilityRange(  // ← changed
+  const { data: availability, isLoading: availLoading } = useAvailabilityRange(
     activeRoomId ?? '',
     startDate,
     endDate
   )
+
+  const { data: bookings = [], isLoading: bookingsLoading } = useBookings(
+    property?.id ?? ''
+  )
+
+  // Build a set of booked dates for the selected room
+  const bookedDates = useMemo(() => {
+    const dates = new Set<string>()
+    bookings
+      .filter(
+        (b) =>
+          b.room_id === activeRoomId &&
+          b.status !== 'cancelled'
+      )
+      .forEach((b) => {
+        const start = new Date(b.check_in)
+        const end = new Date(b.check_out)
+        const cur = new Date(start)
+        while (cur < end) {
+          dates.add(cur.toISOString().split('T')[0])
+          cur.setDate(cur.getDate() + 1)
+        }
+      })
+    return dates
+  }, [bookings, activeRoomId])
+
+  // Build a map of guest names per date for tooltip
+  const bookedGuestMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    bookings
+      .filter(
+        (b) =>
+          b.room_id === activeRoomId &&
+          b.status !== 'cancelled'
+      )
+      .forEach((b) => {
+        const start = new Date(b.check_in)
+        const end = new Date(b.check_out)
+        const cur = new Date(start)
+        while (cur < end) {
+          const d = cur.toISOString().split('T')[0]
+          map[d] = b.guest_name
+          cur.setDate(cur.getDate() + 1)
+        }
+      })
+    return map
+  }, [bookings, activeRoomId])
 
   if (propLoading) {
     return (
@@ -68,6 +116,8 @@ function AdminCalendar() {
     year: 'numeric',
   })
 
+  const isLoading = availLoading || bookingsLoading
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Availability Calendar</h1>
@@ -98,7 +148,7 @@ function AdminCalendar() {
         </button>
       </div>
 
-      {availLoading ? (
+      {isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-green-700" />
         </div>
@@ -121,21 +171,47 @@ function AdminCalendar() {
               const day = i + 1
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
               const slot = availMap[dateStr]
-              const isAvailable = slot?.is_available ?? true
+              const isBooked = bookedDates.has(dateStr)
+              const guestName = bookedGuestMap[dateStr]
+              const isManuallyBlocked = slot?.is_available === false
               const price = slot?.price_override
+
+              const bgColor = isBooked
+                ? 'bg-blue-50'
+                : isManuallyBlocked
+                ? 'bg-red-50'
+                : 'bg-green-50'
+
+              const statusLabel = isBooked
+                ? 'Booked'
+                : isManuallyBlocked
+                ? 'Closed'
+                : 'Open'
+
+              const statusColor = isBooked
+                ? 'text-blue-600'
+                : isManuallyBlocked
+                ? 'text-red-500'
+                : 'text-green-700'
 
               return (
                 <div
                   key={dateStr}
-                  className={`h-16 border-b border-r border-stone-100 p-1.5 text-xs ${
-                    isAvailable ? 'bg-green-50' : 'bg-red-50'
-                  }`}
+                  className={`h-16 border-b border-r border-stone-100 p-1.5 text-xs ${bgColor}`}
+                  title={guestName ? `${guestName}` : undefined}
                 >
                   <div className="font-medium text-stone-700">{day}</div>
-                  <div className={`mt-0.5 ${isAvailable ? 'text-green-700' : 'text-red-500'}`}>
-                    {isAvailable ? 'Open' : 'Closed'}
+                  <div className={`mt-0.5 truncate ${statusColor}`}>
+                    {statusLabel}
                   </div>
-                  {price && <div className="text-amber-600">₹{price}</div>}
+                  {guestName && (
+                    <div className="text-blue-500 truncate text-[10px]">
+                      {guestName.split(' ')[0]}
+                    </div>
+                  )}
+                  {price && !isBooked && (
+                    <div className="text-amber-600">₹{price}</div>
+                  )}
                 </div>
               )
             })}
@@ -149,8 +225,12 @@ function AdminCalendar() {
           Available
         </span>
         <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-sm bg-blue-100 border border-blue-300" />
+          Booked
+        </span>
+        <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-red-100 border border-red-300" />
-          Unavailable
+          Blocked
         </span>
       </div>
     </div>
