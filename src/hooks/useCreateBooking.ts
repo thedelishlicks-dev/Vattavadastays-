@@ -20,8 +20,6 @@ export const useCreateBooking = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: BookingData) => {
-      // Never send 'nights' — it is a generated column in Postgres.
-      // Never send 'id' or 'created_at' — auto-generated.
       const payload = {
         property_id: data.property_id,
         room_id: data.room_id,
@@ -39,20 +37,15 @@ export const useCreateBooking = () => {
         is_paid: false,
       };
 
-      const { data: booking, error } = await supabase
+      const { error } = await supabase
         .from("bookings")
-        .insert(payload)
-        .select("id")
-        .single();
+        .insert(payload);
 
       if (error) {
-        // Surface the real Supabase error message — not just generic fallback
         throw new Error(error.message ?? "Supabase insert failed");
       }
-
-      return booking.id;
     },
-    onSuccess: (_bookingId, variables) => {
+    onSuccess: (_result, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["availability", variables.room_id],
       });
