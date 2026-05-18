@@ -52,7 +52,6 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
 
   const { data: property } = useProperty(subdomain);
 
-  // Fetch all non-cancelled bookings for this property for the next 6 months
   const { data: bookings = [] } = useQuery({
     queryKey: ["guest-bookings", property?.id],
     queryFn: async () => {
@@ -72,7 +71,6 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
     enabled: !!property?.id,
   });
 
-  // Build set of fully booked dates (all rooms taken)
   const totalRooms = useMemo(
     () => (property?.rooms ?? []).filter((r) => r.is_active).length,
     [property]
@@ -144,7 +142,9 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="font-display text-xl font-semibold">{format(month, "MMMM yyyy")}</div>
+              <div className="font-display text-xl font-semibold">
+                {format(month, "MMMM yyyy")}
+              </div>
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
                 className="h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center"
@@ -156,7 +156,9 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground mb-2">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                <div key={d} className="py-2">{d}</div>
+                <div key={d} className="py-2">
+                  {d}
+                </div>
               ))}
             </div>
 
@@ -175,18 +177,26 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                     key={i}
                     disabled={disabled}
                     onClick={() => handlePick(d)}
+                    title={fullyBooked && !outOfMonth ? "Fully booked" : undefined}
                     className={[
-                      "aspect-square rounded-lg text-sm font-medium transition-colors relative",
-                      outOfMonth ? "text-muted-foreground/20 cursor-not-allowed" : "",
-                      isPast && !outOfMonth ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
+                      "aspect-square rounded-lg text-sm font-medium transition-colors",
+                      outOfMonth
+                        ? "text-muted-foreground/20 cursor-not-allowed"
+                        : "",
+                      isPast && !outOfMonth
+                        ? "text-muted-foreground/40 cursor-not-allowed line-through"
+                        : "",
                       fullyBooked && !outOfMonth
                         ? "bg-red-50 text-red-400 cursor-not-allowed"
                         : "",
                       !disabled ? "hover:bg-primary-light" : "",
-                      selected && !isStart && !isEnd ? "bg-primary-light text-primary" : "",
-                      isStart || isEnd ? "bg-primary text-primary-foreground hover:bg-primary" : "",
+                      selected && !isStart && !isEnd
+                        ? "bg-primary-light text-primary"
+                        : "",
+                      isStart || isEnd
+                        ? "bg-primary text-primary-foreground hover:bg-primary"
+                        : "",
                     ].join(" ")}
-                    title={fullyBooked && !outOfMonth ? "Fully booked" : undefined}
                   >
                     {format(d, "d")}
                   </button>
@@ -194,7 +204,6 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               })}
             </div>
 
-            {/* Legend */}
             <div className="flex gap-4 mt-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-sm bg-primary/20 border border-primary/30" />
