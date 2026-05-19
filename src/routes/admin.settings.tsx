@@ -3,7 +3,6 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
-import { compressImage } from '@/lib/imageUtils'
 import { Loader2, Save, CheckCircle, Upload, X } from 'lucide-react'
 
 export const Route = createFileRoute('/admin/settings')({
@@ -12,6 +11,31 @@ export const Route = createFileRoute('/admin/settings')({
 
 const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
+
+async function compressToWebP(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<File> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width, height } = img
+      if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth }
+      if (height > maxHeight) { width = Math.round(width * maxHeight / height); height = maxHeight }
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas unavailable')); return }
+      ctx.drawImage(img, 0, 0, width, height)
+      canvas.toBlob((blob) => {
+        if (!blob) { reject(new Error('Compression failed')); return }
+        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
+      }, 'image/webp', quality)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Load failed')) }
+    img.src = url
+  })
+}
 
 function AdminSettings() {
   const queryClient = useQueryClient()
@@ -78,26 +102,17 @@ function AdminSettings() {
     setHeroUploading(true)
     setHeroError('')
     try {
-      const compressed = await compressImage(file, 'hero')
+      const compressed = await compressToWebP(file, 1920, 1080, 0.80)
       const path = `${property.id}/hero-${Date.now()}.webp`
       const { error: uploadError } = await supabase.storage
         .from('hero-images')
         .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
       if (uploadError) throw uploadError
-
-      const { data: urlData } = supabase.storage
-        .from('hero-images')
-        .getPublicUrl(path)
-
+      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
       const publicUrl = urlData.publicUrl
       setHeroPreview(publicUrl)
       setForm((f) => ({ ...f, hero_image: publicUrl }))
-
-      // Save immediately to DB
-      const { error: dbError } = await supabase
-        .from('properties')
-        .update({ hero_image: publicUrl })
-        .eq('id', property.id)
+      const { error: dbError } = await supabase.from('properties').update({ hero_image: publicUrl }).eq('id', property.id)
       if (dbError) throw dbError
       queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
       queryClient.invalidateQueries({ queryKey: ['property'] })
@@ -128,19 +143,11 @@ function AdminSettings() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
   }
 
   if (!property) {
-    return (
-      <div className="text-center py-16 text-muted-foreground">
-        Could not load property settings.
-      </div>
-    )
+    return <div className="text-center py-16 text-muted-foreground">Could not load property settings.</div>
   }
 
   return (
@@ -151,59 +158,29 @@ function AdminSettings() {
         {/* Hero Image */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
           <h2 className="text-sm font-semibold">Hero Image</h2>
-          <p className="text-xs text-muted-foreground">
-            The main image shown at the top of your guest booking page. Compressed automatically for fast loading.
-          </p>
+          <p className="text-xs text-muted-foreground">The main image shown at the top of your guest booking page. Auto-compressed to WebP for fast loading.</p>
 
           {heroPreview ? (
             <div className="relative rounded-xl overflow-hidden">
-              <img
-                src={heroPreview}
-                alt="Hero preview"
-                className="w-full h-48 object-cover"
-              />
-              <button
-                type="button"
-                onClick={handleRemoveHero}
-                className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
-              >
+              <img src={heroPreview} alt="Hero preview" className="w-full h-48 object-cover" />
+              <button type="button" onClick={handleRemoveHero} className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
                 <X className="h-4 w-4" />
               </button>
             </div>
           ) : (
-            <div
-              onClick={() => heroInputRef.current?.click()}
-              className="border-2 border-dashed border-border rounded-xl h-48 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
-            >
+            <div onClick={() => heroInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-48 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
               {heroUploading ? (
-                <>
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Compressing and uploading...</p>
-                </>
+                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Compressing and uploading...</p></>
               ) : (
-                <>
-                  <Upload className="h-6 w-6 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Tap to upload hero image</p>
-                  <p className="text-xs text-muted-foreground">JPG, PNG or WebP · Auto-compressed</p>
-                </>
+                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-sm text-muted-foreground">Tap to upload hero image</p><p className="text-xs text-muted-foreground">JPG, PNG or WebP · Auto-compressed</p></>
               )}
             </div>
           )}
 
-          <input
-            ref={heroInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={handleHeroUpload}
-          />
+          <input ref={heroInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleHeroUpload} />
 
           {!heroPreview && !heroUploading && (
-            <button
-              type="button"
-              onClick={() => heroInputRef.current?.click()}
-              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted"
-            >
+            <button type="button" onClick={() => heroInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
               <Upload className="h-4 w-4" /> Upload image
             </button>
           )}
@@ -283,22 +260,12 @@ function AdminSettings() {
 
         {/* Save */}
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60"
-          >
+          <button type="submit" disabled={mutation.isPending} className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60">
             {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Changes
           </button>
-          {mutation.isSuccess && (
-            <span className="flex items-center gap-1 text-sm text-primary">
-              <CheckCircle className="h-4 w-4" /> Saved!
-            </span>
-          )}
-          {mutation.isError && (
-            <span className="text-sm text-destructive">Save failed — please try again.</span>
-          )}
+          {mutation.isSuccess && <span className="flex items-center gap-1 text-sm text-primary"><CheckCircle className="h-4 w-4" /> Saved!</span>}
+          {mutation.isError && <span className="text-sm text-destructive">Save failed — please try again.</span>}
         </div>
       </form>
     </div>
