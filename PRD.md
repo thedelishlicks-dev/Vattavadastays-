@@ -308,26 +308,26 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 - [ ] Merge Dev → Main
 
 ### Phase 1 — Multi-Tenant Foundation (Weeks 2–4)
-- [ ] Add `property_id` to all tables + RLS migration
+- [x ] Add `property_id` to all tables + RLS migration
 - [ ] Dynamic subdomain detection (`getSubdomain()`)
 - [ ] Superadmin invite flow
-- [ ] Superadmin dashboard (`/superadmin`)
+- [x]   Superadmin dashboard (`/superadmin`)
 - [ ] Wildcard domain on Vercel (`*.vattavadastays.com`)
 - [ ] Test data isolation (pen test with 2 properties)
 
 ### Phase 2 — Guest Experience & SEO (Weeks 5–6)
-- [ ] Static map image + directions deep links on guest page
-- [ ] WhatsApp booking CTA ("Book via WhatsApp" button)
+- [x] Static map image + directions deep links on guest page
+- [x] WhatsApp booking CTA ("Book via WhatsApp" button)
 - [ ] SEO meta tags + Open Graph per property
 - [ ] `schema.org/LodgingBusiness` structured data
 - [ ] PWA manifest + Service Worker (shell caching)
 - [ ] Performance audit: guest page on simulated 2G
 
 ### Phase 3 — WhatsApp Dashboard Messaging (Week 7)
-- [ ] WhatsApp message templates in booking row actions
-- [ ] Directions message template (sends lat/lng link)
-- [ ] Payment reminder template
-- [ ] Day-before reminder template
+- [x] WhatsApp message templates in booking row actions
+- [x] Directions message template (sends lat/lng link)
+- [x] Payment reminder template
+- [x] Day-before reminder template
 
 ### Phase 4 — Billing & Onboarding (Week 8)
 - [ ] Trial → active subscription flow
