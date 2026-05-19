@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2, BedDouble, Plus, X, Pencil, Check } from 'lucide-react'
+import { compressImage } from '@/lib/imageUtils'
+import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff } from 'lucide-react'
 import type { Room } from '@/types/database'
 
 export const Route = createFileRoute('/admin/rooms')({
@@ -18,8 +19,7 @@ const AMENITY_OPTIONS = [
   'kitchen', 'view', 'wifi', 'wardrobe', 'mini_fridge', 'work_desk',
 ]
 
-const inputCls =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
 type RoomForm = {
@@ -45,6 +45,110 @@ const emptyForm = (): RoomForm => ({
   room_amenities: [],
   is_active: true,
 })
+
+function RoomImageUpload({
+  room,
+  propertyId,
+  onUploaded,
+}: {
+  room: Room
+  propertyId: string
+  onUploaded: () => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+  const currentImage = room.images?.[0] ?? null
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError('')
+    try {
+      const compressed = await compressImage(file, 'room')
+      const path = `${propertyId}/${room.id}-${Date.now()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('room-images')
+        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage
+        .from('room-images')
+        .getPublicUrl(path)
+
+      const { error: dbError } = await supabase
+        .from('rooms')
+        .update({ images: [urlData.publicUrl] })
+        .eq('id', room.id)
+      if (dbError) throw dbError
+      onUploaded()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
+    }
+  }
+
+  const handleRemove = async () => {
+    const { error: dbError } = await supabase
+      .from('rooms')
+      .update({ images: [] })
+      .eq('id', room.id)
+    if (!dbError) onUploaded()
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className={labelCls}>Room Image</p>
+      {currentImage ? (
+        <div className="relative rounded-lg overflow-hidden">
+          <img src={currentImage} alt={room.name} className="w-full h-36 object-cover" />
+          <button
+            type="button"
+            onClick={handleRemove}
+            className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs px-2.5 py-1 hover:bg-black/80"
+          >
+            <Upload className="h-3 w-3" /> Replace
+          </button>
+        </div>
+      ) : (
+        <div
+          onClick={() => inputRef.current?.click()}
+          className="border-2 border-dashed border-border rounded-lg h-36 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Compressing...</p>
+            </>
+          ) : (
+            <>
+              <ImageOff className="h-5 w-5 text-muted-foreground" />
+              <p className="text-xs text-muted-foreground">Tap to upload photo</p>
+            </>
+          )}
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handleUpload}
+      />
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  )
+}
 
 function RoomDrawer({
   room,
@@ -135,6 +239,15 @@ function RoomDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Image upload — only show for existing rooms */}
+          {room && (
+            <RoomImageUpload
+              room={room}
+              propertyId={propertyId}
+              onUploaded={onSaved}
+            />
+          )}
+
           <div>
             <label className={labelCls}>Room name *</label>
             <input value={form.name} onChange={(e) => set('name', e.target.value)}
@@ -260,6 +373,7 @@ function AdminRooms() {
 
   const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
     setDrawerRoom(undefined)
   }
 
@@ -301,42 +415,61 @@ function AdminRooms() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {rooms.map((room) => (
-            <div key={room.id} className="bg-card rounded-xl border border-border p-5 shadow-sm">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <BedDouble className="h-4 w-4 text-primary shrink-0" />
-                  <h2 className="font-semibold text-foreground">{room.name}</h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${room.is_active ? 'bg-primary-light text-primary' : 'bg-muted text-muted-foreground'}`}>
-                    {room.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                  <button onClick={() => setDrawerRoom(room)}
-                    className="h-7 w-7 rounded-md border border-border hover:bg-muted flex items-center justify-center" title="Edit room">
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-              </div>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <div className="flex gap-4">
-                  <span>Type: <span className="text-foreground font-medium capitalize">{room.room_type}</span></span>
-                  <span>Bed: <span className="text-foreground font-medium capitalize">{room.bed_type}</span></span>
-                </div>
-                <div className="flex gap-4">
-                  <span>Max: <span className="text-foreground font-medium">{room.max_guests} guests</span></span>
-                  <span>Base: <span className="text-foreground font-medium">₹{room.base_price.toLocaleString('en-IN')}/night</span></span>
-                </div>
-                {room.extra_guest_price > 0 && (
-                  <span>Extra guest: <span className="text-foreground font-medium">₹{room.extra_guest_price}/person</span></span>
-                )}
-              </div>
-              {room.room_amenities && room.room_amenities.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {room.room_amenities.map((a) => (
-                    <span key={a} className="text-xs bg-primary-light/60 text-primary px-2 py-0.5 rounded-full">{a}</span>
-                  ))}
+            <div key={room.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+              {/* Room image */}
+              {room.images?.[0] ? (
+                <img
+                  src={room.images[0]}
+                  alt={room.name}
+                  className="w-full h-40 object-cover"
+                />
+              ) : (
+                <div
+                  className="w-full h-40 bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/70 transition-colors"
+                  onClick={() => setDrawerRoom(room)}
+                >
+                  <ImageOff className="h-6 w-6 text-muted-foreground/50" />
+                  <p className="text-xs text-muted-foreground">Tap to add photo</p>
                 </div>
               )}
+
+              <div className="p-5">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <BedDouble className="h-4 w-4 text-primary shrink-0" />
+                    <h2 className="font-semibold text-foreground">{room.name}</h2>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${room.is_active ? 'bg-primary-light text-primary' : 'bg-muted text-muted-foreground'}`}>
+                      {room.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                    <button onClick={() => setDrawerRoom(room)}
+                      className="h-7 w-7 rounded-md border border-border hover:bg-muted flex items-center justify-center" title="Edit room">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <div className="flex gap-4">
+                    <span>Type: <span className="text-foreground font-medium capitalize">{room.room_type}</span></span>
+                    <span>Bed: <span className="text-foreground font-medium capitalize">{room.bed_type}</span></span>
+                  </div>
+                  <div className="flex gap-4">
+                    <span>Max: <span className="text-foreground font-medium">{room.max_guests} guests</span></span>
+                    <span>Base: <span className="text-foreground font-medium">₹{room.base_price.toLocaleString('en-IN')}/night</span></span>
+                  </div>
+                  {room.extra_guest_price > 0 && (
+                    <span>Extra guest: <span className="text-foreground font-medium">₹{room.extra_guest_price}/person</span></span>
+                  )}
+                </div>
+                {room.room_amenities && room.room_amenities.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1">
+                    {room.room_amenities.map((a) => (
+                      <span key={a} className="text-xs bg-primary-light/60 text-primary px-2 py-0.5 rounded-full">{a}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
