@@ -1,25 +1,64 @@
-import heroImg from "@/assets/hero-tea.jpg";
+import { useProperty } from "@/hooks/useProperty";
+
+function getSubdomain(): string {
+  const hostname = window.location.hostname;
+  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
+  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
+}
+
+function getTodayLabel(): string {
+  return new Date().toLocaleDateString("en-IN", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
 
 export function Hero() {
+  const subdomain = getSubdomain();
+  const { data: property } = useProperty(subdomain);
+
+  const heroImage = property?.hero_image ?? null;
+  const today = getTodayLabel();
+
   return (
     <section id="top" className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
-      <img
-        src={heroImg}
-        alt="Tea plantation in the Western Ghats"
-        width={1920}
-        height={1280}
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+      {heroImage ? (
+        <img
+          src={heroImage}
+          alt="Bleaf Mud House"
+          width={1920}
+          height={1080}
+          className="absolute inset-0 h-full w-full object-cover"
+          loading="eager"
+          decoding="async"
+        />
+      ) : (
+        <div className="absolute inset-0 h-full w-full bg-gradient-to-br from-green-900 via-green-800 to-stone-900" />
+      )}
+
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/70" />
 
       <div className="relative z-10 mx-auto flex h-full max-w-5xl flex-col items-center justify-center px-6 text-center text-white">
-        <span className="mb-5 inline-flex items-center rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] backdrop-blur-sm">
-          Vattavada · Kerala
-        </span>
+        {/* Date and temperature pill */}
+        <div className="mb-5 flex items-center gap-3 flex-wrap justify-center">
+          <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] backdrop-blur-sm">
+            Vattavada · Kerala
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs backdrop-blur-sm">
+            <span>{today}</span>
+            <span className="opacity-60">·</span>
+            <span>🌡 12–18°C</span>
+          </span>
+        </div>
+
         <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-semibold leading-[1.05] max-w-3xl">
           Bleaf Mud House
         </h1>
-        <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">ബ്ലീഫ് മഡ് ഹൗസ്</div>
+        <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">
+          ബ്ലീഫ് മഡ് ഹൗസ്
+        </div>
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
           12-room mountain retreat in organic Vattavada
         </p>
