@@ -302,8 +302,8 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 - [x] Add/edit rooms (drawer)
 - [x] Add booking (modal)
 - [x] Settings save with correct cache invalidation
-- [ ] Guest booking form end-to-end test
-- [ ] WhatsApp deep links on booking dashboard
+- [x] Guest booking form end-to-end test
+- [x] WhatsApp deep links on booking dashboard
 - [ ] Remove TanStack devtools button
 - [ ] Merge Dev → Main
 
