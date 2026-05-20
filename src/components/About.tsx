@@ -19,7 +19,7 @@ export function About({ property }: AboutProps) {
     { icon: Bath, label: "Meals", value: hasMeals ? "Included" : "Available" },
   ];
 
-  const aboutImage = property.hero_image ?? "/assets/cottage.jpg";
+  const aboutImage = property.about_image ?? property.hero_image ?? "/assets/cottage.jpg";
   const ownerInitial = property.owner_name?.charAt(0).toUpperCase() ?? "H";
 
   return (
