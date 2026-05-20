@@ -8,10 +8,11 @@ export interface Property {
   location_lat?: number;
   location_lng?: number;
   shared_amenities: string[];
+  hero_tagline?: string;
   description?: string;
   description_ml?: string;
   hero_image?: string;
-  about_image?: string;        // ← NEW
+  about_image?: string;
   owner_name?: string;
   owner_phone?: string;
   owner_whatsapp?: string;
