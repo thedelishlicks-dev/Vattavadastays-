@@ -42,6 +42,7 @@ function AdminSettings() {
   const { data: property, isLoading } = useOwnerProperty()
   const heroInputRef = useRef<HTMLInputElement>(null)
   const aboutInputRef = useRef<HTMLInputElement>(null)
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
     name: '',
@@ -58,6 +59,7 @@ function AdminSettings() {
     static_map_image_url: '',
     hero_image: '',
     about_image: '',
+    logo_url: '',
   })
 
   const [heroUploading, setHeroUploading] = useState(false)
@@ -67,6 +69,10 @@ function AdminSettings() {
   const [aboutUploading, setAboutUploading] = useState(false)
   const [aboutError, setAboutError] = useState('')
   const [aboutPreview, setAboutPreview] = useState<string | null>(null)
+
+  const [logoUploading, setLogoUploading] = useState(false)
+  const [logoError, setLogoError] = useState('')
+  const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (property) {
@@ -85,9 +91,11 @@ function AdminSettings() {
         static_map_image_url: property.static_map_image_url ?? '',
         hero_image: property.hero_image ?? '',
         about_image: property.about_image ?? '',
+        logo_url: property.logo_url ?? '',
       })
       if (property.hero_image) setHeroPreview(property.hero_image)
       if (property.about_image) setAboutPreview(property.about_image)
+      if (property.logo_url) setLogoPreview(property.logo_url)
     }
   }, [property])
 
@@ -180,6 +188,43 @@ function AdminSettings() {
     queryClient.invalidateQueries({ queryKey: ['property'] })
   }
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !property?.id) return
+    setLogoUploading(true)
+    setLogoError('')
+    try {
+      const compressed = await compressToWebP(file, 200, 200, 0.90)
+      const path = `${property.id}/logo-${Date.now()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('hero-images')
+        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
+      const publicUrl = urlData.publicUrl
+      setLogoPreview(publicUrl)
+      setForm((f) => ({ ...f, logo_url: publicUrl }))
+      const { error: dbError } = await supabase.from('properties').update({ logo_url: publicUrl }).eq('id', property.id)
+      if (dbError) throw dbError
+      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+      queryClient.invalidateQueries({ queryKey: ['property'] })
+    } catch (err: unknown) {
+      setLogoError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setLogoUploading(false)
+      if (logoInputRef.current) logoInputRef.current.value = ''
+    }
+  }
+
+  const handleRemoveLogo = async () => {
+    if (!property?.id) return
+    setLogoPreview(null)
+    setForm((f) => ({ ...f, logo_url: '' }))
+    await supabase.from('properties').update({ logo_url: null }).eq('id', property.id)
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
@@ -201,6 +246,39 @@ function AdminSettings() {
     <div className="max-w-2xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Property Settings</h1>
       <form onSubmit={handleSubmit} className="space-y-6">
+
+        {/* Logo */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-sm font-semibold">Logo</h2>
+          <p className="text-xs text-muted-foreground">Your property logo shown in the header. Square image recommended (200×200px).</p>
+
+          {logoPreview ? (
+            <div className="relative rounded-xl overflow-hidden inline-block">
+              <img src={logoPreview} alt="Logo preview" className="h-20 w-20 object-cover rounded-full" />
+              <button type="button" onClick={handleRemoveLogo} className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <div onClick={() => logoInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-32 w-32 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+              {logoUploading ? (
+                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-xs text-muted-foreground">Uploading...</p></>
+              ) : (
+                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-xs text-muted-foreground">Tap to upload</p><p className="text-[10px] text-muted-foreground">Square · 200×200</p></>
+              )}
+            </div>
+          )}
+
+          <input ref={logoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} />
+
+          {!logoPreview && !logoUploading && (
+            <button type="button" onClick={() => logoInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
+              <Upload className="h-4 w-4" /> Upload logo
+            </button>
+          )}
+
+          {logoError && <p className="text-xs text-destructive">{logoError}</p>}
+        </div>
 
         {/* Hero Image */}
         <div className="bg-card border border-border rounded-xl p-5 space-y-4">
