@@ -45,6 +45,7 @@ function AdminSettings() {
 
   const [form, setForm] = useState({
     name: '',
+    hero_tagline: '',
     description: '',
     owner_name: '',
     owner_phone: '',
@@ -71,6 +72,7 @@ function AdminSettings() {
     if (property) {
       setForm({
         name: property.name ?? '',
+        hero_tagline: property.hero_tagline ?? '',
         description: property.description ?? '',
         owner_name: property.owner_name ?? '',
         owner_phone: property.owner_phone ?? '',
@@ -274,8 +276,21 @@ function AdminSettings() {
             <input type="text" name="name" value={form.name} onChange={handleChange} className={inputCls} />
           </div>
           <div>
+            <label className={labelCls}>Hero Tagline</label>
+            <input 
+              type="text" 
+              name="hero_tagline" 
+              value={form.hero_tagline} 
+              onChange={handleChange} 
+              placeholder="Short tagline for hero banner (e.g., A 3-room mountain retreat...)"
+              className={inputCls} 
+            />
+            <p className="text-xs text-muted-foreground mt-1">Shown on the hero banner. Keep it short and punchy.</p>
+          </div>
+          <div>
             <label className={labelCls}>Description</label>
             <textarea name="description" value={form.description} onChange={handleChange} rows={4} className={inputCls + ' resize-none'} />
+            <p className="text-xs text-muted-foreground mt-1">Shown in the About section. Can be longer and more detailed.</p>
           </div>
         </div>
 
