@@ -40,8 +40,8 @@ async function compressToWebP(file: File, maxWidth: number, maxHeight: number, q
 function AdminSettings() {
   const queryClient = useQueryClient()
   const { data: property, isLoading } = useOwnerProperty()
-  const heroInputRef = useRef<<HTMLInputElement>(null)
-  const aboutInputRef = useRef<<HTMLInputElement>(null)
+  const heroInputRef = useRef<HTMLInputElement>(null)
+  const aboutInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
     name: '',
@@ -61,11 +61,11 @@ function AdminSettings() {
 
   const [heroUploading, setHeroUploading] = useState(false)
   const [heroError, setHeroError] = useState('')
-  const [heroPreview, setHeroPreview] = useState<<string | null>(null)
+  const [heroPreview, setHeroPreview] = useState<string | null>(null)
 
   const [aboutUploading, setAboutUploading] = useState(false)
   const [aboutError, setAboutError] = useState('')
-  const [aboutPreview, setAboutPreview] = useState<<string | null>(null)
+  const [aboutPreview, setAboutPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (property) {
@@ -92,7 +92,7 @@ function AdminSettings() {
   const mutation = useMutation({
     mutationFn: async (updates: typeof form) => {
       if (!property?.id) throw new Error('No property loaded')
-      const payload: Record<<string, unknown> = { ...updates }
+      const payload: Record<string, unknown> = { ...updates }
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)
@@ -104,7 +104,7 @@ function AdminSettings() {
     },
   })
 
-  const handleHeroUpload = async (e: React.ChangeEvent<<HTMLInputElement>) => {
+  const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !property?.id) return
     setHeroUploading(true)
@@ -141,7 +141,7 @@ function AdminSettings() {
     queryClient.invalidateQueries({ queryKey: ['property'] })
   }
 
-  const handleAboutUpload = async (e: React.ChangeEvent<<HTMLInputElement>) => {
+  const handleAboutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !property?.id) return
     setAboutUploading(true)
@@ -178,7 +178,7 @@ function AdminSettings() {
     queryClient.invalidateQueries({ queryKey: ['property'] })
   }
 
-  const handleChange = (e: React.ChangeEvent<<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
