@@ -11,6 +11,7 @@ export interface Property {
   hero_tagline?: string;
   description?: string;
   description_ml?: string;
+  logo_url?: string;
   hero_image?: string;
   about_image?: string;
   owner_name?: string;
