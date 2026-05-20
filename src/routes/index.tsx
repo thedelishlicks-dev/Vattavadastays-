@@ -11,6 +11,7 @@ import { Amenities } from "@/components/Amenities";
 import { MapSection } from "@/components/MapSection";
 import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
+import { useProperty } from "@/hooks/useProperty";
 import type { Room } from "@/types/database";
 
 function getSubdomain(): string {
@@ -25,10 +26,11 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const subdomain = getSubdomain();
+  const { data: property } = useProperty(subdomain);
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [openRoom, setOpenRoom] = useState<Room | null>(null);
-  const [selection, setSelection] = useState<BookingDetails | null>(null);
+  const [openRoom, setOpenRoom] = useState<<Room | null>(null);
+  const [selection, setSelection] = useState<<BookingDetails | null>(null);
 
   return (
     <div className="min-h-screen bg-background">
@@ -48,7 +50,7 @@ function Index() {
           checkOut={checkOut}
         />
         <BookingForm selection={selection} subdomain={subdomain} />
-        <About />
+        <About property={property} />
         <Amenities />
         <MapSection subdomain={subdomain} />
       </main>
