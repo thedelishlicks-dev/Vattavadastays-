@@ -11,6 +11,7 @@ export interface Property {
   description?: string;
   description_ml?: string;
   hero_image?: string;
+  about_image?: string;        // ← NEW
   owner_name?: string;
   owner_phone?: string;
   owner_whatsapp?: string;
