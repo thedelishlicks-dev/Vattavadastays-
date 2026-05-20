@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Menu, X, Leaf } from "lucide-react";
+import { Menu, X } from "lucide-react";
+import { useProperty } from "@/hooks/useProperty";
+
+function getSubdomain(): string {
+  const hostname = window.location.hostname;
+  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
+  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
+}
 
 const links = [
   { href: "#availability", label: "Dates" },
@@ -12,21 +19,41 @@ const links = [
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const subdomain = getSubdomain();
+  const { data: property } = useProperty(subdomain);
+
+  const logoUrl = property?.logo_url ?? null;
+  const propertyName = property?.name ?? "Loading...";
+  const propertyNameMl = property?.name_ml ?? null;
 
   return (
     <header className="sticky top-0 z-40 backdrop-blur-md bg-background/85 border-b border-border">
       <div className="mx-auto max-w-6xl px-4 md:px-8 h-16 md:h-20 flex items-center justify-between">
         <a href="#top" className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <Leaf className="h-5 w-5" />
-          </span>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={propertyName}
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-full object-cover"
+            />
+          ) : (
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <span className="font-display text-lg font-semibold">
+                {propertyName.charAt(0).toUpperCase()}
+              </span>
+            </span>
+          )}
           <div className="leading-tight">
             <div className="font-display text-base md:text-lg font-semibold text-foreground">
-              Bleaf Mud House
+              {propertyName}
             </div>
-            <div className="font-malayalam text-xs md:text-sm text-muted-foreground">
-              ബ്ലീഫ് മഡ് ഹൗസ്
-            </div>
+            {propertyNameMl && (
+              <div className="font-malayalam text-xs md:text-sm text-muted-foreground">
+                {propertyNameMl}
+              </div>
+            )}
           </div>
         </a>
 
