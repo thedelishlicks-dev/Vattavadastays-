@@ -26,9 +26,9 @@ export function Hero() {
   const propertyNameMl = property?.name_ml ?? null;
   const area = property?.area ?? "Vattavada";
   const roomCount = property?.rooms?.length ?? 0;
-  
-  const tagline = property?.description
-    ? property.description
+
+  const tagline = property?.hero_tagline
+    ? property.hero_tagline
     : `${roomCount}-room stay in ${area}`;
 
   return (
