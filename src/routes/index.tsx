@@ -29,8 +29,8 @@ function Index() {
   const { data: property } = useProperty(subdomain);
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [openRoom, setOpenRoom] = useState<<Room | null>(null);
-  const [selection, setSelection] = useState<<BookingDetails | null>(null);
+  const [openRoom, setOpenRoom] = useState<Room | null>(null);
+  const [selection, setSelection] = useState<BookingDetails | null>(null);
 
   return (
     <div className="min-h-screen bg-background">
