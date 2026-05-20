@@ -41,9 +41,11 @@ function AdminSettings() {
   const queryClient = useQueryClient()
   const { data: property, isLoading } = useOwnerProperty()
   const heroInputRef = useRef<HTMLInputElement>(null)
+  const aboutInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
     name: '',
+    hero_tagline: '',
     description: '',
     owner_name: '',
     owner_phone: '',
@@ -55,16 +57,22 @@ function AdminSettings() {
     landmark_description: '',
     static_map_image_url: '',
     hero_image: '',
+    about_image: '',
   })
 
   const [heroUploading, setHeroUploading] = useState(false)
   const [heroError, setHeroError] = useState('')
   const [heroPreview, setHeroPreview] = useState<string | null>(null)
 
+  const [aboutUploading, setAboutUploading] = useState(false)
+  const [aboutError, setAboutError] = useState('')
+  const [aboutPreview, setAboutPreview] = useState<string | null>(null)
+
   useEffect(() => {
     if (property) {
       setForm({
         name: property.name ?? '',
+        hero_tagline: property.hero_tagline ?? '',
         description: property.description ?? '',
         owner_name: property.owner_name ?? '',
         owner_phone: property.owner_phone ?? '',
@@ -76,8 +84,10 @@ function AdminSettings() {
         landmark_description: property.landmark_description ?? '',
         static_map_image_url: property.static_map_image_url ?? '',
         hero_image: property.hero_image ?? '',
+        about_image: property.about_image ?? '',
       })
       if (property.hero_image) setHeroPreview(property.hero_image)
+      if (property.about_image) setAboutPreview(property.about_image)
     }
   }, [property])
 
@@ -129,6 +139,43 @@ function AdminSettings() {
     setHeroPreview(null)
     setForm((f) => ({ ...f, hero_image: '' }))
     await supabase.from('properties').update({ hero_image: null }).eq('id', property.id)
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+  }
+
+  const handleAboutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !property?.id) return
+    setAboutUploading(true)
+    setAboutError('')
+    try {
+      const compressed = await compressToWebP(file, 1280, 960, 0.80)
+      const path = `${property.id}/about-${Date.now()}.webp`
+      const { error: uploadError } = await supabase.storage
+        .from('hero-images')
+        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
+      if (uploadError) throw uploadError
+      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
+      const publicUrl = urlData.publicUrl
+      setAboutPreview(publicUrl)
+      setForm((f) => ({ ...f, about_image: publicUrl }))
+      const { error: dbError } = await supabase.from('properties').update({ about_image: publicUrl }).eq('id', property.id)
+      if (dbError) throw dbError
+      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+      queryClient.invalidateQueries({ queryKey: ['property'] })
+    } catch (err: unknown) {
+      setAboutError(err instanceof Error ? err.message : 'Upload failed')
+    } finally {
+      setAboutUploading(false)
+      if (aboutInputRef.current) aboutInputRef.current.value = ''
+    }
+  }
+
+  const handleRemoveAbout = async () => {
+    if (!property?.id) return
+    setAboutPreview(null)
+    setForm((f) => ({ ...f, about_image: '' }))
+    await supabase.from('properties').update({ about_image: null }).eq('id', property.id)
     queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
     queryClient.invalidateQueries({ queryKey: ['property'] })
   }
@@ -188,6 +235,39 @@ function AdminSettings() {
           {heroError && <p className="text-xs text-destructive">{heroError}</p>}
         </div>
 
+        {/* About Image */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <h2 className="text-sm font-semibold">About Section Image</h2>
+          <p className="text-xs text-muted-foreground">Image shown in the About section on your guest page. Recommended: landscape photo of your property exterior or host area.</p>
+
+          {aboutPreview ? (
+            <div className="relative rounded-xl overflow-hidden">
+              <img src={aboutPreview} alt="About preview" className="w-full h-48 object-cover" />
+              <button type="button" onClick={handleRemoveAbout} className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div onClick={() => aboutInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-48 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
+              {aboutUploading ? (
+                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Compressing and uploading...</p></>
+              ) : (
+                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-sm text-muted-foreground">Tap to upload about image</p><p className="text-xs text-muted-foreground">JPG, PNG or WebP · Auto-compressed</p></>
+              )}
+            </div>
+          )}
+
+          <input ref={aboutInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAboutUpload} />
+
+          {!aboutPreview && !aboutUploading && (
+            <button type="button" onClick={() => aboutInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
+              <Upload className="h-4 w-4" /> Upload image
+            </button>
+          )}
+
+          {aboutError && <p className="text-xs text-destructive">{aboutError}</p>}
+        </div>
+
         {/* Basic Info */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Basic Info</h2>
@@ -196,8 +276,21 @@ function AdminSettings() {
             <input type="text" name="name" value={form.name} onChange={handleChange} className={inputCls} />
           </div>
           <div>
+            <label className={labelCls}>Hero Tagline</label>
+            <input 
+              type="text" 
+              name="hero_tagline" 
+              value={form.hero_tagline} 
+              onChange={handleChange} 
+              placeholder="Short tagline for hero banner (e.g., A 3-room mountain retreat...)"
+              className={inputCls} 
+            />
+            <p className="text-xs text-muted-foreground mt-1">Shown on the hero banner. Keep it short and punchy.</p>
+          </div>
+          <div>
             <label className={labelCls}>Description</label>
             <textarea name="description" value={form.description} onChange={handleChange} rows={4} className={inputCls + ' resize-none'} />
+            <p className="text-xs text-muted-foreground mt-1">Shown in the About section. Can be longer and more detailed.</p>
           </div>
         </div>
 

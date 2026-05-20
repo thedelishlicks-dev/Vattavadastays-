@@ -22,12 +22,21 @@ export function Hero() {
   const heroImage = property?.hero_image ?? null;
   const today = getTodayLabel();
 
+  const propertyName = property?.name ?? "Loading...";
+  const propertyNameMl = property?.name_ml ?? null;
+  const area = property?.area ?? "Vattavada";
+  const roomCount = property?.rooms?.length ?? 0;
+
+  const tagline = property?.hero_tagline
+    ? property.hero_tagline
+    : `${roomCount}-room stay in ${area}`;
+
   return (
     <section id="top" className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
       {heroImage ? (
         <img
           src={heroImage}
-          alt="Bleaf Mud House"
+          alt={propertyName}
           width={1920}
           height={1080}
           className="absolute inset-0 h-full w-full object-cover"
@@ -41,10 +50,9 @@ export function Hero() {
       <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-black/70" />
 
       <div className="relative z-10 mx-auto flex h-full max-w-5xl flex-col items-center justify-center px-6 text-center text-white">
-        {/* Date and temperature pill */}
         <div className="mb-5 flex items-center gap-3 flex-wrap justify-center">
           <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] backdrop-blur-sm">
-            Vattavada · Kerala
+            {area} · Kerala
           </span>
           <span className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs backdrop-blur-sm">
             <span>{today}</span>
@@ -54,13 +62,15 @@ export function Hero() {
         </div>
 
         <h1 className="font-display text-4xl sm:text-5xl md:text-7xl font-semibold leading-[1.05] max-w-3xl">
-          Bleaf Mud House
+          {propertyName}
         </h1>
-        <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">
-          ബ്ലീഫ് മഡ് ഹൗസ്
-        </div>
+        {propertyNameMl && (
+          <div className="font-malayalam mt-3 text-xl md:text-2xl text-white/90">
+            {propertyNameMl}
+          </div>
+        )}
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
-          12-room mountain retreat in organic Vattavada
+          {tagline}
         </p>
         <a
           href="#availability"

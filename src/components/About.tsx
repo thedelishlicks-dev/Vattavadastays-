@@ -1,20 +1,34 @@
 import { Users, BedDouble, Bath } from "lucide-react";
-import cottage from "@/assets/cottage.jpg";
+import type { Property } from "@/hooks/useProperty";
 
-const stats = [
-  { icon: BedDouble, label: "Rooms", value: "12" },
-  { icon: Users, label: "Farm Stay", value: "Organic" },
-  { icon: Bath, label: "Meals", value: "Included" },
-];
+interface AboutProps {
+  property?: Property | null;
+}
 
-export function About() {
+export function About({ property }: AboutProps) {
+  if (!property) return null;
+
+  const roomCount = property.rooms?.length ?? 0;
+  const hasMeals = property.shared_amenities?.some(
+    (a) => !a.startsWith("__") && (a.toLowerCase().includes("meal") || a.toLowerCase().includes("breakfast"))
+  );
+
+  const stats = [
+    { icon: BedDouble, label: "Rooms", value: roomCount > 0 ? String(roomCount) : "—" },
+    { icon: Users, label: "Host", value: property.owner_name ?? "Your host" },
+    { icon: Bath, label: "Meals", value: hasMeals ? "Included" : "Available" },
+  ];
+
+  const aboutImage = property.about_image ?? property.hero_image ?? "/assets/cottage.jpg";
+  const ownerInitial = property.owner_name?.charAt(0).toUpperCase() ?? "H";
+
   return (
     <section id="about" className="py-20 md:py-28 bg-background">
       <div className="mx-auto max-w-6xl px-4 md:px-8 grid md:grid-cols-2 gap-12 items-center">
         <div className="relative">
           <img
-            src={cottage}
-            alt="Bleaf Mud House exterior"
+            src={aboutImage}
+            alt={`${property.name} exterior`}
             width={1280}
             height={960}
             loading="lazy"
@@ -23,10 +37,10 @@ export function About() {
           <div className="absolute -bottom-6 -right-4 md:-right-6 bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-soft)] max-w-[220px]">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display text-lg font-semibold">
-                D
+                {ownerInitial}
               </div>
               <div>
-                <div className="font-medium text-sm">Deepak</div>
+                <div className="font-medium text-sm">{property.owner_name ?? "Host"}</div>
                 <div className="text-xs text-muted-foreground">Your host</div>
               </div>
             </div>
@@ -38,13 +52,15 @@ export function About() {
             About the stay
           </span>
           <h2 className="mt-3 text-3xl md:text-5xl font-semibold text-foreground">
-            A 12-room mountain retreat among the strawberry farms
+            {property.name}
           </h2>
+          {property.name_ml && (
+            <div className="font-malayalam mt-2 text-xl text-muted-foreground">
+              {property.name_ml}
+            </div>
+          )}
           <p className="mt-5 text-muted-foreground leading-relaxed">
-            Tucked into the misty hills of Vattavada, Bleaf Mud House is a family-run mountain
-            retreat with 12 rooms surrounded by strawberry farms and rolling tea plantations. Wake
-            to birdsong, walk through the plantations with our host Deepak, enjoy home-cooked
-            organic meals, and gather around the bonfire as the mountains turn gold.
+            {property.description ?? `Welcome to ${property.name}, a beautiful stay in ${property.area ?? "Vattavada"}.`}
           </p>
 
           <div className="mt-8 grid grid-cols-3 gap-3">
