@@ -6,11 +6,8 @@
 
 function clean(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-  // Already has country code
   if (digits.startsWith("91") && digits.length === 12) return digits;
-  // 10-digit mobile number
   if (digits.length === 10) return `91${digits}`;
-  // Fallback — return as-is
   return digits;
 }
 
@@ -102,24 +99,59 @@ export function directionsLink({
   return link(guestPhone, text);
 }
 
-/** Owner sends payment reminder to guest */
+/**
+ * Owner sends payment reminder to guest.
+ *
+ * Logic:
+ * - If no advance recorded yet (advancePaid = 0), ask for 25% advance.
+ * - If advance already recorded, ask for the remaining balance.
+ * - If fully paid, the caller should not show this link at all,
+ *   but we handle it gracefully just in case.
+ */
 export function paymentReminderLink({
   guestPhone,
   guestName,
-  amount,
+  totalAmount,
+  advancePaid,
   checkIn,
   propertyName,
+  upiId,
 }: {
   guestPhone: string;
   guestName: string;
-  amount: number;
+  totalAmount: number;
+  advancePaid: number;
   checkIn: string;
   propertyName: string;
+  upiId?: string;
 }): string {
+  const suggested25 = Math.round(totalAmount * 0.25);
+  const balance     = Math.max(0, totalAmount - advancePaid);
+
+  let amountLine: string;
+  let contextLine: string;
+
+  if (advancePaid === 0) {
+    // No advance recorded — ask for 25% to confirm
+    amountLine  = `₹${suggested25.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
+    contextLine = `Total booking amount: ₹${totalAmount.toLocaleString("en-IN")}`;
+  } else if (balance > 0) {
+    // Advance received, balance still pending
+    amountLine  = `₹${balance.toLocaleString("en-IN")} (remaining balance)`;
+    contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${totalAmount.toLocaleString("en-IN")}`;
+  } else {
+    // Fully paid — shouldn't normally be called, but handle gracefully
+    amountLine  = "fully paid ✓";
+    contextLine = `Total: ₹${totalAmount.toLocaleString("en-IN")}`;
+  }
+
   const text =
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
-    `Payment of ₹${amount.toLocaleString("en-IN")} is pending for your stay at ${propertyName} on ${checkIn}.\n\n` +
+    `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
+    `${contextLine}\n\n` +
+    (upiId ? `UPI: ${upiId}\n\n` : "") +
     `Please transfer at your earliest convenience. Thank you!`;
+
   return link(guestPhone, text);
 }
 

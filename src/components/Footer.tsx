@@ -1,4 +1,4 @@
-import { Phone, MapPin, MessageCircle, Leaf } from "lucide-react";
+import { Phone, MapPin, MessageCircle, Leaf, ClipboardList } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { telLink } from "@/lib/whatsapp";
 
@@ -24,9 +24,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
     return d;
   }
 
-  const waLink = whatsapp
-    ? `https://wa.me/${cleanDigits(whatsapp)}`
-    : null;
+  const waLink = whatsapp ? `https://wa.me/${cleanDigits(whatsapp)}` : null;
 
   return (
     <footer id="contact" className="bg-foreground text-background">
@@ -41,9 +39,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
               <div>
                 <div className="font-display text-lg font-semibold">{propertyName}</div>
                 {property?.name_ml && (
-                  <div className="font-malayalam text-sm opacity-70">
-                    {property.name_ml}
-                  </div>
+                  <div className="font-malayalam text-sm opacity-70">{property.name_ml}</div>
                 )}
               </div>
             </div>
@@ -106,14 +102,21 @@ export function Footer({ subdomain }: { subdomain: string }) {
                   WhatsApp
                 </a>
               )}
+
+              {/* Track booking — always visible */}
+              <a
+                href="/booking-status"
+                className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
+              >
+                <ClipboardList className="h-4 w-4" />
+                Track your booking
+              </a>
             </div>
           </div>
         </div>
 
         <div className="mt-12 border-t border-background/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <span>
-            © {new Date().getFullYear()} {propertyName}. All rights reserved.
-          </span>
+          <span>© {new Date().getFullYear()} {propertyName}. All rights reserved.</span>
           {ownerName && <span>Hosted by {ownerName}</span>}
         </div>
       </div>

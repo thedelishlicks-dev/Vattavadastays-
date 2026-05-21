@@ -143,6 +143,12 @@ function BookingDetailModal({
   const lat = property?.location_lat;
   const lng = property?.location_lng;
 
+  // Parse UPI ID from shared_amenities sentinel key __upi:
+  const upiId = (() => {
+    const entry = (property?.shared_amenities ?? []).find((a) => a.startsWith("__upi:"));
+    return entry ? decodeURIComponent(entry.slice("__upi:".length)) : undefined;
+  })();
+
   const handleStatus = async (status: string) => {
     setUpdating(true);
     await onStatusChange(booking.id, status);
@@ -213,7 +219,7 @@ function BookingDetailModal({
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} />}
+          {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
           {tab === "charges" && <ChargesTab booking={booking} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
           {tab === "invoice" && <InvoiceTab booking={booking} roomName={roomName} property={property} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
         </div>
@@ -234,9 +240,9 @@ function ActionChip({ onClick, loading, icon, label, color }: {
   );
 }
 
-function OverviewTab({ booking, roomName, property, advance, balance, chargesTotal, onPaymentSaved, ownerPhone }: {
+function OverviewTab({ booking, roomName, property, advance, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: {
   booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"];
-  advance: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string;
+  advance: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string; upiId?: string;
 }) {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   return (
@@ -273,7 +279,7 @@ function OverviewTab({ booking, roomName, property, advance, balance, chargesTot
 
       <Section title="Send to guest">
         <div className="space-y-2">
-          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, amount: balance, checkIn: booking.check_in, propertyName: property?.name ?? "" })} label="💰 Payment reminder" />
+          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId })} label="💰 Payment reminder" />
           <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
         </div>
       </Section>
