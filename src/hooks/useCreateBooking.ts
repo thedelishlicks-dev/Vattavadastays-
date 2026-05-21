@@ -19,7 +19,7 @@ interface BookingData {
 export const useCreateBooking = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (data: BookingData) => {
+    mutationFn: async (data: BookingData): Promise<string> => {
       const payload = {
         property_id: data.property_id,
         room_id: data.room_id,
@@ -33,19 +33,24 @@ export const useCreateBooking = () => {
         extra_guest_charge: data.extra_guest_charge,
         total_amount: data.total_amount,
         payment_method: data.payment_method ?? null,
+        advance_amount: 0,
         status: "pending",
         is_paid: false,
       };
 
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from("bookings")
-        .insert(payload);
+        .insert(payload)
+        .select("id")
+        .single();
 
       if (error) {
         throw new Error(error.message ?? "Supabase insert failed");
       }
+
+      return inserted.id as string;
     },
-    onSuccess: (_result, variables) => {
+    onSuccess: (_id, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["availability", variables.room_id],
       });
