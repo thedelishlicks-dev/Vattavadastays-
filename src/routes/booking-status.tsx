@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import {
@@ -10,22 +10,18 @@ import type { BookingCharge } from "@/types/database";
 
 export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    phone: (search.phone as string) ?? "",
+    id:    (search.id    as string) ?? "",
+  }),
 });
 
-type StatusStep = {
-  key: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  desc: string;
-};
-
-const STATUS_STEPS: StatusStep[] = [
-  { key: "pending", label: "Request sent", icon: Clock, desc: "Waiting for owner confirmation" },
-  { key: "confirmed", label: "Confirmed", icon: CheckCircle2, desc: "Your stay is confirmed" },
-  { key: "checked_in", label: "Checked in", icon: LogIn, desc: "Enjoy your stay!" },
-  { key: "completed", label: "Completed", icon: Star, desc: "Thank you for staying with us" },
+const STATUS_STEPS = [
+  { key: "pending",    label: "Request sent",  icon: Clock,         desc: "Waiting for owner confirmation" },
+  { key: "confirmed",  label: "Confirmed",      icon: CheckCircle2,  desc: "Your stay is confirmed"         },
+  { key: "checked_in", label: "Checked in",     icon: LogIn,         desc: "Enjoy your stay!"               },
+  { key: "completed",  label: "Completed",      icon: Star,          desc: "Thank you for staying with us"  },
 ];
-
 const STATUS_ORDER = ["pending", "confirmed", "checked_in", "completed"];
 
 function getStepIndex(status: string) {
@@ -34,10 +30,12 @@ function getStepIndex(status: string) {
 }
 
 function BookingStatusPage() {
-  const [phone, setPhone] = useState("");
-  const [bookingId, setBookingId] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const { phone: prefillPhone, id: prefillId } = useSearch({ from: "/booking-status" });
+
+  const [phone, setPhone] = useState(prefillPhone ?? "");
+  const [bookingId, setBookingId] = useState(prefillId ?? "");
   const [formError, setFormError] = useState("");
+  const [hasSearched, setHasSearched] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["booking-status-lookup", phone, bookingId],
@@ -69,6 +67,15 @@ function BookingStatusPage() {
     retry: false,
   });
 
+  // Auto-trigger if query params are pre-filled (coming from confirmation screen)
+  useEffect(() => {
+    if (prefillPhone && prefillId) {
+      setHasSearched(true);
+      refetch();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleLookup = () => {
     setFormError("");
     if (!phone.trim() || phone.replace(/\D/g, "").length < 10) {
@@ -79,7 +86,7 @@ function BookingStatusPage() {
       setFormError("Enter your booking ID");
       return;
     }
-    setSubmitted(true);
+    setHasSearched(true);
     refetch();
   };
 
@@ -94,16 +101,18 @@ function BookingStatusPage() {
           <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">V</span>
           <span className="font-display font-semibold text-primary">VattavadaStays</span>
         </a>
-        <span className="text-muted-foreground text-sm">/ Booking Status</span>
+        <span className="text-muted-foreground text-sm">/ Track Booking</span>
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="font-display text-2xl font-semibold">Track your booking</h1>
-          <p className="text-sm text-muted-foreground mt-1">Enter your phone number and booking ID to check your reservation status.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Enter your phone number and booking ID to check your reservation status.
+          </p>
         </div>
 
-        {/* Lookup form */}
+        {/* Lookup form — always visible so guest can re-search */}
         <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Phone number</label>
@@ -122,10 +131,12 @@ function BookingStatusPage() {
               value={bookingId}
               onChange={(e) => setBookingId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              placeholder="e.g. 3f8a2b1c-..."
+              placeholder="Paste your booking reference here"
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
             />
-            <p className="text-xs text-muted-foreground mt-1">Find this in your booking confirmation message.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Found in your booking confirmation screen — copy the reference ID and paste it here.
+            </p>
           </div>
           {formError && <p className="text-xs text-destructive">{formError}</p>}
           <button
@@ -138,12 +149,12 @@ function BookingStatusPage() {
           </button>
         </div>
 
-        {/* Error state */}
-        {submitted && error && !isLoading && (
+        {/* Error */}
+        {hasSearched && error && !isLoading && (
           <div className="bg-destructive/10 border border-destructive/30 rounded-xl p-4 flex gap-3">
             <XCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-medium text-destructive">Booking not found</p>
+              <p className="text-sm font-medium text-destructive">Not found</p>
               <p className="text-xs text-destructive/80 mt-0.5">
                 {error instanceof Error ? error.message : "Check your details and try again."}
               </p>
@@ -151,37 +162,34 @@ function BookingStatusPage() {
           </div>
         )}
 
-        {/* Result */}
+        {/* Results */}
         {data && !isLoading && (
           <div className="space-y-4">
-            {/* Status header */}
             {isCancelled ? (
               <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-5 flex gap-3 items-center">
                 <XCircle className="h-8 w-8 text-destructive shrink-0" />
                 <div>
                   <div className="font-semibold text-destructive">Booking Cancelled</div>
-                  <div className="text-sm text-muted-foreground mt-0.5">This booking has been cancelled. Contact the property for assistance.</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">Contact the property for assistance.</div>
                 </div>
               </div>
             ) : (
-              /* Timeline */
+              /* Status timeline */
               <div className="bg-card border border-border rounded-2xl p-5">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">Booking status</div>
                 <div className="space-y-0">
                   {STATUS_STEPS.map((step, idx) => {
-                    const done = idx < currentStep;
+                    const done   = idx < currentStep;
                     const active = idx === currentStep;
-                    const upcoming = idx > currentStep;
                     const Icon = step.icon;
                     return (
                       <div key={step.key} className="flex gap-3">
-                        {/* Line + dot */}
                         <div className="flex flex-col items-center">
                           <div className={[
                             "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors",
-                            done ? "bg-primary border-primary text-primary-foreground" :
+                            done   ? "bg-primary border-primary text-primary-foreground" :
                             active ? "bg-primary-light border-primary text-primary" :
-                            "bg-background border-border text-muted-foreground",
+                                     "bg-background border-border text-muted-foreground",
                           ].join(" ")}>
                             <Icon className="h-4 w-4" />
                           </div>
@@ -189,14 +197,11 @@ function BookingStatusPage() {
                             <div className={`w-0.5 h-6 ${done || active ? "bg-primary/30" : "bg-border"}`} />
                           )}
                         </div>
-                        {/* Label */}
                         <div className="pb-4">
-                          <div className={`text-sm font-medium ${upcoming ? "text-muted-foreground" : "text-foreground"}`}>
+                          <div className={`text-sm font-medium ${idx > currentStep ? "text-muted-foreground" : "text-foreground"}`}>
                             {step.label}
                           </div>
-                          {active && (
-                            <div className="text-xs text-primary mt-0.5">{step.desc}</div>
-                          )}
+                          {active && <div className="text-xs text-primary mt-0.5">{step.desc}</div>}
                         </div>
                       </div>
                     );
@@ -209,30 +214,11 @@ function BookingStatusPage() {
             <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Booking details</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <div>
-                  <div className="text-xs text-muted-foreground">Booking ID</div>
-                  <div className="font-mono text-xs mt-0.5">{data.booking.id.slice(0, 8)}…</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Room</div>
-                  <div className="font-medium mt-0.5">{data.booking.room_id}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Check-in</div>
-                  <div className="font-medium mt-0.5">{data.booking.check_in}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Check-out</div>
-                  <div className="font-medium mt-0.5">{data.booking.check_out}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Guests</div>
-                  <div className="font-medium mt-0.5">{data.booking.guest_count}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground">Nights</div>
-                  <div className="font-medium mt-0.5">{data.booking.nights}</div>
-                </div>
+                <DetailRow label="Reference"  value={data.booking.id.slice(0, 8).toUpperCase() + "…"} mono />
+                <DetailRow label="Check-in"   value={data.booking.check_in} />
+                <DetailRow label="Check-out"  value={data.booking.check_out} />
+                <DetailRow label="Nights"     value={`${data.booking.nights}`} />
+                <DetailRow label="Guests"     value={`${data.booking.guest_count}`} />
               </div>
             </div>
 
@@ -266,10 +252,9 @@ function BookingStatusPage() {
                 </div>
               </div>
 
-              {/* Extra charges breakdown */}
               {data.charges.length > 0 && (
                 <div className="border-t border-border pt-2 space-y-1">
-                  <div className="text-xs text-muted-foreground mb-1">Extra charges</div>
+                  <div className="text-xs text-muted-foreground mb-1">Extra charges breakdown</div>
                   {data.charges.map((c) => (
                     <div key={c.id} className="flex justify-between text-xs text-muted-foreground">
                       <span>{c.description}{c.qty > 1 ? ` ×${c.qty}` : ""}</span>
@@ -281,7 +266,7 @@ function BookingStatusPage() {
             </div>
 
             {/* Contact property */}
-            <ContactProperty bookingId={data.booking.property_id} />
+            <ContactProperty propertyId={data.booking.property_id} />
           </div>
         )}
       </div>
@@ -289,19 +274,28 @@ function BookingStatusPage() {
   );
 }
 
-function ContactProperty({ bookingId }: { bookingId: string }) {
+function DetailRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={`font-medium mt-0.5 ${mono ? "font-mono text-xs" : ""}`}>{value}</div>
+    </div>
+  );
+}
+
+function ContactProperty({ propertyId }: { propertyId: string }) {
   const { data: property } = useQuery({
-    queryKey: ["property-contact", bookingId],
+    queryKey: ["property-contact", propertyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
         .select("name, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng")
-        .eq("id", bookingId)
+        .eq("id", propertyId)
         .single();
       if (error) throw error;
       return data;
     },
-    enabled: !!bookingId,
+    enabled: !!propertyId,
   });
 
   if (!property) return null;
@@ -322,30 +316,17 @@ function ContactProperty({ bookingId }: { bookingId: string }) {
       </div>
       <div className="flex flex-col gap-2">
         {phone && (
-          <a
-            href={`tel:+${phone.replace(/\D/g, "")}`}
-            className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
-          >
+          <a href={`tel:+${phone.replace(/\D/g, "")}`} className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
             <Phone className="h-4 w-4" /> Call {property.owner_name ?? "host"}
           </a>
         )}
         {waLink && (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
-          >
+          <a href={waLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity">
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </a>
         )}
         {mapsLink && (
-          <a
-            href={mapsLink}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
-          >
+          <a href={mapsLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
             <MapPin className="h-4 w-4" /> Get directions
           </a>
         )}
