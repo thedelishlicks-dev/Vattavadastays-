@@ -62,9 +62,29 @@ export interface Booking {
   room_price: number;
   extra_guest_charge: number;
   total_amount: number;
-  status: string;
+  advance_amount: number;
+  status: BookingStatus;
   payment_method?: string;
   payment_reference?: string;
   is_paid: boolean;
+  checked_in_at?: string;
+  checked_out_at?: string;
+  invoice_notes?: string;
+  created_at: string;
+}
+
+export type BookingStatus =
+  | "pending"
+  | "confirmed"
+  | "checked_in"
+  | "completed"
+  | "cancelled";
+
+export interface BookingCharge {
+  id: string;
+  booking_id: string;
+  description: string;
+  qty: number;
+  unit_price: number;
   created_at: string;
 }
