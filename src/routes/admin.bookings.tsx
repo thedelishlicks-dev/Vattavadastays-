@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, useRef, useEffect } from "react";
+import { useMemo, useState } from "react";
 import {
-  Search, Phone, MessageCircle, Check, X, Plus, Loader2,
-  ChevronDown, IndianRupee, Utensils, Flame, Printer,
-  ClipboardList, LogIn, LogOut, Trash2, Copy,
+  Search, Plus, Loader2, X, IndianRupee, Utensils,
+  Printer, MessageCircle, Check, LogIn, LogOut,
+  Trash2, Copy, ChevronRight, Phone, Clock,
+  CheckCircle2, Users, Calendar, BedDouble,
 } from "lucide-react";
-import { StatusPill, PaymentPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings } from "@/hooks/useBookings";
 import { useBookingCharges, useAddCharge, useDeleteCharge } from "@/hooks/useBookingCharges";
@@ -21,531 +21,612 @@ export const Route = createFileRoute("/admin/bookings")({
   component: BookingsAdmin,
 });
 
-const STATUSES: ("all" | BookingStatus)[] = [
-  "all", "pending", "confirmed", "checked_in", "completed", "cancelled",
-];
-
 const inputCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
-// ─── SUGGESTED CHARGE PRESETS ─────────────────────────────────────────────
+const STATUS_FILTERS = ["all", "pending", "confirmed", "checked_in", "completed", "cancelled"] as const;
+type FilterStatus = typeof STATUS_FILTERS[number];
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+  pending:    { label: "Pending",    color: "bg-amber-100 text-amber-800",  dot: "bg-amber-400" },
+  confirmed:  { label: "Confirmed",  color: "bg-green-100 text-green-800",  dot: "bg-green-500" },
+  checked_in: { label: "Checked In", color: "bg-blue-100 text-blue-800",    dot: "bg-blue-500"  },
+  completed:  { label: "Completed",  color: "bg-stone-100 text-stone-600",  dot: "bg-stone-400" },
+  cancelled:  { label: "Cancelled",  color: "bg-red-100 text-red-700",      dot: "bg-red-400"   },
+};
+
 const CHARGE_PRESETS = [
-  { description: "Breakfast", unit_price: 200 },
-  { description: "Lunch", unit_price: 300 },
-  { description: "Dinner", unit_price: 350 },
-  { description: "Full Board (all meals)", unit_price: 750 },
-  { description: "Bonfire", unit_price: 500 },
-  { description: "Trekking guide", unit_price: 800 },
-  { description: "Laundry", unit_price: 150 },
-  { description: "Extra blanket", unit_price: 100 },
-  { description: "Room service", unit_price: 200 },
+  { description: "Breakfast",             unit_price: 200 },
+  { description: "Lunch",                 unit_price: 300 },
+  { description: "Dinner",                unit_price: 350 },
+  { description: "Full board (all meals)",unit_price: 750 },
+  { description: "Bonfire",               unit_price: 500 },
+  { description: "Trekking guide",        unit_price: 800 },
+  { description: "Laundry",               unit_price: 150 },
+  { description: "Extra blanket",         unit_price: 100 },
 ];
 
-// ─── RECORD PAYMENT MODAL ─────────────────────────────────────────────────
-function RecordPaymentModal({
-  booking,
-  onClose,
-  onSaved,
+function StatusPill({ status }: { status: string }) {
+  const cfg = STATUS_CONFIG[status] ?? { label: status, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.color}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function BookingCard({ booking, roomName, onClick }: {
+  booking: Booking; roomName: string; onClick: () => void;
+}) {
+  const advance = Number(booking.advance_amount ?? 0);
+  const balance = Math.max(0, Number(booking.total_amount) - advance);
+  const isActive = !["cancelled", "completed"].includes(booking.status);
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/30 transition-all active:scale-[0.99] group"
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <div className="font-semibold text-foreground truncate">{booking.guest_name}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{booking.guest_phone}</div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusPill status={booking.status} />
+          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <BedDouble className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{roomName}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users className="h-3.5 w-3.5 shrink-0" />
+          <span>{booking.guest_count} guest{booking.guest_count > 1 ? "s" : ""}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          <span>{booking.check_in}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          <span>{booking.check_out} · {booking.nights}N</span>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-3 border-t border-border">
+        <div className="text-xs text-muted-foreground">
+          Total <span className="font-semibold text-foreground">₹{Number(booking.total_amount).toLocaleString("en-IN")}</span>
+        </div>
+        {isActive && (
+          advance > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
+              {balance > 0
+                ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span>
+                : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>
+              }
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">No advance recorded</span>
+          )
+        )}
+      </div>
+    </button>
+  );
+}
+
+type ModalTab = "overview" | "charges" | "invoice";
+
+function BookingDetailModal({
+  booking, roomName, property, onClose, onStatusChange, onPaymentSaved,
 }: {
-  booking: Booking;
+  booking: Booking; roomName: string;
+  property: ReturnType<typeof useOwnerProperty>["data"];
   onClose: () => void;
-  onSaved: () => void;
+  onStatusChange: (id: string, status: string) => Promise<void>;
+  onPaymentSaved: () => void;
+}) {
+  const [tab, setTab] = useState<ModalTab>("overview");
+  const [updating, setUpdating] = useState(false);
+  const { data: charges = [] } = useBookingCharges(booking.id);
+
+  const advance = Number(booking.advance_amount ?? 0);
+  const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+  const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - advance);
+  const ownerPhone = property?.owner_phone ?? "";
+  const lat = property?.location_lat;
+  const lng = property?.location_lng;
+
+  const handleStatus = async (status: string) => {
+    setUpdating(true);
+    await onStatusChange(booking.id, status);
+    setUpdating(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="md:hidden flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-border" />
+        </div>
+
+        <div className="px-5 pt-3 pb-4 border-b border-border">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-display text-lg font-semibold">{booking.guest_name}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <StatusPill status={booking.status} />
+                <span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span>
+              </div>
+            </div>
+            <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex gap-2 mt-3 flex-wrap">
+            {booking.status === "pending" && (
+              <ActionChip onClick={() => handleStatus("confirmed")} loading={updating} icon={<Check className="h-3.5 w-3.5" />} label="Confirm" color="green" />
+            )}
+            {booking.status === "confirmed" && (
+              <ActionChip onClick={() => handleStatus("checked_in")} loading={updating} icon={<LogIn className="h-3.5 w-3.5" />} label="Check In" color="blue" />
+            )}
+            {booking.status === "checked_in" && (
+              <ActionChip onClick={() => handleStatus("completed")} loading={updating} icon={<LogOut className="h-3.5 w-3.5" />} label="Check Out" color="amber" />
+            )}
+            <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
+              <Phone className="h-3.5 w-3.5" /> Call
+            </a>
+            <a href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors">
+              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+            </a>
+            {lat && lng && (
+              <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
+                <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions
+              </a>
+            )}
+          </div>
+        </div>
+
+        <div className="flex border-b border-border px-5">
+          {([
+            { key: "overview", label: "Overview" },
+            { key: "charges",  label: "Charges"  },
+            { key: "invoice",  label: "Invoice"  },
+          ] as { key: ModalTab; label: string }[]).map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}
+            >
+              {t.label}
+              {t.key === "charges" && charges.length > 0 && (
+                <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} />}
+          {tab === "charges" && <ChargesTab booking={booking} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
+          {tab === "invoice" && <InvoiceTab booking={booking} roomName={roomName} property={property} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ActionChip({ onClick, loading, icon, label, color }: {
+  onClick: () => void; loading: boolean; icon: React.ReactNode; label: string; color: "green" | "blue" | "amber";
+}) {
+  const colors = { green: "bg-green-600 text-white hover:bg-green-700", blue: "bg-blue-600 text-white hover:bg-blue-700", amber: "bg-amber-500 text-white hover:bg-amber-600" };
+  return (
+    <button onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${colors[color]}`}>
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}
+      {label}
+    </button>
+  );
+}
+
+function OverviewTab({ booking, roomName, property, advance, balance, chargesTotal, onPaymentSaved, ownerPhone }: {
+  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"];
+  advance: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string;
+}) {
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  return (
+    <div className="p-5 space-y-4">
+      <Section title="Stay details">
+        <Row label="Room" value={roomName} />
+        <Row label="Check-in" value={booking.check_in} />
+        <Row label="Check-out" value={booking.check_out} />
+        <Row label="Nights" value={`${booking.nights}`} />
+        <Row label="Guests" value={`${booking.guest_count}`} />
+        {booking.payment_method && <Row label="Payment method" value={booking.payment_method} />}
+        {booking.checked_in_at && <Row label="Checked in at" value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
+        {booking.checked_out_at && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
+      </Section>
+
+      <Section title="Payment summary">
+        <Row label="Room total" value={`₹${Number(booking.total_amount).toLocaleString("en-IN")}`} />
+        {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
+        {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
+        {booking.payment_reference && <Row label="Reference" value={booking.payment_reference} small />}
+        <div className="border-t border-border pt-2 mt-1">
+          <Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold />
+        </div>
+      </Section>
+
+      {!showPaymentForm ? (
+        <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
+          <IndianRupee className="h-4 w-4" />
+          {advance > 0 ? "Update payment record" : "Record advance payment"}
+        </button>
+      ) : (
+        <RecordPaymentForm booking={booking} advance={advance} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />
+      )}
+
+      <Section title="Send to guest">
+        <div className="space-y-2">
+          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, amount: balance, checkIn: booking.check_in, propertyName: property?.name ?? "" })} label="💰 Payment reminder" />
+          <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
+        </div>
+      </Section>
+
+      {!["cancelled", "completed"].includes(booking.status) && (
+        <CancelButton bookingId={booking.id} onCancelled={onPaymentSaved} />
+      )}
+    </div>
+  );
+}
+
+function WALink({ href, label }: { href: string; label: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted transition-colors">
+      <MessageCircle className="h-4 w-4 text-[#25D366]" />{label}
+    </a>
+  );
+}
+
+function CancelButton({ bookingId, onCancelled }: { bookingId: string; onCancelled: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const handleCancel = async () => {
+    setLoading(true);
+    await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
+    onCancelled();
+  };
+  if (!confirming) return (
+    <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel booking</button>
+  );
+  return (
+    <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
+      <p className="text-sm text-destructive font-medium">Are you sure? This cannot be undone.</p>
+      <div className="flex gap-2">
+        <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button>
+        <button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">
+          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
+  booking: Booking; advance: number; onSaved: () => void; onCancel: () => void;
 }) {
   const suggested = Math.round(Number(booking.total_amount) * 0.25);
-  const [amount, setAmount] = useState(String(suggested));
+  const [amount, setAmount] = useState(advance > 0 ? String(advance) : String(suggested));
   const [method, setMethod] = useState(booking.payment_method ?? "UPI");
   const [ref, setRef] = useState(booking.payment_reference ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const queryClient = useQueryClient();
 
   const handleSave = async () => {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { setError("Enter a valid amount"); return; }
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
-      const isFullyPaid = amt >= Number(booking.total_amount);
-      const { error: err } = await supabase
-        .from("bookings")
-        .update({
-          advance_amount: amt,
-          payment_method: method,
-          payment_reference: ref || null,
-          is_paid: isFullyPaid,
-          status: booking.status === "pending" ? "confirmed" : booking.status,
-        })
-        .eq("id", booking.id);
+      const { error: err } = await supabase.from("bookings").update({
+        advance_amount: amt, payment_method: method,
+        payment_reference: ref || null,
+        is_paid: amt >= Number(booking.total_amount),
+        status: booking.status === "pending" ? "confirmed" : booking.status,
+      }).eq("id", booking.id);
       if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["bookings"] });
       onSaved();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
-  const balance = Math.max(0, Number(booking.total_amount) - (parseFloat(amount) || 0));
+  const bal = Math.max(0, Number(booking.total_amount) - (parseFloat(amount) || 0));
 
   return (
-    <Modal title="Record Payment" onClose={onClose}>
-      <div className="space-y-4">
-        <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Total booking amount</span>
-            <span className="font-semibold">₹{Number(booking.total_amount).toLocaleString("en-IN")}</span>
-          </div>
-          <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-            <span>Suggested advance (25%)</span>
-            <span>₹{suggested.toLocaleString("en-IN")}</span>
-          </div>
-        </div>
-
+    <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
+      <div className="text-sm font-medium">Record advance payment</div>
+      <div className="text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 flex justify-between">
+        <span>Suggested advance (25%)</span>
+        <span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span>
+      </div>
+      <div>
+        <label className={labelCls}>Amount received (₹) *</label>
+        <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="Actual amount received" autoFocus />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className={labelCls}>Amount received (₹) *</label>
-          <input
-            type="number" min={0} value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className={inputCls} placeholder="Enter actual amount received"
-            autoFocus
-          />
-        </div>
-
-        <div>
-          <label className={labelCls}>Payment method</label>
+          <label className={labelCls}>Method</label>
           <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-            {["UPI", "Bank Transfer", "Cash on Arrival", "Cash"].map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
+            {["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </div>
-
         <div>
-          <label className={labelCls}>Transaction / UPI reference</label>
-          <input
-            value={ref} onChange={(e) => setRef(e.target.value)}
-            className={inputCls} placeholder="e.g. UPI ref no, bank txn ID"
-          />
+          <label className={labelCls}>Txn reference</label>
+          <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
-
-        {parseFloat(amount) > 0 && (
-          <div className="rounded-xl border border-border p-3 text-sm space-y-1">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Advance paid</span>
-              <span className="text-primary font-medium">₹{(parseFloat(amount) || 0).toLocaleString("en-IN")}</span>
-            </div>
-            <div className="flex justify-between font-semibold border-t border-border pt-1 mt-1">
-              <span>Balance due on arrival</span>
-              <span className={balance === 0 ? "text-primary" : "text-amber-600"}>
-                ₹{balance.toLocaleString("en-IN")}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <ModalFooter onClose={onClose} onSave={handleSave} saving={saving} label="Save payment" />
       </div>
-    </Modal>
+      {parseFloat(amount) > 0 && (
+        <div className="flex justify-between text-sm rounded-lg bg-background px-3 py-2">
+          <span className="text-muted-foreground">Balance after</span>
+          <span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>₹{bal.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex gap-2">
+        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
+        <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+      </div>
+    </div>
   );
 }
 
-// ─── ADD CHARGES MODAL ────────────────────────────────────────────────────
-function AddChargesModal({
-  booking,
-  onClose,
-}: {
-  booking: Booking;
-  onClose: () => void;
+function ChargesTab({ booking, charges, chargesTotal, advance, balance }: {
+  booking: Booking; charges: BookingCharge[];
+  chargesTotal: number; advance: number; balance: number;
 }) {
-  const { data: charges = [], isLoading } = useBookingCharges(booking.id);
   const { mutateAsync: addCharge, isPending: adding } = useAddCharge();
   const { mutateAsync: deleteCharge } = useDeleteCharge();
-
   const [desc, setDesc] = useState("");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState("");
   const [error, setError] = useState("");
 
-  const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-  const balance = Math.max(
-    0,
-    Number(booking.total_amount) + chargesTotal - Number(booking.advance_amount ?? 0)
-  );
-
   const handleAdd = async () => {
     if (!desc.trim()) { setError("Description required"); return; }
-    const q = parseFloat(qty);
-    const p = parseFloat(price);
-    if (!q || q <= 0) { setError("Valid quantity required"); return; }
-    if (!p || p < 0) { setError("Valid price required"); return; }
+    const q = parseFloat(qty); const p = parseFloat(price);
+    if (!q || q <= 0 || !p || p < 0) { setError("Valid qty and price required"); return; }
     setError("");
     try {
       await addCharge({ booking_id: booking.id, description: desc, qty: q, unit_price: p });
       setDesc(""); setQty("1"); setPrice("");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to add charge");
-    }
-  };
-
-  const applyPreset = (preset: { description: string; unit_price: number }) => {
-    setDesc(preset.description);
-    setPrice(String(preset.unit_price));
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed"); }
   };
 
   return (
-    <Modal title="Add On-Property Charges" onClose={onClose} wide>
-      <div className="space-y-4">
-        {/* Summary bar */}
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="rounded-lg bg-muted/50 p-2">
-            <div className="text-muted-foreground">Room total</div>
-            <div className="font-semibold">₹{Number(booking.total_amount).toLocaleString("en-IN")}</div>
-          </div>
-          <div className="rounded-lg bg-amber-50 border border-amber-100 p-2">
-            <div className="text-muted-foreground">Extras</div>
-            <div className="font-semibold text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div>
-          </div>
-          <div className="rounded-lg bg-primary-light/40 border border-border p-2">
-            <div className="text-muted-foreground">Balance due</div>
-            <div className="font-semibold text-primary">₹{balance.toLocaleString("en-IN")}</div>
-          </div>
+    <div className="p-5 space-y-4">
+      <div className="grid grid-cols-3 gap-2">
+        <div className="rounded-xl bg-muted/50 p-3 text-center">
+          <div className="text-xs text-muted-foreground">Room</div>
+          <div className="font-semibold text-sm mt-0.5">₹{Number(booking.total_amount).toLocaleString("en-IN")}</div>
         </div>
-
-        {/* Presets */}
-        <div>
-          <p className={labelCls}>Quick add</p>
-          <div className="flex flex-wrap gap-1.5">
-            {CHARGE_PRESETS.map((p) => (
-              <button
-                key={p.description}
-                onClick={() => applyPreset(p)}
-                className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors"
-              >
-                {p.description} · ₹{p.unit_price}
-              </button>
-            ))}
-          </div>
+        <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+          <div className="text-xs text-muted-foreground">Extras</div>
+          <div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div>
         </div>
+        <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center">
+          <div className="text-xs text-muted-foreground">Balance</div>
+          <div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div>
+        </div>
+      </div>
 
-        {/* Add form */}
-        <div className="grid grid-cols-5 gap-2 items-end">
-          <div className="col-span-2">
-            <label className={labelCls}>Description *</label>
-            <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="e.g. Dinner" />
-          </div>
-          <div>
-            <label className={labelCls}>Qty</label>
-            <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Price (₹)</label>
-            <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className={inputCls} placeholder="350" />
-          </div>
-          <button
-            onClick={handleAdd} disabled={adding}
-            className="h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
-          >
-            {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-            Add
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
+        <div className="flex flex-wrap gap-1.5">
+          {CHARGE_PRESETS.map((p) => (
+            <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors">
+              {p.description} · ₹{p.unit_price}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-border p-3 space-y-2">
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
+        <div className="flex gap-2">
+          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className={`${inputCls} w-20`} placeholder="Qty" />
+          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className={`${inputCls} flex-1`} placeholder="Price ₹" />
+          <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">
+            {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
           </button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
-
-        {/* Charges list */}
-        {isLoading ? (
-          <div className="h-16 rounded-lg bg-muted animate-pulse" />
-        ) : charges.length === 0 ? (
-          <div className="text-center py-6 text-sm text-muted-foreground border border-dashed border-border rounded-xl">
-            No extra charges yet. Add meals, activities, or services above.
-          </div>
-        ) : (
-          <div className="rounded-xl border border-border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-                <tr>
-                  <th className="px-3 py-2">Description</th>
-                  <th className="px-3 py-2 text-center">Qty</th>
-                  <th className="px-3 py-2 text-right">Unit</th>
-                  <th className="px-3 py-2 text-right">Total</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {charges.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
-                    <td className="px-3 py-2">{c.description}</td>
-                    <td className="px-3 py-2 text-center text-muted-foreground">{c.qty}</td>
-                    <td className="px-3 py-2 text-right text-muted-foreground">₹{c.unit_price.toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2 text-right font-medium">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</td>
-                    <td className="px-3 py-2 text-right">
-                      <button
-                        onClick={() => deleteCharge({ id: c.id, bookingId: booking.id })}
-                        className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                <tr className="border-t-2 border-border bg-muted/30">
-                  <td colSpan={3} className="px-3 py-2 text-sm font-medium">Extras total</td>
-                  <td className="px-3 py-2 text-right font-semibold text-amber-700">
-                    ₹{chargesTotal.toLocaleString("en-IN")}
-                  </td>
-                  <td />
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        <button
-          onClick={onClose}
-          className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90"
-        >
-          Done
-        </button>
       </div>
-    </Modal>
+
+      {charges.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          <Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />
+          No extra charges yet
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {charges.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{c.description}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}</div>
+              </div>
+              <div className="font-semibold text-sm shrink-0">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</div>
+              <button onClick={() => deleteCharge({ id: c.id, bookingId: booking.id })} className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0">
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100">
+            <span className="text-sm text-amber-800">Extras total</span>
+            <span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
-// ─── INVOICE MODAL ────────────────────────────────────────────────────────
-function InvoiceModal({
-  booking,
-  charges,
-  roomName,
-  property,
-  onClose,
-}: {
-  booking: Booking;
-  charges: BookingCharge[];
-  roomName: string;
-  property: ReturnType<typeof useOwnerProperty>["data"];
-  onClose: () => void;
+function InvoiceTab({ booking, roomName, property, charges, chargesTotal, advance, balance }: {
+  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"];
+  charges: BookingCharge[]; chargesTotal: number; advance: number; balance: number;
 }) {
   const [copied, setCopied] = useState(false);
-  const printRef = useRef<HTMLDivElement>(null);
-
-  const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-  const subtotal = Number(booking.total_amount) + chargesTotal;
-  const advance = Number(booking.advance_amount ?? 0);
-  const balance = Math.max(0, subtotal - advance);
-
-  const invoiceNum = `INV-${new Date(booking.created_at).getFullYear()}-${booking.id.slice(0, 6).toUpperCase()}`;
+  const invoiceNum = `INV-${booking.id.slice(0, 6).toUpperCase()}`;
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const subtotal = Number(booking.total_amount) + chargesTotal;
 
   const invoiceText = [
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `INVOICE ${invoiceNum}`,
+    `━━━━━━━━━━━━━━━━━━`,
     `${property?.name ?? "VattavadaStays"}`,
-    `Date: ${today}`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `Invoice: ${invoiceNum}  Date: ${today}`,
+    `━━━━━━━━━━━━━━━━━━`,
     `Guest: ${booking.guest_name}`,
     `Phone: ${booking.guest_phone}`,
     `Room: ${roomName}`,
     `Check-in: ${booking.check_in}`,
     `Check-out: ${booking.check_out}`,
-    `Nights: ${booking.nights}`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `Room charge     ₹${Number(booking.room_price).toLocaleString("en-IN")}`,
-    booking.extra_guest_charge > 0 ? `Extra guests    ₹${Number(booking.extra_guest_charge).toLocaleString("en-IN")}` : null,
-    ...charges.map((c) => `${c.description.padEnd(16)}₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`),
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `Subtotal        ₹${subtotal.toLocaleString("en-IN")}`,
-    advance > 0 ? `Advance paid   -₹${advance.toLocaleString("en-IN")}` : null,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    `BALANCE DUE     ₹${balance.toLocaleString("en-IN")}`,
-    `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
-    property?.owner_phone ? `Call: +91 ${property.owner_phone.replace(/\D/g, "").slice(-10)}` : null,
+    `Nights: ${booking.nights}  Guests: ${booking.guest_count}`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `Room charge      ₹${Number(booking.room_price).toLocaleString("en-IN")}`,
+    Number(booking.extra_guest_charge) > 0 ? `Extra guests     ₹${Number(booking.extra_guest_charge).toLocaleString("en-IN")}` : null,
+    ...charges.map((c) => `${c.description.slice(0, 16).padEnd(16)} ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`),
+    `━━━━━━━━━━━━━━━━━━`,
+    `Subtotal         ₹${subtotal.toLocaleString("en-IN")}`,
+    advance > 0 ? `Advance paid    -₹${advance.toLocaleString("en-IN")}` : null,
+    `━━━━━━━━━━━━━━━━━━`,
+    `BALANCE DUE      ₹${balance.toLocaleString("en-IN")}`,
+    `━━━━━━━━━━━━━━━━━━`,
   ].filter(Boolean).join("\n");
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(invoiceText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const waLink = property?.owner_whatsapp
-    ? `https://wa.me/${property.owner_whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(invoiceText)}`
-    : null;
+  const handleCopy = () => { navigator.clipboard.writeText(invoiceText); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const guestWaLink = `https://wa.me/${booking.guest_phone.replace(/\D/g, "")}?text=${encodeURIComponent(invoiceText)}`;
 
   return (
-    <Modal title={`Invoice — ${invoiceNum}`} onClose={onClose} wide>
-      {/* Print-friendly invoice */}
-      <div ref={printRef} className="print-area rounded-xl border border-border bg-white p-5 text-sm space-y-3 font-mono">
-        {/* Header */}
-        <div className="flex items-start justify-between border-b border-border pb-3">
+    <div className="p-5 space-y-4">
+      <div className="rounded-xl border border-border bg-white p-5 space-y-4 font-mono text-sm">
+        <div className="flex justify-between items-start border-b border-dashed border-border pb-3">
           <div>
-            <div className="font-display font-semibold text-lg non-mono">{property?.name ?? "VattavadaStays"}</div>
-            {property?.area && <div className="text-xs text-muted-foreground non-mono">{property.area}, Kerala</div>}
+            <div className="font-display font-semibold text-base not-italic">{property?.name ?? "VattavadaStays"}</div>
+            {property?.area && <div className="text-xs text-muted-foreground not-italic">{property.area}, Kerala</div>}
           </div>
-          <div className="text-right">
+          <div className="text-right text-xs">
             <div className="font-semibold">{invoiceNum}</div>
-            <div className="text-xs text-muted-foreground">{today}</div>
+            <div className="text-muted-foreground">{today}</div>
           </div>
         </div>
 
-        {/* Guest info */}
-        <div className="grid grid-cols-2 gap-3 text-xs border-b border-border pb-3">
+        <div className="grid grid-cols-2 gap-2 text-xs border-b border-dashed border-border pb-3">
           <div>
-            <div className="text-muted-foreground mb-0.5">Guest</div>
-            <div className="font-medium">{booking.guest_name}</div>
-            <div>{booking.guest_phone}</div>
+            <div className="text-muted-foreground mb-0.5 not-italic">Guest</div>
+            <div className="font-medium not-italic">{booking.guest_name}</div>
+            <div className="text-muted-foreground">{booking.guest_phone}</div>
           </div>
           <div>
-            <div className="text-muted-foreground mb-0.5">Stay</div>
-            <div className="font-medium">{roomName}</div>
-            <div>{booking.check_in} → {booking.check_out}</div>
-            <div className="text-muted-foreground">{booking.nights} night{booking.nights > 1 ? "s" : ""} · {booking.guest_count} guest{booking.guest_count > 1 ? "s" : ""}</div>
+            <div className="text-muted-foreground mb-0.5 not-italic">Stay</div>
+            <div className="font-medium not-italic">{roomName}</div>
+            <div className="text-muted-foreground">{booking.check_in} → {booking.check_out}</div>
+            <div className="text-muted-foreground">{booking.nights}N · {booking.guest_count} guests</div>
           </div>
         </div>
 
-        {/* Line items */}
-        <div className="space-y-1">
-          <InvoiceLine label="Room charge" amount={Number(booking.room_price)} />
-          {Number(booking.extra_guest_charge) > 0 && (
-            <InvoiceLine label="Extra guest charge" amount={Number(booking.extra_guest_charge)} />
-          )}
-          {charges.map((c) => (
-            <InvoiceLine
-              key={c.id}
-              label={`${c.description}${c.qty > 1 ? ` ×${c.qty}` : ""}`}
-              amount={c.qty * c.unit_price}
-              sub
-            />
-          ))}
+        <div className="space-y-1.5">
+          <InvLine label="Room charge" amount={Number(booking.room_price)} />
+          {Number(booking.extra_guest_charge) > 0 && <InvLine label="Extra guest charge" amount={Number(booking.extra_guest_charge)} muted />}
+          {charges.map((c) => <InvLine key={c.id} label={`${c.description}${c.qty > 1 ? ` ×${c.qty}` : ""}`} amount={c.qty * c.unit_price} muted />)}
         </div>
 
-        {/* Totals */}
-        <div className="border-t border-border pt-2 space-y-1">
-          <InvoiceLine label="Subtotal" amount={subtotal} bold />
-          {advance > 0 && (
-            <InvoiceLine label="Advance paid" amount={-advance} color="text-primary" />
-          )}
-          <div className="border-t border-border pt-1 mt-1">
-            <InvoiceLine
-              label="BALANCE DUE"
-              amount={balance}
-              bold
-              color={balance === 0 ? "text-primary" : "text-amber-700"}
-              large
-            />
+        <div className="border-t border-dashed border-border pt-2 space-y-1.5">
+          <InvLine label="Subtotal" amount={subtotal} bold />
+          {advance > 0 && <InvLine label="Advance paid" amount={-advance} color="text-primary" />}
+          <div className="border-t border-border pt-1.5">
+            <InvLine label="BALANCE DUE" amount={balance} bold large color={balance === 0 ? "text-primary" : "text-amber-700"} />
           </div>
         </div>
 
-        {/* Payment info */}
-        {(booking.payment_method || booking.payment_reference) && (
-          <div className="border-t border-border pt-2 text-xs text-muted-foreground">
-            {booking.payment_method && <span>Method: {booking.payment_method}</span>}
-            {booking.payment_reference && <span className="ml-3">Ref: {booking.payment_reference}</span>}
+        {booking.payment_reference && (
+          <div className="text-xs text-muted-foreground border-t border-dashed border-border pt-2">
+            Ref: {booking.payment_reference}{booking.payment_method && ` · ${booking.payment_method}`}
           </div>
         )}
-
-        {/* Footer */}
-        <div className="border-t border-border pt-2 text-xs text-muted-foreground text-center">
-          {property?.owner_name && <span>Issued by {property.owner_name}</span>}
-          {property?.owner_phone && <span className="ml-2">· +91 {property.owner_phone.replace(/\D/g, "").slice(-10)}</span>}
+        <div className="text-xs text-center text-muted-foreground border-t border-dashed border-border pt-2">
+          {property?.owner_name && `Issued by ${property.owner_name}`}
+          {property?.owner_phone && ` · +91 ${property.owner_phone.replace(/\D/g, "").slice(-10)}`}
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={handleCopy}
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted"
-        >
-          {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
+      <div className="grid grid-cols-3 gap-2">
+        <button onClick={handleCopy} className="flex flex-col items-center gap-1.5 rounded-xl border border-border py-3 px-2 text-xs font-medium hover:bg-muted transition-colors">
+          {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
           {copied ? "Copied!" : "Copy text"}
         </button>
-        {waLink && (
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noreferrer"
-            className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-[#25D366] text-white py-2.5 text-sm font-medium hover:opacity-90"
-          >
-            <MessageCircle className="h-3.5 w-3.5" />
-            Send on WhatsApp
-          </a>
-        )}
-        <button
-          onClick={handlePrint}
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90"
-        >
-          <Printer className="h-3.5 w-3.5" />
-          Print / PDF
+        <a href={guestWaLink} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 rounded-xl bg-[#25D366] text-white py-3 px-2 text-xs font-medium hover:opacity-90 transition-opacity">
+          <MessageCircle className="h-4 w-4" /> Send to guest
+        </a>
+        <button onClick={() => window.print()} className="flex flex-col items-center gap-1.5 rounded-xl bg-primary text-primary-foreground py-3 px-2 text-xs font-medium hover:opacity-90 transition-opacity">
+          <Printer className="h-4 w-4" /> Print/PDF
         </button>
       </div>
-
-      <style>{`
-        @media print {
-          body > *:not(.print-area) { display: none !important; }
-          .print-area { display: block !important; }
-        }
-      `}</style>
-    </Modal>
+    </div>
   );
 }
 
-function InvoiceLine({
-  label,
-  amount,
-  bold,
-  large,
-  color,
-  sub,
-}: {
-  label: string;
-  amount: number;
-  bold?: boolean;
-  large?: boolean;
-  color?: string;
-  sub?: boolean;
+function InvLine({ label, amount, bold, large, color, muted }: {
+  label: string; amount: number; bold?: boolean; large?: boolean; color?: string; muted?: boolean;
 }) {
   return (
-    <div className={`flex justify-between items-center ${sub ? "pl-3 text-muted-foreground" : ""} ${large ? "text-base" : "text-sm"}`}>
+    <div className={`flex justify-between ${large ? "text-base" : "text-sm"} ${muted ? "text-muted-foreground" : ""}`}>
       <span className={bold ? "font-semibold" : ""}>{label}</span>
-      <span className={`${bold ? "font-semibold" : ""} ${color ?? ""} tabular-nums`}>
+      <span className={`tabular-nums ${bold ? "font-semibold" : ""} ${color ?? ""}`}>
         {amount < 0 ? "-" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
       </span>
     </div>
   );
 }
 
-// ─── ADD BOOKING MODAL (unchanged logic, kept compact) ────────────────────
-type BookingForm = {
-  guest_name: string; guest_phone: string; guest_email: string;
-  room_id: string; check_in: string; check_out: string;
-  guest_count: number; payment_method: string; is_paid: boolean;
-  status: BookingStatus;
-};
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{title}</div>
+      <div className="bg-muted/30 rounded-xl border border-border px-4 py-3 space-y-2">{children}</div>
+    </div>
+  );
+}
 
-const emptyBookingForm = (): BookingForm => ({
-  guest_name: "", guest_phone: "+91 ", guest_email: "",
-  room_id: "", check_in: "", check_out: "",
-  guest_count: 2, payment_method: "Cash on Arrival",
-  is_paid: false, status: "confirmed",
-});
+function Row({ label, value, highlight, bold, small }: {
+  label: string; value: string; highlight?: "green" | "amber"; bold?: boolean; small?: boolean;
+}) {
+  const valColor = highlight === "green" ? "text-primary" : highlight === "amber" ? "text-amber-700" : "text-foreground";
+  return (
+    <div className={`flex justify-between items-center ${small ? "text-xs" : "text-sm"}`}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`${valColor} ${bold ? "font-semibold" : "font-medium"}`}>{value}</span>
+    </div>
+  );
+}
 
-function AddBookingModal({
-  propertyId, rooms, onClose, onSaved,
-}: {
+function AddBookingModal({ propertyId, rooms, onClose, onSaved }: {
   propertyId: string;
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number }[];
-  onClose: () => void;
-  onSaved: () => void;
+  onClose: () => void; onSaved: () => void;
 }) {
-  const [form, setForm] = useState<BookingForm>({ ...emptyBookingForm(), room_id: rooms[0]?.id ?? "" });
+  const [form, setForm] = useState({ guest_name: "", guest_phone: "+91 ", room_id: rooms[0]?.id ?? "", check_in: "", check_out: "", guest_count: 2, status: "confirmed" as BookingStatus });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  const set = (k: keyof BookingForm, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   const nights = useMemo(() => {
     if (!form.check_in || !form.check_out) return 0;
@@ -555,88 +636,62 @@ function AddBookingModal({
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const total = useMemo(() => {
     if (!selectedRoom || nights === 0) return 0;
-    const extra = Math.max(0, form.guest_count - 2) * (selectedRoom.extra_guest_price ?? 0);
-    return (selectedRoom.base_price + extra) * nights;
+    return (selectedRoom.base_price + Math.max(0, form.guest_count - 2) * (selectedRoom.extra_guest_price ?? 0)) * nights;
   }, [selectedRoom, nights, form.guest_count]);
 
   const handleSave = async () => {
     if (!form.guest_name.trim()) { setError("Guest name required"); return; }
-    if (!form.room_id) { setError("Select a room"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     setSaving(true); setError("");
     try {
       const { error: err } = await supabase.from("bookings").insert({
-        property_id: propertyId, room_id: form.room_id,
-        guest_name: form.guest_name, guest_phone: form.guest_phone,
-        guest_email: form.guest_email || null, guest_count: form.guest_count,
+        property_id: propertyId, room_id: form.room_id, guest_name: form.guest_name,
+        guest_phone: form.guest_phone, guest_count: form.guest_count,
         check_in: form.check_in, check_out: form.check_out,
         room_price: selectedRoom?.base_price ?? 0,
         extra_guest_charge: Math.max(0, form.guest_count - 2) * (selectedRoom?.extra_guest_price ?? 0),
-        total_amount: total, payment_method: form.payment_method,
-        is_paid: form.is_paid, status: form.status, advance_amount: 0,
+        total_amount: total, advance_amount: 0, status: form.status, is_paid: false,
       });
       if (err) throw err;
       onSaved();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
-    } finally { setSaving(false); }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full md:max-w-lg bg-card rounded-t-2xl md:rounded-2xl shadow-xl max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-display text-lg font-semibold">Add Booking</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Guest name *</label>
-              <input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" />
-            </div>
-            <div>
-              <label className={labelCls}>Phone</label>
-              <input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} />
-            </div>
+            <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" /></div>
+            <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} /></div>
           </div>
-          <div>
-            <label className={labelCls}>Room *</label>
+          <div><label className={labelCls}>Room</label>
             <select value={form.room_id} onChange={(e) => set("room_id", e.target.value)} className={inputCls}>
               {rooms.map((r) => <option key={r.id} value={r.id}>{r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night</option>)}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Check-in *</label>
-              <input type="date" value={form.check_in} onChange={(e) => set("check_in", e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Check-out *</label>
-              <input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} />
-            </div>
+            <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div>
+            <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Guests</label>
-              <input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", parseInt(e.target.value) || 1)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Status</label>
-              <select value={form.status} onChange={(e) => set("status", e.target.value as BookingStatus)} className={inputCls}>
-                {(["pending", "confirmed", "checked_in", "completed", "cancelled"] as BookingStatus[]).map((s) => (
-                  <option key={s} value={s}>{s.replace("_", " ").replace(/^\w/, (c) => c.toUpperCase())}</option>
-                ))}
+            <div><label className={labelCls}>Guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", parseInt(e.target.value) || 1)} className={inputCls} /></div>
+            <div><label className={labelCls}>Status</label>
+              <select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>
+                {["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
               </select>
             </div>
           </div>
           {nights > 0 && selectedRoom && (
-            <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-sm">
-              <div className="flex justify-between font-semibold font-display">
-                <span>Total</span>
-                <span>₹{total.toLocaleString("en-IN")}</span>
-              </div>
+            <div className="rounded-xl bg-primary-light/40 border border-border p-3 flex justify-between text-sm">
+              <span className="text-muted-foreground">{nights}N · {form.guest_count} guests</span>
+              <span className="font-display font-semibold text-primary">₹{total.toLocaleString("en-IN")}</span>
             </div>
           )}
         </div>
@@ -654,242 +709,16 @@ function AddBookingModal({
   );
 }
 
-// ─── SHARED MODAL SHELL ───────────────────────────────────────────────────
-function Modal({
-  title, children, onClose, wide,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-  wide?: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`relative w-full ${wide ? "md:max-w-2xl" : "md:max-w-md"} bg-card rounded-t-2xl md:rounded-2xl shadow-xl max-h-[95vh] flex flex-col`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">{title}</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function ModalFooter({
-  onClose, onSave, saving, label,
-}: {
-  onClose: () => void;
-  onSave: () => void;
-  saving: boolean;
-  label: string;
-}) {
-  return (
-    <div className="flex gap-2">
-      <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-      <button onClick={onSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
-        {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {label}
-      </button>
-    </div>
-  );
-}
-
-// ─── BOOKING ROW ACTIONS ──────────────────────────────────────────────────
-type ActiveModal =
-  | { type: "payment"; booking: Booking }
-  | { type: "charges"; booking: Booking }
-  | { type: "invoice"; booking: Booking }
-  | null;
-
-function BookingActions({
-  booking,
-  property,
-  roomName,
-  onStatusChange,
-  onOpenModal,
-}: {
-  booking: Booking;
-  property: ReturnType<typeof useOwnerProperty>["data"];
-  roomName: string;
-  onStatusChange: (id: string, status: string) => void;
-  onOpenModal: (modal: ActiveModal) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const ownerPhone = property?.owner_phone ?? "";
-  const lat = property?.location_lat;
-  const lng = property?.location_lng;
-
-  const advance = Number(booking.advance_amount ?? 0);
-  const balance = Math.max(0, Number(booking.total_amount) - advance);
-
-  return (
-    <div className="flex items-center justify-end gap-1" ref={ref}>
-      {/* Quick status transitions */}
-      {booking.status === "pending" && (
-        <button
-          title="Confirm booking"
-          onClick={() => onStatusChange(booking.id, "confirmed")}
-          className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary text-xs"
-        >
-          <Check className="h-3.5 w-3.5 text-primary" />
-        </button>
-      )}
-      {booking.status === "confirmed" && (
-        <button
-          title="Check in guest"
-          onClick={() => onStatusChange(booking.id, "checked_in")}
-          className="h-8 px-2 inline-flex items-center gap-1 rounded-md border border-border hover:bg-primary/10 text-xs font-medium text-primary"
-        >
-          <LogIn className="h-3 w-3" /> In
-        </button>
-      )}
-      {booking.status === "checked_in" && (
-        <button
-          title="Check out guest"
-          onClick={() => onStatusChange(booking.id, "completed")}
-          className="h-8 px-2 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 hover:bg-amber-100 text-xs font-medium text-amber-700"
-        >
-          <LogOut className="h-3 w-3" /> Out
-        </button>
-      )}
-
-      {/* Phone */}
-      <a
-        href={telLink(booking.guest_phone)}
-        title="Call guest"
-        className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted text-xs"
-      >
-        <Phone className="h-3.5 w-3.5" />
-      </a>
-
-      {/* Actions dropdown */}
-      <div className="relative">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="h-8 px-2 inline-flex items-center gap-0.5 rounded-md border border-border hover:bg-muted text-xs"
-          title="More actions"
-        >
-          <ChevronDown className="h-3.5 w-3.5" />
-        </button>
-
-        {open && (
-          <div className="absolute right-0 bottom-9 z-20 w-56 bg-card border border-border rounded-xl shadow-lg py-1 text-sm">
-            {/* Payment section */}
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Payments
-            </div>
-            <button
-              onClick={() => { setOpen(false); onOpenModal({ type: "payment", booking }); }}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left"
-            >
-              <IndianRupee className="h-3.5 w-3.5 text-primary" />
-              Record payment
-              {advance > 0 && <span className="ml-auto text-xs text-primary">₹{advance.toLocaleString("en-IN")}</span>}
-            </button>
-
-            {/* Charges section */}
-            <div className="border-t border-border mt-1 pt-1 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              On-property
-            </div>
-            <button
-              onClick={() => { setOpen(false); onOpenModal({ type: "charges", booking }); }}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left"
-            >
-              <Utensils className="h-3.5 w-3.5 text-amber-600" />
-              Add charges
-            </button>
-
-            {/* Invoice */}
-            <div className="border-t border-border mt-1 pt-1 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              Invoice
-            </div>
-            <button
-              onClick={() => { setOpen(false); onOpenModal({ type: "invoice", booking }); }}
-              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left"
-            >
-              <ClipboardList className="h-3.5 w-3.5 text-foreground" />
-              View / print invoice
-              {balance > 0 && <span className="ml-auto text-xs text-amber-600">₹{balance.toLocaleString("en-IN")} due</span>}
-            </button>
-
-            {/* WhatsApp templates */}
-            <div className="border-t border-border mt-1 pt-1 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
-              WhatsApp
-            </div>
-            <a
-              href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone })}
-              target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-muted"
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> ✅ Booking confirmed
-            </a>
-            {lat && lng && (
-              <a
-                href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })}
-                target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 hover:bg-muted"
-              >
-                <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> 📍 Send directions
-              </a>
-            )}
-            <a
-              href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, amount: balance, checkIn: booking.check_in, propertyName: property?.name ?? "" })}
-              target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-muted"
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> 💰 Payment reminder
-            </a>
-            <a
-              href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })}
-              target="_blank" rel="noreferrer" onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 hover:bg-muted"
-            >
-              <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> 🌿 Day-before reminder
-            </a>
-
-            {/* Cancel */}
-            {booking.status !== "cancelled" && booking.status !== "completed" && (
-              <>
-                <div className="border-t border-border my-1" />
-                <button
-                  onClick={() => { setOpen(false); onStatusChange(booking.id, "cancelled"); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 hover:bg-destructive/10 text-destructive text-left"
-                >
-                  <X className="h-3.5 w-3.5" /> Cancel booking
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN COMPONENT ───────────────────────────────────────────────────────
 function BookingsAdmin() {
   const { data: property } = useOwnerProperty();
   const { data: bookings = [], isLoading } = useBookings(property?.id ?? "");
   const queryClient = useQueryClient();
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
-  const [status, setStatus] = useState<"all" | BookingStatus>("all");
+  const [showAdd, setShowAdd] = useState(false);
+  const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [q, setQ] = useState("");
 
   const rooms = property?.rooms ?? [];
-
   const roomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
     rooms.forEach((r) => { map[r.id] = r.name; });
@@ -898,16 +727,14 @@ function BookingsAdmin() {
 
   const filtered = useMemo(() =>
     bookings.filter((b) => {
-      if (status !== "all" && b.status !== status) return false;
-      if (q && !`${b.guest_name} ${b.guest_phone} ${b.id}`.toLowerCase().includes(q.toLowerCase())) return false;
+      if (filterStatus !== "all" && b.status !== filterStatus) return false;
+      if (q && !`${b.guest_name} ${b.guest_phone}`.toLowerCase().includes(q.toLowerCase())) return false;
       return true;
-    }), [bookings, status, q]);
+    }), [bookings, filterStatus, q]);
 
-  // Stats bar
   const stats = useMemo(() => {
     const active = bookings.filter((b) => !["cancelled", "completed"].includes(b.status));
-    const outstanding = active.reduce((s, b) =>
-      s + Math.max(0, Number(b.total_amount) - Number(b.advance_amount ?? 0)), 0);
+    const outstanding = active.reduce((s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.advance_amount ?? 0)), 0);
     return { active: active.length, outstanding };
   }, [bookings]);
 
@@ -917,209 +744,81 @@ function BookingsAdmin() {
     if (newStatus === "completed") updates.checked_out_at = new Date().toISOString();
     await supabase.from("bookings").update(updates).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+    setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
   };
 
-  const handleModalSaved = () => {
+  const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
-    setActiveModal(null);
   };
 
-  if (isLoading) return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
-
-  // Fetch charges for active invoice/charge modal
-  const activeBookingId =
-    activeModal?.type === "invoice" || activeModal?.type === "charges"
-      ? activeModal.booking.id
-      : null;
+  if (isLoading) return (
+    <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>
+  );
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">Bookings</h1>
-          <p className="text-sm text-muted-foreground">All inquiries and confirmed stays.</p>
+          <p className="text-sm text-muted-foreground">Tap any booking to view details.</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-        >
-          <Plus className="h-4 w-4" /> Add booking
+        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
+          <Plus className="h-4 w-4" /> Add
         </button>
       </div>
 
-      {/* Stats bar */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary-light flex items-center justify-center">
-            <ClipboardList className="h-4 w-4 text-primary" />
+        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Active bookings</div>
-            <div className="font-display text-xl font-semibold">{stats.active}</div>
+            <div className="text-xs text-muted-foreground">Active</div>
+            <div className="font-display text-2xl font-semibold">{stats.active}</div>
           </div>
         </div>
-        <div className="bg-card border border-border rounded-xl p-3 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-amber-50 flex items-center justify-center">
-            <IndianRupee className="h-4 w-4 text-amber-600" />
+        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+            <IndianRupee className="h-5 w-5 text-amber-600" />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Balance outstanding</div>
-            <div className="font-display text-xl font-semibold text-amber-700">
-              ₹{stats.outstanding.toLocaleString("en-IN")}
-            </div>
+            <div className="text-xs text-muted-foreground">Outstanding</div>
+            <div className="font-display text-xl font-semibold text-amber-700">₹{stats.outstanding.toLocaleString("en-IN")}</div>
           </div>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-card border border-border rounded-xl p-3 grid md:grid-cols-3 gap-3">
-        <div className="relative md:col-span-2">
+      <div className="space-y-2">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Search guest, phone, or booking ID"
-            className="w-full rounded-lg border border-border bg-background pl-9 pr-3 py-2 text-sm"
-          />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm" />
         </div>
-        <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value as "all" | BookingStatus)}
-          className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s === "all" ? "All statuses" : s.replace("_", " ").replace(/^\w/, (c) => c.toUpperCase())}
-            </option>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((s) => (
+            <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
+              {s === "all" ? "All" : STATUS_CONFIG[s]?.label ?? s}
+            </button>
           ))}
-        </select>
-      </div>
-
-      {/* Table */}
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[960px]">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Guest</th>
-                <th className="px-4 py-2.5 font-medium">Room</th>
-                <th className="px-4 py-2.5 font-medium">Check-in</th>
-                <th className="px-4 py-2.5 font-medium">Check-out</th>
-                <th className="px-4 py-2.5 font-medium">Amount</th>
-                <th className="px-4 py-2.5 font-medium">Advance</th>
-                <th className="px-4 py-2.5 font-medium">Balance</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((b) => {
-                const advance = Number(b.advance_amount ?? 0);
-                const balance = Math.max(0, Number(b.total_amount) - advance);
-                return (
-                  <tr key={b.id} className="border-t border-border hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="font-medium">{b.guest_name}</div>
-                      <div className="text-xs text-muted-foreground">{b.guest_phone}</div>
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {roomNameMap[b.room_id] ?? <span className="text-muted-foreground text-xs">{b.room_id.slice(0, 8)}</span>}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{b.check_in}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{b.check_out}</td>
-                    <td className="px-4 py-3 font-medium">
-                      ₹{Number(b.total_amount).toLocaleString("en-IN")}
-                    </td>
-                    <td className="px-4 py-3">
-                      {advance > 0
-                        ? <span className="text-primary font-medium">₹{advance.toLocaleString("en-IN")}</span>
-                        : <span className="text-xs text-muted-foreground">—</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {balance > 0
-                        ? <span className="text-amber-700 font-medium">₹{balance.toLocaleString("en-IN")}</span>
-                        : <span className="text-primary text-xs font-medium">Paid ✓</span>}
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusPill status={b.status as BookingStatus} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <BookingActions
-                        booking={b as Booking}
-                        property={property}
-                        roomName={roomNameMap[b.room_id] ?? b.room_id}
-                        onStatusChange={updateStatus}
-                        onOpenModal={setActiveModal}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
-                    No bookings match these filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
-      {/* Modals */}
-      {showAddModal && property && (
-        <AddBookingModal
-          propertyId={property.id}
-          rooms={rooms.filter((r) => r.is_active)}
-          onClose={() => setShowAddModal(false)}
-          onSaved={() => { queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] }); setShowAddModal(false); }}
-        />
+      {filtered.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">No bookings match these filters.</div>
+      ) : (
+        <div className="space-y-3">
+          {filtered.map((b) => (
+            <BookingCard key={b.id} booking={b as Booking} roomName={roomNameMap[b.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(b as Booking)} />
+          ))}
+        </div>
       )}
 
-      {activeModal?.type === "payment" && (
-        <RecordPaymentModal
-          booking={activeModal.booking}
-          onClose={() => setActiveModal(null)}
-          onSaved={handleModalSaved}
-        />
+      {showAdd && property && (
+        <AddBookingModal propertyId={property.id} rooms={rooms.filter((r) => r.is_active)} onClose={() => setShowAdd(false)} onSaved={() => { queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] }); setShowAdd(false); }} />
       )}
 
-      {activeModal?.type === "charges" && (
-        <AddChargesModal
-          booking={activeModal.booking}
-          onClose={() => setActiveModal(null)}
-        />
-      )}
-
-      {activeModal?.type === "invoice" && (
-        <InvoiceModalWrapper
-          booking={activeModal.booking}
-          roomName={roomNameMap[activeModal.booking.room_id] ?? activeModal.booking.room_id}
-          property={property}
-          onClose={() => setActiveModal(null)}
-        />
+      {activeBooking && (
+        <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleRefresh} />
       )}
     </div>
-  );
-}
-
-// Wrapper to load charges then show invoice
-function InvoiceModalWrapper({
-  booking, roomName, property, onClose,
-}: {
-  booking: Booking;
-  roomName: string;
-  property: ReturnType<typeof useOwnerProperty>["data"];
-  onClose: () => void;
-}) {
-  const { data: charges = [] } = useBookingCharges(booking.id);
-  return (
-    <InvoiceModal
-      booking={booking}
-      charges={charges}
-      roomName={roomName}
-      property={property}
-      onClose={onClose}
-    />
   );
 }
