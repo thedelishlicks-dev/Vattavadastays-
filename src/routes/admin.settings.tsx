@@ -48,12 +48,12 @@ function ImageUploadField({
   onUploaded,
   onRemoved,
 }: ImageUploadProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState('')
   const [error, setError] = useState('')
 
-  const handleUpload = async (e: React.ChangeEvent<<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
