@@ -146,7 +146,6 @@ async function encodeToWebP(
 
     canvas.width = w;
     canvas.height = h;
-    // Clear canvas (in case of transparency/resize artifacts)
     ctx.clearRect(0, 0, w, h);
     ctx.drawImage(img, 0, 0, w, h);
 
@@ -161,7 +160,6 @@ async function encodeToWebP(
       q = Math.max(0.35, +(q - 0.06).toFixed(2));
       attempts++;
     }
-    // If we get here, even quality 0.35 at this scale is too big → try smaller scale
   }
 
   throw `Could not compress below ${formatBytes(maxBytes)}. The image is too complex. Try a smaller original or lower-resolution photo.`;
@@ -184,7 +182,6 @@ export async function compressImage(
 
   const blob = await encodeToWebP(img, opts);
 
-  // Hard safety check — should never trigger if encodeToWebP is working
   if (blob.size > opts.maxBytes) {
     throw `Compression failed: output ${formatBytes(blob.size)} exceeds limit ${formatBytes(opts.maxBytes)}.`;
   }
