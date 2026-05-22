@@ -4,45 +4,186 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X } from 'lucide-react'
+import { validateAndCompress, formatBytes, type ImagePreset } from '@/lib/imageUtils'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettings,
 })
 
-const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+const inputCls =
+  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
-async function compressToWebP(file: File, maxWidth: number, maxHeight: number, quality: number): Promise<File> {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    const url = URL.createObjectURL(file)
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      let { width, height } = img
-      if (width > maxWidth) { height = Math.round(height * maxWidth / width); width = maxWidth }
-      if (height > maxHeight) { width = Math.round(width * maxHeight / height); height = maxHeight }
-      const canvas = document.createElement('canvas')
-      canvas.width = width
-      canvas.height = height
-      const ctx = canvas.getContext('2d')
-      if (!ctx) { reject(new Error('Canvas unavailable')); return }
-      ctx.drawImage(img, 0, 0, width, height)
-      canvas.toBlob((blob) => {
-        if (!blob) { reject(new Error('Compression failed')); return }
-        resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }))
-      }, 'image/webp', quality)
+// Preset size limits for hard guard (mirrors imageUtils.ts PRESETS)
+const PRESET_MAX_BYTES: Record<ImagePreset, number> = {
+  room: 150_000,
+  hero: 250_000,
+  about: 180_000,
+  logo: 20_000,
+  staticMap: 120_000,
+}
+
+interface ImageUploadProps {
+  label: string
+  hint: string
+  bucket: string
+  pathPrefix: string
+  stem: string
+  preset: ImagePreset
+  currentUrl: string | null
+  previewClassName?: string
+  onUploaded: (publicUrl: string) => void
+  onRemoved: () => void
+}
+
+function ImageUploadField({
+  label,
+  hint,
+  bucket,
+  pathPrefix,
+  stem,
+  preset,
+  currentUrl,
+  previewClassName = 'w-full h-48 object-cover',
+  onUploaded,
+  onRemoved,
+}: ImageUploadProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState('')
+  const [error, setError] = useState('')
+
+  const handleUpload = async (e: React.ChangeEvent<<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setUploading(true)
+    setError('')
+    setProgress('Checking file…')
+
+    try {
+      setProgress('Compressing…')
+      const { file: compressed, originalBytes, compressedBytes, savingPct } =
+        await validateAndCompress(file, preset)
+
+      setProgress(
+        `${formatBytes(originalBytes)} → ${formatBytes(compressedBytes)} (−${savingPct}%)`
+      )
+
+      // Hard guard: never upload if compression missed the target
+      const limit = PRESET_MAX_BYTES[preset]
+      if (compressed.size > limit) {
+        throw `Compressed image is still ${formatBytes(compressed.size)} (limit ${formatBytes(limit)}). Upload blocked — try a smaller or simpler photo.`
+      }
+
+      const path = `${pathPrefix}/${stem}-${Date.now()}.webp`
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+      onUploaded(urlData.publicUrl)
+      setProgress('')
+    } catch (err: unknown) {
+      setError(typeof err === 'string' ? err : (err as Error).message ?? 'Upload failed')
+      setProgress('')
+    } finally {
+      setUploading(false)
+      if (inputRef.current) inputRef.current.value = ''
     }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Load failed')) }
-    img.src = url
-  })
+  }
+
+  const isLogo = preset === 'logo'
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold">{label}</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+      </div>
+
+      {currentUrl ? (
+        <div className="relative rounded-xl overflow-hidden inline-block w-full">
+          <img
+            src={currentUrl}
+            alt={label}
+            className={isLogo ? 'h-20 w-20 object-cover rounded-full' : previewClassName}
+          />
+          <button
+            type="button"
+            onClick={onRemoved}
+            className={
+              isLogo
+                ? 'absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80'
+                : 'absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80'
+            }
+          >
+            <X className={isLogo ? 'h-3 w-3' : 'h-4 w-4'} />
+          </button>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs px-2.5 py-1 hover:bg-black/80"
+          >
+            <Upload className="h-3 w-3" /> Replace
+          </button>
+        </div>
+      ) : (
+        <div
+          onClick={() => !uploading && inputRef.current?.click()}
+          className={[
+            'border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors',
+            isLogo ? 'h-32 w-32' : 'h-48',
+          ].join(' ')}
+        >
+          {uploading ? (
+            <>
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground text-center px-3">{progress}</p>
+            </>
+          ) : (
+            <>
+              <Upload className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Tap to upload</p>
+              <p className="text-xs text-muted-foreground/60">JPG / PNG / WebP · max 10 MB</p>
+            </>
+          )}
+        </div>
+      )}
+
+      {uploading && currentUrl && (
+        <p className="text-xs text-muted-foreground">{progress}</p>
+      )}
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp,image/heic"
+        className="hidden"
+        onChange={handleUpload}
+      />
+
+      {error && <p className="text-xs text-destructive">{error}</p>}
+
+      {!currentUrl && !uploading && (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted"
+        >
+          <Upload className="h-4 w-4" /> Upload {label.toLowerCase()}
+        </button>
+      )}
+    </div>
+  )
 }
 
 function AdminSettings() {
   const queryClient = useQueryClient()
   const { data: property, isLoading } = useOwnerProperty()
-  const heroInputRef = useRef<HTMLInputElement>(null)
-  const aboutInputRef = useRef<HTMLInputElement>(null)
-  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
     name: '',
@@ -61,18 +202,6 @@ function AdminSettings() {
     about_image: '',
     logo_url: '',
   })
-
-  const [heroUploading, setHeroUploading] = useState(false)
-  const [heroError, setHeroError] = useState('')
-  const [heroPreview, setHeroPreview] = useState<string | null>(null)
-
-  const [aboutUploading, setAboutUploading] = useState(false)
-  const [aboutError, setAboutError] = useState('')
-  const [aboutPreview, setAboutPreview] = useState<string | null>(null)
-
-  const [logoUploading, setLogoUploading] = useState(false)
-  const [logoError, setLogoError] = useState('')
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
   useEffect(() => {
     if (property) {
@@ -93,11 +222,19 @@ function AdminSettings() {
         about_image: property.about_image ?? '',
         logo_url: property.logo_url ?? '',
       })
-      if (property.hero_image) setHeroPreview(property.hero_image)
-      if (property.about_image) setAboutPreview(property.about_image)
-      if (property.logo_url) setLogoPreview(property.logo_url)
     }
   }, [property])
+
+  const persistImage = async (column: string, url: string | null) => {
+    if (!property?.id) return
+    await supabase
+      .from('properties')
+      .update({ [column]: url })
+      .eq('id', property.id)
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+    setForm((f) => ({ ...f, [column]: url ?? '' }))
+  }
 
   const mutation = useMutation({
     mutationFn: async (updates: typeof form) => {
@@ -114,117 +251,6 @@ function AdminSettings() {
     },
   })
 
-  const handleHeroUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !property?.id) return
-    setHeroUploading(true)
-    setHeroError('')
-    try {
-      const compressed = await compressToWebP(file, 1920, 1080, 0.80)
-      const path = `${property.id}/hero-${Date.now()}.webp`
-      const { error: uploadError } = await supabase.storage
-        .from('hero-images')
-        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl
-      setHeroPreview(publicUrl)
-      setForm((f) => ({ ...f, hero_image: publicUrl }))
-      const { error: dbError } = await supabase.from('properties').update({ hero_image: publicUrl }).eq('id', property.id)
-      if (dbError) throw dbError
-      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-      queryClient.invalidateQueries({ queryKey: ['property'] })
-    } catch (err: unknown) {
-      setHeroError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setHeroUploading(false)
-      if (heroInputRef.current) heroInputRef.current.value = ''
-    }
-  }
-
-  const handleRemoveHero = async () => {
-    if (!property?.id) return
-    setHeroPreview(null)
-    setForm((f) => ({ ...f, hero_image: '' }))
-    await supabase.from('properties').update({ hero_image: null }).eq('id', property.id)
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-    queryClient.invalidateQueries({ queryKey: ['property'] })
-  }
-
-  const handleAboutUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !property?.id) return
-    setAboutUploading(true)
-    setAboutError('')
-    try {
-      const compressed = await compressToWebP(file, 1280, 960, 0.80)
-      const path = `${property.id}/about-${Date.now()}.webp`
-      const { error: uploadError } = await supabase.storage
-        .from('hero-images')
-        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl
-      setAboutPreview(publicUrl)
-      setForm((f) => ({ ...f, about_image: publicUrl }))
-      const { error: dbError } = await supabase.from('properties').update({ about_image: publicUrl }).eq('id', property.id)
-      if (dbError) throw dbError
-      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-      queryClient.invalidateQueries({ queryKey: ['property'] })
-    } catch (err: unknown) {
-      setAboutError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setAboutUploading(false)
-      if (aboutInputRef.current) aboutInputRef.current.value = ''
-    }
-  }
-
-  const handleRemoveAbout = async () => {
-    if (!property?.id) return
-    setAboutPreview(null)
-    setForm((f) => ({ ...f, about_image: '' }))
-    await supabase.from('properties').update({ about_image: null }).eq('id', property.id)
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-    queryClient.invalidateQueries({ queryKey: ['property'] })
-  }
-
-  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !property?.id) return
-    setLogoUploading(true)
-    setLogoError('')
-    try {
-      const compressed = await compressToWebP(file, 200, 200, 0.90)
-      const path = `${property.id}/logo-${Date.now()}.webp`
-      const { error: uploadError } = await supabase.storage
-        .from('hero-images')
-        .upload(path, compressed, { upsert: true, contentType: 'image/webp' })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('hero-images').getPublicUrl(path)
-      const publicUrl = urlData.publicUrl
-      setLogoPreview(publicUrl)
-      setForm((f) => ({ ...f, logo_url: publicUrl }))
-      const { error: dbError } = await supabase.from('properties').update({ logo_url: publicUrl }).eq('id', property.id)
-      if (dbError) throw dbError
-      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-      queryClient.invalidateQueries({ queryKey: ['property'] })
-    } catch (err: unknown) {
-      setLogoError(err instanceof Error ? err.message : 'Upload failed')
-    } finally {
-      setLogoUploading(false)
-      if (logoInputRef.current) logoInputRef.current.value = ''
-    }
-  }
-
-  const handleRemoveLogo = async () => {
-    if (!property?.id) return
-    setLogoPreview(null)
-    setForm((f) => ({ ...f, logo_url: '' }))
-    await supabase.from('properties').update({ logo_url: null }).eq('id', property.id)
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
-    queryClient.invalidateQueries({ queryKey: ['property'] })
-  }
-
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
@@ -235,208 +261,253 @@ function AdminSettings() {
   }
 
   if (isLoading) {
-    return <div className="flex justify-center py-16"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   if (!property) {
-    return <div className="text-center py-16 text-muted-foreground">Could not load property settings.</div>
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        Could not load property settings.
+      </div>
+    )
   }
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Property Settings</h1>
+
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* Logo */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold">Logo</h2>
-          <p className="text-xs text-muted-foreground">Your property logo shown in the header. Square image recommended (200×200px).</p>
+        <ImageUploadField
+          label="Logo"
+          hint="Square image shown in the header. Recommended 120×120 px or larger square."
+          bucket="hero-images"
+          pathPrefix={property.id}
+          stem="logo"
+          preset="logo"
+          currentUrl={form.logo_url || null}
+          previewClassName="h-20 w-20 object-cover rounded-full"
+          onUploaded={(url) => persistImage('logo_url', url)}
+          onRemoved={() => persistImage('logo_url', null)}
+        />
 
-          {logoPreview ? (
-            <div className="relative rounded-xl overflow-hidden inline-block">
-              <img src={logoPreview} alt="Logo preview" className="h-20 w-20 object-cover rounded-full" />
-              <button type="button" onClick={handleRemoveLogo} className="absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                <X className="h-3 w-3" />
-              </button>
-            </div>
-          ) : (
-            <div onClick={() => logoInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-32 w-32 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
-              {logoUploading ? (
-                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-xs text-muted-foreground">Uploading...</p></>
-              ) : (
-                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-xs text-muted-foreground">Tap to upload</p><p className="text-[10px] text-muted-foreground">Square · 200×200</p></>
-              )}
-            </div>
-          )}
+        <ImageUploadField
+          label="Hero Image"
+          hint="Full-width banner at the top of your guest booking page. Compressed to ≤250 KB for fast loading on mobile."
+          bucket="hero-images"
+          pathPrefix={property.id}
+          stem="hero"
+          preset="hero"
+          currentUrl={form.hero_image || null}
+          onUploaded={(url) => persistImage('hero_image', url)}
+          onRemoved={() => persistImage('hero_image', null)}
+        />
 
-          <input ref={logoInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleLogoUpload} />
+        <ImageUploadField
+          label="About Section Image"
+          hint="Shown beside your property description. Landscape photo works best."
+          bucket="hero-images"
+          pathPrefix={property.id}
+          stem="about"
+          preset="about"
+          currentUrl={form.about_image || null}
+          onUploaded={(url) => persistImage('about_image', url)}
+          onRemoved={() => persistImage('about_image', null)}
+        />
 
-          {!logoPreview && !logoUploading && (
-            <button type="button" onClick={() => logoInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
-              <Upload className="h-4 w-4" /> Upload logo
-            </button>
-          )}
+        <ImageUploadField
+          label="Static Map Image"
+          hint="A screenshot of your property location on Google Maps. Used instead of a map embed — loads in under 1 second on 2G."
+          bucket="hero-images"
+          pathPrefix={property.id}
+          stem="map"
+          preset="staticMap"
+          currentUrl={form.static_map_image_url || null}
+          onUploaded={(url) => persistImage('static_map_image_url', url)}
+          onRemoved={() => persistImage('static_map_image_url', null)}
+        />
 
-          {logoError && <p className="text-xs text-destructive">{logoError}</p>}
-        </div>
-
-        {/* Hero Image */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold">Hero Image</h2>
-          <p className="text-xs text-muted-foreground">The main image shown at the top of your guest booking page. Auto-compressed to WebP for fast loading.</p>
-
-          {heroPreview ? (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={heroPreview} alt="Hero preview" className="w-full h-48 object-cover" />
-              <button type="button" onClick={handleRemoveHero} className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div onClick={() => heroInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-48 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
-              {heroUploading ? (
-                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Compressing and uploading...</p></>
-              ) : (
-                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-sm text-muted-foreground">Tap to upload hero image</p><p className="text-xs text-muted-foreground">JPG, PNG or WebP · Auto-compressed</p></>
-              )}
-            </div>
-          )}
-
-          <input ref={heroInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleHeroUpload} />
-
-          {!heroPreview && !heroUploading && (
-            <button type="button" onClick={() => heroInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
-              <Upload className="h-4 w-4" /> Upload image
-            </button>
-          )}
-
-          {heroError && <p className="text-xs text-destructive">{heroError}</p>}
-        </div>
-
-        {/* About Image */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-semibold">About Section Image</h2>
-          <p className="text-xs text-muted-foreground">Image shown in the About section on your guest page. Recommended: landscape photo of your property exterior or host area.</p>
-
-          {aboutPreview ? (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={aboutPreview} alt="About preview" className="w-full h-48 object-cover" />
-              <button type="button" onClick={handleRemoveAbout} className="absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          ) : (
-            <div onClick={() => aboutInputRef.current?.click()} className="border-2 border-dashed border-border rounded-xl h-48 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
-              {aboutUploading ? (
-                <><Loader2 className="h-6 w-6 animate-spin text-primary" /><p className="text-sm text-muted-foreground">Compressing and uploading...</p></>
-              ) : (
-                <><Upload className="h-6 w-6 text-muted-foreground" /><p className="text-sm text-muted-foreground">Tap to upload about image</p><p className="text-xs text-muted-foreground">JPG, PNG or WebP · Auto-compressed</p></>
-              )}
-            </div>
-          )}
-
-          <input ref={aboutInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={handleAboutUpload} />
-
-          {!aboutPreview && !aboutUploading && (
-            <button type="button" onClick={() => aboutInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
-              <Upload className="h-4 w-4" /> Upload image
-            </button>
-          )}
-
-          {aboutError && <p className="text-xs text-destructive">{aboutError}</p>}
-        </div>
-
-        {/* Basic Info */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Basic Info</h2>
+
           <div>
             <label className={labelCls}>Property Name</label>
-            <input type="text" name="name" value={form.name} onChange={handleChange} className={inputCls} />
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              className={inputCls}
+            />
           </div>
+
           <div>
             <label className={labelCls}>Hero Tagline</label>
-            <input 
-              type="text" 
-              name="hero_tagline" 
-              value={form.hero_tagline} 
-              onChange={handleChange} 
-              placeholder="Short tagline for hero banner (e.g., A 3-room mountain retreat...)"
-              className={inputCls} 
+            <input
+              type="text"
+              name="hero_tagline"
+              value={form.hero_tagline}
+              onChange={handleChange}
+              placeholder="Short tagline for hero banner (e.g. A 3-room mountain retreat…)"
+              className={inputCls}
             />
-            <p className="text-xs text-muted-foreground mt-1">Shown on the hero banner. Keep it short and punchy.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Shown on the hero banner. Keep it short and punchy.
+            </p>
           </div>
+
           <div>
             <label className={labelCls}>Description</label>
-            <textarea name="description" value={form.description} onChange={handleChange} rows={4} className={inputCls + ' resize-none'} />
-            <p className="text-xs text-muted-foreground mt-1">Shown in the About section. Can be longer and more detailed.</p>
+            <textarea
+              name="description"
+              value={form.description}
+              onChange={handleChange}
+              rows={4}
+              className={inputCls + ' resize-none'}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Shown in the About section. Can be longer and more detailed.
+            </p>
           </div>
         </div>
 
-        {/* Owner Info */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Owner Info</h2>
+
           <div>
             <label className={labelCls}>Owner Name</label>
-            <input type="text" name="owner_name" value={form.owner_name} onChange={handleChange} className={inputCls} />
+            <input
+              type="text"
+              name="owner_name"
+              value={form.owner_name}
+              onChange={handleChange}
+              className={inputCls}
+            />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone</label>
-              <input type="tel" name="owner_phone" value={form.owner_phone} onChange={handleChange} className={inputCls} />
+              <input
+                type="tel"
+                name="owner_phone"
+                value={form.owner_phone}
+                onChange={handleChange}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>WhatsApp</label>
-              <input type="tel" name="owner_whatsapp" value={form.owner_whatsapp} onChange={handleChange} className={inputCls} />
+              <input
+                type="tel"
+                name="owner_whatsapp"
+                value={form.owner_whatsapp}
+                onChange={handleChange}
+                className={inputCls}
+              />
             </div>
           </div>
         </div>
 
-        {/* Check-in / Check-out */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-stone-900">Check-in / Check-out</h2>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Check-in Time</label>
-              <input type="time" name="check_in_time" value={form.check_in_time} onChange={handleChange} className={inputCls} />
+              <input
+                type="time"
+                name="check_in_time"
+                value={form.check_in_time}
+                onChange={handleChange}
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Check-out Time</label>
-              <input type="time" name="check_out_time" value={form.check_out_time} onChange={handleChange} className={inputCls} />
+              <input
+                type="time"
+                name="check_out_time"
+                value={form.check_out_time}
+                onChange={handleChange}
+                className={inputCls}
+              />
             </div>
           </div>
         </div>
 
-        {/* Location */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Location</h2>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Latitude</label>
-              <input type="text" name="location_lat" inputMode="decimal" value={form.location_lat} onChange={handleChange} placeholder="e.g. 10.12" className={inputCls} />
+              <input
+                type="text"
+                name="location_lat"
+                inputMode="decimal"
+                value={form.location_lat}
+                onChange={handleChange}
+                placeholder="e.g. 10.12"
+                className={inputCls}
+              />
             </div>
             <div>
               <label className={labelCls}>Longitude</label>
-              <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.15" className={inputCls} />
+              <input
+                type="text"
+                name="location_lng"
+                inputMode="decimal"
+                value={form.location_lng}
+                onChange={handleChange}
+                placeholder="e.g. 77.15"
+                className={inputCls}
+              />
             </div>
           </div>
+
           <div>
             <label className={labelCls}>Landmark Description</label>
-            <input type="text" name="landmark_description" value={form.landmark_description} onChange={handleChange} placeholder="e.g. Near St. Mary's Church, 500m from main road" className={inputCls} />
-          </div>
-          <div>
-            <label className={labelCls}>Static Map Image URL</label>
-            <input type="text" name="static_map_image_url" value={form.static_map_image_url} onChange={handleChange} placeholder="https://... (from Supabase Storage)" className={inputCls} />
+            <input
+              type="text"
+              name="landmark_description"
+              value={form.landmark_description}
+              onChange={handleChange}
+              placeholder="e.g. Near St. Mary's Church, 500m from main road"
+              className={inputCls}
+            />
           </div>
         </div>
 
-        {/* Save */}
         <div className="flex items-center gap-3 pt-2">
-          <button type="submit" disabled={mutation.isPending} className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60">
-            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          <button
+            type="submit"
+            disabled={mutation.isPending}
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60"
+          >
+            {mutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Save className="h-4 w-4" />
+            )}
             Save Changes
           </button>
-          {mutation.isSuccess && <span className="flex items-center gap-1 text-sm text-primary"><CheckCircle className="h-4 w-4" /> Saved!</span>}
-          {mutation.isError && <span className="text-sm text-destructive">Save failed — please try again.</span>}
+
+          {mutation.isSuccess && (
+            <span className="flex items-center gap-1 text-sm text-primary">
+              <CheckCircle className="h-4 w-4" /> Saved!
+            </span>
+          )}
+
+          {mutation.isError && (
+            <span className="text-sm text-destructive">
+              Save failed — please try again.
+            </span>
+          )}
         </div>
       </form>
     </div>
