@@ -59,13 +59,13 @@ function RoomImageUpload({
   propertyId: string
   onUploaded: () => void
 }) {
-  const inputRef = useRef<<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
   const [progress, setProgress] = useState<string>('')
   const [error, setError] = useState('')
   const currentImage = room.images?.[0] ?? null
 
-  const handleUpload = async (e: React.ChangeEvent<<HTMLInputElement>) => {
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
