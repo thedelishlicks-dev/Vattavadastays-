@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff } from 'lucide-react'
 import type { Room } from '@/types/database'
-import { validateAndCompress, formatBytes } from '@/lib/imageUtils'
+import { validateAndCompress, compressionSummary } from '@/lib/imageUtils'
 
 export const Route = createFileRoute('/admin/rooms')({
   component: AdminRooms,
@@ -76,11 +76,12 @@ function RoomImageUpload({
     try {
       // validateAndCompress throws a user-friendly string on failure
       setProgress('Compressing…')
-      const { file: compressed, originalBytes, compressedBytes, savingPct } =
+      const result = 
         await validateAndCompress(file, 'room')
+      const { file: compressed } = result
 
       setProgress(
-        `Compressed ${formatBytes(originalBytes)} → ${formatBytes(compressedBytes)} (${savingPct}% smaller)`
+        compressionSummary(result)
       )
 
       const path = `${propertyId}/${room.id}-${Date.now()}.webp`
