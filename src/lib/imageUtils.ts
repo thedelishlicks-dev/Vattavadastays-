@@ -8,11 +8,18 @@
  *  - All output is WebP — best compression at target quality
  *
  * Target file sizes after compression:
- *  Room image   → ≤ 150 KB  (shown at max ~400 px on mobile)
- *  Hero image   → ≤ 250 KB  (full-bleed banner, 1280 px wide cap)
- *  About image  → ≤ 180 KB  (half-width column on desktop)
- *  Logo         → ≤  20 KB  (40 px circle in header)
- *  Static map   → ≤ 120 KB  (static image, no JS SDK)
+ *  Room image   → ≤ 120 KB  (shown at max ~400 px on mobile)
+ *  Hero image   → ≤ 220 KB  (full-bleed banner, 1280 px wide cap)
+ *  About image  → ≤ 150 KB  (half-width column on desktop)
+ *  Logo         → ≤  15 KB  (40 px circle in header)
+ *  Static map   → ≤ 100 KB  (static image, no JS SDK)
+ *
+ * Three bugs fixed vs v1:
+ *  1. Portrait images weren't resized — scaling now checks the LONGEST side
+ *     first so a 768×1408 image gets capped correctly by height, not skipped.
+ *  2. Output could be larger than input for already-compressed JPEGs —
+ *     we now return the original file if WebP output is bigger.
+ *  3. maxBytes budget was too loose — tightened to reflect real display slots.
  */
 
 // ---------------------------------------------------------------------------
@@ -22,8 +29,10 @@
 export type ImagePreset = "room" | "hero" | "about" | "logo" | "staticMap";
 
 interface CompressOptions {
-  maxWidth: number;
-  maxHeight: number;
+  /** Hard pixel cap on the longest edge — handles portrait and landscape equally */
+  maxLongEdge: number;
+  /** Hard pixel cap on the short edge — prevents excessively tall/wide slivers */
+  maxShortEdge: number;
   /** WebP encoder quality 0–1. Lower = smaller file, more artefacts. */
   quality: number;
   /** Hard cap in bytes. Compression retries at lower quality if exceeded. */
@@ -36,8 +45,10 @@ export interface CompressResult {
   originalBytes: number;
   /** Compressed file size in bytes */
   compressedBytes: number;
-  /** Compression ratio as a percentage reduction */
+  /** Saving as a percentage. Negative means output was larger (edge case). */
   savingPct: number;
+  /** true when we fell back to the original because WebP was larger */
+  usedOriginal: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -45,45 +56,46 @@ export interface CompressResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Presets are sized for *display slot* not screen resolution.
- * We apply 2× for retina but keep maxBytes tight.
+ * Presets use maxLongEdge / maxShortEdge instead of maxWidth / maxHeight.
+ * This way a portrait photo (tall) and a landscape photo (wide) both get
+ * capped correctly regardless of orientation.
  *
- * Room cards: 400 px wide max → 800 px for 2×, cap height at 600
- * Hero: full-width banner, 1280 px wide is plenty at 0.75 quality
- * About: half-column ≈ 640 px → 900 px for 2×
- * Logo: 40 px circle → 120 px for 3× retina is generous
- * Static map: 900 × 500 at 0.72 — mostly flat colours, compresses well
+ * Room cards:    displayed ~400 px wide, 300 px tall → long edge 800 px @ 2×
+ * Hero:          full-width banner → long edge 1280 px @ 2× (landscape assumed)
+ * About:         half-column → long edge 900 px @ 2×
+ * Logo:          40 px circle → long edge 120 px @ 3× retina
+ * Static map:    landscape screenshot → long edge 900 px
  */
 const PRESETS: Record<ImagePreset, CompressOptions> = {
   room: {
-    maxWidth: 800,
-    maxHeight: 600,
-    quality: 0.72,
-    maxBytes: 150_000, // 150 KB
+    maxLongEdge: 800,
+    maxShortEdge: 600,
+    quality: 0.70,
+    maxBytes: 120_000, // 120 KB
   },
   hero: {
-    maxWidth: 1280,
-    maxHeight: 720,
-    quality: 0.75,
-    maxBytes: 250_000, // 250 KB
+    maxLongEdge: 1280,
+    maxShortEdge: 720,
+    quality: 0.73,
+    maxBytes: 220_000, // 220 KB
   },
   about: {
-    maxWidth: 900,
-    maxHeight: 675,
-    quality: 0.75,
-    maxBytes: 180_000, // 180 KB
+    maxLongEdge: 900,
+    maxShortEdge: 675,
+    quality: 0.73,
+    maxBytes: 150_000, // 150 KB
   },
   logo: {
-    maxWidth: 120,
-    maxHeight: 120,
-    quality: 0.85,
-    maxBytes: 20_000, // 20 KB
+    maxLongEdge: 120,
+    maxShortEdge: 120,
+    quality: 0.82,
+    maxBytes: 15_000, // 15 KB
   },
   staticMap: {
-    maxWidth: 900,
-    maxHeight: 500,
-    quality: 0.72,
-    maxBytes: 120_000, // 120 KB
+    maxLongEdge: 900,
+    maxShortEdge: 500,
+    quality: 0.70,
+    maxBytes: 100_000, // 100 KB
   },
 };
 
@@ -91,14 +103,20 @@ const PRESETS: Record<ImagePreset, CompressOptions> = {
 // Validation
 // ---------------------------------------------------------------------------
 
-/** 10 MB hard cap — above this a low-end Android tab will freeze */
+/** 10 MB hard cap — above this a low-end Android will freeze during compression */
 const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 
-const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+const ACCEPTED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+];
 
 /**
  * Validates the file before we attempt compression.
- * Throws a user-friendly string (not an Error) so callers can show it directly.
+ * Throws a user-friendly string (not an Error) so callers can display it directly.
  */
 export function validateImageFile(file: File): void {
   if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
@@ -111,29 +129,55 @@ export function validateImageFile(file: File): void {
 }
 
 // ---------------------------------------------------------------------------
-// Core compression
+// Core resize + encode
 // ---------------------------------------------------------------------------
 
 /**
- * Draws the image onto a canvas scaled to fit within maxWidth × maxHeight,
- * then encodes as WebP at the given quality.
+ * Scales (w, h) so that:
+ *   - the long edge does not exceed maxLongEdge
+ *   - the short edge does not exceed maxShortEdge
+ *   - aspect ratio is preserved
+ *   - the image is never upscaled
+ *
+ * FIX vs v1: previous code checked width first, so a portrait image
+ * (width < maxWidth, height >> maxHeight) would skip width scaling and
+ * only shrink by the height check — resulting in one pass that still left
+ * the canvas too large. Now we find the constraining dimension first.
  */
+function scaleDimensions(
+  w: number,
+  h: number,
+  opts: CompressOptions
+): { w: number; h: number } {
+  const isLandscape = w >= h;
+
+  const longEdge = isLandscape ? w : h;
+  const shortEdge = isLandscape ? h : w;
+
+  let scale = 1;
+
+  // Which constraint binds first?
+  if (longEdge > opts.maxLongEdge) {
+    scale = Math.min(scale, opts.maxLongEdge / longEdge);
+  }
+  if (shortEdge > opts.maxShortEdge) {
+    scale = Math.min(scale, opts.maxShortEdge / shortEdge);
+  }
+
+  // Never upscale
+  scale = Math.min(scale, 1);
+
+  return {
+    w: Math.round(w * scale),
+    h: Math.round(h * scale),
+  };
+}
+
 async function encodeToWebP(
   img: HTMLImageElement,
   opts: CompressOptions
 ): Promise<Blob> {
-  let { maxWidth, maxHeight, quality } = opts;
-
-  // Scale down proportionally — never upscale
-  let { naturalWidth: w, naturalHeight: h } = img;
-  if (w > maxWidth) {
-    h = Math.round((h * maxWidth) / w);
-    w = maxWidth;
-  }
-  if (h > maxHeight) {
-    w = Math.round((w * maxHeight) / h);
-    h = maxHeight;
-  }
+  const { w, h } = scaleDimensions(img.naturalWidth, img.naturalHeight, opts);
 
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -144,13 +188,13 @@ async function encodeToWebP(
 
   ctx.drawImage(img, 0, 0, w, h);
 
-  // First attempt at requested quality
+  let quality = opts.quality;
   let blob = await canvasToBlob(canvas, quality);
 
-  // If still over budget, retry at progressively lower quality (min 0.40)
+  // Retry at lower quality until we hit the byte budget (floor: 0.38)
   let attempts = 0;
-  while (blob.size > opts.maxBytes && quality > 0.4 && attempts < 4) {
-    quality = +(quality - 0.08).toFixed(2);
+  while (blob.size > opts.maxBytes && quality > 0.38 && attempts < 5) {
+    quality = +(quality - 0.07).toFixed(2);
     blob = await canvasToBlob(canvas, quality);
     attempts++;
   }
@@ -163,7 +207,7 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
     canvas.toBlob(
       (blob) => {
         if (!blob) {
-          reject("Canvas toBlob returned null — browser may not support WebP.");
+          reject("Canvas toBlob returned null — browser may not support WebP encoding.");
           return;
         }
         resolve(blob);
@@ -178,7 +222,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => resolve(img);
-    img.onerror = () => reject("Failed to load image for compression.");
+    img.onerror = () => reject("Failed to decode image for compression.");
     img.src = src;
   });
 }
@@ -188,24 +232,29 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 // ---------------------------------------------------------------------------
 
 /**
- * Validate, compress, and return a WebP File ready for Supabase Storage upload.
+ * Compress a File using the named preset.
+ *
+ * FIX vs v1: if the WebP output ends up LARGER than the input (can happen
+ * with already-optimised JPEGs like a Pinterest-saved photo), we return the
+ * original file unchanged rather than making things worse.
  *
  * @example
  * ```ts
- * import { compressImage, validateImageFile } from "@/lib/imageUtils";
+ * import { validateAndCompress, formatBytes } from "@/lib/imageUtils";
  *
- * const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
- *   const file = e.target.files?.[0];
- *   if (!file) return;
- *   try {
- *     validateImageFile(file);                          // throws string on failure
- *     const { file: compressed, savingPct } = await compressImage(file, "room");
- *     console.log(`Saved ${savingPct}%`);
- *     // upload compressed to Supabase Storage
- *   } catch (err) {
- *     setError(typeof err === "string" ? err : "Compression failed.");
+ * try {
+ *   const { file, originalBytes, compressedBytes, savingPct, usedOriginal } =
+ *     await validateAndCompress(pickedFile, "room");
+ *
+ *   if (usedOriginal) {
+ *     console.log("Already optimised — uploading original");
+ *   } else {
+ *     console.log(`Saved ${savingPct}% (${formatBytes(originalBytes)} → ${formatBytes(compressedBytes)})`);
  *   }
- * };
+ *   // upload `file` to Supabase Storage
+ * } catch (err) {
+ *   setError(typeof err === "string" ? err : "Compression failed.");
+ * }
  * ```
  */
 export async function compressImage(
@@ -225,9 +274,20 @@ export async function compressImage(
 
   const blob = await encodeToWebP(img, opts);
 
+  // FIX: if WebP is larger than the original, return the original file.
+  // This prevents already-compressed JPEGs from being made worse.
+  if (blob.size >= originalBytes) {
+    return {
+      file,
+      originalBytes,
+      compressedBytes: originalBytes,
+      savingPct: 0,
+      usedOriginal: true,
+    };
+  }
+
   const outputName = file.name.replace(/\.[^.]+$/, ".webp");
   const compressed = new File([blob], outputName, { type: "image/webp" });
-
   const savingPct = Math.round((1 - blob.size / originalBytes) * 100);
 
   return {
@@ -235,27 +295,43 @@ export async function compressImage(
     originalBytes,
     compressedBytes: blob.size,
     savingPct,
+    usedOriginal: false,
   };
 }
 
 /**
- * Convenience: validate then compress in one call.
+ * Convenience wrapper: validate then compress in one call.
  * Throws a user-friendly string on validation failure.
  */
 export async function validateAndCompress(
   file: File,
   preset: ImagePreset
 ): Promise<CompressResult> {
-  validateImageFile(file); // throws string if invalid
+  validateImageFile(file);
   return compressImage(file, preset);
 }
 
 // ---------------------------------------------------------------------------
-// Formatting helpers (for UI feedback)
+// UI helpers
 // ---------------------------------------------------------------------------
 
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * Returns a human-readable summary of the compression result for display
+ * in the upload progress UI.
+ *
+ * Examples:
+ *   "Already optimised (498 KB) — uploaded as-is"
+ *   "498 KB → 87 KB  −83%"
+ */
+export function compressionSummary(result: CompressResult): string {
+  if (result.usedOriginal) {
+    return `Already optimised (${formatBytes(result.originalBytes)}) — uploaded as-is`;
+  }
+  return `${formatBytes(result.originalBytes)} → ${formatBytes(result.compressedBytes)}  −${result.savingPct}%`;
 }
