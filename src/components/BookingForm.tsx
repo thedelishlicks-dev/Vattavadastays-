@@ -60,7 +60,7 @@ export function BookingForm({ selection, subdomain }: Props) {
         guest_count: selection.adults + (selection.children ?? 0),
         check_in: selection.checkIn,
         check_out: selection.checkOut,
-        room_price: selection.room.base_price,
+        room_price: selection.room.base_price * selection.nights,
         extra_guest_charge: selection.extraGuestCharge ?? 0,
         total_amount: selection.total,
         payment_method: payment,
