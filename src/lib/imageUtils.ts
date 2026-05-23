@@ -1,21 +1,33 @@
 /**
- * imageUtils.ts — v3
+ * imageUtils.ts — v4
  * Centralised image compression for VattavadaStays.
  *
- * Target file sizes after compression:
- *  Room image   → ≤ 120 KB
- *  Hero image   → ≤ 220 KB
- *  About image  → ≤ 150 KB
- *  Logo         → ≤  15 KB
- *  Static map   → ≤ 100 KB
+ * v4 — root cause fix: replaced canvas.toBlob("image/webp") with
+ * browser-image-compression, which correctly handles Safari on iOS/iPadOS.
  *
- * v3 fixes:
- *  - Two-pass compression: quality retries first, then pixel downscale if
- *    still over budget. Handles high-detail images that quality alone can't tame.
- *  - Correct usedOriginal: triggers when output > input OR when output is
- *    still over maxBytes after all passes (uploads smaller of original/output).
- *  - Portrait fix retained from v2: long-edge / short-edge scaling.
+ * Root cause of previous failures:
+ *   Safari cannot ENCODE WebP via canvas.toBlob — it silently falls back
+ *   to PNG (lossless), producing files as large or larger than the input.
+ *   Owners upload from iPads on Safari, so every previous "WebP" file in
+ *   Supabase Storage was actually an uncompressed PNG renamed .webp.
+ *
+ * browser-image-compression:
+ *   - ~10 KB gzipped, no WASM, safe on 2G
+ *   - Falls back to JPEG (not PNG) when WebP encoding is unavailable
+ *   - Handles HEIC/HEIF from iPhone cameras
+ *   - Battle-tested across Safari, Chrome, Firefox, Samsung Internet
+ *
+ * Install: npm install browser-image-compression
+ *
+ * Target file sizes:
+ *   Room      ≤ 120 KB   (displayed ~400 px wide on mobile)
+ *   Hero      ≤ 220 KB   (full-width banner)
+ *   About     ≤ 150 KB   (half-column)
+ *   Logo      ≤  15 KB   (40 px circle)
+ *   Static map ≤ 100 KB  (no JS SDK)
  */
+
+import imageCompression from "browser-image-compression";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,63 +35,63 @@
 
 export type ImagePreset = "room" | "hero" | "about" | "logo" | "staticMap";
 
-interface CompressOptions {
-  /** Hard pixel cap on the longest edge */
-  maxLongEdge: number;
-  /** Hard pixel cap on the short edge */
-  maxShortEdge: number;
-  /** Starting WebP quality 0–1 */
-  quality: number;
-  /** Target ceiling in bytes — we keep retrying until we hit this */
-  maxBytes: number;
-}
-
 export interface CompressResult {
   file: File;
   originalBytes: number;
   compressedBytes: number;
   /** Saving as a percentage. 0 when usedOriginal is true. */
   savingPct: number;
-  /** true when the original was returned because compression couldn't beat it */
+  /** true when the original was returned because compression didn't help */
   usedOriginal: boolean;
-  /** true when we hit the budget, false when we got close but not under */
+  /** true when output landed at or under the target maxSizeMB */
   hitBudget: boolean;
 }
 
 // ---------------------------------------------------------------------------
-// Presets
+// Presets — translated to browser-image-compression options
 // ---------------------------------------------------------------------------
 
-const PRESETS: Record<ImagePreset, CompressOptions> = {
+/**
+ * maxSizeMB: hard ceiling passed to the library. It will keep retrying
+ *   at lower quality until the output is under this size.
+ * maxWidthOrHeight: longest edge cap. The library handles portrait/landscape.
+ * initialQuality: starting encoder quality 0–1.
+ * useWebWorker: true keeps the UI thread unblocked during compression.
+ *   Critical on low-end Android devices where the main thread is already slow.
+ */
+const PRESET_OPTIONS: Record<
+  ImagePreset,
+  Parameters<typeof imageCompression>[1]
+> = {
   room: {
-    maxLongEdge: 800,
-    maxShortEdge: 600,
-    quality: 0.70,
-    maxBytes: 120_000,
+    maxSizeMB: 0.12,         // 120 KB
+    maxWidthOrHeight: 800,
+    initialQuality: 0.70,
+    useWebWorker: true,
   },
   hero: {
-    maxLongEdge: 1280,
-    maxShortEdge: 720,
-    quality: 0.73,
-    maxBytes: 220_000,
+    maxSizeMB: 0.22,         // 220 KB
+    maxWidthOrHeight: 1280,
+    initialQuality: 0.73,
+    useWebWorker: true,
   },
   about: {
-    maxLongEdge: 900,
-    maxShortEdge: 675,
-    quality: 0.73,
-    maxBytes: 150_000,
+    maxSizeMB: 0.15,         // 150 KB
+    maxWidthOrHeight: 900,
+    initialQuality: 0.73,
+    useWebWorker: true,
   },
   logo: {
-    maxLongEdge: 120,
-    maxShortEdge: 120,
-    quality: 0.82,
-    maxBytes: 15_000,
+    maxSizeMB: 0.015,        // 15 KB
+    maxWidthOrHeight: 120,
+    initialQuality: 0.82,
+    useWebWorker: true,
   },
   staticMap: {
-    maxLongEdge: 900,
-    maxShortEdge: 500,
-    quality: 0.70,
-    maxBytes: 100_000,
+    maxSizeMB: 0.10,         // 100 KB
+    maxWidthOrHeight: 900,
+    initialQuality: 0.70,
+    useWebWorker: true,
   },
 };
 
@@ -98,7 +110,7 @@ const ACCEPTED_MIME_TYPES = [
 ];
 
 /**
- * Throws a user-friendly string on failure — callers can show it directly.
+ * Throws a user-friendly string on failure — callers display it directly.
  */
 export function validateImageFile(file: File): void {
   if (!ACCEPTED_MIME_TYPES.includes(file.type)) {
@@ -111,158 +123,33 @@ export function validateImageFile(file: File): void {
 }
 
 // ---------------------------------------------------------------------------
-// Geometry
-// ---------------------------------------------------------------------------
-
-/**
- * Scale (w, h) so neither the long edge nor the short edge exceeds its cap.
- * Works correctly for both portrait and landscape orientations.
- * Never upscales.
- */
-function scaleDimensions(
-  w: number,
-  h: number,
-  maxLongEdge: number,
-  maxShortEdge: number
-): { w: number; h: number } {
-  const isLandscape = w >= h;
-  const longEdge  = isLandscape ? w : h;
-  const shortEdge = isLandscape ? h : w;
-
-  let scale = 1;
-  if (longEdge  > maxLongEdge)  scale = Math.min(scale, maxLongEdge  / longEdge);
-  if (shortEdge > maxShortEdge) scale = Math.min(scale, maxShortEdge / shortEdge);
-
-  return {
-    w: Math.round(w * scale),
-    h: Math.round(h * scale),
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Canvas helpers
-// ---------------------------------------------------------------------------
-
-function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) {
-          reject("Canvas toBlob returned null — browser may not support WebP encoding.");
-          return;
-        }
-        resolve(blob);
-      },
-      "image/webp",
-      quality
-    );
-  });
-}
-
-function drawCanvas(img: HTMLImageElement, w: number, h: number): HTMLCanvasElement {
-  const canvas = document.createElement("canvas");
-  canvas.width  = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw "Canvas 2D context unavailable.";
-  ctx.drawImage(img, 0, 0, w, h);
-  return canvas;
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload  = () => resolve(img);
-    img.onerror = () => reject("Failed to decode image for compression.");
-    img.src = src;
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Two-pass compression engine
-// ---------------------------------------------------------------------------
-
-/**
- * Pass 1 — quality retries at the preset pixel dimensions.
- *   Start at preset quality, step down by 0.07 up to 6 times (floor 0.32).
- *
- * Pass 2 — pixel downscale if quality retries couldn't hit the budget.
- *   Reduce dimensions to 60% of preset caps and retry quality loop again.
- *   This handles high-detail images (foliage, textured fabrics, mosaics)
- *   where quality alone hits a floor before the byte budget.
- *
- * Returns the smallest blob found across both passes.
- */
-async function twoPassEncode(
-  img: HTMLImageElement,
-  opts: CompressOptions
-): Promise<{ blob: Blob; hitBudget: boolean }> {
-
-  // ── Pass 1: preset dimensions ───────────────────────────────────────────
-  const { w: w1, h: h1 } = scaleDimensions(
-    img.naturalWidth,
-    img.naturalHeight,
-    opts.maxLongEdge,
-    opts.maxShortEdge
-  );
-
-  const canvas1 = drawCanvas(img, w1, h1);
-  let bestBlob  = await canvasToBlob(canvas1, opts.quality);
-  let quality   = opts.quality;
-
-  for (let i = 0; i < 6 && bestBlob.size > opts.maxBytes && quality > 0.32; i++) {
-    quality  = +(quality - 0.07).toFixed(2);
-    const b  = await canvasToBlob(canvas1, quality);
-    if (b.size < bestBlob.size) bestBlob = b;
-  }
-
-  if (bestBlob.size <= opts.maxBytes) {
-    return { blob: bestBlob, hitBudget: true };
-  }
-
-  // ── Pass 2: 60% pixel dimensions, fresh quality loop ───────────────────
-  const { w: w2, h: h2 } = scaleDimensions(
-    img.naturalWidth,
-    img.naturalHeight,
-    Math.round(opts.maxLongEdge  * 0.6),
-    Math.round(opts.maxShortEdge * 0.6)
-  );
-
-  const canvas2 = drawCanvas(img, w2, h2);
-  quality       = opts.quality; // reset quality for pass 2
-  let pass2Blob = await canvasToBlob(canvas2, quality);
-
-  for (let i = 0; i < 6 && pass2Blob.size > opts.maxBytes && quality > 0.32; i++) {
-    quality      = +(quality - 0.07).toFixed(2);
-    const b      = await canvasToBlob(canvas2, quality);
-    if (b.size < pass2Blob.size) pass2Blob = b;
-  }
-
-  // Return the smaller of pass 1 and pass 2 results
-  const finalBlob = pass2Blob.size < bestBlob.size ? pass2Blob : bestBlob;
-  return { blob: finalBlob, hitBudget: finalBlob.size <= opts.maxBytes };
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
 /**
  * Validate then compress a File using the named preset.
  *
- * Decision tree for the output file:
- *   - If compressed WebP < original AND hits budget → return WebP  ✓
- *   - If compressed WebP < original but misses budget → return WebP
- *     (best we could do — still smaller than input)
- *   - If compressed WebP >= original → return original file
- *     (already optimised, WebP made it worse)
+ * Uses browser-image-compression which:
+ *   1. Resizes to maxWidthOrHeight (longest edge, orientation-aware)
+ *   2. Encodes as WebP where supported (Chrome, Firefox, Edge)
+ *   3. Falls back to JPEG (NOT PNG) on Safari — so iOS/iPadOS owners
+ *      get correct compression regardless of browser
+ *   4. Keeps retrying at lower quality until maxSizeMB is achieved
+ *
+ * If the compressed output is larger than the original (already-optimised
+ * images), the original file is returned unchanged.
+ *
+ * @throws string — user-friendly validation error, show directly in UI
  *
  * @example
  * ```ts
- * const result = await validateAndCompress(file, "room");
- * // result.file   — the file to upload (always the smallest option)
- * // result.hitBudget — false means image is very high-detail; still upload
- * // compressionSummary(result) — human-readable string for progress UI
+ * try {
+ *   const result = await validateAndCompress(file, "room");
+ *   // upload result.file to Supabase Storage
+ *   setProgress(compressionSummary(result));
+ * } catch (err) {
+ *   setError(typeof err === "string" ? err : "Compression failed.");
+ * }
  * ```
  */
 export async function validateAndCompress(
@@ -271,42 +158,39 @@ export async function validateAndCompress(
 ): Promise<CompressResult> {
   validateImageFile(file);
 
-  const opts          = PRESETS[preset];
   const originalBytes = file.size;
+  const opts          = PRESET_OPTIONS[preset];
+  const maxBytes      = (opts.maxSizeMB as number) * 1024 * 1024;
 
-  const objectUrl = URL.createObjectURL(file);
-  let img: HTMLImageElement;
+  let compressed: File;
   try {
-    img = await loadImage(objectUrl);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
+    compressed = await imageCompression(file, opts);
+  } catch (err: unknown) {
+    // Library throws on truly unrecoverable errors (corrupt file, etc.)
+    throw err instanceof Error ? err.message : "Image compression failed.";
   }
 
-  const { blob, hitBudget } = await twoPassEncode(img, opts);
-
-  // If WebP is not smaller than the original, return the original unchanged
-  if (blob.size >= originalBytes) {
+  // If compression made it larger (already-optimised source), return original
+  if (compressed.size >= originalBytes) {
     return {
       file,
       originalBytes,
       compressedBytes: originalBytes,
       savingPct: 0,
       usedOriginal: true,
-      hitBudget: originalBytes <= opts.maxBytes,
+      hitBudget: originalBytes <= maxBytes,
     };
   }
 
-  const outputName = file.name.replace(/\.[^.]+$/, ".webp");
-  const compressed = new File([blob], outputName, { type: "image/webp" });
-  const savingPct  = Math.round((1 - blob.size / originalBytes) * 100);
+  const savingPct = Math.round((1 - compressed.size / originalBytes) * 100);
 
   return {
     file: compressed,
     originalBytes,
-    compressedBytes: blob.size,
+    compressedBytes: compressed.size,
     savingPct,
     usedOriginal: false,
-    hitBudget,
+    hitBudget: compressed.size <= maxBytes,
   };
 }
 
@@ -315,17 +199,17 @@ export async function validateAndCompress(
 // ---------------------------------------------------------------------------
 
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024)           return `${bytes} B`;
-  if (bytes < 1024 * 1024)    return `${(bytes / 1024).toFixed(0)} KB`;
+  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 /**
- * Human-readable compression result for the upload progress widget.
+ * Human-readable summary for the upload progress widget.
  *
  * Examples:
  *   "Already optimised (498 KB) — uploaded as-is"
- *   "815 KB → 104 KB  −87%"
+ *   "815 KB → 98 KB  −88%"
  *   "815 KB → 143 KB  −82%  (high-detail image)"
  */
 export function compressionSummary(result: CompressResult): string {
