@@ -11,8 +11,12 @@ export function getSubdomain(): string {
     return hostname.split('.')[0]
   }
 
-  // Vercel preview: {subdomain}.vattavadastays-xyz.vercel.app
-  // In this case use the env var
+  // Vercel preview: use ?slug= query param if present
+  const params = new URLSearchParams(window.location.search)
+  const slug = params.get('slug')
+  if (slug) return slug
+
+  // Final fallback to env var
   return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? 'bleafmudhouse'
 }
 
