@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X } from 'lucide-react'
-import { validateAndCompress, formatBytes, type ImagePreset } from '@/lib/imageUtils'
+import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettings,
@@ -63,11 +63,12 @@ function ImageUploadField({
 
     try {
       setProgress('Compressing…')
-      const { file: compressed, originalBytes, compressedBytes, savingPct } =
+      const result = 
         await validateAndCompress(file, preset)
+      const { file: compressed } = result
 
       setProgress(
-        `${formatBytes(originalBytes)} → ${formatBytes(compressedBytes)} (−${savingPct}%)`
+        compressionSummary(result)
       )
 
       const path = `${pathPrefix}/${stem}-${Date.now()}.webp`
