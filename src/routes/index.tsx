@@ -51,7 +51,7 @@ function Index() {
         />
         <BookingForm selection={selection} subdomain={subdomain} />
         <About property={property} />
-        <Amenities />
+        <Amenities property={property} />
         <MapSection subdomain={subdomain} />
       </main>
       <Footer subdomain={subdomain} />
