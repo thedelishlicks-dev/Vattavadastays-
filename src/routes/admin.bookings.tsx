@@ -143,7 +143,6 @@ function BookingDetailModal({
   const lat = property?.location_lat;
   const lng = property?.location_lng;
 
-  // Parse UPI ID from shared_amenities sentinel key __upi:
   const upiId = (() => {
     const entry = (property?.shared_amenities ?? []).find((a) => a.startsWith("__upi:"));
     return entry ? decodeURIComponent(entry.slice("__upi:".length)) : undefined;
@@ -271,7 +270,7 @@ function OverviewTab({ booking, roomName, property, advance, balance, chargesTot
       {!showPaymentForm ? (
         <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
           <IndianRupee className="h-4 w-4" />
-          {advance > 0 ? "Update payment record" : "Record advance payment"}
+          {advance > 0 ? "Record part payment" : "Record advance payment"}
         </button>
       ) : (
         <RecordPaymentForm booking={booking} advance={advance} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />
@@ -323,26 +322,39 @@ function CancelButton({ bookingId, onCancelled }: { bookingId: string; onCancell
   );
 }
 
+// FIX 3: Accumulate payments instead of overwriting.
+// - Amount field = new instalment only (not pre-filled with existing advance)
+// - Saved value = existing advance + new payment
+// - Balance preview uses cumulative total
+// - Shows existing advance so owner knows what's already recorded
 function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
   booking: Booking; advance: number; onSaved: () => void; onCancel: () => void;
 }) {
   const suggested = Math.round(Number(booking.total_amount) * 0.25);
-  const [amount, setAmount] = useState(advance > 0 ? String(advance) : String(suggested));
+  // Start blank — owner enters only the new instalment amount
+  const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(booking.payment_method ?? "UPI");
-  const [ref, setRef] = useState(booking.payment_reference ?? "");
+  const [ref, setRef] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
 
+  const newPayment = parseFloat(amount) || 0;
+  // Cumulative total: whatever was already paid + this new instalment
+  const newAdvanceTotal = advance + newPayment;
+  const bal = Math.max(0, Number(booking.total_amount) - newAdvanceTotal);
+
   const handleSave = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { setError("Enter a valid amount"); return; }
+    if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     setSaving(true); setError("");
     try {
       const { error: err } = await supabase.from("bookings").update({
-        advance_amount: amt, payment_method: method,
-        payment_reference: ref || null,
-        is_paid: amt >= Number(booking.total_amount),
+        // KEY FIX: store cumulative total, not just this instalment
+        advance_amount: newAdvanceTotal,
+        payment_method: method,
+        // Only overwrite reference if a new one is provided
+        ...(ref.trim() ? { payment_reference: ref.trim() } : {}),
+        is_paid: newAdvanceTotal >= Number(booking.total_amount),
         status: booking.status === "pending" ? "confirmed" : booking.status,
       }).eq("id", booking.id);
       if (err) throw err;
@@ -353,41 +365,82 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
     } finally { setSaving(false); }
   };
 
-  const bal = Math.max(0, Number(booking.total_amount) - (parseFloat(amount) || 0));
-
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
-      <div className="text-sm font-medium">Record advance payment</div>
+      <div className="text-sm font-medium">
+        {advance > 0 ? "Record part payment" : "Record advance payment"}
+      </div>
+
+      {/* Show existing advance so owner knows what's already recorded */}
+      {advance > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Already recorded</span>
+          <span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+
       <div className="text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 flex justify-between">
         <span>Suggested advance (25%)</span>
         <span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span>
       </div>
+
       <div>
-        <label className={labelCls}>Amount received (₹) *</label>
-        <input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="Actual amount received" autoFocus />
+        <label className={labelCls}>
+          {advance > 0 ? "New payment received (₹) *" : "Amount received (₹) *"}
+        </label>
+        <input
+          type="number" min={0} value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+          placeholder={advance > 0 ? "This instalment only" : "Actual amount received"}
+          autoFocus
+        />
       </div>
+
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className={labelCls}>Method</label>
           <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-            {["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}
+            {["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
           </select>
         </div>
         <div>
           <label className={labelCls}>Txn reference</label>
-          <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" />
+          <input
+            value={ref} onChange={(e) => setRef(e.target.value)}
+            className={inputCls} placeholder="Optional"
+          />
         </div>
       </div>
-      {parseFloat(amount) > 0 && (
-        <div className="flex justify-between text-sm rounded-lg bg-background px-3 py-2">
-          <span className="text-muted-foreground">Balance after</span>
-          <span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>₹{bal.toLocaleString("en-IN")}</span>
+
+      {newPayment > 0 && (
+        <div className="rounded-lg bg-background px-3 py-2 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Total paid after this</span>
+            <span className="font-semibold text-primary">
+              ₹{newAdvanceTotal.toLocaleString("en-IN")}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Balance remaining</span>
+            <span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>
+              {bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}
+            </span>
+          </div>
         </div>
       )}
+
       {error && <p className="text-xs text-destructive">{error}</p>}
+
       <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
-        <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">
+        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">
+          Cancel
+        </button>
+        <button onClick={handleSave} disabled={saving}
+          className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
+        >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
         </button>
       </div>
@@ -624,6 +677,7 @@ function Row({ label, value, highlight, bold, small }: {
   );
 }
 
+// FIX 2: room_price and extra_guest_charge both multiplied by nights
 function AddBookingModal({ propertyId, rooms, onClose, onSaved }: {
   propertyId: string;
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number }[];
@@ -654,8 +708,9 @@ function AddBookingModal({ propertyId, rooms, onClose, onSaved }: {
         property_id: propertyId, room_id: form.room_id, guest_name: form.guest_name,
         guest_phone: form.guest_phone, guest_count: form.guest_count,
         check_in: form.check_in, check_out: form.check_out,
-        room_price: selectedRoom?.base_price ?? 0,
-        extra_guest_charge: Math.max(0, form.guest_count - 2) * (selectedRoom?.extra_guest_price ?? 0),
+        // FIX 2: multiply by nights so invoice line items are correct
+        room_price: (selectedRoom?.base_price ?? 0) * nights,
+        extra_guest_charge: Math.max(0, form.guest_count - 2) * (selectedRoom?.extra_guest_price ?? 0) * nights,
         total_amount: total, advance_amount: 0, status: form.status, is_paid: false,
       });
       if (err) throw err;
