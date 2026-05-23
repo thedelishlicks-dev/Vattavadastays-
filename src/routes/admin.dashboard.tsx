@@ -3,17 +3,23 @@ import { CalendarDays, IndianRupee, Percent, MessageSquare, Ban, Plus, Send } fr
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings } from "@/hooks/useBookings";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { BlockDatesModal } from "@/components/BlockDatesModal";
+import { AddBookingModal } from "@/components/AddBookingModal";
+import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: DashboardPage,
 });
+
+type Modal = "block" | "add" | "whatsapp" | null;
 
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   const { data: bookings = [], isLoading: bookLoading } = useBookings(
     property?.id ?? "",
   );
+  const [modal, setModal] = useState<Modal>(null);
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -41,6 +47,20 @@ function DashboardPage() {
     });
     return map;
   }, [property]);
+
+  // Rooms shaped for modals
+  const activeRooms = useMemo(
+    () =>
+      (property?.rooms ?? [])
+        .filter((r) => r.is_active)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          base_price: r.base_price ?? 0,
+          max_guests: r.max_guests ?? 2,
+        })),
+    [property]
+  );
 
   if (isLoading) {
     return (
@@ -77,9 +97,9 @@ function DashboardPage() {
           Quick actions
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionBtn icon={Ban} label="Block dates" />
-          <ActionBtn icon={Plus} label="Add booking" />
-          <ActionBtn icon={Send} label="Send WhatsApp reminder" />
+          <ActionBtn icon={Ban}  label="Block dates"           onClick={() => setModal("block")} />
+          <ActionBtn icon={Plus} label="Add booking"           onClick={() => setModal("add")} />
+          <ActionBtn icon={Send} label="Send WhatsApp reminder" onClick={() => setModal("whatsapp")} />
         </div>
       </div>
 
@@ -133,6 +153,34 @@ function DashboardPage() {
           </table>
         </div>
       </div>
+
+      {/* Modals */}
+      {modal === "block" && property && (
+        <BlockDatesModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "add" && property && (
+        <AddBookingModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "whatsapp" && property && (
+        <WhatsAppReminderModal
+          bookings={bookings}
+          roomNameMap={roomNameMap}
+          property={{
+            name: property.name,
+            owner_phone: property.owner_phone ?? null,
+            owner_whatsapp: property.owner_whatsapp ?? null,
+          }}
+          onClose={() => setModal(null)}
+        />
+      )}
     </div>
   );
 }
@@ -161,12 +209,17 @@ function StatCard({
 function ActionBtn({
   icon: Icon,
   label,
+  onClick,
 }: {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  onClick: () => void;
 }) {
   return (
-    <button className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted">
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted transition-colors"
+    >
       <Icon className="h-4 w-4 text-primary" /> {label}
     </button>
   );
