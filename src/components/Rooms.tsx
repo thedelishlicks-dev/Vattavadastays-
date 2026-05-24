@@ -4,24 +4,13 @@ import { useProperty } from '@/hooks/useProperty'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Loader2, BedDouble, Users } from 'lucide-react'
+import { getSubdomain } from '@/lib/subdomain'
 import type { Room } from '@/types/database'
 
 interface RoomsProps {
   onSelect: (room: Room) => void
   checkIn: Date | null
   checkOut: Date | null
-}
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname
-  if (hostname.endsWith('.vattavadastays.com')) {
-    return hostname.split('.')[0]
-  }
-  const envSubdomain = import.meta.env.VITE_PROPERTY_SUBDOMAIN
-  if (envSubdomain && envSubdomain.length > 0) {
-    return envSubdomain
-  }
-  return 'bleafmudhouse'
 }
 
 export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
@@ -31,7 +20,6 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
   const checkInStr = checkIn ? format(checkIn, 'yyyy-MM-dd') : null
   const checkOutStr = checkOut ? format(checkOut, 'yyyy-MM-dd') : null
 
-  // Fetch booked room IDs for the selected date range
   const { data: bookedRoomIds = [] } = useQuery({
     queryKey: ['booked-rooms', property?.id, checkInStr, checkOutStr],
     queryFn: async () => {
