@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-}
+import { getSubdomain } from "@/lib/subdomain";
 
 const links = [
   { href: "#availability", label: "Dates" },
@@ -59,7 +54,7 @@ export function Header() {
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map((l) => (
-            <a
+            
               key={l.href}
               href={l.href}
               className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
@@ -82,7 +77,7 @@ export function Header() {
         <div className="md:hidden border-t border-border bg-background">
           <nav className="flex flex-col px-4 py-3">
             {links.map((l) => (
-              <a
+              
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
