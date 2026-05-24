@@ -1,10 +1,5 @@
 import { useProperty } from "@/hooks/useProperty";
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-}
+import { getSubdomain } from "@/lib/subdomain";
 
 function getTodayLabel(): string {
   return new Date().toLocaleDateString("en-IN", {
@@ -72,7 +67,7 @@ export function Hero() {
         <p className="mt-6 max-w-xl text-base md:text-lg text-white/85">
           {tagline}
         </p>
-        <a
+        
           href="#availability"
           className="mt-9 inline-flex items-center justify-center rounded-full bg-primary px-8 py-4 text-sm md:text-base font-medium text-primary-foreground shadow-[var(--shadow-elevated)] hover:scale-[1.03] transition-transform"
         >
