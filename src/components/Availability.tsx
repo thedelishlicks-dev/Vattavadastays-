@@ -18,12 +18,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-}
+import { getSubdomain } from "@/lib/subdomain";
 
 function buildMonthDays(month: Date) {
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
@@ -235,7 +230,12 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </p>
             </div>
 
-            <a href="#rooms" className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Browse rooms</a>
+            <a
+              href="#rooms"
+              className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Browse rooms
+            </a>
           </div>
         </div>
       </div>

@@ -1,10 +1,5 @@
 import { useProperty } from "@/hooks/useProperty";
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-}
+import { getSubdomain } from "@/lib/subdomain";
 
 function getTodayLabel(): string {
   return new Date().toLocaleDateString("en-IN", {
