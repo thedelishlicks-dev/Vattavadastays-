@@ -172,11 +172,6 @@ status, payment_method, payment_reference, is_paid, created_at
 
 Valid booking statuses: pending, confirmed, cancelled, completed
 
-### Seed data
-- Property: Bleaf Mud House (subdomain: bleafmudhouse)
-- Owner: your details
-- 3 rooms with 90 days availability seeded
-
 ---
 
 ## RLS policies — already set up
@@ -229,6 +224,54 @@ Never hardcode. Never commit .env files.
 
 ---
 
+## CRITICAL: Sentinel Key Pattern in shared_amenities
+
+`properties.shared_amenities` is a `text[]` column used for TWO purposes:
+1. Real amenity tags like `"parking"`, `"wifi"`, `"bonfire"` — shown to guests
+2. Sentinel keys prefixed with `__` — used to store config without new DB columns
+
+**Sentinel keys currently in use:**
+
+| Prefix | Stores | Used by |
+|---|---|---|
+| `__meals:` | JSON-encoded MealsConfig | admin.meals.tsx |
+| `__cancel:` | Cancellation policy text | admin.policies.tsx |
+| `__rules:` | House rules text | admin.policies.tsx |
+| `__upi:` | UPI ID string | admin.payments.tsx |
+| `__pmethods:` | JSON array of payment methods | admin.payments.tsx |
+
+**CRITICAL rules for sentinel keys:**
+- Always filter sentinels out before displaying amenities to guests: `.filter(a => !a.startsWith('__'))`
+- Always preserve sentinels when saving amenities: keep `__` prefixed items, replace the rest
+- Values are `encodeURIComponent(JSON.stringify(value))` encoded
+- See `admin.amenities.tsx` for the exact preserve pattern
+
+---
+
+## /setup Route — Current Status & Workaround
+
+**What works:**
+- Token validation via `get_invite_by_token` RPC ✅
+- Edge Function `create-owner` correctly creates user and links property ✅
+
+**Known issue:**
+- Auto-sign-in after account creation in `setup.tsx` fails with "Invalid credentials".
+
+**Current workaround:**
+- Redirect the owner to `/login` with their email pre-filled.
+- Use `/login?email=xxx` to help the owner.
+
+---
+
+## Payment & Recording Logic
+
+- **Part Payments**: The `advance_amount` in the `bookings` table stores the *cumulative* total paid so far.
+- **Recording Payment**: When the owner records a new payment (instalment) in the admin dashboard, the frontend adds this new amount to the existing `advance_amount` and saves the result.
+- **Payment Methods**: Supported methods are "UPI", "Bank Transfer", and "Cash on Arrival".
+- **Notifications**: Guests are encouraged to notify the owner via a WhatsApp deep link after submitting a booking request. The owner can send payment reminders (asking for 25% advance if nothing paid, or the balance if part-paid) via WhatsApp deep links from the booking details.
+
+---
+
 ## What is already done
 
 - [x] Supabase project with schema, RLS, seed data
@@ -237,17 +280,12 @@ Never hardcode. Never commit .env files.
 - [x] src/lib/supabase.ts (browser client)
 - [x] src/lib/auth.ts (client-side auth functions)
 - [x] src/hooks/useAuth.ts (onAuthStateChange pattern)
-- [x] TanStack Query hooks scaffolded (need real queries)
+- [x] TanStack Query hooks updated to query Supabase directly
+- [x] All routes wired to real Supabase data
+- [x] Admin dashboard protected with auth check
+- [x] Booking form wired to createBooking mutation
+- [x] Multi-tenant architecture with subdomain routing
+- [x] Superadmin dashboard for property management
+- [x] Cumulative part-payment recording logic
+- [x] WhatsApp notification flow for guests and owners
 - [x] vercel.json configured correctly
-
-## What still needs to be done
-
-- [ ] Update all hooks to query Supabase directly
-  (useProperty, useRoom, useAvailability, useBookings,
-   useCreateBooking, useOwnerProperty)
-- [ ] Wire route components to use hooks (replace mock data)
-- [ ] Owner login page wired to auth
-- [ ] Dashboard protected with auth check
-- [ ] Booking form wired to createBooking mutation
-- [ ] Error and not-found handling
-```
