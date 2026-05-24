@@ -294,7 +294,7 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 
 ## 9. Milestones & Roadmap
 
-### Phase 0 — Complete Dev Branch (Current — Week 1)
+### Phase 0 — Core Foundation ✅
 - [x] Admin login + auth guard
 - [x] Rooms page with real Supabase data
 - [x] Bookings page with real data + room names
@@ -302,20 +302,22 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 - [x] Add/edit rooms (drawer)
 - [x] Add booking (modal)
 - [x] Settings save with correct cache invalidation
-- [ ] Guest booking form end-to-end test
-- [ ] WhatsApp deep links on booking dashboard
-- [ ] Remove TanStack devtools button
-- [ ] Merge Dev → Main
+- [x] Guest booking form end-to-end test
+- [x] WhatsApp deep links on booking dashboard
+- [x] Remove TanStack devtools button
+- [x] "Book via WhatsApp" button on guest page
 
-### Phase 1 — Multi-Tenant Foundation (Weeks 2–4)
-- [ ] Add `property_id` to all tables + RLS migration
-- [ ] Dynamic subdomain detection (`getSubdomain()`)
-- [ ] Superadmin invite flow
-- [ ] Superadmin dashboard (`/superadmin`)
-- [ ] Wildcard domain on Vercel (`*.vattavadastays.com`)
-- [ ] Test data isolation (pen test with 2 properties)
+### Phase 1 — Multi-Tenant & Admin Features ✅
+- [x] Add `property_id` to all tables + RLS migration
+- [x] Dynamic subdomain detection (`getSubdomain()`)
+- [x] Superadmin invite flow (RPC + Edge Function)
+- [x] Superadmin dashboard (`/superadmin`)
+- [x] Wildcard domain support on Vercel
+- [x] Test data isolation (pen test with 2 properties)
+- [x] Pricing, Meals, Amenities, Policies, and Payments admin pages
+- [x] Sentinel key pattern for property config in `shared_amenities`
 
-### Phase 2 — Guest Experience & SEO (Weeks 5–6)
+### Phase 2 — Guest Experience & SEO (Current)
 - [ ] Static map image + directions deep links on guest page
 - [ ] WhatsApp booking CTA ("Book via WhatsApp" button)
 - [ ] SEO meta tags + Open Graph per property
