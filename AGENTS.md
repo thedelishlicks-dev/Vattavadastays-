@@ -263,6 +263,15 @@ Never hardcode. Never commit .env files.
 
 ---
 
+## Payment & Recording Logic
+
+- **Part Payments**: The `advance_amount` in the `bookings` table stores the *cumulative* total paid so far.
+- **Recording Payment**: When the owner records a new payment (instalment) in the admin dashboard, the frontend adds this new amount to the existing `advance_amount` and saves the result.
+- **Payment Methods**: Supported methods are "UPI", "Bank Transfer", and "Cash on Arrival".
+- **Notifications**: Guests are encouraged to notify the owner via a WhatsApp deep link after submitting a booking request. The owner can send payment reminders (asking for 25% advance if nothing paid, or the balance if part-paid) via WhatsApp deep links from the booking details.
+
+---
+
 ## What is already done
 
 - [x] Supabase project with schema, RLS, seed data
@@ -277,4 +286,6 @@ Never hardcode. Never commit .env files.
 - [x] Booking form wired to createBooking mutation
 - [x] Multi-tenant architecture with subdomain routing
 - [x] Superadmin dashboard for property management
+- [x] Cumulative part-payment recording logic
+- [x] WhatsApp notification flow for guests and owners
 - [x] vercel.json configured correctly

@@ -316,6 +316,9 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 - [x] Test data isolation (pen test with 2 properties)
 - [x] Pricing, Meals, Amenities, Policies, and Payments admin pages
 - [x] Sentinel key pattern for property config in `shared_amenities`
+- [x] UPI, Bank Transfer, and Cash on Arrival support
+- [x] Advance and part-payment recording with cumulative balance tracking
+- [x] "Notify Owner" via WhatsApp after guest booking request
 
 ### Phase 2 — Guest Experience & SEO (Current)
 - [ ] Static map image + directions deep links on guest page
