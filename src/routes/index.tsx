@@ -12,13 +12,8 @@ import { MapSection } from "@/components/MapSection";
 import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
 import { useProperty } from "@/hooks/useProperty";
+import { getSubdomain } from "@/lib/subdomain";
 import type { Room } from "@/types/database";
-
-function getSubdomain(): string {
-  const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return hostname.split(".")[0];
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-}
 
 export const Route = createFileRoute("/")({
   component: Index,
