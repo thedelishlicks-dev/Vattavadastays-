@@ -230,7 +230,12 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </p>
             </div>
 
-            <a href="#rooms" className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">Browse rooms</a>
+            <a
+              href="#rooms"
+              className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Browse rooms
+            </a>
           </div>
         </div>
       </div>
