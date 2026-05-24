@@ -54,7 +54,7 @@ export function Header() {
 
         <nav className="hidden md:flex items-center gap-8">
           {links.map((l) => (
-            
+            <a
               key={l.href}
               href={l.href}
               className="text-sm font-medium text-foreground/80 hover:text-primary transition-colors"
@@ -77,7 +77,7 @@ export function Header() {
         <div className="md:hidden border-t border-border bg-background">
           <nav className="flex flex-col px-4 py-3">
             {links.map((l) => (
-              
+              <a
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
