@@ -1,0 +1,61 @@
+export type ThemeName = 'forest' | 'ocean' | 'spice' | 'mist' | 'bloom';
+
+export interface ThemeColors {
+  name: string;
+  primary: string;
+  primaryLight: string;
+}
+
+export const THEMES: Record<ThemeName, ThemeColors> = {
+  forest: {
+    name: 'Forest',
+    primary: 'oklch(0.45 0.13 148)', // #166534
+    primaryLight: 'oklch(0.94 0.05 145)', // #dcfce7
+  },
+  ocean: {
+    name: 'Ocean',
+    primary: 'oklch(0.42 0.17 253)', // #1e40af
+    primaryLight: 'oklch(0.91 0.04 239)', // #dbeafe
+  },
+  spice: {
+    name: 'Spice',
+    primary: 'oklch(0.44 0.18 42)', // #9a3412
+    primaryLight: 'oklch(0.93 0.04 45)', // #ffedd5
+  },
+  mist: {
+    name: 'Mist',
+    primary: 'oklch(0.39 0.05 254)', // #334155
+    primaryLight: 'oklch(0.96 0.01 254)', // #f1f5f9
+  },
+  bloom: {
+    name: 'Bloom',
+    primary: 'oklch(0.38 0.18 15)', // #9f1239
+    primaryLight: 'oklch(0.92 0.04 15)', // #ffe4e6
+  },
+};
+
+export function parseTheme(shared_amenities: string[] | null): ThemeName {
+  if (!shared_amenities) return 'forest';
+  const entry = shared_amenities.find((a) => a.startsWith("__theme:"));
+  const theme = entry ? (entry.slice("__theme:".length) as ThemeName) : 'forest';
+  return THEMES[theme] ? theme : 'forest';
+}
+
+export function encodeTheme(theme: ThemeName, existing: string[]): string[] {
+  const filtered = (existing ?? []).filter((a) => !a.startsWith("__theme:"));
+  return [...filtered, `__theme:${theme}`];
+}
+
+export function applyTheme(themeName: ThemeName) {
+  const theme = THEMES[themeName] || THEMES.forest;
+  const root = document.documentElement;
+
+  // Update the CSS variables that Tailwind uses
+  root.style.setProperty('--primary', theme.primary);
+  root.style.setProperty('--primary-light', theme.primaryLight);
+  root.style.setProperty('--ring', theme.primary);
+  root.style.setProperty('--accent', theme.primaryLight);
+
+  // Persist to localStorage for FOUC prevention on next load
+  localStorage.setItem('vattavadastays-theme', themeName);
+}

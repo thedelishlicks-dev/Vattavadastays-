@@ -3,8 +3,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Save, CheckCircle, Upload, X } from 'lucide-react'
+import { Loader2, Save, CheckCircle, Upload, X, Check } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
+import { THEMES, parseTheme, encodeTheme, type ThemeName } from '@/lib/theme'
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettings,
@@ -202,6 +203,7 @@ function AdminSettings() {
     about_image: '',
     logo_url: '',
   })
+  const [selectedTheme, setSelectedTheme] = useState<ThemeName>('forest')
 
   useEffect(() => {
     if (property) {
@@ -222,6 +224,7 @@ function AdminSettings() {
         about_image: property.about_image ?? '',
         logo_url: property.logo_url ?? '',
       })
+      setSelectedTheme(parseTheme(property.shared_amenities ?? []))
     }
   }, [property])
 
@@ -238,11 +241,15 @@ function AdminSettings() {
   }
 
   const mutation = useMutation({
-    mutationFn: async (updates: typeof form) => {
+    mutationFn: async ({ updates, theme }: { updates: typeof form, theme: ThemeName }) => {
       if (!property?.id) throw new Error('No property loaded')
       const payload: Record<string, unknown> = { ...updates }
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
+
+      // Handle theme in shared_amenities
+      payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
+
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)
       if (error) throw error
     },
@@ -258,7 +265,7 @@ function AdminSettings() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    mutation.mutate(form)
+    mutation.mutate({ updates: form, theme: selectedTheme })
   }
 
   if (isLoading) {
@@ -335,6 +342,40 @@ function AdminSettings() {
           onUploaded={(url) => persistImage('static_map_image_url', url)}
           onRemoved={() => persistImage('static_map_image_url', null)}
         />
+
+        {/* ── Theme Picker ── */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold">Color Theme</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Choose a color palette for your guest booking page.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-5 gap-3">
+            {(Object.entries(THEMES) as [ThemeName, typeof THEMES.forest][]).map(([key, theme]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedTheme(key)}
+                className={[
+                  'flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all',
+                  selectedTheme === key
+                    ? 'border-primary bg-primary/5'
+                    : 'border-transparent hover:border-border hover:bg-muted/30'
+                ].join(' ')}
+              >
+                <div
+                  className="h-10 w-10 rounded-full shadow-sm flex items-center justify-center text-white"
+                  style={{ backgroundColor: theme.primary }}
+                >
+                  {selectedTheme === key && <Check className="h-5 w-5" />}
+                </div>
+                <span className="text-[10px] font-medium uppercase tracking-wider">{theme.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* ── Basic info ── */}
         <div className="space-y-4">
