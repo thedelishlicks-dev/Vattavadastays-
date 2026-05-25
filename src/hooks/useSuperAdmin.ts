@@ -10,7 +10,11 @@ export type PropertyRow = {
   owner_whatsapp: string | null
   area: string | null
   is_active: boolean
-  subscription_status: string
+  subscription_status: 'pending_setup' | 'active' | 'suspended'
+  subscription_tier: 'small' | 'large'
+  monthly_fee: number
+  setup_fee_paid: boolean
+  setup_fee_amount: number
   subscription_end_date: string | null
   created_at: string
 }
@@ -71,14 +75,16 @@ export function useUpdateSubscription() {
   return useMutation({
     mutationFn: async ({
       propertyId,
-      status,
+      ...updates
     }: {
       propertyId: string
-      status: 'trial' | 'active' | 'suspended'
+      subscription_status?: 'pending_setup' | 'active' | 'suspended'
+      subscription_end_date?: string | null
+      setup_fee_paid?: boolean
     }) => {
       const { error } = await supabase
         .from('properties')
-        .update({ subscription_status: status })
+        .update(updates)
         .eq('id', propertyId)
       if (error) throw error
     },

@@ -35,7 +35,7 @@ export function useProperty(subdomain?: string) {
         .from('properties')
         .select('*, rooms(*)')
         .eq('subdomain', slug)
-        .in('subscription_status', ['active', 'trial'])
+        .in('subscription_status', ['active', 'pending_setup'])
         .eq('is_active', true)
         .single()
       if (error) throw error
