@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
-import { Loader2, Plus, X, ExternalLink, Copy, Check } from 'lucide-react'
+import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/superadmin/')({
   component: SuperAdminIndex,
@@ -295,6 +295,7 @@ function SuperAdminIndex() {
                   : null
 
                 const handleActivate = () => {
+                  if (!window.confirm(`Activate ${p.name}? This will mark setup fee as paid and set renewal to 30 days from now.`)) return
                   const thirtyDaysLater = new Date()
                   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
                   updateSubscription({
@@ -338,7 +339,9 @@ function SuperAdminIndex() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border font-semibold ${
-                        p.subscription_tier === 'large' ? 'border-purple-200 bg-purple-50 text-purple-700' : 'border-slate-200 bg-slate-50 text-slate-600'
+                        p.subscription_tier === 'large'
+                          ? 'border-amber-200/50 bg-amber-50 text-amber-700'
+                          : 'border-[#166534]/20 bg-[#dcfce7] text-[#166534]'
                       }`}>
                         {p.subscription_tier ?? 'small'}
                       </span>
@@ -364,6 +367,12 @@ function SuperAdminIndex() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        {p.owner_whatsapp && (
+                          <a href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border hover:bg-muted text-[#25D366]" title="WhatsApp Owner">
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </a>
+                        )}
                         {p.subscription_status === 'pending_setup' && (
                           <button onClick={handleActivate}
                             className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
@@ -376,14 +385,22 @@ function SuperAdminIndex() {
                               className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">
                               Mark Renewed
                             </button>
-                            <button onClick={() => updateSubscription({ propertyId: p.id, subscription_status: 'suspended' })}
+                            <button onClick={() => {
+                              if (window.confirm(`Suspend ${p.name}?`)) {
+                                updateSubscription({ propertyId: p.id, subscription_status: 'suspended' })
+                              }
+                            }}
                               className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
                               Suspend
                             </button>
                           </>
                         )}
                         {p.subscription_status === 'suspended' && (
-                          <button onClick={() => updateSubscription({ propertyId: p.id, subscription_status: 'active' })}
+                          <button onClick={() => {
+                            if (window.confirm(`Re-activate ${p.name}?`)) {
+                              updateSubscription({ propertyId: p.id, subscription_status: 'active' })
+                            }
+                          }}
                             className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
                             Activate
                           </button>
