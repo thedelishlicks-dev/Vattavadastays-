@@ -89,7 +89,10 @@ export function Hero() {
             Check Availability
           </a>
 
-          <div className="flex items-center gap-3 animate-in fade-in duration-1000 delay-500">
+          <div className="flex flex-col items-center gap-3 animate-in fade-in duration-1000 delay-500">
+            <div className="text-[10px] uppercase tracking-[0.3em] font-medium text-white/70">
+              {area} · Kerala
+            </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-4 py-1.5 text-xs backdrop-blur-md">
               <span>{today}</span>
               <span className="opacity-40">|</span>
