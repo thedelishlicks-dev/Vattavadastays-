@@ -42,7 +42,7 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-green-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -130,7 +130,7 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
                     {room.room_amenities.slice(0, 3).map((a) => (
                       <span
                         key={a}
-                        className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full"
+                        className="text-xs bg-primary-light text-primary px-2 py-0.5 rounded-full"
                       >
                         {a}
                       </span>
@@ -154,7 +154,7 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
                   ) : (
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelect(room) }}
-                      className="text-sm bg-green-700 text-white px-4 py-1.5 rounded-full hover:bg-green-800 transition-colors"
+                      className="text-sm bg-primary text-primary-foreground px-4 py-1.5 rounded-full hover:opacity-90 transition-colors"
                     >
                       Select
                     </button>
