@@ -67,13 +67,13 @@ export function About({ property }: AboutProps) {
             {stats.map(({ icon: Icon, label, value }) => (
               <div
                 key={label}
-                className="rounded-xl bg-primary-light/60 border border-border p-4 text-center"
+                className="rounded-xl bg-primary-light/60 border border-border p-4 flex flex-col items-center justify-center text-center overflow-hidden"
               >
-                <Icon className="mx-auto h-5 w-5 text-primary" />
-                <div className="mt-2 font-display text-2xl font-semibold text-foreground">
+                <Icon className="h-5 w-5 text-primary shrink-0" />
+                <div className="mt-2 font-display text-lg md:text-2xl font-semibold text-foreground leading-tight break-words w-full">
                   {value}
                 </div>
-                <div className="text-xs text-muted-foreground">{label}</div>
+                <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider mt-1">{label}</div>
               </div>
             ))}
           </div>
