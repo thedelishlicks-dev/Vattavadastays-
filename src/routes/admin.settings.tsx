@@ -224,7 +224,7 @@ function AdminSettings() {
         about_image: property.about_image ?? '',
         logo_url: property.logo_url ?? '',
       })
-      setSelectedTheme(parseTheme(property.shared_amenities ?? []))
+      setSelectedTheme(parseTheme(property))
     }
   }, [property])
 
@@ -247,7 +247,11 @@ function AdminSettings() {
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
 
-      // Handle theme in shared_amenities
+      // Save directly to theme column
+      payload.theme = theme
+
+      // Also maintain sentinel for backward compatibility if needed,
+      // but primarily we use the dedicated column now.
       payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
 
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)

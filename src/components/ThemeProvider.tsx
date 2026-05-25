@@ -20,7 +20,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const property = guestProperty || ownerProperty;
     if (property) {
-      const theme = parseTheme(property.shared_amenities);
+      const theme = parseTheme(property);
       applyTheme(theme);
     }
   }, [guestProperty, ownerProperty]);

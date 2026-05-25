@@ -34,8 +34,18 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
   },
 };
 
-export function parseTheme(shared_amenities: string[] | null): ThemeName {
+export function parseTheme(property: any): ThemeName {
+  if (!property) return 'forest';
+
+  // 1. Try dedicated column first
+  if (property.theme && THEMES[property.theme as ThemeName]) {
+    return property.theme as ThemeName;
+  }
+
+  // 2. Fallback to sentinel for backward compatibility
+  const shared_amenities = property.shared_amenities as string[] | null;
   if (!shared_amenities) return 'forest';
+
   const entry = shared_amenities.find((a) => a.startsWith("__theme:"));
   const theme = entry ? (entry.slice("__theme:".length) as ThemeName) : 'forest';
   return THEMES[theme] ? theme : 'forest';

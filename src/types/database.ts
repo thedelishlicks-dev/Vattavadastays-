@@ -20,6 +20,7 @@ export interface Property {
   check_in_time: string;
   check_out_time: string;
   is_active: boolean;
+  theme?: string;
   created_at: string;
 }
 
