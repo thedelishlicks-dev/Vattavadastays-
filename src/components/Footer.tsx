@@ -43,9 +43,9 @@ export function Footer({ subdomain }: { subdomain: string }) {
                 )}
               </div>
             </div>
-            {property?.description && (
-              <p className="mt-5 text-sm opacity-70 leading-relaxed line-clamp-3">
-                {property.description}
+            {property?.hero_tagline && (
+              <p className="mt-5 text-sm opacity-70 leading-relaxed max-w-xs">
+                {property.hero_tagline}
               </p>
             )}
           </div>
