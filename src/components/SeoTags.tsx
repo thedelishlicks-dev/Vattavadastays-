@@ -88,6 +88,23 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     updateTwitter("description", description);
     updateTwitter("image", imageUrl);
 
+    // Update favicon if logo exists
+    if (property.logo_url) {
+      const updateIcon = (rel: string, sizes?: string) => {
+        let link = document.querySelector(`link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ''}`) as HTMLLinkElement | null;
+        if (!link) {
+          link = document.createElement('link');
+          link.rel = rel;
+          if (sizes) link.sizes = sizes;
+          document.head.appendChild(link);
+        }
+        link.href = property.logo_url!;
+      };
+
+      updateIcon('icon');
+      updateIcon('apple-touch-icon');
+    }
+
     let canonical = document.querySelector(
       'link[rel="canonical"]'
     ) as HTMLLinkElement | null;

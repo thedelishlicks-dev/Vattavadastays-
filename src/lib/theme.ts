@@ -1,5 +1,39 @@
 export type ThemeName = 'forest' | 'ocean' | 'spice' | 'mist' | 'bloom';
 
+export interface FontOption {
+  name: string;
+  family: string;
+  url: string;
+}
+
+export const FONTS: Record<string, FontOption> = {
+  Fraunces: {
+    name: 'Fraunces',
+    family: '"Fraunces", serif',
+    url: 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap',
+  },
+  'Playfair Display': {
+    name: 'Playfair Display',
+    family: '"Playfair Display", serif',
+    url: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap',
+  },
+  Cormorant: {
+    name: 'Cormorant',
+    family: '"Cormorant", serif',
+    url: 'https://fonts.googleapis.com/css2?family=Cormorant:wght@600;700&display=swap',
+  },
+  'DM Serif Display': {
+    name: 'DM Serif Display',
+    family: '"DM Serif Display", serif',
+    url: 'https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap',
+  },
+  Spectral: {
+    name: 'Spectral',
+    family: '"Spectral", serif',
+    url: 'https://fonts.googleapis.com/css2?family=Spectral:wght@600;700&display=swap',
+  },
+};
+
 export interface ThemeColors {
   name: string;
   primary: string;
@@ -51,6 +85,11 @@ export function parseTheme(property: any): ThemeName {
   return THEMES[theme] ? theme : 'forest';
 }
 
+export function parseFont(property: any): string {
+  if (!property?.heading_font) return 'Fraunces';
+  return FONTS[property.heading_font] ? property.heading_font : 'Fraunces';
+}
+
 export function encodeTheme(theme: ThemeName, existing: string[]): string[] {
   const filtered = (existing ?? []).filter((a) => !a.startsWith("__theme:"));
   return [...filtered, `__theme:${theme}`];
@@ -68,4 +107,27 @@ export function applyTheme(themeName: ThemeName) {
 
   // Persist to localStorage for FOUC prevention on next load
   localStorage.setItem('vattavadastays-theme', themeName);
+}
+
+export function applyFont(fontName: string) {
+  const font = FONTS[fontName] || FONTS.Fraunces;
+  const root = document.documentElement;
+
+  // Update the font-display variable
+  root.style.setProperty('--font-display', font.family);
+
+  // Dynamically load the Google Font
+  let link = document.getElementById('dynamic-heading-font') as HTMLLinkElement;
+  if (!link) {
+    link = document.createElement('link');
+    link.id = 'dynamic-heading-font';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+  }
+
+  if (link.href !== font.url) {
+    link.href = font.url;
+  }
+
+  localStorage.setItem('vattavadastays-font', fontName);
 }
