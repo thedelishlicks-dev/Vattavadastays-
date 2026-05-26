@@ -11,7 +11,7 @@ Read this file fully before writing a single line of code.
 VattavadaStays is a SaaS platform giving Vattavada (Kerala) homestay owners
 their own standalone booking website.
 
-- Guest side: Public booking website at {subdomain}.vattavadastays.com
+- Guest side: Public booking website at {subdomain}.stayidom.in
 - Owner side: Protected dashboard at /admin
 - No platform payments: owners collect money directly (UPI, cash, bank transfer)
 

@@ -119,9 +119,9 @@ function AddPropertyModal({
             <div className="space-y-4">
               <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
                 <div className="font-semibold mb-1">Property live at:</div>
-                <a href={`https://${inviteResult.subdomain}.vattavadastays.com`} target="_blank" rel="noreferrer"
+                <a href={`https://${inviteResult.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1 underline text-green-700">
-                  {inviteResult.subdomain}.vattavadastays.com
+                  {inviteResult.subdomain}.stayidom.in
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -165,7 +165,7 @@ function AddPropertyModal({
                     className="flex-1 rounded-l-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder="greenvalley" />
                   <span className="rounded-r-lg border border-l-0 border-border bg-muted px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                    .vattavadastays.com
+                    .stayidom.in
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Lowercase letters and numbers only</p>
@@ -322,9 +322,9 @@ function SuperAdminIndex() {
                       {p.area && <div className="text-xs text-muted-foreground">{p.area}</div>}
                     </td>
                     <td className="px-4 py-3">
-                      <a href={`https://${p.subdomain}.vattavadastays.com`} target="_blank" rel="noreferrer"
+                      <a href={`https://${p.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
                         className="inline-flex items-center gap-1 text-primary hover:underline text-xs">
-                        {p.subdomain}.vattavadastays.com
+                        {p.subdomain}.stayidom.in
                         <ExternalLink className="h-3 w-3" />
                       </a>
                     </td>
