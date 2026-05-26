@@ -21,11 +21,27 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const subdomain = getSubdomain();
-  const { data: property } = useProperty(subdomain);
+  const { data: property, isLoading } = useProperty(subdomain);
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [openRoom, setOpenRoom] = useState<Room | null>(null);
   const [selection, setSelection] = useState<BookingDetails | null>(null);
+
+  if (!isLoading && (!property || !property.rooms || property.rooms.length === 0)) {
+    return (
+      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6 text-center text-white">
+        <SeoTags subdomain={subdomain} />
+        <div className="space-y-4 max-w-md">
+          <h1 className="font-display text-2xl font-bold italic tracking-tight opacity-50">
+            {property?.name ?? "Stayidom"}
+          </h1>
+          <p className="text-xl font-medium text-white/90 leading-relaxed">
+            This property is not yet available for booking.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
