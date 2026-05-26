@@ -1,13 +1,13 @@
 /**
  * Detects the current property subdomain from the URL.
- * bleafmudhouse.vattavadastays.com → 'bleafmudhouse'
+ * bleafmudhouse.stayidom.in → 'bleafmudhouse'
  * localhost → falls back to VITE_PROPERTY_SUBDOMAIN env var
  */
 export function getSubdomain(): string {
   const hostname = window.location.hostname
 
-  // Production: {subdomain}.vattavadastays.com
-  if (hostname.endsWith('.vattavadastays.com')) {
+  // Production: {subdomain}.stayidom.in
+  if (hostname.endsWith('.stayidom.in')) {
     return hostname.split('.')[0]
   }
 

@@ -9,7 +9,7 @@
 ## Project Summary
 
 VattavadaStays is a white-label, commission-free booking SaaS for Vattavada (Kerala) homestays.
-- Guest side: `{subdomain}.vattavadastays.com` — public booking page
+- Guest side: `{subdomain}.stayidom.in` — public booking page
 - Owner side: `/admin` — protected dashboard
 - Superadmin side: `/superadmin` — platform management
 - Stack: Vite + React + TypeScript + TanStack Router 1.166.7 + Supabase + Tailwind CSS v4
@@ -292,13 +292,13 @@ const row = Array.isArray(data) ? data[0] : data; // ALWAYS do this
 - [ ] Razorpay subscription API (V2)
 
 ### Phase 5 — Central Listing Page
-- [ ] `vattavadastays.com` landing with property cards
+- [ ] `stayidom.in` landing with property cards
 - [ ] Filter by dates, guests, price
 
 ### Domain (When purchased)
-- Buy `vattavadastays.com` (or `.in`)
-- Add to Vercel → Domains → add `vattavadastays.com` + `*.vattavadastays.com`
-- Update `src/lib/subdomain.ts` — already handles `.vattavadastays.com` subdomains
+- Buy `stayidom.in` (or `.in`)
+- Add to Vercel → Domains → add `stayidom.in` + `*.stayidom.in`
+- Update `src/lib/subdomain.ts` — already handles `.stayidom.in` subdomains
 - Update `create_property_with_invite` SQL function — change invite_link domain
 - Add production URL to Supabase Auth → URL Configuration → allowed redirect URLs
 

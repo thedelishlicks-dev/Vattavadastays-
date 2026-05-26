@@ -8,7 +8,7 @@ interface SeoTagsProps {
 function getBaseUrl(): string {
   if (typeof window === "undefined") return "https://vattavadastays.vercel.app";
   const hostname = window.location.hostname;
-  if (hostname.endsWith(".vattavadastays.com")) return `https://${hostname}`;
+  if (hostname.endsWith(".stayidom.in")) return `https://${hostname}`;
   return "https://vattavadastays.vercel.app";
 }
 

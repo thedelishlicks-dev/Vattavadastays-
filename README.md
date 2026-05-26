@@ -4,7 +4,7 @@ A white-label, commission-free booking engine for Vattavada homestays, designed 
 
 ## Project Overview
 
-VattavadaStays provides homestay owners in Vattavada (Kerala) with their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.vattavadastays.com`).
+VattavadaStays provides homestay owners in Vattavada (Kerala) with their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
 
 ### Key Features
 
@@ -51,7 +51,7 @@ VattavadaStays provides homestay owners in Vattavada (Kerala) with their own bra
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    VITE_PROPERTY_SUBDOMAIN=bleafmudhouse
-   VITE_SUPERADMIN_EMAIL=admin@vattavadastays.com
+   VITE_SUPERADMIN_EMAIL=admin@stayidom.in
    ```
 
 4. Start the development server:

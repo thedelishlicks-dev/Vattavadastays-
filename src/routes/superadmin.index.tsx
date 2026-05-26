@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
-import { Loader2, Plus, X, ExternalLink, Copy, Check } from 'lucide-react'
+import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle } from 'lucide-react'
 
 export const Route = createFileRoute('/superadmin/')({
   component: SuperAdminIndex,
@@ -31,12 +31,15 @@ const emptyForm = (): NewPropertyForm => ({
 function StatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     active: 'bg-green-100 text-green-700',
-    trial: 'bg-amber-100 text-amber-700',
+    pending_setup: 'bg-amber-100 text-amber-700',
     suspended: 'bg-red-100 text-red-600',
+  }
+  const labels: Record<string, string> = {
+    pending_setup: 'pending',
   }
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[status] ?? 'bg-muted text-muted-foreground'}`}>
-      {status}
+      {labels[status] ?? status}
     </span>
   )
 }
@@ -116,9 +119,9 @@ function AddPropertyModal({
             <div className="space-y-4">
               <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
                 <div className="font-semibold mb-1">Property live at:</div>
-                <a href={`https://${inviteResult.subdomain}.vattavadastays.com`} target="_blank" rel="noreferrer"
+                <a href={`https://${inviteResult.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1 underline text-green-700">
-                  {inviteResult.subdomain}.vattavadastays.com
+                  {inviteResult.subdomain}.stayidom.in
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
@@ -162,7 +165,7 @@ function AddPropertyModal({
                     className="flex-1 rounded-l-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder="greenvalley" />
                   <span className="rounded-r-lg border border-l-0 border-border bg-muted px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
-                    .vattavadastays.com
+                    .stayidom.in
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">Lowercase letters and numbers only</p>
@@ -224,8 +227,10 @@ function SuperAdminIndex() {
   const stats = {
     total: properties.length,
     active: properties.filter((p) => p.subscription_status === 'active').length,
-    trial: properties.filter((p) => p.subscription_status === 'trial').length,
-    suspended: properties.filter((p) => p.subscription_status === 'suspended').length,
+    pending: properties.filter((p) => p.subscription_status === 'pending_setup').length,
+    mrr: properties
+      .filter((p) => p.subscription_status === 'active')
+      .reduce((sum, p) => sum + (p.monthly_fee || 0), 0),
   }
 
   if (isLoading) {
@@ -255,10 +260,10 @@ function SuperAdminIndex() {
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Total', value: stats.total },
-          { label: 'Active', value: stats.active },
-          { label: 'Trial', value: stats.trial },
-          { label: 'Suspended', value: stats.suspended },
+          { label: 'Total', value: stats.total.toString() },
+          { label: 'Active', value: stats.active.toString() },
+          { label: 'Pending Setup', value: stats.pending.toString() },
+          { label: 'MRR', value: `₹${stats.mrr.toLocaleString('en-IN')}` },
         ].map((s) => (
           <div key={s.label} className="bg-card border border-border rounded-xl p-4">
             <div className="text-xs uppercase tracking-wider text-muted-foreground">{s.label}</div>
@@ -276,64 +281,135 @@ function SuperAdminIndex() {
                 <th className="px-4 py-2.5 font-medium">Property</th>
                 <th className="px-4 py-2.5 font-medium">Subdomain</th>
                 <th className="px-4 py-2.5 font-medium">Owner</th>
+                <th className="px-4 py-2.5 font-medium">Tier</th>
+                <th className="px-4 py-2.5 font-medium">Setup Fee</th>
                 <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium">Created</th>
+                <th className="px-4 py-2.5 font-medium">Renewal</th>
                 <th className="px-4 py-2.5 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {properties.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{p.name}</div>
-                    {p.area && <div className="text-xs text-muted-foreground">{p.area}</div>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <a href={`https://${p.subdomain}.vattavadastays.com`} target="_blank" rel="noreferrer"
-                      className="inline-flex items-center gap-1 text-primary hover:underline text-xs">
-                      {p.subdomain}.vattavadastays.com
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div>{p.owner_name ?? '—'}</div>
-                    {p.owner_phone && (
-                      <a href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
-                        className="text-xs text-muted-foreground hover:text-primary">
-                        {p.owner_phone}
+              {properties.map((p) => {
+                const daysRemaining = p.subscription_end_date
+                  ? Math.ceil((new Date(p.subscription_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  : null
+
+                const handleActivate = () => {
+                  if (!window.confirm(`Activate ${p.name}? This will mark setup fee as paid and set renewal to 30 days from now.`)) return
+                  const thirtyDaysLater = new Date()
+                  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+                  updateSubscription({
+                    propertyId: p.id,
+                    subscription_status: 'active',
+                    setup_fee_paid: true,
+                    subscription_end_date: thirtyDaysLater.toISOString()
+                  })
+                }
+
+                const handleRenew = () => {
+                  const thirtyDaysLater = new Date()
+                  thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+                  updateSubscription({
+                    propertyId: p.id,
+                    subscription_end_date: thirtyDaysLater.toISOString()
+                  })
+                }
+
+                return (
+                  <tr key={p.id} className="border-t border-border">
+                    <td className="px-4 py-3">
+                      <div className="font-medium">{p.name}</div>
+                      {p.area && <div className="text-xs text-muted-foreground">{p.area}</div>}
+                    </td>
+                    <td className="px-4 py-3">
+                      <a href={`https://${p.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs">
+                        {p.subdomain}.stayidom.in
+                        <ExternalLink className="h-3 w-3" />
                       </a>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={p.subscription_status} />
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                    {new Date(p.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      {p.subscription_status !== 'active' && (
-                        <button onClick={() => updateSubscription({ propertyId: p.id, status: 'active' })}
-                          className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
-                          Activate
-                        </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div>{p.owner_name ?? '—'}</div>
+                      {p.owner_phone && (
+                        <a href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                          className="text-xs text-muted-foreground hover:text-primary">
+                          {p.owner_phone}
+                        </a>
                       )}
-                      {p.subscription_status !== 'suspended' && (
-                        <button onClick={() => updateSubscription({ propertyId: p.id, status: 'suspended' })}
-                          className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
-                          Suspend
-                        </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border font-semibold ${
+                        p.subscription_tier === 'large'
+                          ? 'border-amber-200/50 bg-amber-50 text-amber-700'
+                          : 'border-[#166534]/20 bg-[#dcfce7] text-[#166534]'
+                      }`}>
+                        {p.subscription_tier ?? 'small'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.setup_fee_paid ? (
+                        <span className="text-green-600 flex items-center gap-1 text-xs font-medium">
+                          Paid <Check className="h-3 w-3" />
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 text-xs font-medium">Pending</span>
                       )}
-                      {p.subscription_status !== 'trial' && (
-                        <button onClick={() => updateSubscription({ propertyId: p.id, status: 'trial' })}
-                          className="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 hover:bg-amber-200">
-                          Trial
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge status={p.subscription_status} />
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {p.subscription_status === 'active' && daysRemaining !== null ? (
+                        <span className={daysRemaining < 7 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
+                          in {daysRemaining} days
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        {p.owner_whatsapp && (
+                          <a href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border hover:bg-muted text-[#25D366]" title="WhatsApp Owner">
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </a>
+                        )}
+                        {p.subscription_status === 'pending_setup' && (
+                          <button onClick={handleActivate}
+                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
+                            Activate
+                          </button>
+                        )}
+                        {p.subscription_status === 'active' && (
+                          <>
+                            <button onClick={handleRenew}
+                              className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">
+                              Mark Renewed
+                            </button>
+                            <button onClick={() => {
+                              if (window.confirm(`Suspend ${p.name}?`)) {
+                                updateSubscription({ propertyId: p.id, subscription_status: 'suspended' })
+                              }
+                            }}
+                              className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
+                              Suspend
+                            </button>
+                          </>
+                        )}
+                        {p.subscription_status === 'suspended' && (
+                          <button onClick={() => {
+                            if (window.confirm(`Re-activate ${p.name}?`)) {
+                              updateSubscription({ propertyId: p.id, subscription_status: 'active' })
+                            }
+                          }}
+                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
+                            Activate
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
               {properties.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
