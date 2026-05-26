@@ -24,6 +24,7 @@ export function useAllProperties() {
   return useQuery({
     queryKey: ['superadmin', 'properties'],
     queryFn: async () => {
+      console.log('service role key present:', !!import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY)
       const { data, error } = await supabaseAdmin
         .from('properties')
         .select('*')
