@@ -1,3 +1,6 @@
+export type SubscriptionStatus = "pending_setup" | "active" | "suspended";
+export type SubscriptionTier = "small" | "large";
+
 export interface Property {
   id: string;
   owner_id: string;
@@ -23,6 +26,13 @@ export interface Property {
   theme?: string;
   heading_font?: string;
   created_at: string;
+  subscription_status: SubscriptionStatus;
+  subscription_tier: SubscriptionTier;
+  monthly_fee: number;
+  setup_fee_paid: boolean;
+  setup_fee_amount: number;
+  billing_notes: string | null;
+  subscription_end_date: string | null;
 }
 
 export interface Room {

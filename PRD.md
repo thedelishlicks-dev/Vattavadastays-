@@ -15,7 +15,7 @@
 
 **Success Metrics (V1)**:
 - 5+ properties onboarded within 3 months of launch
-- Each property live at `{slug}.vattavadastays.com` within 10 minutes of setup
+- Each property live at `{slug}.stayidom.in` within 10 minutes of setup
 - Guest booking flow completes on 2G (BSNL/Jio weak signal)
 - Zero data leaks between properties (RLS audit passed)
 - Owner can manage bookings entirely from mobile on slow connection
@@ -65,7 +65,7 @@ Vattavada has Jio and BSNL only, with weak signal. Guests travel from cities and
 
 ## 4. Functional Requirements
 
-### 4.1 Guest Booking Page (`{slug}.vattavadastays.com`)
+### 4.1 Guest Booking Page (`{slug}.stayidom.in`)
 
 **Already built (Dev branch):**
 - Property info + rooms loaded from Supabase
@@ -183,7 +183,7 @@ availability → room_id FK (already isolated via rooms)
 // src/lib/property.ts
 export function getSubdomain(): string {
   const host = window.location.hostname
-  // bleafmudhouse.vattavadastays.com → 'bleafmudhouse'
+  // bleafmudhouse.stayidom.in → 'bleafmudhouse'
   // localhost → fallback to env var for dev
   if (host === 'localhost' || host === '127.0.0.1') {
     return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? 'bleafmudhouse'
@@ -192,7 +192,7 @@ export function getSubdomain(): string {
 }
 ```
 
-Vercel: Wildcard domain `*.vattavadastays.com` → same deployment. No code changes per property.
+Vercel: Wildcard domain `*.stayidom.in` → same deployment. No code changes per property.
 
 ### 5.3 RLS Policies
 
@@ -341,10 +341,10 @@ No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, ins
 - [ ] Pilot: onboard 2 beta properties (Bleaf + 1 more)
 
 ### Phase 5 — Central Listing Page (Future, Post-Pilot)
-- [ ] `vattavadastays.com` landing page with "Browse properties"
+- [ ] `stayidom.in` landing page with "Browse properties"
 - [ ] Property cards with availability preview
 - [ ] Filter by dates, guests, price
-- [ ] Each card links to `{slug}.vattavadastays.com`
+- [ ] Each card links to `{slug}.stayidom.in`
 
 ---
 
