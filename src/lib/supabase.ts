@@ -8,3 +8,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createSupabaseClient(supabaseUrl, supabaseAnonKey)
+
+export const supabaseAdmin = createSupabaseClient(
+  supabaseUrl,
+  import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
+)

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { supabase, supabaseAdmin } from '@/lib/supabase'
 
 export type PropertyRow = {
   id: string
@@ -24,7 +24,7 @@ export function useAllProperties() {
   return useQuery({
     queryKey: ['superadmin', 'properties'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('properties')
         .select('*')
         .order('created_at', { ascending: false })
@@ -82,7 +82,7 @@ export function useUpdateSubscription() {
       subscription_end_date?: string | null
       setup_fee_paid?: boolean
     }) => {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('properties')
         .update(updates)
         .eq('id', propertyId)
