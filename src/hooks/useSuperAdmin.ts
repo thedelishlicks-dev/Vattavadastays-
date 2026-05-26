@@ -1,6 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase, supabaseAdmin } from '@/lib/supabase'
-import { createClient } from '@supabase/supabase-js'
 
 export type PropertyRow = {
   id: string
@@ -25,16 +24,11 @@ export function useAllProperties() {
   return useQuery({
     queryKey: ['superadmin', 'properties'],
     queryFn: async () => {
-      const client = createClient(
-        import.meta.env.VITE_SUPABASE_URL,
-        import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
-      )
-      const { data, error } = await client
+      const { data, error } = await supabaseAdmin
         .from('properties')
         .select('*')
         .order('created_at', { ascending: false })
       if (error) throw error
-      console.log('properties fetched:', data?.length)
       return data as PropertyRow[]
     },
   })
