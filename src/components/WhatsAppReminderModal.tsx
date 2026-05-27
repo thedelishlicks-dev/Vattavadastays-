@@ -8,6 +8,7 @@ interface Booking {
   check_in: string;
   check_out: string;
   total_amount: number;
+  advance_amount: number;
   room_id: string;
 }
 
@@ -18,6 +19,7 @@ interface Props {
     name: string;
     owner_phone: string | null;
     owner_whatsapp: string | null;
+    upiId?: string | null;
   };
   onClose: () => void;
 }
@@ -43,17 +45,45 @@ function buildMessage(
   const checkIn = booking.check_in;
   const checkOut = booking.check_out;
   const phone = property.owner_phone ?? property.owner_whatsapp ?? "";
-  const amount = `₹${Number(booking.total_amount).toLocaleString("en-IN")}`;
+  const totalAmount = Number(booking.total_amount);
+  const advancePaid = Number(booking.advance_amount ?? 0);
+  const balance = Math.max(0, totalAmount - advancePaid);
+  const amountDue = balance > 0 ? balance : totalAmount;
+  const amountStr = `₹${amountDue.toLocaleString("en-IN")}`;
 
   switch (template) {
     case "confirmed":
-      return `Dear ${name}, your booking at ${prop} is confirmed. Check-in: ${checkIn}. Check-out: ${checkOut}. Room: ${room}. Any questions, call us at ${phone}.`;
+      return (
+        `Dear ${name}, your booking at ${prop} is confirmed.\n\n` +
+        `Check-in: ${checkIn}\n` +
+        `Check-out: ${checkOut}\n` +
+        `Room: ${room}\n\n` +
+        `Any questions, call us at ${phone}.`
+      );
+
     case "reminder":
-      return `Hi ${name}, looking forward to your arrival tomorrow at ${prop}! Check-in from 12:00 PM. Room: ${room}. Call us at ${phone} if you need anything.`;
+      return (
+        `Hi ${name}, looking forward to your arrival tomorrow at ${prop}!\n\n` +
+        `Check-in from 12:00 PM.\n` +
+        `Room: ${room}\n\n` +
+        `Call us at ${phone} if you need anything.`
+      );
+
     case "payment":
-      return `Hi ${name}, friendly reminder — payment of ${amount} is pending for your stay at ${prop} on ${checkIn}. Please pay via UPI to ${phone} or call us to confirm.`;
+      return (
+        `Hi ${name}, friendly reminder — ${amountStr} is pending for your stay at ${prop} (Check-in: ${checkIn}).\n\n` +
+        `Please pay via UPI:\n` +
+        `UPI ID: ${property.upiId ?? phone}\n` +
+        `Amount: ${amountStr}\n\n` +
+        `Open GPay / PhonePe / Paytm → Send money → paste the UPI ID above.\n\n` +
+        `Call us at ${phone} if you need help.`
+      );
+
     case "directions":
-      return `Hi ${name}, here's how to reach ${prop}. Call us at ${phone} when you reach Munnar — we'll guide you from there.`;
+      return (
+        `Hi ${name}, here's how to reach ${prop}.\n\n` +
+        `Call us at ${phone} when you reach Munnar — we'll guide you from there.`
+      );
   }
 }
 
