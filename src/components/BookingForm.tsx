@@ -3,6 +3,8 @@ import { Check, MessageCircle, ExternalLink, Copy } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink } from "@/lib/whatsapp";
+import { extractUPIId } from "@/utils/upi";
+import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
 
 type Payment = "UPI" | "Bank Transfer" | "Cash on Arrival";
@@ -113,6 +115,8 @@ export function BookingForm({ selection, subdomain }: Props) {
   const trackingUrl = bookingId
     ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}&id=${bookingId}`
     : null;
+
+  const upiId = property ? extractUPIId(property.shared_amenities) : null;
 
   const handleCopyRef = () => {
     if (bookingId) {
@@ -227,6 +231,22 @@ export function BookingForm({ selection, subdomain }: Props) {
                 )}
 
                 {/* Stay details reminder */}
+                  {/* UPI Payment Section */}
+                  {upiId && payment === "UPI" && (
+                    <UPIPaymentSection
+                      upiId={upiId}
+                      payeeName={property?.owner_name ?? property?.name ?? ""}
+                      totalAmount={selection.total}
+                      advancePaid={0}
+                      bookingNote={`Booking – ${property?.name} – ${selection.checkIn}`}
+                      ownerWhatsapp={property?.owner_whatsapp ?? ""}
+                      guestName={submittedName}
+                      propertyName={property?.name ?? ""}
+                      checkIn={selection.checkIn}
+                    />
+                  )}
+
+                  {/* Stay details reminder */}
                 <p className="text-center text-xs text-muted-foreground">
                   {selection.checkIn} → {selection.checkOut} · {selection.room.name}
                 </p>

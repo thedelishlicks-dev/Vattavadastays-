@@ -6,6 +6,8 @@ import {
   Loader2, Search, CheckCircle2, Clock, LogIn, Star,
   XCircle, Phone, MapPin, MessageCircle, IndianRupee,
 } from "lucide-react";
+import { extractUPIId } from "@/utils/upi";
+import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingCharge } from "@/types/database";
 
 export const Route = createFileRoute("/booking-status")({
@@ -266,7 +268,12 @@ function BookingStatusPage() {
             </div>
 
             {/* Contact property */}
-            <ContactProperty propertyId={data.booking.property_id} />
+            <ContactProperty
+              propertyId={data.booking.property_id}
+              booking={data.booking}
+              totalAmount={data.booking.total_amount + data.chargesTotal}
+              advancePaid={data.advance}
+            />
           </div>
         )}
       </div>
@@ -283,13 +290,23 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
   );
 }
 
-function ContactProperty({ propertyId }: { propertyId: string }) {
+function ContactProperty({
+  propertyId,
+  booking,
+  totalAmount,
+  advancePaid
+}: {
+  propertyId: string;
+  booking: any;
+  totalAmount: number;
+  advancePaid: number;
+}) {
   const { data: property } = useQuery({
     queryKey: ["property-contact", propertyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
-        .select("name, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng")
+        .select("name, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
         .eq("id", propertyId)
         .single();
       if (error) throw error;
@@ -300,6 +317,8 @@ function ContactProperty({ propertyId }: { propertyId: string }) {
 
   if (!property) return null;
 
+  const upiId = extractUPIId(property.shared_amenities);
+
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, "")}` : null;
@@ -308,28 +327,44 @@ function ContactProperty({ propertyId }: { propertyId: string }) {
     : null;
 
   return (
-    <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-      <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Contact property</div>
-      <div className="text-sm">
-        <div className="font-medium">{property.name}</div>
-        {property.owner_name && <div className="text-muted-foreground text-xs mt-0.5">Host: {property.owner_name}</div>}
-      </div>
-      <div className="flex flex-col gap-2">
-        {phone && (
-          <a href={`tel:+${phone.replace(/\D/g, "")}`} className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
-            <Phone className="h-4 w-4" /> Call {property.owner_name ?? "host"}
-          </a>
-        )}
-        {waLink && (
-          <a href={waLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity">
-            <MessageCircle className="h-4 w-4" /> WhatsApp
-          </a>
-        )}
-        {mapsLink && (
-          <a href={mapsLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
-            <MapPin className="h-4 w-4" /> Get directions
-          </a>
-        )}
+    <div className="space-y-4">
+      {upiId && booking.status !== 'cancelled' && (
+        <UPIPaymentSection
+          upiId={upiId}
+          payeeName={property.owner_name ?? property.name}
+          totalAmount={totalAmount}
+          advancePaid={advancePaid}
+          bookingNote={`Booking – ${property.name} – ${booking.check_in}`}
+          ownerWhatsapp={property.owner_whatsapp ?? ""}
+          guestName={booking.guest_name}
+          propertyName={property.name}
+          checkIn={booking.check_in}
+        />
+      )}
+
+      <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Contact property</div>
+        <div className="text-sm">
+          <div className="font-medium">{property.name}</div>
+          {property.owner_name && <div className="text-muted-foreground text-xs mt-0.5">Host: {property.owner_name}</div>}
+        </div>
+        <div className="flex flex-col gap-2">
+          {phone && (
+            <a href={`tel:+${phone.replace(/\D/g, "")}`} className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
+              <Phone className="h-4 w-4" /> Call {property.owner_name ?? "host"}
+            </a>
+          )}
+          {waLink && (
+            <a href={waLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </a>
+          )}
+          {mapsLink && (
+            <a href={mapsLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
+              <MapPin className="h-4 w-4" /> Get directions
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
