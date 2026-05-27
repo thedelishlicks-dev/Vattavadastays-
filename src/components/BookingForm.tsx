@@ -116,6 +116,7 @@ export function BookingForm({ selection, subdomain }: Props) {
     ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}&id=${bookingId}`
     : null;
 
+  // Extract UPI ID from sentinel key — renders regardless of payment method selected
   const upiId = property ? extractUPIId(property.shared_amenities) : null;
 
   const handleCopyRef = () => {
@@ -219,8 +220,8 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                 )}
 
-                {/* UPI Payment Section */}
-                {upiId && payment === "UPI" && (
+                {/* UPI Payment Section — always shown if UPI ID exists, regardless of payment method */}
+                {upiId && (
                   <UPIPaymentSection
                     upiId={upiId}
                     payeeName={property?.owner_name ?? property?.name ?? ""}
@@ -317,7 +318,7 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {payment === "UPI" &&
-                      "Pay 25% advance via UPI to confirm. Details shared on WhatsApp."}
+                      "Pay 25% advance via UPI to confirm."}
                     {payment === "Bank Transfer" &&
                       "Bank details shared after your request is confirmed."}
                     {payment === "Cash on Arrival" &&
