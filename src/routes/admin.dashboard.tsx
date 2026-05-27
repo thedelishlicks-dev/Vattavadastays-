@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CalendarDays, IndianRupee, Percent, MessageSquare, Ban, Plus, Send } from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { extractUPIId } from "@/utils/upi";
 import { useBookings } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
@@ -178,6 +179,7 @@ function DashboardPage() {
             owner_phone: property.owner_phone ?? null,
             owner_whatsapp: property.owner_whatsapp ?? null,
           }}
+          upiId={extractUPIId(property.shared_amenities ?? []) || undefined}
           onClose={() => setModal(null)}
         />
       )}

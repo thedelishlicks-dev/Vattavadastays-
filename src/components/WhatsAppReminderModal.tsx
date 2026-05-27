@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, Send } from "lucide-react";
+import { buildWhatsAppPaymentMessage } from "@/utils/upi";
 
 interface Booking {
   id: string;
@@ -35,7 +36,8 @@ function buildMessage(
   template: Template,
   booking: Booking,
   roomName: string,
-  property: Props["property"]
+  property: Props["property"],
+  upiId?: string
 ): string {
   const name = booking.guest_name;
   const prop = property.name;
@@ -43,7 +45,7 @@ function buildMessage(
   const checkIn = booking.check_in;
   const checkOut = booking.check_out;
   const phone = property.owner_phone ?? property.owner_whatsapp ?? "";
-  const amount = `₹${Number(booking.total_amount).toLocaleString("en-IN")}`;
+  const amountStr = `₹${Number(booking.total_amount).toLocaleString("en-IN")}`;
 
   switch (template) {
     case "confirmed":
@@ -51,20 +53,30 @@ function buildMessage(
     case "reminder":
       return `Hi ${name}, looking forward to your arrival tomorrow at ${prop}! Check-in from 12:00 PM. Room: ${room}. Call us at ${phone} if you need anything.`;
     case "payment":
-      return `Hi ${name}, friendly reminder — payment of ${amount} is pending for your stay at ${prop} on ${checkIn}. Please pay via UPI to ${phone} or call us to confirm.`;
+      if (upiId) {
+        return buildWhatsAppPaymentMessage({
+          guestName: name,
+          propertyName: prop,
+          amount: Number(booking.total_amount),
+          upiId,
+          ownerPhone: phone,
+          checkIn,
+        });
+      }
+      return `Hi ${name}, friendly reminder — payment of ${amountStr} is pending for your stay at ${prop} on ${checkIn}. Please pay via UPI to ${phone} or call us to confirm.`;
     case "directions":
       return `Hi ${name}, here's how to reach ${prop}. Call us at ${phone} when you reach Munnar — we'll guide you from there.`;
   }
 }
 
-export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose }: Props) {
+export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose, upiId: passedUpiId }: Props & { upiId?: string }) {
   const upcoming = bookings.filter(b => b.check_in >= new Date().toISOString().split("T")[0]);
   const [bookingId, setBookingId] = useState(upcoming[0]?.id ?? bookings[0]?.id ?? "");
   const [template, setTemplate] = useState<Template>("confirmed");
 
   const booking = bookings.find(b => b.id === bookingId);
   const roomName = booking ? (roomNameMap[booking.room_id] ?? "your room") : "";
-  const message = booking ? buildMessage(template, booking, roomName, property) : "";
+  const message = booking ? buildMessage(template, booking, roomName, property, passedUpiId) : "";
   const phone = booking?.guest_phone?.replace(/\D/g, "") ?? "";
   const waUrl = `https://wa.me/${phone.startsWith("91") ? phone : `91${phone}`}?text=${encodeURIComponent(message)}`;
 

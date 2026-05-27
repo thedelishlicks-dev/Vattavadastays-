@@ -149,7 +149,11 @@ export function paymentReminderLink({
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
     `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
     `${contextLine}\n\n` +
-    (upiId ? `UPI: ${upiId}\n\n` : "") +
+    (upiId
+      ? `UPI ID: ${upiId}\n` +
+        `Amount: ₹${(advancePaid === 0 ? suggested25 : balance).toLocaleString("en-IN")}\n\n` +
+        `Open GPay / PhonePe / Paytm → Send money → paste the UPI ID above.\n\n`
+      : "") +
     `Please transfer at your earliest convenience. Thank you!`;
 
   return link(guestPhone, text);
