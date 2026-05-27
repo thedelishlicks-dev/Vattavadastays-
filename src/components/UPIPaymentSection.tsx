@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from 'lucide-react'
 import { buildUPILink } from '@/utils/upi'
 
@@ -6,8 +6,8 @@ interface UPIPaymentSectionProps {
   upiId: string
   payeeName: string
   totalAmount: number
-  advancePaid: number       // booking.advance_amount from DB
-  bookingNote: string       // e.g. "Booking – Bleaf Mud House – 2025-06-10"
+  advancePaid: number
+  bookingNote: string
   ownerWhatsapp: string
   guestName: string
   propertyName: string
@@ -31,12 +31,17 @@ export function UPIPaymentSection({
 }: UPIPaymentSectionProps) {
   const isFirstPayment = advancePaid === 0
   const remaining = totalAmount - advancePaid
-  const isMobile = typeof navigator !== 'undefined' && /android|iphone|ipad/i.test(navigator.userAgent)
+
+  // More reliable mobile detection — also catches tablets
+  const isMobile = typeof navigator !== 'undefined' &&
+    (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
+     ('ontouchstart' in window && navigator.maxTouchPoints > 1))
 
   const [selectedAmount, setSelectedAmount] = useState(
     isFirstPayment ? Math.round(totalAmount * 0.25) : remaining
   )
-  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(!isMobile)
+  // Always start false — only reveal after guest action
+  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const upiLink = buildUPILink({
@@ -54,13 +59,14 @@ export function UPIPaymentSection({
     `- Room: ${roomName}\n` +
     `- Check-in: ${checkIn}\n` +
     `${shortId}\n\n` +
-    `Please find my payment screenshot attached.`;
+    `Please find my payment screenshot attached.`
 
   const whatsappLink = `https://wa.me/${ownerWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
 
   const handleCopyUPI = () => {
     navigator.clipboard.writeText(upiId)
     setCopied(true)
+    setShowWhatsAppPrompt(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -69,28 +75,33 @@ export function UPIPaymentSection({
     window.location.href = upiLink
   }
 
-  const chips = [
-    { label: '25%', amount: Math.round(totalAmount * 0.25) },
-    { label: '50%', amount: Math.round(totalAmount * 0.5) },
-    { label: 'Full', amount: totalAmount },
-  ]
+  const chips = isFirstPayment
+    ? [
+        { label: '25%', amount: Math.round(totalAmount * 0.25) },
+        { label: '50%', amount: Math.round(totalAmount * 0.5) },
+        { label: 'Full', amount: totalAmount },
+      ]
+    : []
 
   if (remaining <= 0) return null
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-[var(--shadow-soft)]">
+      {/* Header */}
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">
         <IndianRupee className="h-3.5 w-3.5" />
-        UPI Payment
+        Pay via UPI
       </div>
 
+      {/* Amount selection — only for first payment */}
       {isFirstPayment ? (
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">Select advance amount to pay via UPI:</p>
+          <p className="text-sm text-muted-foreground">Select advance amount:</p>
           <div className="flex gap-2">
             {chips.map((chip) => (
               <button
                 key={chip.label}
+                type="button"
                 onClick={() => setSelectedAmount(chip.amount)}
                 className={[
                   "flex-1 py-2 px-3 rounded-xl border text-sm font-medium transition-colors",
@@ -112,46 +123,53 @@ export function UPIPaymentSection({
         </div>
       )}
 
-      {isMobile ? (
-        <button
-          onClick={handleUPIClick}
-          className="w-full rounded-full bg-primary text-primary-foreground py-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-        >
-          <Smartphone className="h-4 w-4" />
-          {isFirstPayment ? "Pay via GPay / Paytm / PhonePe" : `Pay ₹${remaining.toLocaleString('en-IN')} balance via UPI`}
-        </button>
-      ) : (
-        <div className="space-y-3">
-          <div className="p-3 bg-muted/50 rounded-xl border border-border flex items-center justify-between gap-3">
-            <code className="text-sm font-mono text-primary font-medium">{upiId}</code>
-            <button
-              onClick={handleCopyUPI}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-xs font-medium"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5 text-primary" />
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  Copy
-                </>
-              )}
-            </button>
-          </div>
-          <p className="text-xs text-muted-foreground text-center">
-            Scan with any UPI app to pay ₹{selectedAmount.toLocaleString('en-IN')}
-          </p>
-        </div>
-      )}
+      {/* Pay button — shown on ALL devices */}
+      {/* On mobile: opens UPI app directly via upi:// deep link */}
+      {/* On desktop: falls through to copy fallback below */}
+      <a
+        href={upiLink}
+        onClick={handleUPIClick}
+        className="w-full rounded-full bg-primary text-primary-foreground py-3 text-sm font-medium hover:opacity-90 flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+      >
+        <Smartphone className="h-4 w-4" />
+        {isFirstPayment
+          ? `Pay ₹${selectedAmount.toLocaleString('en-IN')} via GPay / Paytm / PhonePe`
+          : `Pay ₹${remaining.toLocaleString('en-IN')} balance via UPI`}
+      </a>
 
+      {/* UPI ID copy fallback — shown on all devices as secondary option */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground text-center">
+          Or copy UPI ID and pay manually
+        </p>
+        <div className="p-3 bg-muted/50 rounded-xl border border-border flex items-center justify-between gap-3">
+          <code className="text-sm font-mono text-primary font-medium">{upiId}</code>
+          <button
+            type="button"
+            onClick={handleCopyUPI}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-xs font-medium shrink-0"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-primary" />
+                Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copy
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* WhatsApp follow-up — only appears after guest taps Pay or Copy */}
       {showWhatsAppPrompt && (
-        <div className="pt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-3">
             <p className="text-xs text-muted-foreground leading-relaxed text-center">
-              "After paying, send your payment screenshot to the owner on WhatsApp so they can confirm your booking."
+              After paying, send your payment screenshot to the owner on WhatsApp so they can confirm your booking.
             </p>
             <a
               href={whatsappLink}
@@ -160,7 +178,7 @@ export function UPIPaymentSection({
               className="flex items-center justify-center gap-2 w-full rounded-full bg-[#25D366] text-white py-2.5 text-sm font-medium hover:opacity-90 transition-opacity shadow-md shadow-[#25D366]/20"
             >
               <MessageCircle className="h-4 w-4" />
-              Send Screenshot on WhatsApp
+              Send payment screenshot on WhatsApp
             </a>
           </div>
         </div>
