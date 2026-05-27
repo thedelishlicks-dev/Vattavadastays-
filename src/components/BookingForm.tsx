@@ -3,6 +3,8 @@ import { Check, MessageCircle, ExternalLink, Copy } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink } from "@/lib/whatsapp";
+import { extractUPIId } from "@/utils/upi";
+import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
 
 type Payment = "UPI" | "Bank Transfer" | "Cash on Arrival";
@@ -114,6 +116,9 @@ export function BookingForm({ selection, subdomain }: Props) {
     ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}&id=${bookingId}`
     : null;
 
+  // Extract UPI ID from sentinel key — renders regardless of payment method selected
+  const upiId = property ? extractUPIId(property.shared_amenities) : null;
+
   const handleCopyRef = () => {
     if (bookingId) {
       navigator.clipboard.writeText(bookingId);
@@ -215,6 +220,23 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                 )}
 
+                {/* UPI Payment Section — always shown if UPI ID exists, regardless of payment method */}
+                {upiId && (
+                  <UPIPaymentSection
+                    upiId={upiId}
+                    payeeName={property?.owner_name ?? property?.name ?? ""}
+                    totalAmount={selection.total}
+                    advancePaid={0}
+                    bookingNote={`Booking – ${property?.name} – ${selection.checkIn}`}
+                    ownerWhatsapp={property?.owner_whatsapp ?? ""}
+                    guestName={submittedName}
+                    propertyName={property?.name ?? ""}
+                    roomName={selection.room.name}
+                    checkIn={selection.checkIn}
+                    bookingId={bookingId ?? undefined}
+                  />
+                )}
+
                 {/* Track booking */}
                 {trackingUrl && (
                   <a
@@ -296,7 +318,7 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {payment === "UPI" &&
-                      "Pay 25% advance via UPI to confirm. Details shared on WhatsApp."}
+                      "Pay 25% advance via UPI to confirm."}
                     {payment === "Bank Transfer" &&
                       "Bank details shared after your request is confirmed."}
                     {payment === "Cash on Arrival" &&
