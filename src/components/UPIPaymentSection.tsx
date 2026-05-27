@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from 'lucide-react'
 import { buildUPILink } from '@/utils/upi'
 
@@ -32,34 +32,32 @@ export function UPIPaymentSection({
   const isFirstPayment = advancePaid === 0
   const remaining = totalAmount - advancePaid
 
-  // More reliable mobile detection — also catches tablets
-  const isMobile = typeof navigator !== 'undefined' &&
-    (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
-     ('ontouchstart' in window && navigator.maxTouchPoints > 1))
-
   const [selectedAmount, setSelectedAmount] = useState(
     isFirstPayment ? Math.round(totalAmount * 0.25) : remaining
   )
-  // Always start false — only reveal after guest action
   const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const upiLink = buildUPILink({
+  // Recomputed every time selectedAmount changes
+  const upiLink = useMemo(() => buildUPILink({
     upiId,
     payeeName,
     amount: selectedAmount,
     note: bookingNote,
-  })
+  }), [upiId, payeeName, selectedAmount, bookingNote])
 
   const shortId = bookingId ? `Ref: #${bookingId.slice(0, 8).toUpperCase()}` : ''
-  const whatsappMessage =
+
+  const whatsappMessage = useMemo(() =>
     `Hi, I just paid ₹${selectedAmount.toLocaleString('en-IN')} via UPI for my booking at ${propertyName}.\n\n` +
     `Details:\n` +
     `- Guest: ${guestName}\n` +
     `- Room: ${roomName}\n` +
     `- Check-in: ${checkIn}\n` +
     `${shortId}\n\n` +
-    `Please find my payment screenshot attached.`
+    `Please find my payment screenshot attached.`,
+    [selectedAmount, propertyName, guestName, roomName, checkIn, shortId]
+  )
 
   const whatsappLink = `https://wa.me/${ownerWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
 
@@ -72,7 +70,6 @@ export function UPIPaymentSection({
 
   const handleUPIClick = () => {
     setShowWhatsAppPrompt(true)
-    window.location.href = upiLink
   }
 
   const chips = isFirstPayment
@@ -93,7 +90,7 @@ export function UPIPaymentSection({
         Pay via UPI
       </div>
 
-      {/* Amount selection — only for first payment */}
+      {/* Amount chips — first payment only */}
       {isFirstPayment ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">Select advance amount:</p>
@@ -123,9 +120,7 @@ export function UPIPaymentSection({
         </div>
       )}
 
-      {/* Pay button — shown on ALL devices */}
-      {/* On mobile: opens UPI app directly via upi:// deep link */}
-      {/* On desktop: falls through to copy fallback below */}
+      {/* Pay button — href always reflects current selectedAmount via useMemo */}
       <a
         href={upiLink}
         onClick={handleUPIClick}
@@ -137,7 +132,7 @@ export function UPIPaymentSection({
           : `Pay ₹${remaining.toLocaleString('en-IN')} balance via UPI`}
       </a>
 
-      {/* UPI ID copy fallback — shown on all devices as secondary option */}
+      {/* UPI ID copy fallback */}
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground text-center">
           Or copy UPI ID and pay manually
@@ -164,7 +159,7 @@ export function UPIPaymentSection({
         </div>
       </div>
 
-      {/* WhatsApp follow-up — only appears after guest taps Pay or Copy */}
+      {/* WhatsApp follow-up — appears only after Pay or Copy is tapped */}
       {showWhatsAppPrompt && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-3">
