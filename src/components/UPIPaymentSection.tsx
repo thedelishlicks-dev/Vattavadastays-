@@ -11,7 +11,9 @@ interface UPIPaymentSectionProps {
   ownerWhatsapp: string
   guestName: string
   propertyName: string
+  roomName: string
   checkIn: string
+  bookingId?: string
 }
 
 export function UPIPaymentSection({
@@ -23,7 +25,9 @@ export function UPIPaymentSection({
   ownerWhatsapp,
   guestName,
   propertyName,
+  roomName,
   checkIn,
+  bookingId,
 }: UPIPaymentSectionProps) {
   const isFirstPayment = advancePaid === 0
   const remaining = totalAmount - advancePaid
@@ -42,7 +46,16 @@ export function UPIPaymentSection({
     note: bookingNote,
   })
 
-  const whatsappMessage = `Hi, I just paid ₹${selectedAmount} via UPI for my booking at ${propertyName} (Check-in: ${checkIn}). Please find my payment screenshot attached. - ${guestName}`
+  const shortId = bookingId ? `Ref: #${bookingId.slice(0, 8).toUpperCase()}` : ''
+  const whatsappMessage =
+    `Hi, I just paid ₹${selectedAmount.toLocaleString('en-IN')} via UPI for my booking at ${propertyName}.\n\n` +
+    `Details:\n` +
+    `- Guest: ${guestName}\n` +
+    `- Room: ${roomName}\n` +
+    `- Check-in: ${checkIn}\n` +
+    `${shortId}\n\n` +
+    `Please find my payment screenshot attached.`;
+
   const whatsappLink = `https://wa.me/${ownerWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
 
   const handleCopyUPI = () => {

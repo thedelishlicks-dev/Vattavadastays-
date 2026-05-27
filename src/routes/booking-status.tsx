@@ -338,7 +338,9 @@ function ContactProperty({
           ownerWhatsapp={property.owner_whatsapp ?? ""}
           guestName={booking.guest_name}
           propertyName={property.name}
+          roomName={booking.room_name ?? "Room"}
           checkIn={booking.check_in}
+          bookingId={booking.id}
         />
       )}
 

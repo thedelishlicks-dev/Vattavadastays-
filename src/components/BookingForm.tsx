@@ -200,8 +200,8 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </p>
                 </div>
 
-                {/* Notify owner — primary CTA */}
-                {ownerNotifyLink && (
+                {/* Notify owner — primary CTA (Hidden if UPI payment is shown to avoid clutter) */}
+                {ownerNotifyLink && (payment !== "UPI" || !upiId) && (
                   <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
                     <div className="text-sm font-medium">Notify the owner</div>
                     <p className="text-xs text-muted-foreground">
@@ -242,7 +242,9 @@ export function BookingForm({ selection, subdomain }: Props) {
                       ownerWhatsapp={property?.owner_whatsapp ?? ""}
                       guestName={submittedName}
                       propertyName={property?.name ?? ""}
+                      roomName={selection.room.name}
                       checkIn={selection.checkIn}
+                      bookingId={bookingId ?? undefined}
                     />
                   )}
 
