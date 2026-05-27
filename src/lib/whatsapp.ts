@@ -107,6 +107,10 @@ export function directionsLink({
  * - If advance already recorded, ask for the remaining balance.
  * - If fully paid, the caller should not show this link at all,
  *   but we handle it gracefully just in case.
+ *
+ * NOTE: UPI ID is sent as plain text — never as a upi:// link.
+ * WhatsApp intercepts upi:// links and forces WhatsApp Pay.
+ * Plain text lets the guest copy the ID into GPay / PhonePe / Paytm.
  */
 export function paymentReminderLink({
   guestPhone,
@@ -116,6 +120,7 @@ export function paymentReminderLink({
   checkIn,
   propertyName,
   upiId,
+  ownerPhone,
 }: {
   guestPhone: string;
   guestName: string;
@@ -124,6 +129,7 @@ export function paymentReminderLink({
   checkIn: string;
   propertyName: string;
   upiId?: string;
+  ownerPhone?: string;
 }): string {
   const suggested25 = Math.round(totalAmount * 0.25);
   const balance     = Math.max(0, totalAmount - advancePaid);
@@ -132,25 +138,36 @@ export function paymentReminderLink({
   let contextLine: string;
 
   if (advancePaid === 0) {
-    // No advance recorded — ask for 25% to confirm
     amountLine  = `₹${suggested25.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
     contextLine = `Total booking amount: ₹${totalAmount.toLocaleString("en-IN")}`;
   } else if (balance > 0) {
-    // Advance received, balance still pending
     amountLine  = `₹${balance.toLocaleString("en-IN")} (remaining balance)`;
     contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${totalAmount.toLocaleString("en-IN")}`;
   } else {
-    // Fully paid — shouldn't normally be called, but handle gracefully
     amountLine  = "fully paid ✓";
     contextLine = `Total: ₹${totalAmount.toLocaleString("en-IN")}`;
   }
+
+  const upiBlock = upiId
+    ? (
+        `To pay, open GPay / PhonePe / Paytm → Send money → paste this UPI ID:\n` +
+        `UPI ID: ${upiId}\n` +
+        `Amount: ${advancePaid === 0
+          ? `₹${suggested25.toLocaleString("en-IN")}`
+          : `₹${balance.toLocaleString("en-IN")}`}\n\n`
+      )
+    : "";
+
+  const helpLine = ownerPhone
+    ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
+    : "Call us if you need help.";
 
   const text =
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
     `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
     `${contextLine}\n\n` +
-    (upiId ? `UPI: ${upiId}\n\n` : "") +
-    `Please transfer at your earliest convenience. Thank you!`;
+    upiBlock +
+    helpLine;
 
   return link(guestPhone, text);
 }
