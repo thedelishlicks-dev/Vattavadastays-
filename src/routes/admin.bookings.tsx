@@ -2,8 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Search, Plus, Loader2, X, IndianRupee, Utensils,
-  Printer, MessageCircle, Check, LogIn, LogOut,
-  Trash2, Copy, ChevronRight, Phone, Clock,
+  MessageCircle, Check, LogIn, LogOut,
+  Trash2, ChevronRight, Phone, Clock,
   CheckCircle2, Users, Calendar, BedDouble,
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -15,6 +15,7 @@ import {
   confirmationLink, directionsLink,
   paymentReminderLink, dayBeforeReminderLink, telLink,
 } from "@/lib/whatsapp";
+import { BookingInvoice } from "@/components/BookingInvoice";
 import type { Booking, BookingCharge, BookingStatus } from "@/types/database";
 
 export const Route = createFileRoute("/admin/bookings")({
@@ -37,14 +38,14 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string 
 };
 
 const CHARGE_PRESETS = [
-  { description: "Breakfast",             unit_price: 200 },
-  { description: "Lunch",                 unit_price: 300 },
-  { description: "Dinner",                unit_price: 350 },
-  { description: "Full board (all meals)",unit_price: 750 },
-  { description: "Bonfire",               unit_price: 500 },
-  { description: "Trekking guide",        unit_price: 800 },
-  { description: "Laundry",               unit_price: 150 },
-  { description: "Extra blanket",         unit_price: 100 },
+  { description: "Breakfast",              unit_price: 200 },
+  { description: "Lunch",                  unit_price: 300 },
+  { description: "Dinner",                 unit_price: 350 },
+  { description: "Full board (all meals)", unit_price: 750 },
+  { description: "Bonfire",                unit_price: 500 },
+  { description: "Trekking guide",         unit_price: 800 },
+  { description: "Laundry",                unit_price: 150 },
+  { description: "Extra blanket",          unit_price: 100 },
 ];
 
 function StatusPill({ status }: { status: string }) {
@@ -219,8 +220,21 @@ function BookingDetailModal({
 
         <div className="flex-1 overflow-y-auto">
           {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
-          {tab === "charges" && <ChargesTab booking={booking} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
-          {tab === "invoice" && <InvoiceTab booking={booking} roomName={roomName} property={property} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
+          {tab === "charges"  && <ChargesTab booking={booking} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} />}
+          {tab === "invoice"  && (
+            <div className="p-5">
+              <BookingInvoice
+                booking={booking}
+                roomName={roomName}
+                property={property ?? null}
+                charges={charges}
+                chargesTotal={chargesTotal}
+                advance={advance}
+                balance={balance}
+                guestView={false}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -247,20 +261,20 @@ function OverviewTab({ booking, roomName, property, advance, balance, chargesTot
   return (
     <div className="p-5 space-y-4">
       <Section title="Stay details">
-        <Row label="Room" value={roomName} />
-        <Row label="Check-in" value={booking.check_in} />
-        <Row label="Check-out" value={booking.check_out} />
-        <Row label="Nights" value={`${booking.nights}`} />
-        <Row label="Guests" value={`${booking.guest_count}`} />
-        {booking.payment_method && <Row label="Payment method" value={booking.payment_method} />}
-        {booking.checked_in_at && <Row label="Checked in at" value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
-        {booking.checked_out_at && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
+        <Row label="Room"           value={roomName} />
+        <Row label="Check-in"       value={booking.check_in} />
+        <Row label="Check-out"      value={booking.check_out} />
+        <Row label="Nights"         value={`${booking.nights}`} />
+        <Row label="Guests"         value={`${booking.guest_count}`} />
+        {booking.payment_method    && <Row label="Payment method" value={booking.payment_method} />}
+        {booking.checked_in_at     && <Row label="Checked in at"  value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
+        {booking.checked_out_at    && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
       </Section>
 
       <Section title="Payment summary">
         <Row label="Room total" value={`₹${Number(booking.total_amount).toLocaleString("en-IN")}`} />
         {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
-        {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
+        {advance > 0      && <Row label="Advance paid"  value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
         {booking.payment_reference && <Row label="Reference" value={booking.payment_reference} small />}
         <div className="border-t border-border pt-2 mt-1">
           <Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold />
@@ -278,7 +292,7 @@ function OverviewTab({ booking, roomName, property, advance, balance, chargesTot
 
       <Section title="Send to guest">
         <div className="space-y-2">
-          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId })} label="💰 Payment reminder" />
+          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone })} label="💰 Payment reminder" />
           <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
         </div>
       </Section>
@@ -322,16 +336,10 @@ function CancelButton({ bookingId, onCancelled }: { bookingId: string; onCancell
   );
 }
 
-// FIX 3: Accumulate payments instead of overwriting.
-// - Amount field = new instalment only (not pre-filled with existing advance)
-// - Saved value = existing advance + new payment
-// - Balance preview uses cumulative total
-// - Shows existing advance so owner knows what's already recorded
 function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
   booking: Booking; advance: number; onSaved: () => void; onCancel: () => void;
 }) {
   const suggested = Math.round(Number(booking.total_amount) * 0.25);
-  // Start blank — owner enters only the new instalment amount
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(booking.payment_method ?? "UPI");
   const [ref, setRef] = useState("");
@@ -340,7 +348,6 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
   const queryClient = useQueryClient();
 
   const newPayment = parseFloat(amount) || 0;
-  // Cumulative total: whatever was already paid + this new instalment
   const newAdvanceTotal = advance + newPayment;
   const bal = Math.max(0, Number(booking.total_amount) - newAdvanceTotal);
 
@@ -349,10 +356,8 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
     setSaving(true); setError("");
     try {
       const { error: err } = await supabase.from("bookings").update({
-        // KEY FIX: store cumulative total, not just this instalment
         advance_amount: newAdvanceTotal,
         payment_method: method,
-        // Only overwrite reference if a new one is provided
         ...(ref.trim() ? { payment_reference: ref.trim() } : {}),
         is_paid: newAdvanceTotal >= Number(booking.total_amount),
         status: booking.status === "pending" ? "confirmed" : booking.status,
@@ -371,7 +376,6 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
         {advance > 0 ? "Record part payment" : "Record advance payment"}
       </div>
 
-      {/* Show existing advance so owner knows what's already recorded */}
       {advance > 0 && (
         <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
           <span className="text-muted-foreground">Already recorded</span>
@@ -408,10 +412,7 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
         </div>
         <div>
           <label className={labelCls}>Txn reference</label>
-          <input
-            value={ref} onChange={(e) => setRef(e.target.value)}
-            className={inputCls} placeholder="Optional"
-          />
+          <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" />
         </div>
       </div>
 
@@ -419,9 +420,7 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
         <div className="rounded-lg bg-background px-3 py-2 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Total paid after this</span>
-            <span className="font-semibold text-primary">
-              ₹{newAdvanceTotal.toLocaleString("en-IN")}
-            </span>
+            <span className="font-semibold text-primary">₹{newAdvanceTotal.toLocaleString("en-IN")}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Balance remaining</span>
@@ -435,12 +434,8 @@ function RecordPaymentForm({ booking, advance, onSaved, onCancel }: {
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">
-          Cancel
-        </button>
-        <button onClick={handleSave} disabled={saving}
-          className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
-        >
+        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
+        <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
         </button>
       </div>
@@ -539,123 +534,6 @@ function ChargesTab({ booking, charges, chargesTotal, advance, balance }: {
   );
 }
 
-function InvoiceTab({ booking, roomName, property, charges, chargesTotal, advance, balance }: {
-  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"];
-  charges: BookingCharge[]; chargesTotal: number; advance: number; balance: number;
-}) {
-  const [copied, setCopied] = useState(false);
-  const invoiceNum = `INV-${booking.id.slice(0, 6).toUpperCase()}`;
-  const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-  const subtotal = Number(booking.total_amount) + chargesTotal;
-
-  const invoiceText = [
-    `━━━━━━━━━━━━━━━━━━`,
-    `${property?.name ?? "VattavadaStays"}`,
-    `Invoice: ${invoiceNum}  Date: ${today}`,
-    `━━━━━━━━━━━━━━━━━━`,
-    `Guest: ${booking.guest_name}`,
-    `Phone: ${booking.guest_phone}`,
-    `Room: ${roomName}`,
-    `Check-in: ${booking.check_in}`,
-    `Check-out: ${booking.check_out}`,
-    `Nights: ${booking.nights}  Guests: ${booking.guest_count}`,
-    `━━━━━━━━━━━━━━━━━━`,
-    `Room charge      ₹${Number(booking.room_price).toLocaleString("en-IN")}`,
-    Number(booking.extra_guest_charge) > 0 ? `Extra guests     ₹${Number(booking.extra_guest_charge).toLocaleString("en-IN")}` : null,
-    ...charges.map((c) => `${c.description.slice(0, 16).padEnd(16)} ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`),
-    `━━━━━━━━━━━━━━━━━━`,
-    `Subtotal         ₹${subtotal.toLocaleString("en-IN")}`,
-    advance > 0 ? `Advance paid    -₹${advance.toLocaleString("en-IN")}` : null,
-    `━━━━━━━━━━━━━━━━━━`,
-    `BALANCE DUE      ₹${balance.toLocaleString("en-IN")}`,
-    `━━━━━━━━━━━━━━━━━━`,
-  ].filter(Boolean).join("\n");
-
-  const handleCopy = () => { navigator.clipboard.writeText(invoiceText); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  const guestWaLink = `https://wa.me/${booking.guest_phone.replace(/\D/g, "")}?text=${encodeURIComponent(invoiceText)}`;
-
-  return (
-    <div className="p-5 space-y-4">
-      <div className="rounded-xl border border-border bg-white p-5 space-y-4 font-mono text-sm">
-        <div className="flex justify-between items-start border-b border-dashed border-border pb-3">
-          <div>
-            <div className="font-display font-semibold text-base not-italic">{property?.name ?? "VattavadaStays"}</div>
-            {property?.area && <div className="text-xs text-muted-foreground not-italic">{property.area}, Kerala</div>}
-          </div>
-          <div className="text-right text-xs">
-            <div className="font-semibold">{invoiceNum}</div>
-            <div className="text-muted-foreground">{today}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-xs border-b border-dashed border-border pb-3">
-          <div>
-            <div className="text-muted-foreground mb-0.5 not-italic">Guest</div>
-            <div className="font-medium not-italic">{booking.guest_name}</div>
-            <div className="text-muted-foreground">{booking.guest_phone}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground mb-0.5 not-italic">Stay</div>
-            <div className="font-medium not-italic">{roomName}</div>
-            <div className="text-muted-foreground">{booking.check_in} → {booking.check_out}</div>
-            <div className="text-muted-foreground">{booking.nights}N · {booking.guest_count} guests</div>
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <InvLine label="Room charge" amount={Number(booking.room_price)} />
-          {Number(booking.extra_guest_charge) > 0 && <InvLine label="Extra guest charge" amount={Number(booking.extra_guest_charge)} muted />}
-          {charges.map((c) => <InvLine key={c.id} label={`${c.description}${c.qty > 1 ? ` ×${c.qty}` : ""}`} amount={c.qty * c.unit_price} muted />)}
-        </div>
-
-        <div className="border-t border-dashed border-border pt-2 space-y-1.5">
-          <InvLine label="Subtotal" amount={subtotal} bold />
-          {advance > 0 && <InvLine label="Advance paid" amount={-advance} color="text-primary" />}
-          <div className="border-t border-border pt-1.5">
-            <InvLine label="BALANCE DUE" amount={balance} bold large color={balance === 0 ? "text-primary" : "text-amber-700"} />
-          </div>
-        </div>
-
-        {booking.payment_reference && (
-          <div className="text-xs text-muted-foreground border-t border-dashed border-border pt-2">
-            Ref: {booking.payment_reference}{booking.payment_method && ` · ${booking.payment_method}`}
-          </div>
-        )}
-        <div className="text-xs text-center text-muted-foreground border-t border-dashed border-border pt-2">
-          {property?.owner_name && `Issued by ${property.owner_name}`}
-          {property?.owner_phone && ` · +91 ${property.owner_phone.replace(/\D/g, "").slice(-10)}`}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        <button onClick={handleCopy} className="flex flex-col items-center gap-1.5 rounded-xl border border-border py-3 px-2 text-xs font-medium hover:bg-muted transition-colors">
-          {copied ? <Check className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
-          {copied ? "Copied!" : "Copy text"}
-        </button>
-        <a href={guestWaLink} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 rounded-xl bg-[#25D366] text-white py-3 px-2 text-xs font-medium hover:opacity-90 transition-opacity">
-          <MessageCircle className="h-4 w-4" /> Send to guest
-        </a>
-        <button onClick={() => window.print()} className="flex flex-col items-center gap-1.5 rounded-xl bg-primary text-primary-foreground py-3 px-2 text-xs font-medium hover:opacity-90 transition-opacity">
-          <Printer className="h-4 w-4" /> Print/PDF
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function InvLine({ label, amount, bold, large, color, muted }: {
-  label: string; amount: number; bold?: boolean; large?: boolean; color?: string; muted?: boolean;
-}) {
-  return (
-    <div className={`flex justify-between ${large ? "text-base" : "text-sm"} ${muted ? "text-muted-foreground" : ""}`}>
-      <span className={bold ? "font-semibold" : ""}>{label}</span>
-      <span className={`tabular-nums ${bold ? "font-semibold" : ""} ${color ?? ""}`}>
-        {amount < 0 ? "-" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
-      </span>
-    </div>
-  );
-}
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
@@ -677,7 +555,6 @@ function Row({ label, value, highlight, bold, small }: {
   );
 }
 
-// FIX 2: room_price and extra_guest_charge both multiplied by nights
 function AddBookingModal({ propertyId, rooms, onClose, onSaved }: {
   propertyId: string;
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number }[];
@@ -708,7 +585,6 @@ function AddBookingModal({ propertyId, rooms, onClose, onSaved }: {
         property_id: propertyId, room_id: form.room_id, guest_name: form.guest_name,
         guest_phone: form.guest_phone, guest_count: form.guest_count,
         check_in: form.check_in, check_out: form.check_out,
-        // FIX 2: multiply by nights so invoice line items are correct
         room_price: (selectedRoom?.base_price ?? 0) * nights,
         extra_guest_charge: Math.max(0, form.guest_count - 2) * (selectedRoom?.extra_guest_price ?? 0) * nights,
         total_amount: total, advance_amount: 0, status: form.status, is_paid: false,
@@ -802,7 +678,7 @@ function BookingsAdmin() {
   const updateStatus = async (id: string, newStatus: string) => {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "checked_in") updates.checked_in_at = new Date().toISOString();
-    if (newStatus === "completed") updates.checked_out_at = new Date().toISOString();
+    if (newStatus === "completed")  updates.checked_out_at = new Date().toISOString();
     await supabase.from("bookings").update(updates).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
