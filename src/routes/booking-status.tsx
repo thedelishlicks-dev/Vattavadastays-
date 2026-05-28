@@ -4,25 +4,25 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import {
   Loader2, Search, CheckCircle2, Clock, LogIn, Star,
-  XCircle, Phone, MapPin, MessageCircle, IndianRupee,
+  XCircle, Phone, MapPin, MessageCircle, IndianRupee, Receipt,
 } from "lucide-react";
 import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
+import { BookingInvoice } from "@/components/BookingInvoice";
 import type { BookingCharge } from "@/types/database";
 
 export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
   validateSearch: (search: Record<string, unknown>) => ({
     phone: (search.phone as string) ?? "",
-    id:    (search.id    as string) ?? "",
   }),
 });
 
 const STATUS_STEPS = [
-  { key: "pending",    label: "Request sent",  icon: Clock,         desc: "Waiting for owner confirmation" },
-  { key: "confirmed",  label: "Confirmed",      icon: CheckCircle2,  desc: "Your stay is confirmed"         },
-  { key: "checked_in", label: "Checked in",     icon: LogIn,         desc: "Enjoy your stay!"               },
-  { key: "completed",  label: "Completed",      icon: Star,          desc: "Thank you for staying with us"  },
+  { key: "pending",    label: "Request sent",  icon: Clock,        desc: "Waiting for owner confirmation" },
+  { key: "confirmed",  label: "Confirmed",      icon: CheckCircle2, desc: "Your stay is confirmed"         },
+  { key: "checked_in", label: "Checked in",     icon: LogIn,        desc: "Enjoy your stay!"               },
+  { key: "completed",  label: "Completed",      icon: Star,         desc: "Thank you for staying with us"  },
 ];
 const STATUS_ORDER = ["pending", "confirmed", "checked_in", "completed"];
 
@@ -32,46 +32,45 @@ function getStepIndex(status: string) {
 }
 
 function BookingStatusPage() {
-  const { phone: prefillPhone, id: prefillId } = useSearch({ from: "/booking-status" });
+  const { phone: prefillPhone } = useSearch({ from: "/booking-status" });
 
   const [phone, setPhone] = useState(prefillPhone ?? "");
-  const [bookingId, setBookingId] = useState(prefillId ?? "");
   const [formError, setFormError] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
+  const [selectedBookingIdx, setSelectedBookingIdx] = useState(0);
+  const [showInvoice, setShowInvoice] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["booking-status-lookup", phone, bookingId],
+    queryKey: ["booking-status-lookup", phone],
     queryFn: async () => {
       const digits = phone.replace(/\D/g, "");
-      const inputLast10 = digits.slice(-10);
+      const last10 = digits.slice(-10);
+      if (last10.length < 10) throw new Error("Enter a valid 10-digit phone number.");
 
-      const { data: booking, error: err } = await supabase
+      const { data: bookings, error: err } = await supabase
         .from("bookings")
         .select("*, booking_charges(*)")
-        .eq("id", bookingId.trim())
-        .single();
+        .or(`guest_phone.eq.${last10},guest_phone.eq.91${last10},guest_phone.eq.+91${last10}`)
+        .order("created_at", { ascending: false });
 
-      if (err || !booking) throw new Error("Booking not found. Check your booking ID.");
+      if (err) throw new Error("Could not fetch bookings. Please try again.");
+      if (!bookings || bookings.length === 0)
+        throw new Error("No bookings found for this phone number.");
 
-      const bookingDigits = booking.guest_phone.replace(/\D/g, "").slice(-10);
-      if (inputLast10 !== bookingDigits) {
-        throw new Error("Phone number doesn't match this booking.");
-      }
-
-      const charges = (booking.booking_charges ?? []) as BookingCharge[];
-      const chargesTotal = charges.reduce((s: number, c: BookingCharge) => s + c.qty * c.unit_price, 0);
-      const advance = Number(booking.advance_amount ?? 0);
-      const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - advance);
-
-      return { booking, charges, chargesTotal, advance, balance };
+      return bookings.map((booking) => {
+        const charges = (booking.booking_charges ?? []) as BookingCharge[];
+        const chargesTotal = charges.reduce((s: number, c: BookingCharge) => s + c.qty * c.unit_price, 0);
+        const advance = Number(booking.advance_amount ?? 0);
+        const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - advance);
+        return { booking, charges, chargesTotal, advance, balance };
+      });
     },
     enabled: false,
     retry: false,
   });
 
-  // Auto-trigger if query params are pre-filled (coming from confirmation screen)
   useEffect(() => {
-    if (prefillPhone && prefillId) {
+    if (prefillPhone) {
       setHasSearched(true);
       refetch();
     }
@@ -84,16 +83,15 @@ function BookingStatusPage() {
       setFormError("Enter a valid 10-digit phone number");
       return;
     }
-    if (!bookingId.trim()) {
-      setFormError("Enter your booking ID");
-      return;
-    }
+    setSelectedBookingIdx(0);
+    setShowInvoice(false);
     setHasSearched(true);
     refetch();
   };
 
-  const currentStep = data ? getStepIndex(data.booking.status) : -1;
-  const isCancelled = data?.booking.status === "cancelled";
+  const selected = data?.[selectedBookingIdx];
+  const isCancelled = selected?.booking.status === "cancelled";
+  const currentStep = selected ? getStepIndex(selected.booking.status) : -1;
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -110,11 +108,11 @@ function BookingStatusPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold">Track your booking</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Enter your phone number and booking ID to check your reservation status.
+            Enter your phone number to check your booking status.
           </p>
         </div>
 
-        {/* Lookup form — always visible so guest can re-search */}
+        {/* Lookup form */}
         <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1">Phone number</label>
@@ -122,22 +120,12 @@ function BookingStatusPage() {
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
               placeholder="+91 98765 43210"
               className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Booking ID</label>
-            <input
-              type="text"
-              value={bookingId}
-              onChange={(e) => setBookingId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              placeholder="Paste your booking reference here"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
-            />
             <p className="text-xs text-muted-foreground mt-1">
-              Found in your booking confirmation screen — copy the reference ID and paste it here.
+              Use the same number you used when booking.
             </p>
           </div>
           {formError && <p className="text-xs text-destructive">{formError}</p>}
@@ -158,15 +146,45 @@ function BookingStatusPage() {
             <div>
               <p className="text-sm font-medium text-destructive">Not found</p>
               <p className="text-xs text-destructive/80 mt-0.5">
-                {error instanceof Error ? error.message : "Check your details and try again."}
+                {error instanceof Error ? error.message : "Check your number and try again."}
               </p>
             </div>
           </div>
         )}
 
+        {/* Multiple bookings picker */}
+        {data && data.length > 1 && (
+          <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
+            <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+              Your bookings
+            </div>
+            <div className="space-y-2">
+              {data.map((d, idx) => (
+                <button
+                  key={d.booking.id}
+                  onClick={() => { setSelectedBookingIdx(idx); setShowInvoice(false); }}
+                  className={[
+                    "w-full text-left rounded-xl border px-4 py-3 text-sm transition-colors",
+                    selectedBookingIdx === idx
+                      ? "border-primary bg-primary-light/30"
+                      : "border-border hover:bg-muted",
+                  ].join(" ")}
+                >
+                  <div className="font-medium">{d.booking.check_in} → {d.booking.check_out}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    ₹{Number(d.booking.total_amount).toLocaleString("en-IN")} · {d.booking.status}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Results */}
-        {data && !isLoading && (
+        {selected && !isLoading && (
           <div className="space-y-4">
+
+            {/* Status */}
             {isCancelled ? (
               <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-5 flex gap-3 items-center">
                 <XCircle className="h-8 w-8 text-destructive shrink-0" />
@@ -176,7 +194,6 @@ function BookingStatusPage() {
                 </div>
               </div>
             ) : (
-              /* Status timeline */
               <div className="bg-card border border-border rounded-2xl p-5">
                 <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">Booking status</div>
                 <div className="space-y-0">
@@ -216,63 +233,89 @@ function BookingStatusPage() {
             <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Booking details</div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <DetailRow label="Reference"  value={data.booking.id.slice(0, 8).toUpperCase() + "…"} mono />
-                <DetailRow label="Check-in"   value={data.booking.check_in} />
-                <DetailRow label="Check-out"  value={data.booking.check_out} />
-                <DetailRow label="Nights"     value={`${data.booking.nights}`} />
-                <DetailRow label="Guests"     value={`${data.booking.guest_count}`} />
+                <DetailRow label="Check-in"  value={selected.booking.check_in} />
+                <DetailRow label="Check-out" value={selected.booking.check_out} />
+                <DetailRow label="Nights"    value={`${selected.booking.nights}`} />
+                <DetailRow label="Guests"    value={`${selected.booking.guest_count}`} />
               </div>
             </div>
 
-            {/* Payment summary */}
-            <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-2">
-                <IndianRupee className="h-3.5 w-3.5" /> Payment summary
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Room total</span>
-                  <span>₹{Number(data.booking.total_amount).toLocaleString("en-IN")}</span>
+            {/* Payment summary — hide balance for cancelled */}
+            {!isCancelled && (
+              <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium flex items-center gap-2">
+                  <IndianRupee className="h-3.5 w-3.5" /> Payment summary
                 </div>
-                {data.chargesTotal > 0 && (
+                <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Extra charges</span>
-                    <span>₹{data.chargesTotal.toLocaleString("en-IN")}</span>
+                    <span className="text-muted-foreground">Room total</span>
+                    <span>₹{Number(selected.booking.total_amount).toLocaleString("en-IN")}</span>
                   </div>
-                )}
-                {data.advance > 0 && (
-                  <div className="flex justify-between text-primary">
-                    <span>Advance paid</span>
-                    <span>-₹{data.advance.toLocaleString("en-IN")}</span>
-                  </div>
-                )}
-                <div className="border-t border-border pt-2 flex justify-between font-semibold">
-                  <span>Balance due</span>
-                  <span className={data.balance === 0 ? "text-primary" : "text-amber-700"}>
-                    {data.balance === 0 ? "Fully paid ✓" : `₹${data.balance.toLocaleString("en-IN")}`}
-                  </span>
-                </div>
-              </div>
-
-              {data.charges.length > 0 && (
-                <div className="border-t border-border pt-2 space-y-1">
-                  <div className="text-xs text-muted-foreground mb-1">Extra charges breakdown</div>
-                  {data.charges.map((c) => (
-                    <div key={c.id} className="flex justify-between text-xs text-muted-foreground">
-                      <span>{c.description}{c.qty > 1 ? ` ×${c.qty}` : ""}</span>
-                      <span>₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</span>
+                  {selected.chargesTotal > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Extra charges</span>
+                      <span>₹{selected.chargesTotal.toLocaleString("en-IN")}</span>
                     </div>
-                  ))}
+                  )}
+                  {selected.advance > 0 && (
+                    <div className="flex justify-between text-primary">
+                      <span>Advance paid</span>
+                      <span>-₹{selected.advance.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  <div className="border-t border-border pt-2 flex justify-between font-semibold">
+                    <span>Balance due</span>
+                    <span className={selected.balance === 0 ? "text-primary" : "text-amber-700"}>
+                      {selected.balance === 0 ? "Fully paid ✓" : `₹${selected.balance.toLocaleString("en-IN")}`}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
+                {selected.charges.length > 0 && (
+                  <div className="border-t border-border pt-2 space-y-1">
+                    <div className="text-xs text-muted-foreground mb-1">Extra charges breakdown</div>
+                    {selected.charges.map((c) => (
+                      <div key={c.id} className="flex justify-between text-xs text-muted-foreground">
+                        <span>{c.description}{c.qty > 1 ? ` ×${c.qty}` : ""}</span>
+                        <span>₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
-            {/* Contact property */}
+            {/* Invoice toggle */}
+            {!isCancelled && (
+              <button
+                onClick={() => setShowInvoice((v) => !v)}
+                className="w-full flex items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3 text-sm font-medium hover:bg-muted transition-colors"
+              >
+                <Receipt className="h-4 w-4 text-primary" />
+                {showInvoice ? "Hide invoice" : "View invoice"}
+              </button>
+            )}
+
+            {/* Invoice — guest view (no Send to guest button) */}
+            {showInvoice && !isCancelled && (
+              <ContactPropertyWithInvoice
+                propertyId={selected.booking.property_id}
+                booking={selected.booking}
+                charges={selected.charges}
+                chargesTotal={selected.chargesTotal}
+                advance={selected.advance}
+                balance={selected.balance}
+                totalAmount={selected.booking.total_amount + selected.chargesTotal}
+                advancePaid={selected.advance}
+              />
+            )}
+
+            {/* Contact property (always shown) */}
             <ContactProperty
-              propertyId={data.booking.property_id}
-              booking={data.booking}
-              totalAmount={data.booking.total_amount + data.chargesTotal}
-              advancePaid={data.advance}
+              propertyId={selected.booking.property_id}
+              booking={selected.booking}
+              totalAmount={selected.booking.total_amount + selected.chargesTotal}
+              advancePaid={selected.advance}
+              showUPI={!isCancelled}
             />
           </div>
         )}
@@ -290,14 +333,16 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
   );
 }
 
-function ContactProperty({
-  propertyId,
-  booking,
-  totalAmount,
-  advancePaid
+// Fetches property for invoice rendering
+function ContactPropertyWithInvoice({
+  propertyId, booking, charges, chargesTotal, advance, balance, totalAmount, advancePaid,
 }: {
   propertyId: string;
   booking: any;
+  charges: BookingCharge[];
+  chargesTotal: number;
+  advance: number;
+  balance: number;
   totalAmount: number;
   advancePaid: number;
 }) {
@@ -306,7 +351,49 @@ function ContactProperty({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
-        .select("name, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
+        .select("name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
+        .eq("id", propertyId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!propertyId,
+  });
+
+  if (!property) return null;
+
+  // Room name — we don't have it easily here so use a fallback
+  const roomName = booking.room_name ?? "Room";
+
+  return (
+    <BookingInvoice
+      booking={booking}
+      roomName={roomName}
+      property={property}
+      charges={charges}
+      chargesTotal={chargesTotal}
+      advance={advance}
+      balance={balance}
+      guestView={true}
+    />
+  );
+}
+
+function ContactProperty({
+  propertyId, booking, totalAmount, advancePaid, showUPI,
+}: {
+  propertyId: string;
+  booking: any;
+  totalAmount: number;
+  advancePaid: number;
+  showUPI: boolean;
+}) {
+  const { data: property } = useQuery({
+    queryKey: ["property-contact", propertyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
         .eq("id", propertyId)
         .single();
       if (error) throw error;
@@ -318,7 +405,6 @@ function ContactProperty({
   if (!property) return null;
 
   const upiId = extractUPIId(property.shared_amenities);
-
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, "")}` : null;
@@ -328,7 +414,7 @@ function ContactProperty({
 
   return (
     <div className="space-y-4">
-      {upiId && booking.status !== 'cancelled' && (
+      {upiId && showUPI && (
         <UPIPaymentSection
           upiId={upiId}
           payeeName={property.owner_name ?? property.name}
@@ -348,7 +434,9 @@ function ContactProperty({
         <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Contact property</div>
         <div className="text-sm">
           <div className="font-medium">{property.name}</div>
-          {property.owner_name && <div className="text-muted-foreground text-xs mt-0.5">Host: {property.owner_name}</div>}
+          {property.owner_name && (
+            <div className="text-muted-foreground text-xs mt-0.5">Host: {property.owner_name}</div>
+          )}
         </div>
         <div className="flex flex-col gap-2">
           {phone && (

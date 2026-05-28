@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
+import { extractUPIId } from "@/utils/upi";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: DashboardPage,
@@ -177,6 +178,7 @@ function DashboardPage() {
             name: property.name,
             owner_phone: property.owner_phone ?? null,
             owner_whatsapp: property.owner_whatsapp ?? null,
+            upiId: extractUPIId(property.shared_amenities ?? []),
           }}
           onClose={() => setModal(null)}
         />
