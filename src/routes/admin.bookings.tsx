@@ -110,7 +110,7 @@ function BookingCard({ booking, roomName, onClick }: {
               <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
               {balance > 0
                 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span>
-                : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>
+                : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py.0.5">Paid ✓</span>
               }
             </div>
           ) : (
@@ -118,6 +118,14 @@ function BookingCard({ booking, roomName, onClick }: {
           )
         )}
       </div>
+
+      {/* Gap 1 — nudge owner to record payment for pending bookings with no advance */}
+      {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800 flex items-center gap-1.5">
+          <IndianRupee className="h-3 w-3 shrink-0" />
+          Guest may have paid — tap to record advance
+        </div>
+      )}
     </button>
   );
 }
@@ -682,6 +690,23 @@ function BookingsAdmin() {
     await supabase.from("bookings").update(updates).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
+
+    // Gap 5 — auto prompt WhatsApp confirmation when owner confirms a booking
+    if (newStatus === "confirmed" && property) {
+      const booking = bookings.find((b) => b.id === id);
+      if (booking) {
+        const waUrl = confirmationLink({
+          guestPhone: booking.guest_phone,
+          guestName: booking.guest_name,
+          propertyName: property.name,
+          roomName: roomNameMap[booking.room_id] ?? "your room",
+          checkIn: booking.check_in,
+          checkOut: booking.check_out,
+          ownerPhone: property.owner_phone ?? "",
+        });
+        window.open(waUrl, "_blank");
+      }
+    }
   };
 
   const handleRefresh = () => {
