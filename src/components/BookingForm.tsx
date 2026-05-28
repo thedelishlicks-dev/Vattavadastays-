@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, MessageCircle, ExternalLink, Copy } from "lucide-react";
+import { Check, MessageCircle, ExternalLink } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink } from "@/lib/whatsapp";
@@ -7,7 +7,9 @@ import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
 
-type Payment = "UPI" | "Bank Transfer" | "Cash on Arrival";
+// Bank Transfer removed from guest-facing options
+// It remains in admin payment recording dropdown (admin.bookings.tsx)
+type Payment = "UPI" | "Cash on Arrival";
 
 type Props = {
   selection: BookingDetails | null;
@@ -27,7 +29,6 @@ export function BookingForm({ selection, subdomain }: Props) {
   const [submittedName, setSubmittedName] = useState("");
   const [submittedPhone, setSubmittedPhone] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
-  const [copiedRef, setCopiedRef] = useState(false);
   const [error, setError] = useState("");
 
   const { data: property } = useProperty(subdomain);
@@ -112,20 +113,13 @@ export function BookingForm({ selection, subdomain }: Props) {
         })
       : null;
 
-  const trackingUrl = bookingId
-    ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}&id=${bookingId}`
+  // Phone-based tracking URL — no booking ID needed
+  const trackingUrl = submittedPhone
+    ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}`
     : null;
 
-  // Extract UPI ID from sentinel key — renders regardless of payment method selected
+  // UPI ID from sentinel key — shown on confirmation for UPI bookings only
   const upiId = property ? extractUPIId(property.shared_amenities) : null;
-
-  const handleCopyRef = () => {
-    if (bookingId) {
-      navigator.clipboard.writeText(bookingId);
-      setCopiedRef(true);
-      setTimeout(() => setCopiedRef(false), 2000);
-    }
-  };
 
   return (
     <section id="booking" className="py-16 md:py-24 bg-background">
@@ -158,9 +152,11 @@ export function BookingForm({ selection, subdomain }: Props) {
               <div className="mt-2 font-display text-xl font-semibold text-primary">
                 ₹{selection.total.toLocaleString("en-IN")}
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Suggested advance (25%): ₹{Math.round(selection.total * 0.25).toLocaleString("en-IN")}
-              </div>
+              {payment === "UPI" && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Suggested advance (25%): ₹{Math.round(selection.total * 0.25).toLocaleString("en-IN")}
+                </div>
+              )}
             </div>
 
             {submitted ? (
@@ -177,28 +173,34 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </p>
                 </div>
 
-                {/* Booking reference card */}
-                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
-                    Your booking reference
+                {/* Stay summary — replaces UUID reference card */}
+                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
+                    Your booking
                   </div>
-                  <div className="flex items-center gap-2">
-                    <code className="flex-1 text-xs bg-background border border-border rounded-lg px-3 py-2 font-mono break-all">
-                      {bookingId}
-                    </code>
-                    <button
-                      onClick={handleCopyRef}
-                      className="h-8 w-8 rounded-lg border border-border hover:bg-muted flex items-center justify-center shrink-0"
-                      title="Copy booking ID"
-                    >
-                      {copiedRef
-                        ? <Check className="h-3.5 w-3.5 text-primary" />
-                        : <Copy className="h-3.5 w-3.5" />}
-                    </button>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Room</span>
+                    <span className="font-medium">{selection.room.name}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Save this ID — you'll need it to track your booking status.
-                  </p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Check-in</span>
+                    <span className="font-medium">{selection.checkIn}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Check-out</span>
+                    <span className="font-medium">{selection.checkOut}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-semibold text-primary">
+                      ₹{selection.total.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  {payment === "Cash on Arrival" && (
+                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+                      Full payment of ₹{selection.total.toLocaleString("en-IN")} is due on arrival. No advance needed.
+                    </div>
+                  )}
                 </div>
 
                 {/* Notify owner — primary CTA */}
@@ -220,8 +222,8 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                 )}
 
-                {/* UPI Payment Section — always shown if UPI ID exists, regardless of payment method */}
-                {upiId && (
+                {/* UPI Payment Section — only for UPI bookings, not Cash on Arrival */}
+                {upiId && payment === "UPI" && (
                   <UPIPaymentSection
                     upiId={upiId}
                     payeeName={property?.owner_name ?? property?.name ?? ""}
@@ -298,9 +300,10 @@ export function BookingForm({ selection, subdomain }: Props) {
                   />
                 </Field>
 
+                {/* Payment method — UPI and Cash on Arrival only, Bank Transfer removed */}
                 <Field label="Payment method">
-                  <div className="grid grid-cols-3 gap-2">
-                    {(["UPI", "Bank Transfer", "Cash on Arrival"] as Payment[]).map((p) => (
+                  <div className="grid grid-cols-2 gap-2">
+                    {(["UPI", "Cash on Arrival"] as Payment[]).map((p) => (
                       <button
                         type="button"
                         key={p}
@@ -318,11 +321,9 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {payment === "UPI" &&
-                      "Pay 25% advance via UPI to confirm."}
-                    {payment === "Bank Transfer" &&
-                      "Bank details shared after your request is confirmed."}
+                      "Pay 25% advance via UPI to confirm. Full balance due on arrival."}
                     {payment === "Cash on Arrival" &&
-                      "Pay in full on arrival at the property."}
+                      "No advance needed. Pay the full amount on arrival at the property."}
                   </p>
                 </Field>
 
