@@ -270,6 +270,14 @@ function BookingStatusPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Explanatory note — shown when balance is still due */}
+                {selected.balance > 0 && (
+                  <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
+                    <span className="font-medium">Already paid an advance?</span> The balance above updates after the owner records your payment. If you've already paid, send your payment screenshot to the owner on WhatsApp — they'll confirm and update your balance shortly.
+                  </div>
+                )}
+
                 {selected.charges.length > 0 && (
                   <div className="border-t border-border pt-2 space-y-1">
                     <div className="text-xs text-muted-foreground mb-1">Extra charges breakdown</div>
@@ -315,7 +323,7 @@ function BookingStatusPage() {
               booking={selected.booking}
               totalAmount={selected.booking.total_amount + selected.chargesTotal}
               advancePaid={selected.advance}
-              showUPI={!isCancelled}
+              showUPI={!isCancelled && selected.booking.payment_method !== "Cash on Arrival"}
             />
           </div>
         )}
