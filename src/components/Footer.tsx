@@ -9,7 +9,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
   const whatsapp = property?.owner_whatsapp ?? phone;
   const lat = property?.location_lat;
   const lng = property?.location_lng;
-  const propertyName = property?.name ?? "Bleaf Mud House";
+  const propertyName = property?.name ?? "stayidom.in";
   const ownerName = property?.owner_name ?? "the host";
 
   const mapsUrl =
