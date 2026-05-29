@@ -627,7 +627,7 @@ function RecordPaymentForm({
         })
         .eq("id", booking.id);
       if (err) throw err;
-      queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onSaved();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Save failed");
@@ -1187,7 +1187,7 @@ function BookingsAdmin() {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "completed") updates.checked_out_at = new Date().toISOString();
     await supabase.from("bookings").update(updates).eq("id", id);
-    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     setActiveBooking((prev) =>
       prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev,
     );
@@ -1217,7 +1217,7 @@ function BookingsAdmin() {
   };
 
   const handleRefresh = () => {
-    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
   };
 
   if (isLoading)
@@ -1318,7 +1318,7 @@ function BookingsAdmin() {
           rooms={rooms.filter((r) => r.is_active)}
           onClose={() => setShowAdd(false)}
           onSaved={() => {
-            queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+            queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
             setShowAdd(false);
           }}
         />
