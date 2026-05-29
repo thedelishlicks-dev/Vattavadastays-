@@ -1191,6 +1191,23 @@ function BookingsAdmin() {
     setActiveBooking((prev) =>
       prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev,
     );
+
+    // Gap 5 — auto prompt WhatsApp confirmation when owner confirms a booking
+    if (newStatus === "confirmed" && property) {
+      const booking = bookings.find((b) => b.id === id);
+      if (booking) {
+        const waUrl = confirmationLink({
+          guestPhone: booking.guest_phone,
+          guestName: booking.guest_name,
+          propertyName: property.name,
+          roomName: roomNameMap[booking.room_id] ?? "your room",
+          checkIn: booking.check_in,
+          checkOut: booking.check_out,
+          ownerPhone: property.owner_phone ?? "",
+        });
+        window.location.href = waUrl;
+      }
+    }
   };
 
   const handleRefresh = () => {
