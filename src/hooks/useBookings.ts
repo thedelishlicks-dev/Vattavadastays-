@@ -8,13 +8,10 @@ interface BookingFilters {
   to?: string;
 }
 
-export const useBookings = (
-  propertyId: string,
-  filters?: BookingFilters
-) => {
+export const useBookings = (propertyId: string, filters?: BookingFilters) => {
   const { isAuthenticated } = useAuth();
   return useQuery({
-    queryKey: ["bookings", propertyId, filters],
+    queryKey: ["bookings", propertyId, filters ?? null],
     queryFn: async () => {
       let query = supabase
         .from("bookings")

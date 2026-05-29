@@ -1,4 +1,4 @@
- import { useState } from "react";
+import { useState } from "react";
 import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -53,13 +53,13 @@ export function AdminLayout() {
 
   const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
   const ownerEmail = user?.email ?? "";
-  const propertyName = property?.name ?? "Bleaf Mud House";
+  const propertyName = property?.name ?? "stayidom.in";
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <div className="h-14 px-5 flex items-center border-b border-border">
-          <span className="font-display text-lg font-semibold text-primary">Bleaf Admin</span>
+          <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => (
@@ -139,7 +139,9 @@ export function AdminLayout() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col">
             <div className="h-14 px-5 flex items-center border-b border-border justify-between">
-              <span className="font-display text-lg font-semibold text-primary">Bleaf Admin</span>
+              <span className="font-display text-lg font-semibold text-primary">
+                {propertyName}
+              </span>
               <button
                 onClick={() => setMobileOpen(false)}
                 className="p-2 -mr-2 rounded-md hover:bg-muted"
