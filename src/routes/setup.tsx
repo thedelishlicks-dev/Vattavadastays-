@@ -120,21 +120,9 @@ function SetupPage() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to create account");
 
-      // Auto-sign-in after account creation
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: ownerEmail,
-        password: password,
-      });
-
       setStep("done");
-
       setTimeout(() => {
-        if (signInError) {
-          console.error("Auto-login failed:", signInError.message);
-          navigate({ to: "/login", search: { email: ownerEmail } });
-        } else {
-          navigate({ to: "/admin/dashboard" });
-        }
+        navigate({ to: "/login", search: { email: ownerEmail } });
       }, 2000);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
@@ -174,7 +162,7 @@ function SetupPage() {
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <CheckCircle2 className="h-10 w-10 text-primary" />
           <h2 className="font-display text-lg font-semibold">You're all set!</h2>
-          <p className="text-sm text-muted-foreground">Redirecting you to your dashboard…</p>
+          <p className="text-sm text-muted-foreground">Redirecting you to login…</p>
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
         </div>
       </Shell>

@@ -30,15 +30,19 @@ function DashboardPage() {
     ).length;
     const monthlyRevenue = bookings
       .filter((b) => {
-        const d = b.created_at?.slice(0, 7);
         const thisMonth = new Date().toISOString().slice(0, 7);
-        return d === thisMonth && b.status !== "cancelled";
+        return b.check_in?.slice(0, 7) === thisMonth &&
+               b.status !== "cancelled";
       })
       .reduce((sum, b) => sum + Number(b.total_amount), 0);
     return { upcoming, monthlyRevenue };
   }, [bookings, today]);
 
-  const recent = bookings.slice(0, 6);
+  const recent = [...bookings]
+    .sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    .slice(0, 6);
   const isLoading = propLoading || bookLoading;
 
   const roomNameMap = useMemo(() => {
