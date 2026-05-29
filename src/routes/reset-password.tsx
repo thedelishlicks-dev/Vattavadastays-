@@ -16,18 +16,48 @@ function ResetPasswordPage() {
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [sessionReady, setSessionReady] = useState(false);
+  const [linkExpired, setLinkExpired] = useState(false);
 
-  // Supabase puts the recovery token in the URL hash as:
-  // /reset-password#access_token=xxx&refresh_token=yyy&type=recovery
-  // The Supabase JS SDK picks this up automatically via onAuthStateChange
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        // SDK has exchanged the token for a session — safe to update password now
+    // The Supabase SDK processes the #access_token hash automatically.
+    // By the time the component mounts, the session may already be set.
+    // Check both: existing session AND the onAuthStateChange event.
+
+    let settled = false;
+
+    const markReady = () => {
+      if (!settled) {
+        settled = true;
         setSessionReady(true);
       }
+    };
+
+    // 1. Check if session already exists (token processed before mount)
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        markReady();
+      }
     });
-    return () => subscription.unsubscribe();
+
+    // 2. Also listen for the PASSWORD_RECOVERY event (token processed after mount)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
+        markReady();
+      }
+    });
+
+    // 3. Timeout — if nothing fires in 8 seconds, link is likely expired
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        setLinkExpired(true);
+      }
+    }, 8000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -54,13 +84,8 @@ function ResetPasswordPage() {
     }
 
     setStatus("success");
-
-    // Sign out so they log in fresh with new password
     await supabase.auth.signOut();
-
-    setTimeout(() => {
-      navigate({ to: "/admin" });
-    }, 2500);
+    setTimeout(() => navigate({ to: "/admin" }), 2500);
   };
 
   const inputCls =
@@ -69,6 +94,7 @@ function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-muted/30 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
+
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-4">
@@ -80,33 +106,44 @@ function ResetPasswordPage() {
           </p>
         </div>
 
-        {/* Waiting for token */}
-        {!sessionReady && status !== "success" && (
-          <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-3">
-            <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
-            <p className="text-sm text-muted-foreground">
-              Verifying your reset link…
-            </p>
+        {/* Link expired */}
+        {linkExpired && (
+          <div className="bg-card border border-destructive/30 rounded-2xl p-6 text-center space-y-3">
+            <p className="text-sm font-medium text-destructive">Reset link expired</p>
             <p className="text-xs text-muted-foreground">
-              If this takes too long, your link may have expired. Request a new one from the login page.
+              Password reset links expire after 1 hour. Please request a new one.
             </p>
+            <a
+              href="/admin"
+              className="inline-block mt-2 text-sm text-primary hover:underline"
+            >
+              Back to login
+            </a>
           </div>
         )}
 
-        {/* Success state */}
+        {/* Waiting for token */}
+        {!sessionReady && !linkExpired && (
+          <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-3">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto text-primary" />
+            <p className="text-sm text-muted-foreground">Verifying reset link…</p>
+          </div>
+        )}
+
+        {/* Success */}
         {status === "success" && (
           <div className="bg-card border border-border rounded-2xl p-6 text-center space-y-3">
             <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
             <div>
               <p className="font-medium">Password updated!</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Redirecting you to login…
+                Redirecting to login…
               </p>
             </div>
           </div>
         )}
 
-        {/* Password form — shown once session is ready */}
+        {/* Password form */}
         {sessionReady && status !== "success" && (
           <div className="bg-card border border-border rounded-2xl p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -150,9 +187,9 @@ function ResetPasswordPage() {
                 />
               </div>
 
-              {/* Password strength hint */}
+              {/* Password strength indicator */}
               {password.length > 0 && (
-                <div className="flex gap-1">
+                <div className="flex items-center gap-1">
                   {[...Array(4)].map((_, i) => (
                     <div
                       key={i}
@@ -166,7 +203,7 @@ function ResetPasswordPage() {
                       ].join(" ")}
                     />
                   ))}
-                  <span className="text-xs text-muted-foreground ml-1 self-center">
+                  <span className="text-xs text-muted-foreground ml-1">
                     {password.length < 8 ? "Too short" : password.length < 12 ? "OK" : "Strong"}
                   </span>
                 </div>
