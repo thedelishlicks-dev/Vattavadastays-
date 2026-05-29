@@ -7,7 +7,6 @@ import {
   Search,
   CheckCircle2,
   Clock,
-  LogIn,
   Star,
   XCircle,
   Phone,
@@ -31,10 +30,9 @@ export const Route = createFileRoute("/booking-status")({
 const STATUS_STEPS = [
   { key: "pending", label: "Request sent", icon: Clock, desc: "Waiting for owner confirmation" },
   { key: "confirmed", label: "Confirmed", icon: CheckCircle2, desc: "Your stay is confirmed" },
-  { key: "checked_in", label: "Checked in", icon: LogIn, desc: "Enjoy your stay!" },
   { key: "completed", label: "Completed", icon: Star, desc: "Thank you for staying with us" },
 ];
-const STATUS_ORDER = ["pending", "confirmed", "checked_in", "completed"];
+const STATUS_ORDER = ["pending", "confirmed", "completed"];
 
 function getStepIndex(status: string) {
   const i = STATUS_ORDER.indexOf(status);
@@ -59,8 +57,13 @@ function BookingStatusPage() {
 
       const { data: bookings, error: err } = await supabase
         .from("bookings")
-        .select("*, booking_charges(*)")
-        .or(`guest_phone.eq.${last10},guest_phone.eq.91${last10},guest_phone.eq.+91${last10}`)
+        .select("*, booking_charges(*), rooms(name)")
+        .or(
+          `guest_phone.eq.${last10},` +
+            `guest_phone.eq.91${last10},` +
+            `guest_phone.eq.+91${last10},` +
+            `guest_phone.eq.+91 ${last10}`,
+        )
         .order("created_at", { ascending: false });
 
       if (err) throw new Error("Could not fetch bookings. Please try again.");
@@ -364,7 +367,7 @@ function BookingStatusPage() {
                 chargesTotal={selected.chargesTotal}
                 advance={selected.advance}
                 balance={selected.balance}
-                totalAmount={selected.booking.total_amount + selected.chargesTotal}
+                totalAmount={Number(selected.booking.total_amount) + selected.chargesTotal}
                 advancePaid={selected.advance}
               />
             )}
@@ -373,7 +376,7 @@ function BookingStatusPage() {
             <ContactProperty
               propertyId={selected.booking.property_id}
               booking={selected.booking}
-              totalAmount={selected.booking.total_amount + selected.chargesTotal}
+              totalAmount={Number(selected.booking.total_amount) + selected.chargesTotal}
               advancePaid={selected.advance}
               showUPI={!isCancelled && selected.booking.payment_method !== "Cash on Arrival"}
             />
@@ -432,7 +435,7 @@ function ContactPropertyWithInvoice({
   if (!property) return null;
 
   // Room name — we don't have it easily here so use a fallback
-  const roomName = booking.room_name ?? "Room";
+  const roomName = booking.rooms?.name ?? "Room";
 
   return (
     <BookingInvoice
@@ -500,7 +503,7 @@ function ContactProperty({
           ownerWhatsapp={property.owner_whatsapp ?? ""}
           guestName={booking.guest_name}
           propertyName={property.name}
-          roomName={booking.room_name ?? "Room"}
+          roomName={booking.rooms?.name ?? "Room"}
           checkIn={booking.check_in}
           bookingId={booking.id}
         />

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
@@ -22,10 +22,26 @@ export const Route = createFileRoute("/")({
 function Index() {
   const subdomain = getSubdomain();
   const { data: property, isLoading } = useProperty(subdomain);
+
+  useEffect(() => {
+    if (property?.name) {
+      document.title = `${property.name} — Book Direct`;
+    }
+  }, [property?.name]);
+
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [openRoom, setOpenRoom] = useState<Room | null>(null);
   const [selection, setSelection] = useState<BookingDetails | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <SeoTags subdomain={subdomain} />
+        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
+      </div>
+    );
+  }
 
   if (!isLoading && (!property || !property.rooms || property.rooms.length === 0)) {
     return (
@@ -55,11 +71,7 @@ function Index() {
           setCheckIn={setCheckIn}
           setCheckOut={setCheckOut}
         />
-        <Rooms
-          onSelect={setOpenRoom}
-          checkIn={checkIn}
-          checkOut={checkOut}
-        />
+        <Rooms onSelect={setOpenRoom} checkIn={checkIn} checkOut={checkOut} />
         <BookingForm selection={selection} subdomain={subdomain} />
         <About property={property} />
         <Amenities property={property} />

@@ -44,8 +44,14 @@ export function BookingForm({ selection, subdomain }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selection) return;
     setError("");
+    if (!selection) return;
+
+    const digits = phone.replace(/\D/g, "");
+    if (digits.length !== 12) {
+      setError("Please enter a valid 10-digit Indian mobile number.");
+      return;
+    }
 
     const propertyId = property?.id;
     if (!propertyId) {
@@ -74,9 +80,7 @@ export function BookingForm({ selection, subdomain }: Props) {
       setSubmitted(true);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error && err.message
-          ? err.message
-          : "Insert failed — check Supabase logs";
+        err instanceof Error && err.message ? err.message : "Insert failed — check Supabase logs";
       setError(msg);
     }
   };
@@ -128,9 +132,7 @@ export function BookingForm({ selection, subdomain }: Props) {
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
             Step 3
           </span>
-          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">
-            Confirm your booking
-          </h2>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
         </div>
 
         {!selection && (
@@ -145,8 +147,8 @@ export function BookingForm({ selection, subdomain }: Props) {
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 text-sm">
               <div className="font-medium">{selection.room.name}</div>
               <div className="text-muted-foreground text-xs mt-0.5">
-                {selection.nights} night{selection.nights > 1 ? "s" : ""} ·{" "}
-                {selection.adults} adults
+                {selection.nights} night{selection.nights > 1 ? "s" : ""} · {selection.adults}{" "}
+                adults
                 {selection.children ? ` · ${selection.children} children` : ""}
               </div>
               <div className="mt-2 font-display text-xl font-semibold text-primary">
@@ -154,7 +156,8 @@ export function BookingForm({ selection, subdomain }: Props) {
               </div>
               {payment === "UPI" && (
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Suggested advance (25%): ₹{Math.round(selection.total * 0.25).toLocaleString("en-IN")}
+                  Suggested advance (25%): ₹
+                  {Math.round(selection.total * 0.25).toLocaleString("en-IN")}
                 </div>
               )}
             </div>
@@ -198,7 +201,8 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </div>
                   {payment === "Cash on Arrival" && (
                     <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
-                      Full payment of ₹{selection.total.toLocaleString("en-IN")} is due on arrival. No advance needed.
+                      Full payment of ₹{selection.total.toLocaleString("en-IN")} is due on arrival.
+                      No advance needed.
                     </div>
                   )}
                 </div>
@@ -208,7 +212,8 @@ export function BookingForm({ selection, subdomain }: Props) {
                   <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
                     <div className="text-sm font-medium">Notify the owner</div>
                     <p className="text-xs text-muted-foreground">
-                      Tap below to send your booking details to {property?.owner_name ?? "the host"} on WhatsApp so they can confirm faster.
+                      Tap below to send your booking details to {property?.owner_name ?? "the host"}{" "}
+                      on WhatsApp so they can confirm faster.
                     </p>
                     <a
                       href={ownerNotifyLink}
@@ -298,6 +303,9 @@ export function BookingForm({ selection, subdomain }: Props) {
                     className={inputCls}
                     placeholder="Arrival time, dietary needs, etc."
                   />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Send these to the owner via WhatsApp after booking.
+                  </p>
                 </Field>
 
                 {/* Payment method — UPI and Cash on Arrival only, Bank Transfer removed */}
@@ -330,9 +338,7 @@ export function BookingForm({ selection, subdomain }: Props) {
                 {/* WhatsApp direct option */}
                 {whatsappBookingLink && (
                   <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Prefer to book directly?
-                    </p>
+                    <p className="text-xs text-muted-foreground mb-2">Prefer to book directly?</p>
                     <a
                       href={whatsappBookingLink}
                       target="_blank"
@@ -413,9 +419,12 @@ function buildOwnerNotifyLink({
   bookingId: string;
 }): string {
   const digits = ownerWhatsapp.replace(/\D/g, "");
-  const normalized = digits.startsWith("91") && digits.length === 12
-    ? digits
-    : digits.length === 10 ? `91${digits}` : digits;
+  const normalized =
+    digits.startsWith("91") && digits.length === 12
+      ? digits
+      : digits.length === 10
+        ? `91${digits}`
+        : digits;
 
   const shortId = bookingId.slice(0, 8).toUpperCase();
   const text =
