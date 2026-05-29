@@ -38,11 +38,25 @@ interface InvoiceProps {
   guestView?: boolean;
 }
 
-function InvLine({ label, amount, bold, large, color, muted }: {
-  label: string; amount: number; bold?: boolean; large?: boolean; color?: string; muted?: boolean;
+function InvLine({
+  label,
+  amount,
+  bold,
+  large,
+  color,
+  muted,
+}: {
+  label: string;
+  amount: number;
+  bold?: boolean;
+  large?: boolean;
+  color?: string;
+  muted?: boolean;
 }) {
   return (
-    <div className={`flex justify-between ${large ? "text-base" : "text-sm"} ${muted ? "text-muted-foreground" : ""}`}>
+    <div
+      className={`flex justify-between ${large ? "text-base" : "text-sm"} ${muted ? "text-muted-foreground" : ""}`}
+    >
       <span className={bold ? "font-semibold" : ""}>{label}</span>
       <span className={`tabular-nums ${bold ? "font-semibold" : ""} ${color ?? ""}`}>
         {amount < 0 ? "-" : ""}₹{Math.abs(amount).toLocaleString("en-IN")}
@@ -52,17 +66,28 @@ function InvLine({ label, amount, bold, large, color, muted }: {
 }
 
 export function BookingInvoice({
-  booking, roomName, property, charges, chargesTotal, advance, balance, guestView = false,
+  booking,
+  roomName,
+  property,
+  charges,
+  chargesTotal,
+  advance,
+  balance,
+  guestView = false,
 }: InvoiceProps) {
   const [copied, setCopied] = useState(false);
 
   const invoiceNum = `INV-${booking.id.slice(0, 6).toUpperCase()}`;
-  const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  const today = new Date().toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
   const subtotal = Number(booking.total_amount) + chargesTotal;
 
   const invoiceText = [
     `━━━━━━━━━━━━━━━━━━`,
-    `${property?.name ?? "VattavadaStays"}`,
+    `${property?.name ?? "stayidom.in"}`,
     `Invoice: ${invoiceNum}  Date: ${today}`,
     `━━━━━━━━━━━━━━━━━━`,
     `Guest: ${booking.guest_name}`,
@@ -76,14 +101,19 @@ export function BookingInvoice({
     Number(booking.extra_guest_charge) > 0
       ? `Extra guests     ₹${Number(booking.extra_guest_charge).toLocaleString("en-IN")}`
       : null,
-    ...charges.map((c) => `${c.description.slice(0, 16).padEnd(16)} ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`),
+    ...charges.map(
+      (c) =>
+        `${c.description.slice(0, 16).padEnd(16)} ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`,
+    ),
     `━━━━━━━━━━━━━━━━━━`,
     `Subtotal         ₹${subtotal.toLocaleString("en-IN")}`,
     advance > 0 ? `Advance paid    -₹${advance.toLocaleString("en-IN")}` : null,
     `━━━━━━━━━━━━━━━━━━`,
     `BALANCE DUE      ₹${balance.toLocaleString("en-IN")}`,
     `━━━━━━━━━━━━━━━━━━`,
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const handleCopy = () => {
     navigator.clipboard.writeText(invoiceText);
@@ -101,10 +131,12 @@ export function BookingInvoice({
         <div className="flex justify-between items-start border-b border-dashed border-border pb-3">
           <div>
             <div className="font-display font-semibold text-base not-italic">
-              {property?.name ?? "VattavadaStays"}
+              {property?.name ?? "stayidom.in"}
             </div>
             {property?.area && (
-              <div className="text-xs text-muted-foreground not-italic">{property.area}, Kerala</div>
+              <div className="text-xs text-muted-foreground not-italic">
+                {property.area}, Kerala
+              </div>
             )}
           </div>
           <div className="text-right text-xs">
@@ -123,8 +155,12 @@ export function BookingInvoice({
           <div>
             <div className="text-muted-foreground mb-0.5 not-italic">Stay</div>
             <div className="font-medium not-italic">{roomName}</div>
-            <div className="text-muted-foreground">{booking.check_in} → {booking.check_out}</div>
-            <div className="text-muted-foreground">{booking.nights}N · {booking.guest_count} guests</div>
+            <div className="text-muted-foreground">
+              {booking.check_in} → {booking.check_out}
+            </div>
+            <div className="text-muted-foreground">
+              {booking.nights}N · {booking.guest_count} guests
+            </div>
           </div>
         </div>
 

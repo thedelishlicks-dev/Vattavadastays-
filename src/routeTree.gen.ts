@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as TestBookingRouteImport } from './routes/test-booking'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as SetupRouteImport } from './routes/setup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as BookingStatusRouteImport } from './routes/booking-status'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -43,6 +44,11 @@ const SuperadminRoute = SuperadminRouteImport.update({
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -136,6 +142,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/booking-status': typeof BookingStatusRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/test-booking': typeof TestBookingRoute
@@ -157,6 +164,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/booking-status': typeof BookingStatusRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/test-booking': typeof TestBookingRoute
   '/admin/amenities': typeof AdminAmenitiesRoute
@@ -179,6 +187,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/booking-status': typeof BookingStatusRoute
   '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/setup': typeof SetupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/test-booking': typeof TestBookingRoute
@@ -203,6 +212,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/booking-status'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/superadmin'
     | '/test-booking'
@@ -224,6 +234,7 @@ export interface FileRouteTypes {
     | '/'
     | '/booking-status'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/test-booking'
     | '/admin/amenities'
@@ -245,6 +256,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/booking-status'
     | '/login'
+    | '/reset-password'
     | '/setup'
     | '/superadmin'
     | '/test-booking'
@@ -268,6 +280,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   BookingStatusRoute: typeof BookingStatusRoute
   LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SetupRoute: typeof SetupRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
   TestBookingRoute: typeof TestBookingRoute
@@ -294,6 +307,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -467,6 +487,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   BookingStatusRoute: BookingStatusRoute,
   LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SetupRoute: SetupRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
   TestBookingRoute: TestBookingRoute,

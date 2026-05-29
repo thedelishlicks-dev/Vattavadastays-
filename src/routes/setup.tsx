@@ -20,9 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-sm p-6">
         <div className="mb-5">
-          <span className="font-display text-primary font-semibold text-lg">
-            VattavadaStays
-          </span>
+          <span className="font-display text-primary font-semibold text-lg">stayidom.in</span>
         </div>
         {children}
       </div>
@@ -89,13 +87,9 @@ function SetupPage() {
   })();
 
   const strengthLabel = ["", "Weak", "Fair", "Good", "Strong"][strengthScore];
-  const strengthColor = [
-    "",
-    "bg-destructive",
-    "bg-yellow-400",
-    "bg-blue-400",
-    "bg-primary",
-  ][strengthScore];
+  const strengthColor = ["", "bg-destructive", "bg-yellow-400", "bg-blue-400", "bg-primary"][
+    strengthScore
+  ];
 
   const handleSetPassword = async () => {
     setError("");
@@ -121,7 +115,7 @@ function SetupPage() {
             property_id: propertyId,
             token,
           }),
-        }
+        },
       );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Failed to create account");
@@ -166,8 +160,8 @@ function SetupPage() {
           <XCircle className="h-10 w-10 text-destructive" />
           <h2 className="font-display text-lg font-semibold">Invalid or expired link</h2>
           <p className="text-sm text-muted-foreground max-w-xs">
-            This invite link has already been used or has expired. Ask your platform
-            admin for a new one.
+            This invite link has already been used or has expired. Ask your platform admin for a new
+            one.
           </p>
         </div>
       </Shell>
@@ -180,9 +174,7 @@ function SetupPage() {
         <div className="flex flex-col items-center gap-3 py-8 text-center">
           <CheckCircle2 className="h-10 w-10 text-primary" />
           <h2 className="font-display text-lg font-semibold">You're all set!</h2>
-          <p className="text-sm text-muted-foreground">
-            Redirecting you to your dashboard…
-          </p>
+          <p className="text-sm text-muted-foreground">Redirecting you to your dashboard…</p>
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
         </div>
       </Shell>
@@ -192,20 +184,16 @@ function SetupPage() {
   return (
     <Shell>
       <div className="space-y-1 mb-6">
-        <h1 className="font-display text-2xl font-semibold">Welcome to VattavadaStays</h1>
+        <h1 className="font-display text-2xl font-semibold">Welcome to stayidom.in</h1>
         <p className="text-sm text-muted-foreground">
-          Set a password for{" "}
-          <span className="font-medium text-foreground">{ownerEmail}</span> to access
-          the{" "}
-          <span className="font-medium text-foreground">{propertyName}</span> dashboard.
+          Set a password for <span className="font-medium text-foreground">{ownerEmail}</span> to
+          access the <span className="font-medium text-foreground">{propertyName}</span> dashboard.
         </p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-muted-foreground mb-1">
-            Password
-          </label>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Password</label>
           <div className="relative">
             <input
               type={showPw ? "text" : "password"}
@@ -220,11 +208,7 @@ function SetupPage() {
               onClick={() => setShowPw((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showPw ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+              {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {password.length > 0 && (
@@ -263,11 +247,7 @@ function SetupPage() {
               onClick={() => setShowConfirm((v) => !v)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              {showConfirm ? (
-                <EyeOff className="h-4 w-4" />
-              ) : (
-                <Eye className="h-4 w-4" />
-              )}
+              {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           {confirm.length > 0 && password !== confirm && (
@@ -276,9 +256,7 @@ function SetupPage() {
         </div>
 
         {error && (
-          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">
-            {error}
-          </p>
+          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
         )}
 
         <button
