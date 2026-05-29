@@ -66,7 +66,7 @@ function LoginPage() {
             <Leaf className="h-5 w-5" />
           </span>
           <div>
-            <div className="font-display text-lg font-semibold text-primary">VattavadaStays</div>
+            <div className="font-display text-lg font-semibold text-primary">stayidom.in</div>
             <div className="text-xs text-muted-foreground">Owner login</div>
           </div>
         </div>

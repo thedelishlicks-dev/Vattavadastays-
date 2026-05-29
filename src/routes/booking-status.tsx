@@ -3,8 +3,18 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import {
-  Loader2, Search, CheckCircle2, Clock, LogIn, Star,
-  XCircle, Phone, MapPin, MessageCircle, IndianRupee, Receipt,
+  Loader2,
+  Search,
+  CheckCircle2,
+  Clock,
+  LogIn,
+  Star,
+  XCircle,
+  Phone,
+  MapPin,
+  MessageCircle,
+  IndianRupee,
+  Receipt,
 } from "lucide-react";
 import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
@@ -19,10 +29,10 @@ export const Route = createFileRoute("/booking-status")({
 });
 
 const STATUS_STEPS = [
-  { key: "pending",    label: "Request sent",  icon: Clock,        desc: "Waiting for owner confirmation" },
-  { key: "confirmed",  label: "Confirmed",      icon: CheckCircle2, desc: "Your stay is confirmed"         },
-  { key: "checked_in", label: "Checked in",     icon: LogIn,        desc: "Enjoy your stay!"               },
-  { key: "completed",  label: "Completed",      icon: Star,         desc: "Thank you for staying with us"  },
+  { key: "pending", label: "Request sent", icon: Clock, desc: "Waiting for owner confirmation" },
+  { key: "confirmed", label: "Confirmed", icon: CheckCircle2, desc: "Your stay is confirmed" },
+  { key: "checked_in", label: "Checked in", icon: LogIn, desc: "Enjoy your stay!" },
+  { key: "completed", label: "Completed", icon: Star, desc: "Thank you for staying with us" },
 ];
 const STATUS_ORDER = ["pending", "confirmed", "checked_in", "completed"];
 
@@ -59,7 +69,10 @@ function BookingStatusPage() {
 
       return bookings.map((booking) => {
         const charges = (booking.booking_charges ?? []) as BookingCharge[];
-        const chargesTotal = charges.reduce((s: number, c: BookingCharge) => s + c.qty * c.unit_price, 0);
+        const chargesTotal = charges.reduce(
+          (s: number, c: BookingCharge) => s + c.qty * c.unit_price,
+          0,
+        );
         const advance = Number(booking.advance_amount ?? 0);
         const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - advance);
         return { booking, charges, chargesTotal, advance, balance };
@@ -74,7 +87,7 @@ function BookingStatusPage() {
       setHasSearched(true);
       refetch();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleLookup = () => {
@@ -98,8 +111,10 @@ function BookingStatusPage() {
       {/* Header */}
       <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-3">
         <a href="/" className="flex items-center gap-2">
-          <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">V</span>
-          <span className="font-display font-semibold text-primary">VattavadaStays</span>
+          <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+            S
+          </span>
+          <span className="font-display font-semibold text-primary">stayidom.in</span>
         </a>
         <span className="text-muted-foreground text-sm">/ Track Booking</span>
       </header>
@@ -115,7 +130,9 @@ function BookingStatusPage() {
         {/* Lookup form */}
         <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">Phone number</label>
+            <label className="block text-xs font-medium text-muted-foreground mb-1">
+              Phone number
+            </label>
             <input
               type="tel"
               value={phone}
@@ -134,7 +151,11 @@ function BookingStatusPage() {
             disabled={isLoading}
             className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="h-4 w-4" />
+            )}
             {isLoading ? "Looking up…" : "Track booking"}
           </button>
         </div>
@@ -162,7 +183,10 @@ function BookingStatusPage() {
               {data.map((d, idx) => (
                 <button
                   key={d.booking.id}
-                  onClick={() => { setSelectedBookingIdx(idx); setShowInvoice(false); }}
+                  onClick={() => {
+                    setSelectedBookingIdx(idx);
+                    setShowInvoice(false);
+                  }}
                   className={[
                     "w-full text-left rounded-xl border px-4 py-3 text-sm transition-colors",
                     selectedBookingIdx === idx
@@ -170,7 +194,9 @@ function BookingStatusPage() {
                       : "border-border hover:bg-muted",
                   ].join(" ")}
                 >
-                  <div className="font-medium">{d.booking.check_in} → {d.booking.check_out}</div>
+                  <div className="font-medium">
+                    {d.booking.check_in} → {d.booking.check_out}
+                  </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     ₹{Number(d.booking.total_amount).toLocaleString("en-IN")} · {d.booking.status}
                   </div>
@@ -183,41 +209,52 @@ function BookingStatusPage() {
         {/* Results */}
         {selected && !isLoading && (
           <div className="space-y-4">
-
             {/* Status */}
             {isCancelled ? (
               <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-5 flex gap-3 items-center">
                 <XCircle className="h-8 w-8 text-destructive shrink-0" />
                 <div>
                   <div className="font-semibold text-destructive">Booking Cancelled</div>
-                  <div className="text-sm text-muted-foreground mt-0.5">Contact the property for assistance.</div>
+                  <div className="text-sm text-muted-foreground mt-0.5">
+                    Contact the property for assistance.
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="bg-card border border-border rounded-2xl p-5">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">Booking status</div>
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">
+                  Booking status
+                </div>
                 <div className="space-y-0">
                   {STATUS_STEPS.map((step, idx) => {
-                    const done   = idx < currentStep;
+                    const done = idx < currentStep;
                     const active = idx === currentStep;
                     const Icon = step.icon;
                     return (
                       <div key={step.key} className="flex gap-3">
                         <div className="flex flex-col items-center">
-                          <div className={[
-                            "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors",
-                            done   ? "bg-primary border-primary text-primary-foreground" :
-                            active ? "bg-primary-light border-primary text-primary" :
-                                     "bg-background border-border text-muted-foreground",
-                          ].join(" ")}>
+                          <div
+                            className={[
+                              "h-8 w-8 rounded-full flex items-center justify-center shrink-0 border-2 transition-colors",
+                              done
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : active
+                                  ? "bg-primary-light border-primary text-primary"
+                                  : "bg-background border-border text-muted-foreground",
+                            ].join(" ")}
+                          >
                             <Icon className="h-4 w-4" />
                           </div>
                           {idx < STATUS_STEPS.length - 1 && (
-                            <div className={`w-0.5 h-6 ${done || active ? "bg-primary/30" : "bg-border"}`} />
+                            <div
+                              className={`w-0.5 h-6 ${done || active ? "bg-primary/30" : "bg-border"}`}
+                            />
                           )}
                         </div>
                         <div className="pb-4">
-                          <div className={`text-sm font-medium ${idx > currentStep ? "text-muted-foreground" : "text-foreground"}`}>
+                          <div
+                            className={`text-sm font-medium ${idx > currentStep ? "text-muted-foreground" : "text-foreground"}`}
+                          >
                             {step.label}
                           </div>
                           {active && <div className="text-xs text-primary mt-0.5">{step.desc}</div>}
@@ -231,12 +268,14 @@ function BookingStatusPage() {
 
             {/* Booking details */}
             <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Booking details</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                Booking details
+              </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <DetailRow label="Check-in"  value={selected.booking.check_in} />
+                <DetailRow label="Check-in" value={selected.booking.check_in} />
                 <DetailRow label="Check-out" value={selected.booking.check_out} />
-                <DetailRow label="Nights"    value={`${selected.booking.nights}`} />
-                <DetailRow label="Guests"    value={`${selected.booking.guest_count}`} />
+                <DetailRow label="Nights" value={`${selected.booking.nights}`} />
+                <DetailRow label="Guests" value={`${selected.booking.guest_count}`} />
               </div>
             </div>
 
@@ -266,7 +305,9 @@ function BookingStatusPage() {
                   <div className="border-t border-border pt-2 flex justify-between font-semibold">
                     <span>Balance due</span>
                     <span className={selected.balance === 0 ? "text-primary" : "text-amber-700"}>
-                      {selected.balance === 0 ? "Fully paid ✓" : `₹${selected.balance.toLocaleString("en-IN")}`}
+                      {selected.balance === 0
+                        ? "Fully paid ✓"
+                        : `₹${selected.balance.toLocaleString("en-IN")}`}
                     </span>
                   </div>
                 </div>
@@ -274,16 +315,27 @@ function BookingStatusPage() {
                 {/* Explanatory note — shown when balance is still due */}
                 {selected.balance > 0 && (
                   <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
-                    <span className="font-medium">Already paid an advance?</span> The balance above updates after the owner records your payment. If you've already paid, send your payment screenshot to the owner on WhatsApp — they'll confirm and update your balance shortly.
+                    <span className="font-medium">Already paid an advance?</span> The balance above
+                    updates after the owner records your payment. If you've already paid, send your
+                    payment screenshot to the owner on WhatsApp — they'll confirm and update your
+                    balance shortly.
                   </div>
                 )}
 
                 {selected.charges.length > 0 && (
                   <div className="border-t border-border pt-2 space-y-1">
-                    <div className="text-xs text-muted-foreground mb-1">Extra charges breakdown</div>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      Extra charges breakdown
+                    </div>
                     {selected.charges.map((c) => (
-                      <div key={c.id} className="flex justify-between text-xs text-muted-foreground">
-                        <span>{c.description}{c.qty > 1 ? ` ×${c.qty}` : ""}</span>
+                      <div
+                        key={c.id}
+                        className="flex justify-between text-xs text-muted-foreground"
+                      >
+                        <span>
+                          {c.description}
+                          {c.qty > 1 ? ` ×${c.qty}` : ""}
+                        </span>
                         <span>₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</span>
                       </div>
                     ))}
@@ -343,7 +395,14 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 
 // Fetches property for invoice rendering
 function ContactPropertyWithInvoice({
-  propertyId, booking, charges, chargesTotal, advance, balance, totalAmount, advancePaid,
+  propertyId,
+  booking,
+  charges,
+  chargesTotal,
+  advance,
+  balance,
+  totalAmount,
+  advancePaid,
 }: {
   propertyId: string;
   booking: any;
@@ -359,7 +418,9 @@ function ContactPropertyWithInvoice({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
-        .select("name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
+        .select(
+          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities",
+        )
         .eq("id", propertyId)
         .single();
       if (error) throw error;
@@ -388,7 +449,11 @@ function ContactPropertyWithInvoice({
 }
 
 function ContactProperty({
-  propertyId, booking, totalAmount, advancePaid, showUPI,
+  propertyId,
+  booking,
+  totalAmount,
+  advancePaid,
+  showUPI,
 }: {
   propertyId: string;
   booking: any;
@@ -401,7 +466,9 @@ function ContactProperty({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
-        .select("name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities")
+        .select(
+          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities",
+        )
         .eq("id", propertyId)
         .single();
       if (error) throw error;
@@ -416,9 +483,10 @@ function ContactProperty({
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, "")}` : null;
-  const mapsLink = property.location_lat && property.location_lng
-    ? `https://maps.google.com/?q=${property.location_lat},${property.location_lng}`
-    : null;
+  const mapsLink =
+    property.location_lat && property.location_lng
+      ? `https://maps.google.com/?q=${property.location_lat},${property.location_lng}`
+      : null;
 
   return (
     <div className="space-y-4">
@@ -439,7 +507,9 @@ function ContactProperty({
       )}
 
       <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Contact property</div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+          Contact property
+        </div>
         <div className="text-sm">
           <div className="font-medium">{property.name}</div>
           {property.owner_name && (
@@ -448,17 +518,30 @@ function ContactProperty({
         </div>
         <div className="flex flex-col gap-2">
           {phone && (
-            <a href={`tel:+${phone.replace(/\D/g, "")}`} className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
+            <a
+              href={`tel:+${phone.replace(/\D/g, "")}`}
+              className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+            >
               <Phone className="h-4 w-4" /> Call {property.owner_name ?? "host"}
             </a>
           )}
           {waLink && (
-            <a href={waLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity">
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 rounded-full bg-[#25D366] text-white px-4 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity"
+            >
               <MessageCircle className="h-4 w-4" /> WhatsApp
             </a>
           )}
           {mapsLink && (
-            <a href={mapsLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors">
+            <a
+              href={mapsLink}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+            >
               <MapPin className="h-4 w-4" /> Get directions
             </a>
           )}

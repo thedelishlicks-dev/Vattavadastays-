@@ -116,8 +116,13 @@ export function Footer({ subdomain }: { subdomain: string }) {
         </div>
 
         <div className="mt-12 border-t border-background/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs opacity-60">
-          <span>© {new Date().getFullYear()} {propertyName}. All rights reserved.</span>
-          {ownerName && <span>Hosted by {ownerName}</span>}
+          <div className="flex flex-col md:flex-row items-center gap-3 md:gap-6">
+            <span>
+              © {new Date().getFullYear()} {propertyName}. All rights reserved.
+            </span>
+            {ownerName && <span>Hosted by {ownerName}</span>}
+          </div>
+          <span className="font-medium text-primary">Powered by stayidom.in</span>
         </div>
       </div>
     </footer>
