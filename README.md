@@ -1,10 +1,10 @@
-# VattavadaStays
+# stayidom.in
 
 A white-label, commission-free booking engine for Vattavada homestays, designed for rural connectivity.
 
 ## Project Overview
 
-VattavadaStays provides homestay owners in Vattavada (Kerala) with their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
+stayidom.in provides homestay owners in Vattavada (Kerala) with their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
 
 ### Key Features
 
@@ -33,12 +33,14 @@ VattavadaStays provides homestay owners in Vattavada (Kerala) with their own bra
 ### Local Development
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/thedelishlicks-dev/Vattavadastays-.git
    cd Vattavadastays-
    ```
 
 2. Install dependencies:
+
    ```bash
    bun install
    # or
@@ -47,6 +49,7 @@ VattavadaStays provides homestay owners in Vattavada (Kerala) with their own bra
 
 3. Set up environment variables:
    Create a `.env` file in the root directory and add the following:
+
    ```env
    VITE_SUPABASE_URL=your_supabase_url
    VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -55,6 +58,7 @@ VattavadaStays provides homestay owners in Vattavada (Kerala) with their own bra
    ```
 
 4. Start the development server:
+
    ```bash
    bun dev
    # or

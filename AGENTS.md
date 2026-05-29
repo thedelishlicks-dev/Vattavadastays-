@@ -1,6 +1,6 @@
-
 # AGENTS.md
-# VattavadaStays — Agent Instructions
+
+# stayidom.in — Agent Instructions
 
 Read this file fully before writing a single line of code.
 
@@ -8,7 +8,7 @@ Read this file fully before writing a single line of code.
 
 ## What this project is
 
-VattavadaStays is a SaaS platform giving Vattavada (Kerala) homestay owners
+stayidom.in is a SaaS platform giving Vattavada (Kerala) homestay owners
 their own standalone booking website.
 
 - Guest side: Public booking website at {subdomain}.stayidom.in
@@ -19,15 +19,15 @@ their own standalone booking website.
 
 ## Tech stack — do not deviate from this
 
-| Layer | Tool | Notes |
-|---|---|---|
-| Framework | Vite + React + TypeScript | SPA — NOT SSR, NOT TanStack Start |
-| Routing | TanStack Router 1.166.7 | File-based routing under src/routes/ |
-| Styling | Tailwind CSS v4 | No CSS modules, no styled-components |
-| Database | Supabase (PostgreSQL) | Schema already exists |
-| Auth | Supabase Auth | Client-side, localStorage managed by Supabase SDK |
-| Data fetching | TanStack Query v5 | useQuery + useMutation only |
-| Hosting | Vercel (static SPA) | |
+| Layer         | Tool                      | Notes                                             |
+| ------------- | ------------------------- | ------------------------------------------------- |
+| Framework     | Vite + React + TypeScript | SPA — NOT SSR, NOT TanStack Start                 |
+| Routing       | TanStack Router 1.166.7   | File-based routing under src/routes/              |
+| Styling       | Tailwind CSS v4           | No CSS modules, no styled-components              |
+| Database      | Supabase (PostgreSQL)     | Schema already exists                             |
+| Auth          | Supabase Auth             | Client-side, localStorage managed by Supabase SDK |
+| Data fetching | TanStack Query v5         | useQuery + useMutation only                       |
+| Hosting       | Vercel (static SPA)       |                                                   |
 
 ---
 
@@ -37,7 +37,7 @@ These mistakes will break the build immediately:
 
 - NEVER use createServerFn() — it does not exist in this project
 - NEVER import from @tanstack/react-start — not installed
-- NEVER import from @supabase/ssr — not installed  
+- NEVER import from @supabase/ssr — not installed
 - NEVER use createServerClient or createBrowserClient from @supabase/ssr
 - NEVER write server-side loaders or beforeLoad auth guards
 - NEVER use HTTP-only cookies for session management
@@ -52,11 +52,11 @@ All data fetching is done directly from the browser using the Supabase client.
 
 ```typescript
 // src/lib/supabase.ts — single exported instance
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from "@supabase/supabase-js";
 export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-)
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+);
 ```
 
 Import `supabase` directly in server functions and hooks.
@@ -87,19 +87,19 @@ Direct Supabase queries wrapped in TanStack Query hooks:
 // In a hook — call supabase directly, no server functions
 export function useProperty(subdomain: string) {
   return useQuery({
-    queryKey: ['property', subdomain],
+    queryKey: ["property", subdomain],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('properties')
-        .select('*, rooms(*)')
-        .eq('subdomain', subdomain)
-        .eq('is_active', true)
-        .single()
-      if (error) throw error
-      return data
+        .from("properties")
+        .select("*, rooms(*)")
+        .eq("subdomain", subdomain)
+        .eq("is_active", true)
+        .single();
+      if (error) throw error;
+      return data;
     },
     enabled: !!subdomain,
-  })
+  });
 }
 ```
 
@@ -142,6 +142,7 @@ src/
 DO NOT recreate the schema. DO NOT run CREATE TABLE statements.
 
 ### properties
+
 ```
 id, owner_id, name, name_ml, subdomain, area, location_lat, location_lng,
 shared_amenities (text[]), description, description_ml, hero_image,
@@ -150,6 +151,7 @@ is_active, created_at
 ```
 
 ### rooms
+
 ```
 id, property_id, name, name_ml, room_type, max_guests, bed_type,
 base_price, extra_guest_price, weekend_multiplier,
@@ -157,12 +159,14 @@ room_amenities (text[]), images (text[]), is_active, created_at
 ```
 
 ### availability
+
 ```
 room_id, date, is_available, price_override, note
 PRIMARY KEY (room_id, date)
 ```
 
 ### bookings
+
 ```
 id, property_id, room_id, guest_name, guest_phone, guest_email,
 guest_count, check_in, check_out, nights (generated),
@@ -197,13 +201,13 @@ Never upgrade @tanstack packages without explicit instruction.
 
 ## Design system — do not change these values
 
-| Token | Value |
-|---|---|
-| Primary green | #166534 |
-| Light green | #dcfce7 |
-| Accent amber | #f59e0b |
-| Background | #fafaf9 (stone-50) |
-| Text primary | #1c1917 (stone-900) |
+| Token          | Value               |
+| -------------- | ------------------- |
+| Primary green  | #166534             |
+| Light green    | #dcfce7             |
+| Accent amber   | #f59e0b             |
+| Background     | #fafaf9 (stone-50)  |
+| Text primary   | #1c1917 (stone-900) |
 | Text secondary | #78716c (stone-500) |
 
 The frontend UI was built on Lovable.
@@ -227,20 +231,22 @@ Never hardcode. Never commit .env files.
 ## CRITICAL: Sentinel Key Pattern in shared_amenities
 
 `properties.shared_amenities` is a `text[]` column used for TWO purposes:
+
 1. Real amenity tags like `"parking"`, `"wifi"`, `"bonfire"` — shown to guests
 2. Sentinel keys prefixed with `__` — used to store config without new DB columns
 
 **Sentinel keys currently in use:**
 
-| Prefix | Stores | Used by |
-|---|---|---|
-| `__meals:` | JSON-encoded MealsConfig | admin.meals.tsx |
-| `__cancel:` | Cancellation policy text | admin.policies.tsx |
-| `__rules:` | House rules text | admin.policies.tsx |
-| `__upi:` | UPI ID string | admin.payments.tsx |
+| Prefix        | Stores                        | Used by            |
+| ------------- | ----------------------------- | ------------------ |
+| `__meals:`    | JSON-encoded MealsConfig      | admin.meals.tsx    |
+| `__cancel:`   | Cancellation policy text      | admin.policies.tsx |
+| `__rules:`    | House rules text              | admin.policies.tsx |
+| `__upi:`      | UPI ID string                 | admin.payments.tsx |
 | `__pmethods:` | JSON array of payment methods | admin.payments.tsx |
 
 **CRITICAL rules for sentinel keys:**
+
 - Always filter sentinels out before displaying amenities to guests: `.filter(a => !a.startsWith('__'))`
 - Always preserve sentinels when saving amenities: keep `__` prefixed items, replace the rest
 - Values are `encodeURIComponent(JSON.stringify(value))` encoded
@@ -251,13 +257,16 @@ Never hardcode. Never commit .env files.
 ## /setup Route — Current Status & Workaround
 
 **What works:**
+
 - Token validation via `get_invite_by_token` RPC ✅
 - Edge Function `create-owner` correctly creates user and links property ✅
 
 **Known issue:**
+
 - Auto-sign-in after account creation in `setup.tsx` fails with "Invalid credentials".
 
 **Current workaround:**
+
 - Redirect the owner to `/login` with their email pre-filled.
 - Use `/login?email=xxx` to help the owner.
 
@@ -265,7 +274,7 @@ Never hardcode. Never commit .env files.
 
 ## Payment & Recording Logic
 
-- **Part Payments**: The `advance_amount` in the `bookings` table stores the *cumulative* total paid so far.
+- **Part Payments**: The `advance_amount` in the `bookings` table stores the _cumulative_ total paid so far.
 - **Recording Payment**: When the owner records a new payment (instalment) in the admin dashboard, the frontend adds this new amount to the existing `advance_amount` and saves the result.
 - **Payment Methods**: Supported methods are "UPI", "Bank Transfer", and "Cash on Arrival".
 - **Notifications**: Guests are encouraged to notify the owner via a WhatsApp deep link after submitting a booking request. The owner can send payment reminders (asking for 25% advance if nothing paid, or the balance if part-paid) via WhatsApp deep links from the booking details.

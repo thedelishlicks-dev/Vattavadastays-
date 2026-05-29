@@ -24,15 +24,13 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     if (!property) return;
 
     const baseUrl = getBaseUrl();
-    const title = `${property.name ?? "Property"} | VattavadaStays`;
+    const title = `${property.name ?? "Property"} | stayidom.in`;
     const description = property.description
       ? property.description.slice(0, 160)
       : `Book your stay at ${property.name ?? "this property"} in Vattavada, Kerala. Beautiful homestay experience in the mountains.`;
 
     // hero_image is the correct column name
-    const imageUrl = property.hero_image
-      ? property.hero_image
-      : `${baseUrl}/og-default.jpg`;
+    const imageUrl = property.hero_image ? property.hero_image : `${baseUrl}/og-default.jpg`;
 
     // shared_amenities is the correct column name
     const keywords = filterAmenities(property.shared_amenities).join(", ");
@@ -40,9 +38,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     document.title = title;
 
     const updateMeta = (name: string, content: string) => {
-      let el = document.querySelector(
-        `meta[name="${name}"]`
-      ) as HTMLMetaElement | null;
+      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
         el.name = name;
@@ -52,9 +48,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     };
 
     const updateOg = (prop: string, content: string) => {
-      let el = document.querySelector(
-        `meta[property="og:${prop}"]`
-      ) as HTMLMetaElement | null;
+      let el = document.querySelector(`meta[property="og:${prop}"]`) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
         el.setAttribute("property", `og:${prop}`);
@@ -64,9 +58,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     };
 
     const updateTwitter = (name: string, content: string) => {
-      let el = document.querySelector(
-        `meta[name="twitter:${name}"]`
-      ) as HTMLMetaElement | null;
+      let el = document.querySelector(`meta[name="twitter:${name}"]`) as HTMLMetaElement | null;
       if (!el) {
         el = document.createElement("meta");
         el.name = `twitter:${name}`;
@@ -82,7 +74,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     updateOg("image", imageUrl);
     updateOg("url", baseUrl);
     updateOg("type", "website");
-    updateOg("site_name", "VattavadaStays");
+    updateOg("site_name", "stayidom.in");
     updateTwitter("card", "summary_large_image");
     updateTwitter("title", title);
     updateTwitter("description", description);
@@ -91,9 +83,11 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     // Update favicon if logo exists
     if (property.logo_url) {
       const updateIcon = (rel: string, sizes?: string) => {
-        let link = document.querySelector(`link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ''}`) as HTMLLinkElement | null;
+        let link = document.querySelector(
+          `link[rel="${rel}"]${sizes ? `[sizes="${sizes}"]` : ""}`,
+        ) as HTMLLinkElement | null;
         if (!link) {
-          link = document.createElement('link');
+          link = document.createElement("link");
           link.rel = rel;
           if (sizes) link.sizes = sizes;
           document.head.appendChild(link);
@@ -101,13 +95,11 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
         link.href = property.logo_url!;
       };
 
-      updateIcon('icon');
-      updateIcon('apple-touch-icon');
+      updateIcon("icon");
+      updateIcon("apple-touch-icon");
     }
 
-    let canonical = document.querySelector(
-      'link[rel="canonical"]'
-    ) as HTMLLinkElement | null;
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
       canonical.rel = "canonical";
@@ -129,13 +121,11 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
         addressRegion: "Kerala",
         addressCountry: "IN",
       },
-      amenityFeature: filterAmenities(property.shared_amenities).map(
-        (name) => ({
-          "@type": "LocationFeatureSpecification",
-          name,
-          value: true,
-        })
-      ),
+      amenityFeature: filterAmenities(property.shared_amenities).map((name) => ({
+        "@type": "LocationFeatureSpecification",
+        name,
+        value: true,
+      })),
       ...(property.location_lat && property.location_lng
         ? {
             geo: {
@@ -147,9 +137,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
         : {}),
     };
 
-    let scriptEl = document.querySelector(
-      "#schema-org-ld"
-    ) as HTMLScriptElement | null;
+    let scriptEl = document.querySelector("#schema-org-ld") as HTMLScriptElement | null;
     if (!scriptEl) {
       scriptEl = document.createElement("script");
       scriptEl.id = "schema-org-ld";
@@ -161,4 +149,3 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
 
   return null;
 }
- 
