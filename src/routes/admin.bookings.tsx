@@ -1205,7 +1205,13 @@ function BookingsAdmin() {
           checkOut: booking.check_out,
           ownerPhone: property.owner_phone ?? "",
         });
-        window.location.href = waUrl;
+        const a = document.createElement("a");
+        a.href = waUrl;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
       }
     }
   };
