@@ -80,7 +80,7 @@ function AdminCalendar() {
   if (propLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-green-700" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -120,8 +120,11 @@ function AdminCalendar() {
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold text-stone-900 mb-6">Availability Calendar</h1>
+      <h1 className="font-display text-2xl md:text-3xl font-semibold mb-6">Availability Calendar</h1>
 
+      <p className="text-xs text-muted-foreground mb-3">
+        To block dates, use the Block dates button on the Dashboard.
+      </p>
       <div className="flex gap-2 mb-6 flex-wrap">
         {rooms.map((room) => (
           <button
@@ -129,8 +132,8 @@ function AdminCalendar() {
             onClick={() => setSelectedRoomId(room.id)}
             className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
               activeRoomId === room.id
-                ? 'bg-green-700 text-white border-green-700'
-                : 'bg-white text-stone-700 border-stone-300 hover:border-green-600'
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'bg-background text-foreground border-border hover:border-primary'
             }`}
           >
             {room.name}
@@ -142,7 +145,7 @@ function AdminCalendar() {
         <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-stone-100">
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="font-semibold text-stone-900">{monthLabel}</span>
+        <span className="font-semibold text-foreground">{monthLabel}</span>
         <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-stone-100">
           <ChevronRight className="h-5 w-5" />
         </button>
@@ -150,13 +153,13 @@ function AdminCalendar() {
 
       {isLoading ? (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-green-700" />
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="rounded-xl border border-stone-200 overflow-hidden bg-white">
-          <div className="grid grid-cols-7 bg-stone-50 border-b border-stone-200">
+        <div className="rounded-xl border border-border overflow-hidden bg-card">
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-stone-500">
+              <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">
                 {d}
               </div>
             ))}
@@ -164,7 +167,7 @@ function AdminCalendar() {
 
           <div className="grid grid-cols-7">
             {Array.from({ length: firstWeekday }).map((_, i) => (
-              <div key={`empty-${i}`} className="h-16 border-b border-r border-stone-100" />
+              <div key={`empty-${i}`} className="h-16 border-b border-r border-border/50" />
             ))}
 
             {Array.from({ length: daysInMonth }).map((_, i) => {
@@ -197,10 +200,10 @@ function AdminCalendar() {
               return (
                 <div
                   key={dateStr}
-                  className={`h-16 border-b border-r border-stone-100 p-1.5 text-xs ${bgColor}`}
+                  className={`h-16 border-b border-r border-border/50 p-1.5 text-xs ${bgColor}`}
                   title={guestName ? `${guestName}` : undefined}
                 >
-                  <div className="font-medium text-stone-700">{day}</div>
+                  <div className="font-medium text-foreground">{day}</div>
                   <div className={`mt-0.5 truncate ${statusColor}`}>
                     {statusLabel}
                   </div>
@@ -219,7 +222,7 @@ function AdminCalendar() {
         </div>
       )}
 
-      <div className="flex gap-4 mt-4 text-sm text-stone-600">
+      <div className="flex gap-4 mt-4 text-sm text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-sm bg-green-100 border border-green-300" />
           Available

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
+import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X, Check } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
@@ -184,6 +185,7 @@ function ImageUploadField({
 
 function AdminSettings() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const { data: property, isLoading } = useOwnerProperty()
 
   const [form, setForm] = useState({
@@ -237,7 +239,7 @@ function AdminSettings() {
       .from('properties')
       .update({ [column]: url })
       .eq('id', property.id)
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
     queryClient.invalidateQueries({ queryKey: ['property'] })
     setForm((f) => ({ ...f, [column]: url ?? '' }))
   }
@@ -261,7 +263,7 @@ function AdminSettings() {
       if (error) throw error
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ownerProperty'] })
+      queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
       queryClient.invalidateQueries({ queryKey: ['property'] })
     },
   })
