@@ -9,7 +9,8 @@ interface Props {
   onClose: () => void;
 }
 
-const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
 export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
   const qc = useQueryClient();
@@ -28,7 +29,7 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
-  const room = rooms.find(r => r.id === roomId);
+  const room = rooms.find((r) => r.id === roomId);
 
   // Derive nights + total from selected dates and room
   const nights = (() => {
@@ -68,7 +69,7 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
         is_paid: isPaid,
       });
       if (err) throw err;
-      qc.invalidateQueries({ queryKey: ["bookings"] });
+      qc.invalidateQueries({ queryKey: ["bookings"], exact: false });
       setDone(true);
       setTimeout(onClose, 1000);
     } catch (e: unknown) {
@@ -87,7 +88,10 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
             <Plus className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-sm">Add booking</h2>
           </div>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted">
+          <button
+            onClick={onClose}
+            className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -95,56 +99,122 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
         <div className="p-5 space-y-4">
           {/* Room */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Room</label>
-            <select value={roomId} onChange={e => setRoomId(e.target.value)} className={`mt-1.5 ${inputCls}`}>
-              {rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Room
+            </label>
+            <select
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              className={`mt-1.5 ${inputCls}`}
+            >
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
             </select>
           </div>
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Check-in</label>
-              <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className={`mt-1.5 ${inputCls}`} />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Check-in
+              </label>
+              <input
+                type="date"
+                value={checkIn}
+                onChange={(e) => setCheckIn(e.target.value)}
+                className={`mt-1.5 ${inputCls}`}
+              />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Check-out</label>
-              <input type="date" value={checkOut} onChange={e => setCheckOut(e.target.value)} className={`mt-1.5 ${inputCls}`} />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Check-out
+              </label>
+              <input
+                type="date"
+                value={checkOut}
+                onChange={(e) => setCheckOut(e.target.value)}
+                className={`mt-1.5 ${inputCls}`}
+              />
             </div>
           </div>
 
           {/* Guest details */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest name</label>
-            <input value={guestName} onChange={e => setGuestName(e.target.value)} placeholder="Full name" className={`mt-1.5 ${inputCls}`} />
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Guest name
+            </label>
+            <input
+              value={guestName}
+              onChange={(e) => setGuestName(e.target.value)}
+              placeholder="Full name"
+              className={`mt-1.5 ${inputCls}`}
+            />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Phone</label>
-              <input value={guestPhone} onChange={e => setGuestPhone(e.target.value)} placeholder="+91 …" className={`mt-1.5 ${inputCls}`} />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Phone
+              </label>
+              <input
+                value={guestPhone}
+                onChange={(e) => setGuestPhone(e.target.value)}
+                placeholder="+91 …"
+                className={`mt-1.5 ${inputCls}`}
+              />
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guests</label>
-              <input type="number" min={1} max={room?.max_guests ?? 10} value={guestCount} onChange={e => setGuestCount(Number(e.target.value))} className={`mt-1.5 ${inputCls}`} />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Guests
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={room?.max_guests ?? 10}
+                value={guestCount}
+                onChange={(e) => setGuestCount(Number(e.target.value))}
+                className={`mt-1.5 ${inputCls}`}
+              />
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Email (optional)</label>
-            <input value={guestEmail} onChange={e => setGuestEmail(e.target.value)} placeholder="guest@example.com" className={`mt-1.5 ${inputCls}`} />
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Email (optional)
+            </label>
+            <input
+              value={guestEmail}
+              onChange={(e) => setGuestEmail(e.target.value)}
+              placeholder="guest@example.com"
+              className={`mt-1.5 ${inputCls}`}
+            />
           </div>
 
           {/* Status */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</label>
-              <select value={status} onChange={e => setStatus(e.target.value as "confirmed" | "pending")} className={`mt-1.5 ${inputCls}`}>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Status
+              </label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as "confirmed" | "pending")}
+                className={`mt-1.5 ${inputCls}`}
+              >
                 <option value="confirmed">Confirmed</option>
                 <option value="pending">Pending</option>
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment</label>
-              <select value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)} className={`mt-1.5 ${inputCls}`}>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                Payment
+              </label>
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className={`mt-1.5 ${inputCls}`}
+              >
                 <option value="upi">UPI</option>
                 <option value="cash">Cash</option>
                 <option value="bank">Bank transfer</option>
@@ -152,19 +222,36 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Payment reference (optional)</label>
-            <input value={paymentRef} onChange={e => setPaymentRef(e.target.value)} placeholder="UPI txn ID / ref" className={`mt-1.5 ${inputCls}`} />
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Payment reference (optional)
+            </label>
+            <input
+              value={paymentRef}
+              onChange={(e) => setPaymentRef(e.target.value)}
+              placeholder="UPI txn ID / ref"
+              className={`mt-1.5 ${inputCls}`}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="isPaid" checked={isPaid} onChange={e => setIsPaid(e.target.checked)} className="rounded border-border accent-primary" />
-            <label htmlFor="isPaid" className="text-sm">Mark as paid</label>
+            <input
+              type="checkbox"
+              id="isPaid"
+              checked={isPaid}
+              onChange={(e) => setIsPaid(e.target.checked)}
+              className="rounded border-border accent-primary"
+            />
+            <label htmlFor="isPaid" className="text-sm">
+              Mark as paid
+            </label>
           </div>
 
           {/* Amount summary */}
           {nights > 0 && (
             <div className="rounded-xl bg-primary-light/60 border border-border p-4 space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground">
-                <span>Room ({nights} night{nights !== 1 ? "s" : ""})</span>
+                <span>
+                  Room ({nights} night{nights !== 1 ? "s" : ""})
+                </span>
                 <span>₹{roomPrice.toLocaleString("en-IN")}</span>
               </div>
               {extraCharge > 0 && (
@@ -185,7 +272,10 @@ export function AddBookingModal({ propertyId, rooms, onClose }: Props) {
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 pb-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-full border border-border hover:bg-muted">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm rounded-full border border-border hover:bg-muted"
+          >
             Cancel
           </button>
           <button

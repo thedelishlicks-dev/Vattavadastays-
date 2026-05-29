@@ -46,12 +46,12 @@ function AdminPayments() {
     if (property) {
       setUpiId(parseUpiId(property.shared_amenities ?? []));
       const methodEntry = (property.shared_amenities ?? []).find((a) =>
-        a.startsWith("__pmethods:")
+        a.startsWith("__pmethods:"),
       );
       if (methodEntry) {
         try {
           setAcceptedMethods(
-            JSON.parse(decodeURIComponent(methodEntry.slice("__pmethods:".length)))
+            JSON.parse(decodeURIComponent(methodEntry.slice("__pmethods:".length))),
           );
         } catch {
           // keep default
@@ -61,9 +61,7 @@ function AdminPayments() {
   }, [property?.id]);
 
   const toggleMethod = (m: string) =>
-    setAcceptedMethods((prev) =>
-      prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]
-    );
+    setAcceptedMethods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
 
   const handleSaveConfig = async () => {
     if (!property) return;
@@ -92,11 +90,18 @@ function AdminPayments() {
 
   const togglePaid = async (bookingId: string, currentlyPaid: boolean) => {
     setTogglingId(bookingId);
-    await supabase
-      .from("bookings")
-      .update({ is_paid: !currentlyPaid })
-      .eq("id", bookingId);
-    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id] });
+    const booking = bookings.find((b) => b.id === bookingId);
+    const updates = currentlyPaid
+      ? { is_paid: false }
+      : {
+          is_paid: true,
+          advance_amount: booking ? Number(booking.total_amount) : undefined,
+        };
+    await supabase.from("bookings").update(updates).eq("id", bookingId);
+    queryClient.invalidateQueries({
+      queryKey: ["bookings", property?.id],
+      exact: false,
+    });
     setTogglingId(null);
   };
 
@@ -104,25 +109,20 @@ function AdminPayments() {
     () =>
       bookings
         .filter((b) => !b.is_paid && b.status !== "cancelled")
-        .sort(
-          (a, b) =>
-            new Date(a.check_in).getTime() - new Date(b.check_in).getTime()
-        ),
-    [bookings]
+        .sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime()),
+    [bookings],
   );
 
   const stats = useMemo(() => {
-    const confirmed = bookings.filter(
-      (b) => b.status !== "cancelled"
+    const active = bookings.filter((b) => b.status !== "cancelled");
+    const totalCollected = active.reduce((s, b) => s + Number(b.advance_amount ?? 0), 0);
+    const totalOutstanding = active.reduce(
+      (s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.advance_amount ?? 0)),
+      0,
     );
-    const paid = confirmed.filter((b) => b.is_paid);
-    const unpaid = confirmed.filter((b) => !b.is_paid);
-    return {
-      totalCollected: paid.reduce((s, b) => s + Number(b.total_amount), 0),
-      totalOutstanding: unpaid.reduce((s, b) => s + Number(b.total_amount), 0),
-      paidCount: paid.length,
-      unpaidCount: unpaid.length,
-    };
+    const fullyPaid = active.filter((b) => b.is_paid).length;
+    const partPaid = active.filter((b) => !b.is_paid && Number(b.advance_amount ?? 0) > 0).length;
+    return { totalCollected, totalOutstanding, fullyPaid, partPaid };
   }, [bookings]);
 
   if (isLoading) {
@@ -145,14 +145,15 @@ function AdminPayments() {
           <p className="font-display text-2xl font-semibold text-primary">
             ₹{stats.totalCollected.toLocaleString("en-IN")}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{stats.paidCount} bookings</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {stats.fullyPaid} fully paid · {stats.partPaid} part paid
+          </p>
         </div>
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Outstanding</p>
           <p className="font-display text-2xl font-semibold text-destructive">
             ₹{stats.totalOutstanding.toLocaleString("en-IN")}
           </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{stats.unpaidCount} bookings</p>
         </div>
       </div>
 
@@ -199,7 +200,8 @@ function AdminPayments() {
 
         <div className="flex items-center gap-3 pt-1">
           <button
-            onClick={handleSaveConfig} disabled={savingConfig}
+            onClick={handleSaveConfig}
+            disabled={savingConfig}
             className="rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
           >
             {savingConfig && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -227,7 +229,7 @@ function AdminPayments() {
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Guest</th>
                   <th className="px-4 py-2.5 font-medium">Check-in</th>
-                  <th className="px-4 py-2.5 font-medium">Amount</th>
+                  <th className="px-4 py-2.5 font-medium">Balance due</th>
                   <th className="px-4 py-2.5 font-medium">Method</th>
                   <th className="px-4 py-2.5 font-medium text-right">Mark paid</th>
                 </tr>
@@ -240,8 +242,19 @@ function AdminPayments() {
                       <div className="text-xs text-muted-foreground">{b.guest_phone}</div>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{b.check_in}</td>
-                    <td className="px-4 py-3 font-semibold">
-                      ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                    <td className="px-4 py-3">
+                      <div className="font-semibold">
+                        ₹
+                        {Math.max(
+                          0,
+                          Number(b.total_amount) - Number(b.advance_amount ?? 0),
+                        ).toLocaleString("en-IN")}
+                      </div>
+                      {Number(b.advance_amount ?? 0) > 0 && (
+                        <div className="text-xs text-primary mt-0.5">
+                          Adv ₹{Number(b.advance_amount).toLocaleString("en-IN")}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
                       {b.payment_method ?? "—"}
@@ -252,9 +265,11 @@ function AdminPayments() {
                         disabled={togglingId === b.id}
                         className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
                       >
-                        {togglingId === b.id
-                          ? <Loader2 className="h-3 w-3 animate-spin" />
-                          : <Check className="h-3 w-3" />}
+                        {togglingId === b.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Check className="h-3 w-3" />
+                        )}
                         Paid
                       </button>
                     </td>

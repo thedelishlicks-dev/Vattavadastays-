@@ -1,4 +1,4 @@
-export type SubscriptionStatus = "pending_setup" | "active" | "suspended";
+export type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
 
 export interface Property {
@@ -85,12 +85,7 @@ export interface Booking {
   created_at: string;
 }
 
-export type BookingStatus =
-  | "pending"
-  | "confirmed"
-  | "checked_in"
-  | "completed"
-  | "cancelled";
+export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export interface BookingCharge {
   id: string;
