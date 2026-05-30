@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Save, CheckCircle, Upload, X, Check } from 'lucide-react'
+import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
 
@@ -579,6 +579,50 @@ function AdminSettings() {
               placeholder="e.g. Near St. Mary's Church, 500m from main road"
               className={inputCls}
             />
+          </div>
+        </div>
+
+        {/* ── Add to Home Screen ── */}
+        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Smartphone className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h2 className="text-sm font-semibold">Add to Home Screen</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Use your dashboard like a native app
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
+              <p className="text-xs font-medium text-foreground">iPhone / iPad</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Open your dashboard in Safari → tap the Share icon (□↑) at the bottom → tap <span className="font-medium text-foreground">Add to Home Screen</span>
+              </p>
+            </div>
+
+            <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
+              <p className="text-xs font-medium text-foreground">Android</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Open your dashboard in Chrome → tap the ⋮ menu → tap <span className="font-medium text-foreground">Add to Home Screen</span>
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(
+                  `${window.location.origin}/admin/dashboard`
+                ).catch(() => {});
+              }}
+              className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2"
+            >
+              <Smartphone className="h-4 w-4" />
+              Copy dashboard link
+            </button>
           </div>
         </div>
 

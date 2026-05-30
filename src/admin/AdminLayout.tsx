@@ -18,6 +18,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { supabase } from "@/lib/supabase";
+import { DynamicManifest } from "@/components/DynamicManifest";
 
 type NavItemDef = {
   to: string;
@@ -57,6 +58,7 @@ export function AdminLayout() {
 
   return (
     <div className="min-h-screen bg-muted/40 flex w-full">
+      <DynamicManifest />
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <div className="h-14 px-5 flex items-center border-b border-border">
           <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
