@@ -21,20 +21,24 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const subdomain = getSubdomain();
+  const hostname = window.location.hostname;
 
+  // Check hostname directly — do NOT rely on getSubdomain() here because
+  // stayidom.in does not end with .stayidom.in, so getSubdomain() falls
+  // through to the VITE_PROPERTY_SUBDOMAIN env var and returns a property
+  // slug instead of indicating root domain.
   const isRootDomain =
-    !subdomain ||
-    subdomain === "stayidom" ||
-    subdomain === "www" ||
-    window.location.hostname === "stayidom.in" ||
-    window.location.hostname === "www.stayidom.in" ||
-    window.location.hostname.endsWith(".vercel.app");
+    hostname === "stayidom.in" ||
+    hostname === "www.stayidom.in" ||
+    hostname.endsWith(".vercel.app") ||
+    hostname === "localhost" ||
+    hostname === "127.0.0.1";
 
   if (isRootDomain) {
     return <LandingPage />;
   }
 
+  const subdomain = getSubdomain();
   return <GuestPage subdomain={subdomain} />;
 }
 
@@ -63,7 +67,10 @@ function GuestPage({ subdomain }: { subdomain: string }) {
     );
   }
 
-  if (!isLoading && (!property || !property.rooms || property.rooms.length === 0)) {
+  if (
+    !isLoading &&
+    (!property || !property.rooms || property.rooms.length === 0)
+  ) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <SeoTags subdomain={subdomain} />
