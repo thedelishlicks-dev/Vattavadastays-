@@ -477,12 +477,13 @@ function ProblemStrip() {
 function PhoneMockup() {
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "center" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
+        style={{ maxWidth: 940, margin: "0 auto" }}>
 
         {/* Phone frame */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{
-            width: 220, background: C.dark, borderRadius: "2.5rem",
+            width: 260, background: C.dark, borderRadius: "2.5rem",
             padding: 10, boxShadow: "0 24px 60px rgba(0,0,0,.18)",
           }}>
             <div style={{ background: "#fff", borderRadius: "2rem", overflow: "hidden" }}>
@@ -493,7 +494,7 @@ function PhoneMockup() {
                 {/* Hero image */}
                 <div style={{
                   background: "linear-gradient(160deg,#166534,#14532d)",
-                  height: 90, borderRadius: "0.75rem", display: "flex", alignItems: "center",
+                  height: 120, borderRadius: "0.75rem", display: "flex", alignItems: "center",
                   justifyContent: "center", color: C.greenLight, fontSize: "0.6875rem",
                   fontWeight: 600, letterSpacing: "0.03em", marginBottom: "0.75rem",
                 }}>
@@ -584,9 +585,10 @@ function WhatsAppFlow() {
         />
 
         {/* Steps */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "1rem", position: "relative" }}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6"
+          style={{ position: "relative" }}>
           {/* Connecting line */}
-          <div style={{
+          <div className="hidden md:block" style={{
             position: "absolute", top: 28, left: "12%", right: "12%",
             height: 2, background: `linear-gradient(90deg,#25D366,${C.green})`, zIndex: 0,
           }} />
@@ -637,7 +639,8 @@ function DirectPayment() {
 
   return (
     <section style={{ background: C.dark, padding: "5rem 1.25rem" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "center" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
+        style={{ maxWidth: 940, margin: "0 auto" }}>
 
         {/* Copy */}
         <div>
@@ -780,7 +783,7 @@ function GuestTrustSignals() {
           title="Guests-ന് trust ചെയ്യാൻ കാരണം"
           sub="Booking.com ഇല്ലാതെ guest book ചെയ്യുമോ? — ഈ trust signals ഉണ്ടെങ്കിൽ, yes."
         />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1.25rem" }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {TRUST_CARDS.map(({ icon, title, desc, badges }) => (
             <div key={title} style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "1.75rem" }}>
               <div style={{ fontSize: "2rem", marginBottom: "0.875rem" }}>{icon}</div>
@@ -810,7 +813,7 @@ function FeaturesGrid() {
     <section id="features" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="എല്ലാം ഒരു platform-ൽ" sub="Vattavada-ക്കായി design ചെയ്‌ത features" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1.125rem" }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {FEATURES.map(({ icon, title, desc }) => (
             <div key={title} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.125rem", padding: "1.625rem" }}>
               <div style={{ fontSize: "2.25rem", marginBottom: "0.875rem" }}>{icon}</div>
@@ -837,7 +840,8 @@ function AccountsPanel() {
 
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "center" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
+        style={{ maxWidth: 940, margin: "0 auto" }}>
 
         {/* Mock dashboard */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
@@ -947,7 +951,7 @@ function TwoGSimulator() {
           </button>
 
           {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem", marginTop: "2rem" }}>
+          <div className="grid grid-cols-3 gap-3 mt-8">
             {[
               { label: "Page weight",   val: "180 KB", color: "#4ade80" },
               { label: "2G load time",  val: "< 4s",   color: "#4ade80" },
@@ -1014,7 +1018,7 @@ function SavingsCalculator() {
           ))}
 
           {/* Results */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.875rem" }}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { label: "Platform commission (20%)", val: `₹${commission.toLocaleString("en-IN")}`, bg: "#3f2828", border: "#7f1d1d", color: "#fca5a5" },
               { label: "stayidom cost",              val: `₹${stayidomFee.toLocaleString("en-IN")}`, bg: "#1c2e22", border: C.green,   color: "#86efac" },
@@ -1041,7 +1045,7 @@ function Testimonials() {
     <section id="testimonials" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="Vattavada Owners പറയുന്നത്" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1.25rem" }}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {TESTIMONIALS.map(({ name, property, quote, saving }) => (
             <div key={name} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.25rem", padding: "1.875rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
               <p style={{ fontSize: "1rem", color: "#44403c", lineHeight: 1.8, flex: 1, fontStyle: "italic" }}>
@@ -1114,9 +1118,11 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
     <section id="pricing" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="Simple, Transparent Pricing" sub="Commission ഇല്ല · Contract ഇല്ല · 14 days free trial" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1.25rem", alignItems: "start" }}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
           {PRICING.map(({ rooms, setup, monthly, tier, highlight }) => (
-            <div key={tier} style={{
+            <div key={tier}
+              className={highlight ? "md:scale-105" : ""}
+              style={{
               background:    highlight ? C.green : "#fff",
               border:        highlight ? "2px solid #14532d" : `1px solid ${C.greenMid}`,
               borderRadius:  "1.25rem",
@@ -1124,7 +1130,6 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
               display:       "flex",
               flexDirection: "column",
               gap:           "1.125rem",
-              transform:     highlight ? "scale(1.04)" : "none",
               boxShadow:     highlight ? "0 20px 50px rgba(22,101,52,.25)" : "none",
               transition:    "transform .2s",
             }}>
