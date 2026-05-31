@@ -13,6 +13,7 @@ import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
 import { useProperty } from "@/hooks/useProperty";
 import { getSubdomain } from "@/lib/subdomain";
+import LandingPage from "@/components/LandingPage";
 import type { Room } from "@/types/database";
 
 export const Route = createFileRoute("/")({
@@ -21,6 +22,23 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const subdomain = getSubdomain();
+
+  const isRootDomain =
+    !subdomain ||
+    subdomain === "stayidom" ||
+    subdomain === "www" ||
+    window.location.hostname === "stayidom.in" ||
+    window.location.hostname === "www.stayidom.in" ||
+    window.location.hostname.endsWith(".vercel.app");
+
+  if (isRootDomain) {
+    return <LandingPage />;
+  }
+
+  return <GuestPage subdomain={subdomain} />;
+}
+
+function GuestPage({ subdomain }: { subdomain: string }) {
   const { data: property, isLoading } = useProperty(subdomain);
 
   useEffect(() => {
@@ -38,7 +56,9 @@ function Index() {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <SeoTags subdomain={subdomain} />
-        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
+        <div className="text-sm text-muted-foreground animate-pulse">
+          Loading…
+        </div>
       </div>
     );
   }
@@ -88,7 +108,9 @@ function Index() {
             setSelection(details);
             setOpenRoom(null);
             setTimeout(() => {
-              document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
+              document.getElementById("booking")?.scrollIntoView({
+                behavior: "smooth",
+              });
             }, 50);
           }}
         />
