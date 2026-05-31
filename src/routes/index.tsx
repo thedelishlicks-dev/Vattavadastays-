@@ -13,9 +13,13 @@ export const Route = createFileRoute('/')({
 function RootIndex() {
   const sub = getSubdomain()
 
-  // Root domain (stayidom.in, www, or local dev with no subdomain)
-  // → show marketing landing page
-  if (!sub || sub === 'stayidom' || sub === 'www') {
+  const isRootDomain =
+    !sub ||
+    sub === 'stayidom' ||
+    sub === 'www' ||
+    window.location.hostname.endsWith('.vercel.app')
+
+  if (isRootDomain) {
     return <LandingPage />
   }
 
