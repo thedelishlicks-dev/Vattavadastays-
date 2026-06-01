@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, MessageCircle, ExternalLink } from "lucide-react";
+import { useState, useRef } from "react";
+import { Check, ExternalLink, MessageCircle } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink } from "@/lib/whatsapp";
@@ -29,7 +29,11 @@ export function BookingForm({ selection, subdomain }: Props) {
   const [submittedName, setSubmittedName] = useState("");
   const [submittedPhone, setSubmittedPhone] = useState("");
   const [bookingId, setBookingId] = useState<string | null>(null);
+  const [ownerNotifyLink, setOwnerNotifyLink] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // Hidden anchor ref — clicking an <a> tag is not blocked by mobile popup blockers
+  const waRef = useRef<HTMLAnchorElement>(null);
 
   const { data: property } = useProperty(subdomain);
   const { mutateAsync: createBooking, isPending } = useCreateBooking();
@@ -74,9 +78,35 @@ export function BookingForm({ selection, subdomain }: Props) {
         total_amount: selection.total,
         payment_method: payment,
       });
+
       setSubmittedName(name);
       setSubmittedPhone(phone);
       setBookingId(id ?? null);
+
+      // Build the WhatsApp link and store it in state
+      if (property?.owner_whatsapp && id) {
+        const link = buildOwnerNotifyLink({
+          ownerWhatsapp: property.owner_whatsapp,
+          guestName: name,
+          guestPhone: phone,
+          propertyName: property.name,
+          roomName: selection.room.name,
+          checkIn: selection.checkIn,
+          checkOut: selection.checkOut,
+          guests: selection.adults + (selection.children ?? 0),
+          total: selection.total,
+          bookingId: id,
+        });
+        setOwnerNotifyLink(link);
+
+        // Set the hidden anchor href and programmatically click it
+        // <a>.click() bypasses mobile popup blockers unlike window.open()
+        if (waRef.current) {
+          waRef.current.href = link;
+          waRef.current.click();
+        }
+      }
+
       setSubmitted(true);
     } catch (err: unknown) {
       const msg =
@@ -85,7 +115,7 @@ export function BookingForm({ selection, subdomain }: Props) {
     }
   };
 
-  // WhatsApp link for guest to message owner directly
+  // WhatsApp link for guest to message owner directly (pre-submission)
   const whatsappBookingLink =
     property?.owner_whatsapp && selection
       ? bookingInquiryLink({
@@ -100,23 +130,6 @@ export function BookingForm({ selection, subdomain }: Props) {
         })
       : null;
 
-  // WhatsApp notification link — guest taps to notify owner of new request
-  const ownerNotifyLink =
-    property?.owner_whatsapp && selection && bookingId
-      ? buildOwnerNotifyLink({
-          ownerWhatsapp: property.owner_whatsapp,
-          guestName: submittedName,
-          guestPhone: submittedPhone,
-          propertyName: property.name,
-          roomName: selection.room.name,
-          checkIn: selection.checkIn,
-          checkOut: selection.checkOut,
-          guests: selection.adults + (selection.children ?? 0),
-          total: selection.total,
-          bookingId,
-        })
-      : null;
-
   // Phone-based tracking URL — no booking ID needed
   const trackingUrl = submittedPhone
     ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}`
@@ -127,6 +140,9 @@ export function BookingForm({ selection, subdomain }: Props) {
 
   return (
     <section id="booking" className="py-16 md:py-24 bg-background">
+      {/* Hidden anchor used to trigger WhatsApp without popup blocker */}
+      <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
+
       <div className="mx-auto max-w-3xl px-4 md:px-8">
         <div className="text-center mb-10">
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
@@ -176,7 +192,25 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </p>
                 </div>
 
-                {/* Stay summary — replaces UUID reference card */}
+                {/* WhatsApp CTA — shown as fallback if auto-open was blocked */}
+                {ownerNotifyLink && (
+                  <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
+                    <p className="text-xs text-muted-foreground text-center">
+                      Tap below to notify {property?.owner_name ?? "the host"} on WhatsApp so they confirm faster.
+                    </p>
+                    <a
+                      href={ownerNotifyLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-5 py-3 text-sm font-medium hover:opacity-90 transition-opacity w-full justify-center"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      Notify {property?.owner_name ?? "host"} on WhatsApp
+                    </a>
+                  </div>
+                )}
+
+                {/* Stay summary */}
                 <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
                   <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
                     Your booking
@@ -207,27 +241,7 @@ export function BookingForm({ selection, subdomain }: Props) {
                   )}
                 </div>
 
-                {/* Notify owner — primary CTA */}
-                {ownerNotifyLink && (
-                  <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
-                    <div className="text-sm font-medium">Notify the owner</div>
-                    <p className="text-xs text-muted-foreground">
-                      Tap below to send your booking details to {property?.owner_name ?? "the host"}{" "}
-                      on WhatsApp so they can confirm faster.
-                    </p>
-                    <a
-                      href={ownerNotifyLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-5 py-2.5 text-sm font-medium hover:opacity-90 transition-opacity w-full justify-center"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Notify {property?.owner_name ?? "host"} on WhatsApp
-                    </a>
-                  </div>
-                )}
-
-                {/* UPI Payment Section — only for UPI bookings, not Cash on Arrival */}
+                {/* UPI Payment Section — only for UPI bookings */}
                 {upiId && payment === "UPI" && (
                   <UPIPaymentSection
                     upiId={upiId}
@@ -308,7 +322,7 @@ export function BookingForm({ selection, subdomain }: Props) {
                   </p>
                 </Field>
 
-                {/* Payment method — UPI and Cash on Arrival only, Bank Transfer removed */}
+                {/* Payment method — UPI and Cash on Arrival only */}
                 <Field label="Payment method">
                   <div className="grid grid-cols-2 gap-2">
                     {(["UPI", "Cash on Arrival"] as Payment[]).map((p) => (
