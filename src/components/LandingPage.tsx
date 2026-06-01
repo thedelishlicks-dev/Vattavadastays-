@@ -3,7 +3,7 @@
  *
  * Stack : Vite + React + TypeScript + Tailwind CSS v4
  * Place  : src/components/LandingPage.tsx
- * Route  : src/routes/index.tsx — render when getSubdomain() returns no property slug
+ * Route  : src/routes/index.tsx — render when hostname is root domain
  *
  * ── index.html <head> — add these before </head> ──────────────────────────────
  *
@@ -30,12 +30,10 @@
  * ── Wire signup form ──────────────────────────────────────────────────────────
  *
  *   Replace submitLead() stub with:
- *     import { supabase } from '../lib/supabase'
- *     await supabase.from('leads').insert({ name, phone, property_name, tier })
+ *     import { submitLead } from '../lib/leads'
  */
 
 import { useState } from "react";
-import { submitLead } from '../lib/leads'
 
 // ─── Design tokens — mirrors AGENTS.md ───────────────────────────────────────
 const C = {
@@ -52,6 +50,16 @@ const C = {
 const serif: React.CSSProperties = {
   fontFamily: "'Playfair Display', Georgia, serif",
 };
+
+// ─── Stub — replace with: import { submitLead } from '../lib/leads' ──────────
+async function submitLead(data: {
+  name: string;
+  phone: string;
+  property_name?: string;
+  tier?: string;
+}) {
+  console.log("Lead captured:", data);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATA
@@ -70,177 +78,52 @@ const FEATURES = [
 ];
 
 const COMPARISON = [
-  {
-    feature:  "Commission & Fees",
-    ota:      "15–25% per booking. ₹10,000 booking → ₹2,500 gone.",
-    stayidom: "₹0 commission. Flat monthly subscription. You keep 100%.",
-  },
-  {
-    feature:  "Payout Speed",
-    ota:      "14–21 days after checkout. Cash flow problems during peak season.",
-    stayidom: "Instant. UPI hits your account seconds after guest pays.",
-  },
-  {
-    feature:  "Guest Data",
-    ota:      "None. OTAs mask phone & email. You can't remarket or build loyalty.",
-    stayidom: "100% yours. Full name, phone, email in your dashboard.",
-  },
-  {
-    feature:  "Setup Time",
-    ota:      "Days to weeks. Verification, document uploads, approval queue.",
-    stayidom: "5 minutes. Property info → live booking page. Done.",
-  },
-  {
-    feature:  "Network & Connectivity",
-    ota:      "Heavy apps. Fails on 2G/Edge. Timeout errors in Vattavada frequently.",
-    stayidom: "2G optimized. Lightweight SPA built for mountain networks.",
-  },
-  {
-    feature:  "Guest Communication",
-    ota:      "Masked channels only. No direct WhatsApp. No direct calls.",
-    stayidom: "WhatsApp integrated. Direct deep links to owner's number.",
-  },
-  {
-    feature:  "Financial Tracking",
-    ota:      "No tracking of cash advances, partial payments, or food bills.",
-    stayidom: "Full accounts. Part-payment, balance, revenue, CSV export.",
-  },
-  {
-    feature:  "Data Portability",
-    ota:      "Locked in. Lose booking history if you leave the platform.",
-    stayidom: "100% portable. Export everything to CSV anytime. No lock-in.",
-  },
+  { feature: "Commission & Fees",        ota: "15–25% per booking. ₹10,000 booking → ₹2,500 gone.",                     stayidom: "₹0 commission. Flat monthly subscription. You keep 100%." },
+  { feature: "Payout Speed",             ota: "14–21 days after checkout. Cash flow problems during peak season.",        stayidom: "Instant. UPI hits your account seconds after guest pays." },
+  { feature: "Guest Data",               ota: "None. OTAs mask phone & email. You can't remarket or build loyalty.",      stayidom: "100% yours. Full name, phone, email in your dashboard." },
+  { feature: "Setup Time",               ota: "Days to weeks. Verification, document uploads, approval queue.",           stayidom: "5 minutes. Property info → live booking page. Done." },
+  { feature: "Network & Connectivity",   ota: "Heavy apps. Fails on 2G/Edge. Timeout errors in Vattavada frequently.",   stayidom: "2G optimized. Lightweight SPA built for mountain networks." },
+  { feature: "Guest Communication",      ota: "Masked channels only. No direct WhatsApp. No direct calls.",              stayidom: "WhatsApp integrated. Direct deep links to owner's number." },
+  { feature: "Financial Tracking",       ota: "No tracking of cash advances, partial payments, or food bills.",          stayidom: "Full accounts. Part-payment, balance, revenue, CSV export." },
+  { feature: "Data Portability",         ota: "Locked in. Lose booking history if you leave the platform.",              stayidom: "100% portable. Export everything to CSV anytime. No lock-in." },
 ];
 
 const TRUST_CARDS = [
-  {
-    icon:   "🛡️",
-    title:  "Direct-to-Owner Verified",
-    desc:   "Guest page-ൽ owner verification badge കാണിക്കും. ഇത് property owner directly run ചെയ്യുന്നു — hidden middleman ഇല്ല.",
-    badges: ["Owner verified", "No middleman"],
-  },
-  {
-    icon:   "💬",
-    title:  "Instant WhatsApp Touchpoint",
-    desc:   "Booking ചെയ്‌ത് seconds-ൽ owner-ന്റെ WhatsApp-ൽ message send ആകും. Real human response — confidence builds instantly.",
-    badges: ["WhatsApp confirmed", "Instant response"],
-  },
-  {
-    icon:   "🧾",
-    title:  "Professional Invoice & Status",
-    desc:   "Guest-ന് professional booking confirmation. Live booking status phone-ൽ കാണാം. PDF invoice ഉടനെ ready.",
-    badges: ["PDF invoice", "Live status"],
-  },
-  {
-    icon:   "📋",
-    title:  "Transparent Policies",
-    desc:   "Cancellation policy, house rules, meal options — checkout page-ൽ clearly display ആകും. Guest-ന് surprise ഇല്ല.",
-    badges: ["House rules visible", "Cancellation clear"],
-  },
-  {
-    icon:   "📦",
-    title:  "Zero Platform Lock-in",
-    desc:   "Tax season-ൽ entire guest database, booking history, billing ledger — ഒരു click-ൽ CSV export. Data is yours forever.",
-    badges: ["Full CSV export", "No lock-in"],
-  },
-  {
-    icon:   "📍",
-    title:  "Offline Directions",
-    desc:   "Google Maps deep link — guest offline map download ചെയ്‌താൽ Vattavada-ൽ no signal-ലും directions കിട്ടും.",
-    badges: ["Works offline", "2G ready"],
-  },
+  { icon: "🛡️", title: "Direct-to-Owner Verified",      desc: "Guest page-ൽ owner verification badge കാണിക്കും. Property owner directly run ചെയ്യുന്നു — hidden middleman ഇല്ല.",           badges: ["Owner verified", "No middleman"] },
+  { icon: "💬", title: "Instant WhatsApp Touchpoint",    desc: "Booking ചെയ്‌ത് seconds-ൽ owner-ന്റെ WhatsApp-ൽ message send ആകും. Real human response — confidence builds instantly.",       badges: ["WhatsApp confirmed", "Instant response"] },
+  { icon: "🧾", title: "Professional Invoice & Status",  desc: "Guest-ന് professional booking confirmation. Live booking status phone-ൽ കാണാം. PDF invoice ഉടനെ ready.",                   badges: ["PDF invoice", "Live status"] },
+  { icon: "📋", title: "Transparent Policies",           desc: "Cancellation policy, house rules, meal options — checkout page-ൽ clearly display ആകും. Guest-ന് surprise ഇല്ല.",             badges: ["House rules visible", "Cancellation clear"] },
+  { icon: "📦", title: "Zero Platform Lock-in",          desc: "Tax season-ൽ entire guest database, booking history, billing ledger — ഒരു click-ൽ CSV export. Data is yours forever.",       badges: ["Full CSV export", "No lock-in"] },
+  { icon: "📍", title: "Offline Directions",             desc: "Google Maps deep link — guest offline map download ചെയ്‌താൽ Vattavada-ൽ no signal-ലും directions കിട്ടും.",                   badges: ["Works offline", "2G ready"] },
 ];
 
 const TESTIMONIALS = [
-  {
-    name:     "Rajesh M.",
-    property: "Vattavada Mudhouse · Peak season operator",
-    quote:    "MMT requested 18% for our peak season weekend bookings. We shifted our Instagram traffic to stayidom.in, kept 100% of the revenue, and collected advances directly via Google Pay before guests even arrived.",
-    saving:   "₹18,000 / month saved",
-  },
-  {
-    name:     "Suresh Kumar",
-    property: "Misty Valley Homestay, Vattavada",
-    quote:    "Booking.com-ൽ നിന്ന് ₹800 commission per booking. ഇപ്പോൾ ആ പണം ഞാൻ save ചെയ്യുന്നു. CSV export ചെയ്‌ത് accountant-ന് കൊടുക്കുന്നു — accounts neat ആണ്.",
-    saving:   "₹12,000 / month save",
-  },
-  {
-    name:     "Thomas Varghese",
-    property: "Cardamom Estate Stay, Munnar",
-    quote:    "WhatsApp-ൽ link share ചെയ്‌താൽ guests directly book ചെയ്യും. Guest-ന് booking status phone-ൽ കാണാം. 2G-ൽ ഒക്കെ smooth ആണ്.",
-    saving:   "100% direct bookings",
-  },
+  { name: "Rajesh M.",      property: "Vattavada Mudhouse · Peak season operator",   saving: "₹18,000 / month saved",   quote: "MMT requested 18% for our peak season weekend bookings. We shifted our Instagram traffic to stayidom.in, kept 100% of the revenue, and collected advances directly via Google Pay before guests even arrived." },
+  { name: "Suresh Kumar",   property: "Misty Valley Homestay, Vattavada",            saving: "₹12,000 / month save",    quote: "Booking.com-ൽ നിന്ന് ₹800 commission per booking. ഇപ്പോൾ ആ പണം ഞാൻ save ചെയ്യുന്നു. CSV export ചെയ്‌ത് accountant-ന് കൊടുക്കുന്നു — accounts neat ആണ്." },
+  { name: "Thomas Varghese",property: "Cardamom Estate Stay, Munnar",                saving: "100% direct bookings",    quote: "WhatsApp-ൽ link share ചെയ്‌താൽ guests directly book ചെയ്യും. Guest-ന് booking status phone-ൽ കാണാം. 2G-ൽ ഒക്കെ smooth ആണ്." },
 ];
 
 const FAQS = [
-  {
-    q: "📡 Range കുറഞ്ഞിരിക്കുമ്പോഴും booking കിട്ടുമോ?",
-    a: "Yes — guests city-ൽ ഇരുന്ന് book ചെയ്യും (good network). Guest page ഒരിക്കൽ load ആയാൽ PWA cache ചെയ്യും. Owner dashboard 2G-ൽ work ചെയ്യാൻ TanStack Query optimistic updates ഉപയോഗിക്കുന്നു — actions instant ആണ്, sync background-ൽ ആകും.",
-  },
-  {
-    q: "💸 stayidom-ന് എന്റെ payment-ൽ access ഉണ്ടോ?",
-    a: "ഇല്ല. stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest നേരിട്ട് നിങ്ങളുടെ UPI ID-ലേക്ക് pay ചെയ്യും. V1-ൽ no payment gateway — direct P2P payment.",
-  },
-  {
-    q: "👥 Guests stayidom-ൽ trust ചെയ്യുമോ? Booking.com ഇല്ലാതെ book ചെയ്യുമോ?",
-    a: "Yes. Property page-ൽ owner verification, WhatsApp instant contact, transparent policies, professional invoice — ഇതെല്ലാം guest trust build ചെയ്യും. Instagram-ൽ നിന്ന് direct booking convert rate ഉയർന്നതാണ്.",
-  },
-  {
-    q: "📦 Platform ഒഴിഞ്ഞ് പോകണം എന്ന് തോന്നിയാൽ data കിട്ടുമോ?",
-    a: "100%. Booking history, guest database, billing ledger — ഒരു click-ൽ CSV export. No restrictions, no lock-in, no extraction fee. Data always yours.",
-  },
-  {
-    q: "⏱️ Setup-ന് എത്ര time കൊടുക്കണം?",
-    a: "Property details fill ചെയ്‌ത് 5 minutes. stayidom team setup help ചെയ്യും. Domain live ആകും, WhatsApp link ready ആകും. ഇന്ന് register ചെയ്‌താൽ ഇന്ന് booking page live.",
-  },
-  {
-    q: "📄 Contract ഉണ്ടോ? Lock-in period ഉണ്ടോ?",
-    a: "ഇല്ല. Monthly subscription. Cancel anytime. Hidden fees ഇല്ല. Commission ഇല്ല. 14 days free trial-ൽ start ചെയ്യൂ.",
-  },
-];
-
-const PRICING = [
-  { rooms: "1–5 മുറികൾ",  setup: "₹5,000",  monthly: "₹1,000 / മാസം", tier: "starter", highlight: false },
-  { rooms: "6–10 മുറികൾ", setup: "₹10,000", monthly: "₹1,500 / മാസം", tier: "growth",  highlight: true  },
-  { rooms: "10+ മുറികൾ",  setup: "₹25,000", monthly: "₹2,000 / മാസം", tier: "pro",     highlight: false },
+  { q: "📡 Range കുറഞ്ഞിരിക്കുമ്പോഴും booking കിട്ടുമോ?",                     a: "Yes — guests city-ൽ ഇരുന്ന് book ചെയ്യും (good network). Guest page ഒരിക്കൽ load ആയാൽ PWA cache ചെയ്യും. Owner dashboard 2G-ൽ work ചെയ്യാൻ TanStack Query optimistic updates ഉപയോഗിക്കുന്നു — actions instant ആണ്, sync background-ൽ ആകും." },
+  { q: "💸 stayidom-ന് എന്റെ payment-ൽ access ഉണ്ടോ?",                         a: "ഇല്ല. stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest നേരിട്ട് നിങ്ങളുടെ UPI ID-ലേക്ക് pay ചെയ്യും. V1-ൽ no payment gateway — direct P2P payment." },
+  { q: "👥 Guests stayidom-ൽ trust ചെയ്യുമോ? Booking.com ഇല്ലാതെ book ചെയ്യുമോ?", a: "Yes. Property page-ൽ owner verification, WhatsApp instant contact, transparent policies, professional invoice — ഇതെല്ലാം guest trust build ചെയ്യും. Instagram-ൽ നിന്ന് direct booking convert rate ഉയർന്നതാണ്." },
+  { q: "📦 Platform ഒഴിഞ്ഞ് പോകണം എന്ന് തോന്നിയാൽ data കിട്ടുമോ?",            a: "100%. Booking history, guest database, billing ledger — ഒരു click-ൽ CSV export. No restrictions, no lock-in, no extraction fee. Data always yours." },
+  { q: "⏱️ Setup-ന് എത്ര time കൊടുക്കണം?",                                     a: "Property details fill ചെയ്‌ത് 5 minutes. stayidom team setup help ചെയ്യും. Domain live ആകും, WhatsApp link ready ആകും. ഇന്ന് register ചെയ്‌താൽ ഇന്ന് booking page live." },
+  { q: "📄 Contract ഉണ്ടോ? Lock-in period ഉണ്ടോ?",                              a: "ഇല്ല. Monthly subscription. Cancel anytime. Hidden fees ഇല്ല. Commission ഇല്ല. 14 days free trial-ൽ start ചെയ്യൂ." },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHARED UI PRIMITIVES
+// SHARED PRIMITIVES
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function SectionHeader({ title, sub, light = false }: { title: string; sub?: string; light?: boolean }) {
   return (
     <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
-      <h2 style={{
-        ...serif,
-        fontSize: "clamp(1.875rem,4vw,2.75rem)",
-        fontWeight: 700,
-        color: light ? "#fafaf9" : C.text,
-        marginBottom: "0.625rem",
-        lineHeight: 1.15,
-      }}>
+      <h2 style={{ ...serif, fontSize: "clamp(1.875rem,4vw,2.75rem)", fontWeight: 700, color: light ? "#fafaf9" : C.text, marginBottom: "0.625rem", lineHeight: 1.15 }}>
         {title}
       </h2>
       {sub && <p style={{ color: light ? "#a8a29e" : C.muted, fontSize: "1.0625rem" }}>{sub}</p>}
     </div>
-  );
-}
-
-function Pill({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return (
-    <span style={{
-      display: "inline-block",
-      padding: "0.3rem 0.875rem",
-      borderRadius: 99,
-      fontSize: "0.8125rem",
-      fontWeight: 600,
-      background: C.greenLight,
-      color: C.green,
-      ...style,
-    }}>
-      {children}
-    </span>
   );
 }
 
@@ -250,22 +133,14 @@ function Pill({ children, style }: { children: React.ReactNode; style?: React.CS
 
 function HeroBg() {
   return (
-    <svg
-      aria-hidden="true"
+    <svg aria-hidden="true"
       style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.07, pointerEvents: "none" }}
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 1200 600"
-      preserveAspectRatio="xMidYMid slice"
-    >
+      xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid slice">
       <g stroke={C.green} fill="none" strokeWidth="1.2">
-        <ellipse cx="600" cy="300" rx="560" ry="270" />
-        <ellipse cx="600" cy="300" rx="460" ry="220" />
-        <ellipse cx="600" cy="300" rx="360" ry="170" />
-        <ellipse cx="600" cy="300" rx="260" ry="120" />
-        <ellipse cx="200" cy="150" rx="280" ry="180" />
-        <ellipse cx="200" cy="150" rx="180" ry="115" />
-        <ellipse cx="1020" cy="480" rx="260" ry="165" />
-        <ellipse cx="1020" cy="480" rx="160" ry="105" />
+        <ellipse cx="600" cy="300" rx="560" ry="270" /><ellipse cx="600" cy="300" rx="460" ry="220" />
+        <ellipse cx="600" cy="300" rx="360" ry="170" /><ellipse cx="600" cy="300" rx="260" ry="120" />
+        <ellipse cx="200" cy="150" rx="280" ry="180" /><ellipse cx="200" cy="150" rx="180" ry="115" />
+        <ellipse cx="1020" cy="480" rx="260" ry="165" /><ellipse cx="1020" cy="480" rx="160" ry="105" />
       </g>
     </svg>
   );
@@ -277,56 +152,40 @@ function HeroBg() {
 
 function Navbar() {
   const [open, setOpen] = useState(false);
-
   return (
     <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-
-        {/* Logo */}
+        {/* Logo — always visible */}
         <a href="#" style={{ ...serif, fontSize: "1.25rem", fontWeight: 700 }}>
-          <span style={{ color: C.green }}>stay</span>
-          <span style={{ color: C.text }}>idom</span>
-          <span style={{ color: C.amber }}>.in</span>
+          <span style={{ color: C.green }}>stay</span><span style={{ color: C.text }}>idom</span><span style={{ color: C.amber }}>.in</span>
         </a>
 
-        {/* Desktop links */}
-        <div style={{ display: "flex", gap: "1.5rem", alignItems: "center", fontSize: "0.9375rem", color: C.muted }}
-          className="hidden md:flex">
-          {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h, l]) => (
-            <a key={h} href={h} style={{ color: C.muted, transition: "color .15s" }}
-              onMouseEnter={e => (e.currentTarget.style.color = C.text)}
-              onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
-              {l}
-            </a>
+        {/* Desktop nav — hidden on mobile */}
+        <div className="hidden md:flex" style={{ gap: "1.5rem", alignItems: "center", fontSize: "0.9375rem", color: C.muted }}>
+          {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
+            <a key={h} href={h} style={{ color: C.muted }} onMouseEnter={e => (e.currentTarget.style.color=C.text)} onMouseLeave={e => (e.currentTarget.style.color=C.muted)}>{l}</a>
           ))}
-          <a href="#signup" style={{ background: C.green, color: "#fff", padding: "0.5rem 1.25rem", borderRadius: 99, fontWeight: 700, fontSize: "0.9375rem" }}>
-            Free Demo
-          </a>
+          <a href="#signup" style={{ background: C.green, color: "#fff", padding: "0.5rem 1.25rem", borderRadius: 99, fontWeight: 700, fontSize: "0.9375rem" }}>Free Demo</a>
         </div>
 
-        {/* Hamburger */}
-        <button className="md:hidden" onClick={() => setOpen(v => !v)} aria-label="Toggle menu"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "0.5rem", display: "flex", flexDirection: "column", gap: 5 }}>
-          {[
-            open ? "rotate(45deg) translate(5px,5px)" : "",
-            open ? "opacity:0" : "",
-            open ? "rotate(-45deg) translate(5px,-5px)" : "",
-          ].map((t, i) => (
-            <span key={i} style={{ display: "block", width: 20, height: 2, background: C.text, transform: t, transition: "all .2s" }} />
-          ))}
+        {/* Hamburger — mobile only */}
+        <button
+          className="md:hidden"
+          onClick={() => setOpen(v=>!v)}
+          aria-label="Toggle menu"
+          style={{ background: "none", border: "none", cursor: "pointer", padding: "0.5rem", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5, flexShrink: 0 }}
+        >
+          <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", transform: open ? "rotate(45deg) translateY(7px)" : "none" }} />
+          <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", opacity: open ? 0 : 1 }} />
+          <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", transform: open ? "rotate(-45deg) translateY(-7px)" : "none" }} />
         </button>
       </div>
-
-      {/* Mobile drawer */}
       {open && (
         <div style={{ background: C.bg, borderTop: "1px solid #e7e5e4", padding: "1rem 1.25rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h, l]) => (
-            <a key={h} href={h} onClick={() => setOpen(false)} style={{ color: C.muted, fontSize: "1rem" }}>{l}</a>
+          {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
+            <a key={h} href={h} onClick={()=>setOpen(false)} style={{ color: C.muted, fontSize: "1rem" }}>{l}</a>
           ))}
-          <a href="#signup" onClick={() => setOpen(false)}
-            style={{ background: C.green, color: "#fff", padding: "0.75rem 1.25rem", borderRadius: 99, fontWeight: 700, textAlign: "center", fontSize: "1rem" }}>
-            Free Demo
-          </a>
+          <a href="#signup" onClick={()=>setOpen(false)} style={{ background: C.green, color: "#fff", padding: "0.75rem 1.25rem", borderRadius: 99, fontWeight: 700, textAlign: "center", fontSize: "1rem" }}>Free Demo</a>
         </div>
       )}
     </nav>
@@ -339,75 +198,25 @@ function Navbar() {
 
 function Hero() {
   return (
-    <section style={{
-      background: "linear-gradient(155deg,#f0fdf4 0%,#fafaf9 55%,#fef3c7 100%)",
-      padding: "5.5rem 1.25rem 4.5rem",
-      textAlign: "center",
-      position: "relative",
-      overflow: "hidden",
-    }}>
+    <section style={{ background: "linear-gradient(155deg,#f0fdf4 0%,#fafaf9 55%,#fef3c7 100%)", padding: "5.5rem 1.25rem 4.5rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
       <HeroBg />
       <div style={{ position: "relative", maxWidth: 760, margin: "0 auto" }}>
-
-        {/* Badge */}
-        <div style={{
-          display: "inline-flex", alignItems: "center", gap: "0.5rem",
-          padding: "0.375rem 1rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 500,
-          background: C.greenLight, color: C.green, border: `1px solid ${C.greenMid}`,
-          marginBottom: "2rem",
-        }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.375rem 1rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 500, background: C.greenLight, color: C.green, border: `1px solid ${C.greenMid}`, marginBottom: "2rem" }}>
           🌿 Vattavada &amp; Munnar Homestay Owners-ന്
         </div>
-
-        {/* Headline */}
-        <h1 style={{
-          ...serif,
-          fontSize: "clamp(2.75rem,7vw,5rem)",
-          fontWeight: 700,
-          lineHeight: 1.08,
-          letterSpacing: "-0.03em",
-          color: C.text,
-          marginBottom: "1.5rem",
-        }}>
+        <h1 style={{ ...serif, fontSize: "clamp(2.75rem,7vw,5rem)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.03em", color: C.text, marginBottom: "1.5rem" }}>
           നിങ്ങളുടെ Homestay.{" "}
-          <em style={{ color: C.green, fontStyle: "italic", display: "block" }}>
-            നിങ്ങളുടെ Platform.
-          </em>
+          <em style={{ color: C.green, fontStyle: "italic", display: "block" }}>നിങ്ങളുടെ Platform.</em>
         </h1>
-
-        {/* Sub-headline */}
         <p style={{ fontSize: "1.125rem", color: C.muted, maxWidth: 600, margin: "0 auto 2.5rem", lineHeight: 1.8 }}>
-          Branded booking website · Direct UPI payments · Guest invoicing · WhatsApp integration ·
-          Accounts tracking — എല്ലാം ഒരിടത്ത്. Booking.com &amp; MakeMyTrip-ന് കൊടുക്കുന്ന 15–25%
-          commission ഇനി നിങ്ങളുടെ business-ലേക്ക്.
+          Branded booking website · Direct UPI payments · Guest invoicing · WhatsApp integration · Accounts tracking — എല്ലാം ഒരിടത്ത്. Booking.com &amp; MakeMyTrip-ന് കൊടുക്കുന്ന 15–25% commission ഇനി നിങ്ങളുടെ business-ലേക്ക്.
         </p>
-
-        {/* CTAs */}
         <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "3.5rem" }}>
-          <a href="#signup" style={{
-            background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99,
-            fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)",
-          }}>
-            Free Demo — ഇന്ന് തന്നെ
-          </a>
-          <a href="https://bleafmudhouse.stayidom.in" target="_blank" rel="noopener noreferrer"
-            style={{
-              color: C.green, border: `1.5px solid ${C.green}`, padding: "0.9375rem 2rem",
-              borderRadius: 99, fontWeight: 600, fontSize: "1rem",
-            }}>
-            View Sample Site ↗
-          </a>
+          <a href="#signup" style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)" }}>Free Demo — ഇന്ന് തന്നെ</a>
+          <a href="https://bleafmudhouse.stayidom.in" target="_blank" rel="noopener noreferrer" style={{ color: C.green, border: `1.5px solid ${C.green}`, padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 600, fontSize: "1rem" }}>View Sample Site ↗</a>
         </div>
-
-        {/* Stats bar */}
-        <div style={{ display: "flex", gap: "2.5rem", justifyContent: "center", flexWrap: "wrap" }}>
-          {[
-            ["50+", "Homestays live"],
-            ["₹0", "Commission"],
-            ["Instant", "UPI Payouts"],
-            ["2G", "Ready"],
-            ["5 min", "Setup"],
-          ].map(([n, l]) => (
+        <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center", flexWrap: "wrap", rowGap: "1rem" }}>
+          {[["50+","Homestays live"],["₹0","Commission"],["Instant","UPI Payouts"],["2G","Ready"],["5 min","Setup"]].map(([n,l]) => (
             <div key={l} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem" }}>
               <span style={{ ...serif, fontSize: "2rem", fontWeight: 700, color: C.green }}>{n}</span>
               <span style={{ fontSize: "0.9375rem", color: C.muted }}>{l}</span>
@@ -427,10 +236,7 @@ function TrustBar() {
   return (
     <div style={{ background: C.green, padding: "1.125rem 1.25rem", textAlign: "center" }}>
       <p style={{ color: C.greenLight, fontSize: "0.9375rem", letterSpacing: "0.02em" }}>
-        Trusted by{" "}
-        <strong style={{ color: "#fff" }}>50+ properties</strong>{" "}
-        across Vattavada, Munnar &amp; the Cardamom Hills &nbsp;·&nbsp; Recommended by{" "}
-        <strong style={{ color: "#fff" }}>Vattavada Tourism Collective</strong>
+        Trusted by <strong style={{ color: "#fff" }}>50+ properties</strong> across Vattavada, Munnar &amp; the Cardamom Hills &nbsp;·&nbsp; Recommended by <strong style={{ color: "#fff" }}>Vattavada Tourism Collective</strong>
       </p>
     </div>
   );
@@ -444,25 +250,13 @@ function ProblemStrip() {
   return (
     <section style={{ background: C.dark, padding: "4.5rem 1.25rem", textAlign: "center" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
-        <p style={{
-          ...serif,
-          fontSize: "clamp(1.5rem,4vw,2.125rem)",
-          fontWeight: 700,
-          color: "#fafaf9",
-          marginBottom: "1.125rem",
-          lineHeight: 1.3,
-        }}>
+        <p style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2.125rem)", fontWeight: 700, color: "#fafaf9", marginBottom: "1.125rem", lineHeight: 1.3 }}>
           ₹10,000 booking-ൽ ₹2,500 Booking.com-ന്. 15 ദിവസം കഴിഞ്ഞ് payout.
         </p>
         <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.75rem" }}>
-          Booking.com &amp; MakeMyTrip ഓരോ booking-ൽ 15–25% commission എടുക്കുന്നു. പണം
-          15 ദിവസം കഴിഞ്ഞ് transfer ആകും. Guest-ന്റെ phone number നിങ്ങൾക്ക് കിട്ടില്ല.
-          Platform ഒഴിഞ്ഞ് നിങ്ങൾ ഒന്നും ചെയ്യാൻ കഴിയില്ല.
+          Booking.com &amp; MakeMyTrip ഓരോ booking-ൽ 15–25% commission എടുക്കുന്നു. പണം 15 ദിവസം കഴിഞ്ഞ് transfer ആകും. Guest-ന്റെ phone number നിങ്ങൾക്ക് കിട്ടില്ല.
         </p>
-        <span style={{
-          background: C.amber, color: C.dark, fontSize: "0.9375rem", fontWeight: 700,
-          padding: "0.5rem 1.375rem", borderRadius: 99, display: "inline-block",
-        }}>
+        <span style={{ background: C.amber, color: C.dark, fontSize: "0.9375rem", fontWeight: 700, padding: "0.5rem 1.375rem", borderRadius: 99, display: "inline-block" }}>
           stayidom.in — ഈ cycle ഇന്ന് break ചെയ്യാം
         </span>
       </div>
@@ -471,93 +265,101 @@ function ProblemStrip() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PHONE MOCKUP
+// PHONE MOCKUP — tall, realistic iPhone-style frame
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function PhoneMockup() {
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
-        style={{ maxWidth: 940, margin: "0 auto" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center" style={{ maxWidth: 940, margin: "0 auto" }}>
 
         {/* Phone frame */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
           <div style={{
-            width: 260, background: C.dark, borderRadius: "2.5rem",
-            padding: 10, boxShadow: "0 24px 60px rgba(0,0,0,.18)",
+            width: 280,
+            background: "#0f0f0f",
+            borderRadius: "3rem",
+            padding: "10px",
+            boxShadow: "0 32px 80px rgba(0,0,0,.28), 0 0 0 1px rgba(255,255,255,.06)",
           }}>
-            <div style={{ background: "#fff", borderRadius: "2rem", overflow: "hidden" }}>
-              {/* Notch */}
-              <div style={{ background: C.dark, height: 22, borderRadius: "0 0 1rem 1rem", width: "40%", margin: "0 auto" }} />
-              {/* Screen content */}
-              <div style={{ padding: "1rem 0.875rem" }}>
+            <div style={{ background: "#fff", borderRadius: "2.5rem", overflow: "hidden" }}>
+
+              {/* Status bar */}
+              <div style={{ background: "#0f0f0f", padding: "12px 20px 8px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative" }}>
+                <span style={{ color: "#fff", fontSize: "0.6875rem", fontWeight: 600 }}>9:41</span>
+                <div style={{ width: 90, height: 24, background: "#0f0f0f", borderRadius: 99, position: "absolute", left: "50%", transform: "translateX(-50%)" }} />
+                <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                  <span style={{ fontSize: "0.5rem", color: "#fff" }}>●●●</span>
+                  <span style={{ fontSize: "0.5625rem", color: "#fff" }}>📶</span>
+                  <span style={{ fontSize: "0.5625rem", color: "#fff" }}>🔋</span>
+                </div>
+              </div>
+
+              {/* Screen */}
+              <div style={{ padding: "0.875rem 1rem 1rem" }}>
+
                 {/* Hero image */}
                 <div style={{
                   background: "linear-gradient(160deg,#166534,#14532d)",
-                  height: 120, borderRadius: "0.75rem", display: "flex", alignItems: "center",
-                  justifyContent: "center", color: C.greenLight, fontSize: "0.6875rem",
-                  fontWeight: 600, letterSpacing: "0.03em", marginBottom: "0.75rem",
+                  height: 140, borderRadius: "1rem",
+                  display: "flex", flexDirection: "column",
+                  alignItems: "center", justifyContent: "center",
+                  color: C.greenLight, marginBottom: "0.875rem",
+                  position: "relative", overflow: "hidden",
                 }}>
-                  📍 Bleaf Mud House · Vattavada
+                  <div style={{ position: "absolute", inset: 0, opacity: 0.15, background: "radial-gradient(circle at 30% 70%,#4ade80,transparent)" }} />
+                  <span style={{ fontSize: "1.75rem", marginBottom: "0.375rem" }}>🌿</span>
+                  <span style={{ fontSize: "0.6875rem", fontWeight: 700, letterSpacing: "0.04em" }}>📍 Bleaf Mud House · Vattavada</span>
                 </div>
-                <p style={{ fontWeight: 700, fontSize: "0.875rem", color: C.text, marginBottom: "0.25rem" }}>
-                  Bleaf Mud House
-                </p>
-                <p style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: "0.625rem" }}>
-                  Vattavada, Munnar · ★ 4.9 · Open for bookings
-                </p>
-                {/* Room cards */}
+
+                {/* Property info */}
+                <p style={{ fontWeight: 700, fontSize: "0.9375rem", color: C.text, marginBottom: "0.2rem" }}>Bleaf Mud House</p>
+                <p style={{ fontSize: "0.6875rem", color: C.muted, marginBottom: "0.75rem" }}>Vattavada, Munnar · ★ 4.9 · Open for bookings</p>
+
+                {/* Date picker row */}
                 <div style={{ display: "flex", gap: "0.375rem", marginBottom: "0.75rem" }}>
-                  {[["Mud Suite","₹3,500/night"],["Forest Room","₹4,200/night"]].map(([name, price]) => (
-                    <div key={name} style={{
-                      flex: 1, background: C.greenLight, borderRadius: "0.5rem",
-                      padding: "0.4rem 0.375rem", fontSize: "0.5625rem", fontWeight: 600,
-                      color: C.green, textAlign: "center",
-                    }}>
-                      {name}<br />{price}
+                  {[["Check-in","June 15"],["Check-out","June 17"]].map(([label,val]) => (
+                    <div key={label} style={{ flex: 1, background: "#f5f5f4", borderRadius: "0.5rem", padding: "0.4rem 0.5rem", fontSize: "0.5625rem", color: C.text, border: "1px solid #e7e5e4" }}>
+                      <div style={{ color: C.muted, fontSize: "0.5rem", marginBottom: 1 }}>{label}</div>
+                      <div style={{ fontWeight: 700 }}>{val}</div>
                     </div>
                   ))}
                 </div>
+
+                {/* Room cards */}
+                <div style={{ display: "flex", gap: "0.375rem", marginBottom: "0.875rem" }}>
+                  {[["Mud Suite","₹3,500/night"],["Forest Room","₹4,200/night"]].map(([name,price]) => (
+                    <div key={name} style={{ flex: 1, background: C.greenLight, borderRadius: "0.625rem", padding: "0.5rem 0.375rem", fontSize: "0.5625rem", fontWeight: 600, color: C.green, textAlign: "center", border: `1px solid ${C.greenMid}` }}>
+                      {name}<br /><span style={{ fontWeight: 700, fontSize: "0.625rem" }}>{price}</span>
+                    </div>
+                  ))}
+                </div>
+
                 {/* Buttons */}
-                <div style={{
-                  background: C.green, color: "#fff", borderRadius: 99,
-                  padding: "0.4rem 0.5rem", fontSize: "0.625rem", fontWeight: 700,
-                  textAlign: "center", marginBottom: "0.375rem",
-                }}>
+                <div style={{ background: C.green, color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center", marginBottom: "0.4rem", boxShadow: "0 2px 8px rgba(22,101,52,.3)" }}>
                   Book Now — Pick Dates
                 </div>
-                <div style={{
-                  background: "#25D366", color: "#fff", borderRadius: 99,
-                  padding: "0.4rem 0.5rem", fontSize: "0.625rem", fontWeight: 700,
-                  textAlign: "center",
-                }}>
+                <div style={{ background: "#25D366", color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center" }}>
                   💬 Book via WhatsApp
                 </div>
               </div>
+
+              {/* Home bar */}
+              <div style={{ padding: "0.5rem 0 0.875rem", display: "flex", justifyContent: "center" }}>
+                <div style={{ width: 100, height: 4, background: "#1c1917", borderRadius: 99, opacity: 0.2 }} />
+              </div>
+
             </div>
           </div>
-          <p style={{ textAlign: "center", fontSize: "0.8125rem", color: C.muted, marginTop: "1rem" }}>
-            bleafmudhouse.stayidom.in
-          </p>
+          <p style={{ textAlign: "center", fontSize: "0.8125rem", color: C.muted, marginTop: "1.125rem" }}>bleafmudhouse.stayidom.in</p>
         </div>
 
         {/* Copy */}
         <div>
-          <h2 style={{ ...serif, fontSize: "clamp(1.5rem,3vw,2.25rem)", fontWeight: 700, color: C.text, marginBottom: "1rem", lineHeight: 1.3 }}>
-            Guests-ന് ഒരു professional booking page
-          </h2>
-          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1rem" }}>
-            Instagram bio-ൽ ഒരു link share ചെയ്‌താൽ മതി. Guests directly dates pick
-            ചെയ്ത് book ചെയ്യും — Booking.com-ന്റേതു പോലെ clean, fast, mobile-first.
-          </p>
-          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1.5rem" }}>
-            ഓരോ property-ക്കും unique subdomain. Guests-ന് confused ആകില്ല.
-            നിങ്ങളുടെ brand, നിങ്ങളുടെ identity.
-          </p>
-          <a href="https://bleafmudhouse.stayidom.in" target="_blank" rel="noopener noreferrer"
-            style={{ color: C.green, fontWeight: 600, fontSize: "0.9375rem", textDecoration: "underline" }}>
-            Live sample കാണൂ →
-          </a>
+          <h2 style={{ ...serif, fontSize: "clamp(1.5rem,3vw,2.25rem)", fontWeight: 700, color: C.text, marginBottom: "1rem", lineHeight: 1.3 }}>Guests-ന് ഒരു professional booking page</h2>
+          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1rem" }}>Instagram bio-ൽ ഒരു link share ചെയ്‌താൽ മതി. Guests directly dates pick ചെയ്ത് book ചെയ്യും — Booking.com-ന്റേതു പോലെ clean, fast, mobile-first.</p>
+          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1.5rem" }}>ഓരോ property-ക്കും unique subdomain. Guests-ന് confused ആകില്ല. നിങ്ങളുടെ brand, നിങ്ങളുടെ identity.</p>
+          <a href="https://bleafmudhouse.stayidom.in" target="_blank" rel="noopener noreferrer" style={{ color: C.green, fontWeight: 600, fontSize: "0.9375rem", textDecoration: "underline" }}>Live sample കാണൂ →</a>
         </div>
       </div>
     </section>
@@ -570,56 +372,28 @@ function PhoneMockup() {
 
 function WhatsAppFlow() {
   const steps = [
-    { icon: "🔍", bg: "#f0fdf4", border: C.greenMid,  title: "Guest discovers",     desc: "Instagram / WhatsApp forward / Google search → property page" },
-    { icon: "💬", bg: "#f0fdf4", border: "#25D366",    title: "One tap to book",     desc: '"Book via WhatsApp" button → pre-filled message opens instantly' },
-    { icon: "📲", bg: "#f0fdf4", border: C.amber,      title: "Owner gets notified", desc: "WhatsApp message arrives: Room, Dates, Guest name & Phone" },
-    { icon: "✅", bg: C.greenLight, border: C.green,   title: "Confirm & collect",   desc: "Owner confirms, sends UPI link. Payment direct to your account." },
+    { icon: "🔍", bg: "#f0fdf4", border: C.greenMid, title: "Guest discovers",     desc: "Instagram / WhatsApp forward / Google search → property page" },
+    { icon: "💬", bg: "#f0fdf4", border: "#25D366",  title: "One tap to book",     desc: '"Book via WhatsApp" button → pre-filled message opens instantly' },
+    { icon: "📲", bg: "#f0fdf4", border: C.amber,    title: "Owner gets notified", desc: "WhatsApp message arrives: Room, Dates, Guest name & Phone" },
+    { icon: "✅", bg: C.greenLight, border: C.green, title: "Confirm & collect",   desc: "Owner confirms, sends UPI link. Payment direct to your account." },
   ];
-
   return (
     <section style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader
-          title="WhatsApp — Guest-ൽ നിന്ന് നിങ്ങളിലേക്ക് നേരിട്ട്"
-          sub="ഒരു button tap — Guest-ന്റെ WhatsApp-ൽ pre-filled message ready. No app download, no registration."
-        />
-
-        {/* Steps */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6"
-          style={{ position: "relative" }}>
-          {/* Connecting line */}
-          <div className="hidden md:block" style={{
-            position: "absolute", top: 28, left: "12%", right: "12%",
-            height: 2, background: `linear-gradient(90deg,#25D366,${C.green})`, zIndex: 0,
-          }} />
+        <SectionHeader title="WhatsApp — Guest-ൽ നിന്ന് നിങ്ങളിലേക്ക് നേരിട്ട്" sub="ഒരു button tap — Guest-ന്റെ WhatsApp-ൽ pre-filled message ready. No app download, no registration." />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6" style={{ position: "relative" }}>
+          <div className="hidden md:block" style={{ position: "absolute", top: 28, left: "12%", right: "12%", height: 2, background: `linear-gradient(90deg,#25D366,${C.green})`, zIndex: 0 }} />
           {steps.map(({ icon, bg, border, title, desc }) => (
             <div key={title} style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%", background: bg,
-                border: `2px solid ${border}`, display: "flex", alignItems: "center",
-                justifyContent: "center", margin: "0 auto 0.875rem", fontSize: "1.375rem",
-              }}>
-                {icon}
-              </div>
+              <div style={{ width: 56, height: 56, borderRadius: "50%", background: bg, border: `2px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 0.875rem", fontSize: "1.375rem" }}>{icon}</div>
               <h4 style={{ fontSize: "0.9375rem", fontWeight: 700, color: C.text, marginBottom: "0.375rem" }}>{title}</h4>
               <p style={{ fontSize: "0.875rem", color: C.muted, lineHeight: 1.6 }}>{desc}</p>
             </div>
           ))}
         </div>
-
-        {/* Sample message preview */}
-        <div style={{
-          marginTop: "1.75rem", background: C.greenLight,
-          border: `1px solid ${C.greenMid}`, borderRadius: "1rem",
-          padding: "1.125rem 1.5rem",
-        }}>
-          <p style={{ fontSize: "0.9375rem", color: "#14532d", fontWeight: 600, marginBottom: "0.375rem" }}>
-            💬 Sample pre-filled message guests send:
-          </p>
-          <p style={{ fontSize: "0.9375rem", color: C.green, fontStyle: "italic", lineHeight: 1.7 }}>
-            "Hi, I'd like to book the Mud Suite at Bleaf Mud House. Check-in: June 15.
-            Check-out: June 17. Guests: 2. My name: Anoop Kumar. Phone: 98765XXXXX"
-          </p>
+        <div style={{ marginTop: "1.75rem", background: C.greenLight, border: `1px solid ${C.greenMid}`, borderRadius: "1rem", padding: "1.125rem 1.5rem" }}>
+          <p style={{ fontSize: "0.9375rem", color: "#14532d", fontWeight: 600, marginBottom: "0.375rem" }}>💬 Sample pre-filled message guests send:</p>
+          <p style={{ fontSize: "0.9375rem", color: C.green, fontStyle: "italic", lineHeight: 1.7 }}>"Hi, I'd like to book the Mud Suite at Bleaf Mud House. Check-in: June 15. Check-out: June 17. Guests: 2. My name: Anoop Kumar. Phone: 98765XXXXX"</p>
         </div>
       </div>
     </section>
@@ -632,40 +406,20 @@ function WhatsAppFlow() {
 
 function DirectPayment() {
   const methods = [
-    { icon: "📲", label: "UPI / Google Pay / PhonePe",  desc: "Instant. Guest scans your QR or sends to your UPI ID." },
-    { icon: "🏦", label: "Bank Transfer (NEFT/IMPS)",   desc: "Your account details shared. Money arrives same day." },
-    { icon: "💵", label: "Cash on Arrival",              desc: "Dashboard records it. Advance + balance tracked automatically." },
+    { icon: "📲", label: "UPI / Google Pay / PhonePe", desc: "Instant. Guest scans your QR or sends to your UPI ID." },
+    { icon: "🏦", label: "Bank Transfer (NEFT/IMPS)",  desc: "Your account details shared. Money arrives same day." },
+    { icon: "💵", label: "Cash on Arrival",             desc: "Dashboard records it. Advance + balance tracked automatically." },
   ];
-
   return (
     <section style={{ background: C.dark, padding: "5rem 1.25rem" }}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
-        style={{ maxWidth: 940, margin: "0 auto" }}>
-
-        {/* Copy */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center" style={{ maxWidth: 940, margin: "0 auto" }}>
         <div>
-          <h2 style={{ ...serif, fontSize: "clamp(1.75rem,3.5vw,2.5rem)", fontWeight: 700, color: "#fff", marginBottom: "1rem", lineHeight: 1.2 }}>
-            പണം നേരിട്ട് നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക്
-          </h2>
-          <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.5rem" }}>
-            stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest pay ചെയ്‌ത്
-            0 seconds-ൽ നിങ്ങളുടെ UPI-ൽ കിട്ടും. 15 ദിവസം wait ചെയ്യേണ്ടതില്ല.
-          </p>
-
-          {/* Payment methods */}
+          <h2 style={{ ...serif, fontSize: "clamp(1.75rem,3.5vw,2.5rem)", fontWeight: 700, color: "#fff", marginBottom: "1rem", lineHeight: 1.2 }}>പണം നേരിട്ട് നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക്</h2>
+          <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.5rem" }}>stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest pay ചെയ്‌ത് 0 seconds-ൽ നിങ്ങളുടെ UPI-ൽ കിട്ടും. 15 ദിവസം wait ചെയ്യേണ്ടതില്ല.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", marginBottom: "1.25rem" }}>
             {methods.map(({ icon, label, desc }) => (
-              <div key={label} style={{
-                background: "#292524", border: "1px solid #44403c", borderRadius: "0.875rem",
-                padding: "0.875rem 1.125rem", display: "flex", alignItems: "center", gap: "0.875rem",
-              }}>
-                <div style={{
-                  width: 38, height: 38, borderRadius: "0.5rem", background: C.greenLight,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1.125rem", flexShrink: 0,
-                }}>
-                  {icon}
-                </div>
+              <div key={label} style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "0.875rem", padding: "0.875rem 1.125rem", display: "flex", alignItems: "center", gap: "0.875rem" }}>
+                <div style={{ width: 38, height: 38, borderRadius: "0.5rem", background: C.greenLight, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.125rem", flexShrink: 0 }}>{icon}</div>
                 <div>
                   <div style={{ fontSize: "0.9375rem", fontWeight: 600, color: "#fff" }}>{label}</div>
                   <div style={{ fontSize: "0.8125rem", color: "#a8a29e" }}>{desc}</div>
@@ -673,39 +427,22 @@ function DirectPayment() {
               </div>
             ))}
           </div>
-
-          {/* No wait callout */}
-          <div style={{
-            background: "#2d2208", border: `1px solid ${C.amber}`, borderRadius: "1rem",
-            padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.875rem",
-          }}>
+          <div style={{ background: "#2d2208", border: `1px solid ${C.amber}`, borderRadius: "1rem", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.875rem" }}>
             <span style={{ fontSize: "1.375rem", flexShrink: 0 }}>⏱️</span>
             <p style={{ fontSize: "0.9375rem", color: "#fef3c7", lineHeight: 1.6 }}>
-              Booking.com average payout:{" "}
-              <strong style={{ color: C.amber }}>14–21 days after checkout.</strong>{" "}
-              stayidom.in: <strong style={{ color: C.amber }}>Instant. No middleman.</strong>
+              Booking.com average payout: <strong style={{ color: C.amber }}>14–21 days after checkout.</strong> stayidom.in: <strong style={{ color: C.amber }}>Instant. No middleman.</strong>
             </p>
           </div>
         </div>
-
-        {/* Live settlements panel */}
-        <div style={{
-          background: "#292524", border: "1px solid #44403c",
-          borderRadius: "1.25rem", padding: "1.75rem",
-        }}>
-          <p style={{ fontSize: "0.75rem", color: "#a8a29e", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "1.125rem" }}>
-            Today's Settlements
-          </p>
+        <div style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "1.25rem", padding: "1.75rem" }}>
+          <p style={{ fontSize: "0.75rem", color: "#a8a29e", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "1.125rem" }}>Today's Settlements</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
             {[
-              { name: "Ravi Nair · Mud Suite",     sub: "UPI · 2 minutes ago",        amount: "₹7,000",  amountColor: "#4ade80", bg: "#1c2e22", border: C.green },
-              { name: "Priya S · Forest Room",      sub: "Advance · Cash",             amount: "₹3,500",  amountColor: "#4ade80", bg: "#1c2e22", border: C.green },
-              { name: "Anoop K · Tent Stay",        sub: "Balance pending · June 20",  amount: "₹4,200",  amountColor: C.amber,   bg: "#2d2208", border: C.amber },
+              { name: "Ravi Nair · Mud Suite",   sub: "UPI · 2 minutes ago",       amount: "₹7,000", amountColor: "#4ade80", bg: "#1c2e22", border: C.green },
+              { name: "Priya S · Forest Room",    sub: "Advance · Cash",            amount: "₹3,500", amountColor: "#4ade80", bg: "#1c2e22", border: C.green },
+              { name: "Anoop K · Tent Stay",      sub: "Balance pending · June 20", amount: "₹4,200", amountColor: C.amber,   bg: "#2d2208", border: C.amber },
             ].map(({ name, sub, amount, amountColor, bg, border }) => (
-              <div key={name} style={{
-                background: bg, border: `1px solid ${border}`, borderRadius: "0.75rem",
-                padding: "0.875rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center",
-              }}>
+              <div key={name} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "0.75rem", padding: "0.875rem 1rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ fontSize: "0.875rem", color: "#86efac", fontWeight: 600 }}>{name}</div>
                   <div style={{ fontSize: "0.75rem", color: "#4ade80" }}>{sub}</div>
@@ -732,35 +469,22 @@ function ComparisonTable() {
   return (
     <section id="compare" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader
-          title="stayidom.in vs Booking.com & MakeMyTrip"
-          sub="ഓരോ row-ഉം compare ചെയ്ത് decide ചെയ്യൂ"
-        />
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontSize: "0.9375rem" }}>
+        <SectionHeader title="stayidom.in vs Booking.com & MakeMyTrip" sub="ഓരോ row-ഉം compare ചെയ്ത് decide ചെയ്യൂ" />
+        <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", borderRadius: "0.75rem" }}>
+          <table style={{ width: "100%", minWidth: 560, borderCollapse: "separate", borderSpacing: 0, fontSize: "0.9375rem" }}>
             <thead>
               <tr>
                 <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", width: "26%" }}>Feature</th>
-                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: "#fff1f2", color: "#991b1b", width: "37%" }}>
-                  🚫 Booking.com / MakeMyTrip
-                </th>
-                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: C.greenLight, color: C.green, width: "37%" }}>
-                  ✅ stayidom.in
-                </th>
+                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: "#fff1f2", color: "#991b1b", width: "37%" }}>🚫 Booking.com / MakeMyTrip</th>
+                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: C.greenLight, color: C.green, width: "37%" }}>✅ stayidom.in</th>
               </tr>
             </thead>
             <tbody>
               {COMPARISON.map(({ feature, ota, stayidom }, i) => (
                 <tr key={feature}>
-                  <td style={{ padding: "0.875rem 1.125rem", fontWeight: 600, color: C.text, borderBottom: i < COMPARISON.length - 1 ? "1px solid #f5f5f4" : "none", verticalAlign: "top" }}>
-                    {feature}
-                  </td>
-                  <td style={{ padding: "0.875rem 1.125rem", background: "#fff8f8", color: "#7f1d1d", borderBottom: i < COMPARISON.length - 1 ? "1px solid #f5f5f4" : "none", lineHeight: 1.6, verticalAlign: "top" }}>
-                    {ota}
-                  </td>
-                  <td style={{ padding: "0.875rem 1.125rem", background: "#f0fdf8", color: "#14532d", borderBottom: i < COMPARISON.length - 1 ? "1px solid #f5f5f4" : "none", lineHeight: 1.6, verticalAlign: "top", fontWeight: 500 }}>
-                    {stayidom}
-                  </td>
+                  <td style={{ padding: "0.875rem 1.125rem", fontWeight: 600, color: C.text, borderBottom: i < COMPARISON.length-1 ? "1px solid #f5f5f4" : "none", verticalAlign: "top" }}>{feature}</td>
+                  <td style={{ padding: "0.875rem 1.125rem", background: "#fff8f8", color: "#7f1d1d", borderBottom: i < COMPARISON.length-1 ? "1px solid #f5f5f4" : "none", lineHeight: 1.6, verticalAlign: "top" }}>{ota}</td>
+                  <td style={{ padding: "0.875rem 1.125rem", background: "#f0fdf8", color: "#14532d", borderBottom: i < COMPARISON.length-1 ? "1px solid #f5f5f4" : "none", lineHeight: 1.6, verticalAlign: "top", fontWeight: 500 }}>{stayidom}</td>
                 </tr>
               ))}
             </tbody>
@@ -779,10 +503,7 @@ function GuestTrustSignals() {
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader
-          title="Guests-ന് trust ചെയ്യാൻ കാരണം"
-          sub="Booking.com ഇല്ലാതെ guest book ചെയ്യുമോ? — ഈ trust signals ഉണ്ടെങ്കിൽ, yes."
-        />
+        <SectionHeader title="Guests-ന് trust ചെയ്യാൻ കാരണം" sub="Booking.com ഇല്ലാതെ guest book ചെയ്യുമോ? — ഈ trust signals ഉണ്ടെങ്കിൽ, yes." />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {TRUST_CARDS.map(({ icon, title, desc, badges }) => (
             <div key={title} style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "1.75rem" }}>
@@ -790,11 +511,7 @@ function GuestTrustSignals() {
               <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem" }}>{title}</h3>
               <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.7, marginBottom: "0.875rem" }}>{desc}</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
-                {badges.map(b => (
-                  <span key={b} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.25rem 0.625rem", borderRadius: 99, background: C.greenLight, color: C.green }}>
-                    {b}
-                  </span>
-                ))}
+                {badges.map(b => <span key={b} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.25rem 0.625rem", borderRadius: 99, background: C.greenLight, color: C.green }}>{b}</span>)}
               </div>
             </div>
           ))}
@@ -828,34 +545,27 @@ function FeaturesGrid() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ACCOUNTS & TRACKING PANEL
+// ACCOUNTS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function AccountsPanel() {
   const rows = [
     { id: "#1042", name: "Ravi Nair",                   pct: 100, barColor: C.green,   label: "Paid ✓",   labelColor: C.green   },
-    { id: "#1043", name: "Priya S · ₹6,000 of ₹9,000", pct: 66,  barColor: C.amber,   label: "Part paid",labelColor: "#d97706"  },
+    { id: "#1043", name: "Priya S · ₹6,000 of ₹9,000", pct: 66,  barColor: C.amber,   label: "Part paid", labelColor: "#d97706" },
     { id: "#1044", name: "Anoop K",                     pct: 0,   barColor: "#dc2626", label: "Pending",  labelColor: "#dc2626" },
   ];
-
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center"
-        style={{ maxWidth: 940, margin: "0 auto" }}>
-
-        {/* Mock dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center" style={{ maxWidth: 940, margin: "0 auto" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
-          {/* Summary */}
           <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1rem", padding: "1.125rem", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.5rem", textAlign: "center" }}>
             {[["₹84,500","Collected",C.green],["₹12,000","Pending",C.amber],["23","Bookings",C.text]].map(([v,l,col]) => (
-              <div key={l}>
+              <div key={l as string}>
                 <div style={{ ...serif, fontSize: "1.375rem", fontWeight: 700, color: col as string }}>{v}</div>
                 <div style={{ fontSize: "0.75rem", color: C.muted, marginTop: 2 }}>{l}</div>
               </div>
             ))}
           </div>
-
-          {/* Booking rows */}
           {rows.map(({ id, name, pct, barColor, label, labelColor }) => (
             <div key={id} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "0.875rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.875rem" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -867,28 +577,17 @@ function AccountsPanel() {
               <span style={{ fontSize: "0.9375rem", fontWeight: 600, color: labelColor, whiteSpace: "nowrap" }}>{label}</span>
             </div>
           ))}
-
-          {/* CSV row */}
           <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "0.875rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <span style={{ fontSize: "0.9375rem", color: C.muted }}>📥 May 2026 bookings.csv</span>
             <span style={{ fontSize: "0.8125rem", fontWeight: 600, background: C.greenLight, color: C.green, padding: "0.25rem 0.875rem", borderRadius: 99 }}>Export ready</span>
           </div>
         </div>
-
-        {/* Copy */}
         <div>
-          <h2 style={{ ...serif, fontSize: "clamp(1.625rem,3vw,2.25rem)", fontWeight: 700, color: C.text, marginBottom: "1rem", lineHeight: 1.3 }}>
-            Accounts &amp; Payment Tracking — ഒരു place-ൽ
-          </h2>
-          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1.25rem" }}>
-            ഓരോ booking-ന്റെയും payment real-time-ൽ track ചെയ്യാം. Month end-ൽ CSV export
-            ചെയ്‌ത് accountant-ന് share ചെയ്യൂ. Tax season easy ആകും.
-          </p>
+          <h2 style={{ ...serif, fontSize: "clamp(1.625rem,3vw,2.25rem)", fontWeight: 700, color: C.text, marginBottom: "1rem", lineHeight: 1.3 }}>Accounts &amp; Payment Tracking — ഒരു place-ൽ</h2>
+          <p style={{ fontSize: "1.0625rem", color: C.muted, lineHeight: 1.8, marginBottom: "1.25rem" }}>ഓരോ booking-ന്റെയും payment real-time-ൽ track ചെയ്യാം. Month end-ൽ CSV export ചെയ്‌ത് accountant-ന് share ചെയ്യൂ. Tax season easy ആകും.</p>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
             {["📊 Revenue overview","🧾 Auto invoice","💰 Part-payment tracking","📥 CSV export","📱 Mobile-first"].map(t => (
-              <span key={t} style={{ fontSize: "0.875rem", fontWeight: 500, background: C.greenLight, color: C.green, border: `1px solid ${C.greenMid}`, padding: "0.375rem 1rem", borderRadius: 99 }}>
-                {t}
-              </span>
+              <span key={t} style={{ fontSize: "0.875rem", fontWeight: 500, background: C.greenLight, color: C.green, border: `1px solid ${C.greenMid}`, padding: "0.375rem 1rem", borderRadius: 99 }}>{t}</span>
             ))}
           </div>
         </div>
@@ -903,74 +602,37 @@ function AccountsPanel() {
 
 function TwoGSimulator() {
   const [simOn, setSimOn] = useState(false);
-
   const items = [
     { normal: "Maps SDK → Native deep link (saves 1.5 MB)",        active: "✅ Heavy Maps SDK removed → Native deep link active (1.5 MB saved)" },
     { normal: "Images → Auto-compressed WebP (saves 600 KB)",      active: "✅ Dynamic images → Ultra-light WebP served (600 KB saved)" },
     { normal: "Fonts → System fonts on guest page (saves 80 KB)",  active: "✅ Web fonts dropped → System fonts loaded (80 KB saved)" },
     { normal: "PWA shell cached → Works offline after first load", active: "✅ PWA shell cached → Page loads offline with zero data" },
   ];
-
   return (
     <section style={{ background: C.dark, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader light title="Range കുറഞ്ഞാലും booking കിട്ടും" sub="Vattavada-ൽ 2G signal-ൽ ഞങ്ങളുടെ platform exactly how ആണ് load ആകുന്നത് — see for yourself" />
-
         <div style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "1.5rem", padding: "2.5rem", maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
-          <h3 style={{ ...serif, fontSize: "1.5rem", fontWeight: 700, color: "#fafaf9", marginBottom: "0.625rem" }}>
-            📡 2G Network Optimizer
-          </h3>
-          <p style={{ color: "#a8a29e", fontSize: "1rem", marginBottom: "2rem" }}>
-            Simulate ചെയ്‌ത് കണ്ടോളൂ — weak signal-ൽ stayidom.in guest page exactly how ആണ് load ആകുന്നത്
-          </p>
-
-          {/* Signal bars */}
+          <h3 style={{ ...serif, fontSize: "1.5rem", fontWeight: 700, color: "#fafaf9", marginBottom: "0.625rem" }}>📡 2G Network Optimizer</h3>
+          <p style={{ color: "#a8a29e", fontSize: "1rem", marginBottom: "2rem" }}>Simulate ചെയ്‌ത് കണ്ടോളൂ — weak signal-ൽ stayidom.in guest page exactly how ആണ് load ആകുന്നത്</p>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 3, justifyContent: "center", marginBottom: "0.5rem" }}>
-            {[8, 14, 20, 26, 32].map((h, i) => (
-              <div key={i} style={{
-                width: 8, height: h, borderRadius: 2,
-                background: simOn && i > 1 ? "#44403c" : "#4ade80",
-                transition: "background .3s",
-              }} />
-            ))}
+            {[8,14,20,26,32].map((h,i) => <div key={i} style={{ width: 8, height: h, borderRadius: 2, background: simOn && i>1 ? "#44403c" : "#4ade80", transition: "background .3s" }} />)}
           </div>
-          <p style={{ fontSize: "0.875rem", color: "#a8a29e", marginBottom: "1.5rem" }}>
-            {simOn ? "📶 2G / E — Low Signal Mode Active" : "📶 Full Signal — Normal Mode"}
-          </p>
-
-          <button
-            onClick={() => setSimOn(v => !v)}
-            style={{
-              background: simOn ? "#ef4444" : C.amber, color: simOn ? "#fff" : C.dark,
-              border: "none", padding: "0.875rem 2rem", borderRadius: 99,
-              fontSize: "1rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
-              transition: "background .2s",
-            }}
-          >
+          <p style={{ fontSize: "0.875rem", color: "#a8a29e", marginBottom: "1.5rem" }}>{simOn ? "📶 2G / E — Low Signal Mode Active" : "📶 Full Signal — Normal Mode"}</p>
+          <button onClick={() => setSimOn(v=>!v)} style={{ background: simOn ? "#ef4444" : C.amber, color: simOn ? "#fff" : C.dark, border: "none", padding: "0.875rem 2rem", borderRadius: 99, fontSize: "1rem", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", transition: "background .2s" }}>
             {simOn ? "Exit Low Signal Mode" : "Simulate Low Signal Mode"}
           </button>
-
-          {/* Stats */}
           <div className="grid grid-cols-3 gap-3 mt-8">
-            {[
-              { label: "Page weight",   val: "180 KB", color: "#4ade80" },
-              { label: "2G load time",  val: "< 4s",   color: "#4ade80" },
-              { label: "Maps SDK",      val: "0 KB",   color: "#4ade80" },
-            ].map(({ label, val, color }) => (
+            {[{ label:"Page weight",val:"180 KB" },{ label:"2G load time",val:"< 4s" },{ label:"Maps SDK",val:"0 KB" }].map(({ label,val }) => (
               <div key={label} style={{ background: C.dark, border: "1px solid #292524", borderRadius: "0.875rem", padding: "1rem", textAlign: "center" }}>
-                <div style={{ ...serif, fontSize: "1.375rem", fontWeight: 700, color, marginBottom: "0.25rem" }}>{val}</div>
+                <div style={{ ...serif, fontSize: "1.375rem", fontWeight: 700, color: "#4ade80", marginBottom: "0.25rem" }}>{val}</div>
                 <div style={{ fontSize: "0.8125rem", color: "#a8a29e" }}>{label}</div>
               </div>
             ))}
           </div>
-
-          {/* Item list */}
           <div style={{ textAlign: "left", marginTop: "1.5rem", display: "flex", flexDirection: "column", gap: "0.625rem" }}>
             {items.map(({ normal, active }) => (
-              <div key={normal} style={{
-                background: C.dark, borderRadius: "0.75rem", padding: "0.75rem 1rem",
-                display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.9375rem",
-              }}>
+              <div key={normal} style={{ background: C.dark, borderRadius: "0.75rem", padding: "0.75rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", fontSize: "0.9375rem" }}>
                 <div style={{ width: 10, height: 10, borderRadius: "50%", flexShrink: 0, background: "#4ade80" }} />
                 <span style={{ color: "#86efac" }}>{simOn ? active : normal}</span>
               </div>
@@ -992,37 +654,28 @@ function SavingsCalculator() {
   const commission  = Math.round(bookings * rate * 0.2);
   const stayidomFee = 1000;
   const saved       = Math.max(0, commission - stayidomFee);
-
   return (
     <section style={{ background: C.dark, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader light title="നിങ്ങൾ എത്ര save ചെയ്യും?" sub="Sliders move ചെയ്‌ത് നോക്കൂ" />
-
         <div style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "1.5rem", padding: "2.25rem", maxWidth: 680, margin: "0 auto" }}>
-          {/* Sliders */}
           {[
-            { id: "b", label: "ഒരു മാസം bookings", min: 5, max: 80, step: 1, val: bookings, display: String(bookings), set: setBookings },
-            { id: "r", label: "Average room rate",  min: 500, max: 10000, step: 100, val: rate, display: `₹${rate.toLocaleString("en-IN")}`, set: setRate },
+            { id:"b", label:"ഒരു മാസം bookings", min:5,   max:80,    step:1,   val:bookings, display:String(bookings),                 set:setBookings },
+            { id:"r", label:"Average room rate",  min:500, max:10000, step:100, val:rate,     display:`₹${rate.toLocaleString("en-IN")}`, set:setRate },
           ].map(({ id, label, min, max, step, val, display, set }) => (
             <div key={id} style={{ marginBottom: "2rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
                 <label htmlFor={id} style={{ fontSize: "0.9375rem", color: "#a8a29e" }}>{label}</label>
                 <span style={{ ...serif, fontSize: "1.375rem", fontWeight: 700, color: C.amber }}>{display}</span>
               </div>
-              <input
-                id={id} type="range" min={min} max={max} step={step} value={val}
-                onChange={e => set(Number(e.target.value))}
-                style={{ width: "100%", accentColor: C.amber, cursor: "pointer" }}
-              />
+              <input id={id} type="range" min={min} max={max} step={step} value={val} onChange={e => set(Number(e.target.value))} style={{ width: "100%", accentColor: C.amber, cursor: "pointer" }} />
             </div>
           ))}
-
-          {/* Results */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
-              { label: "Platform commission (20%)", val: `₹${commission.toLocaleString("en-IN")}`, bg: "#3f2828", border: "#7f1d1d", color: "#fca5a5" },
-              { label: "stayidom cost",              val: `₹${stayidomFee.toLocaleString("en-IN")}`, bg: "#1c2e22", border: C.green,   color: "#86efac" },
-              { label: "നിങ്ങൾ save ചെയ്യും",        val: `₹${saved.toLocaleString("en-IN")}`,       bg: "#2d2208", border: C.amber,   color: "#fbbf24" },
+              { label:"Platform commission (20%)", val:`₹${commission.toLocaleString("en-IN")}`, bg:"#3f2828", border:"#7f1d1d", color:"#fca5a5" },
+              { label:"stayidom cost",              val:`₹${stayidomFee.toLocaleString("en-IN")}`, bg:"#1c2e22", border:C.green,   color:"#86efac" },
+              { label:"നിങ്ങൾ save ചെയ്യും",        val:`₹${saved.toLocaleString("en-IN")}`,       bg:"#2d2208", border:C.amber,   color:"#fbbf24" },
             ].map(({ label, val, bg, border, color }) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "0.875rem", padding: "1.125rem", textAlign: "center" }}>
                 <p style={{ fontSize: "0.875rem", color: "#a8a29e", marginBottom: "0.5rem" }}>{label}</p>
@@ -1048,13 +701,9 @@ function Testimonials() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {TESTIMONIALS.map(({ name, property, quote, saving }) => (
             <div key={name} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.25rem", padding: "1.875rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <p style={{ fontSize: "1rem", color: "#44403c", lineHeight: 1.8, flex: 1, fontStyle: "italic" }}>
-                "{quote}"
-              </p>
+              <p style={{ fontSize: "1rem", color: "#44403c", lineHeight: 1.8, flex: 1, fontStyle: "italic" }}>"{quote}"</p>
               <div>
-                <span style={{ display: "inline-block", fontSize: "0.875rem", fontWeight: 600, background: C.greenLight, color: C.green, padding: "0.3125rem 0.875rem", borderRadius: 99, marginBottom: "0.625rem" }}>
-                  {saving}
-                </span>
+                <span style={{ display: "inline-block", fontSize: "0.875rem", fontWeight: 600, background: C.greenLight, color: C.green, padding: "0.3125rem 0.875rem", borderRadius: 99, marginBottom: "0.625rem" }}>{saving}</span>
                 <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: C.text }}>{name}</p>
                 <p style={{ fontSize: "0.875rem", color: C.muted }}>{property}</p>
               </div>
@@ -1072,7 +721,6 @@ function Testimonials() {
 
 function FAQ() {
   const [openIndex, setOpenIndex] = useState<number>(0);
-
   return (
     <section id="faq" style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
@@ -1082,24 +730,11 @@ function FAQ() {
             const isOpen = openIndex === i;
             return (
               <div key={q} style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1rem", overflow: "hidden" }}>
-                <button
-                  onClick={() => setOpenIndex(isOpen ? -1 : i)}
-                  style={{
-                    width: "100%", padding: "1.125rem 1.25rem", background: "none", border: "none",
-                    cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center",
-                    textAlign: "left", fontSize: "1rem", fontWeight: 700, color: C.text, fontFamily: "inherit",
-                  }}
-                >
+                <button onClick={() => setOpenIndex(isOpen ? -1 : i)} style={{ width: "100%", padding: "1.125rem 1.25rem", background: "none", border: "none", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", textAlign: "left", fontSize: "1rem", fontWeight: 700, color: C.text, fontFamily: "inherit" }}>
                   {q}
-                  <span style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .25s", fontSize: "0.875rem", color: C.green, flexShrink: 0, marginLeft: "1rem" }}>
-                    ▾
-                  </span>
+                  <span style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform .25s", fontSize: "0.875rem", color: C.green, flexShrink: 0, marginLeft: "1rem" }}>▾</span>
                 </button>
-                {isOpen && (
-                  <div style={{ padding: "0 1.25rem 1.125rem" }}>
-                    <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.8 }}>{a}</p>
-                  </div>
-                )}
+                {isOpen && <div style={{ padding: "0 1.25rem 1.125rem" }}><p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.8 }}>{a}</p></div>}
               </div>
             );
           })}
@@ -1113,57 +748,220 @@ function FAQ() {
 // PRICING
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Feature comparison rows — null = not included, true = included, string = custom label
+const FEATURE_ROWS: {
+  category: string;
+  features: { label: string; starter: true | null; growth: true | string | null; pro: true | string | null }[];
+}[] = [
+  {
+    category: "Booking Website",
+    features: [
+      { label: "Branded subdomain (yourplace.stayidom.in)", starter: true,  growth: true,  pro: true },
+      { label: "Mobile-first guest booking page",            starter: true,  growth: true,  pro: true },
+      { label: "WhatsApp booking deep link",                 starter: true,  growth: true,  pro: true },
+      { label: "Room & availability management",             starter: true,  growth: true,  pro: true },
+      { label: "Custom branding — colors & font",            starter: null,  growth: true,  pro: true },
+      { label: "Offline directions (Google Maps deep link)", starter: true,  growth: true,  pro: true },
+      { label: "SEO meta tags + Open Graph",                 starter: null,  growth: true,  pro: true },
+    ],
+  },
+  {
+    category: "Payments & Accounts",
+    features: [
+      { label: "UPI / Cash / Bank payment recording",        starter: true,  growth: true,  pro: true },
+      { label: "Part-payment & advance tracking",            starter: true,  growth: true,  pro: true },
+      { label: "Auto invoice generation (PDF)",              starter: null,  growth: true,  pro: true },
+      { label: "Monthly accounts overview",                  starter: null,  growth: true,  pro: true },
+      { label: "CSV export — bookings & payments",           starter: null,  growth: true,  pro: true },
+    ],
+  },
+  {
+    category: "Guest Experience",
+    features: [
+      { label: "Live booking status for guests",             starter: true,  growth: true,  pro: true },
+      { label: "Guest booking tracking page",                starter: null,  growth: true,  pro: true },
+      { label: "Seasonal & weekend price multipliers",       starter: null,  growth: true,  pro: true },
+      { label: "Multiple room types & complex pricing",      starter: null,  growth: true,  pro: true },
+    ],
+  },
+  {
+    category: "WhatsApp & Communication",
+    features: [
+      { label: "WhatsApp booking notification to owner",     starter: true,  growth: true,  pro: true },
+      { label: "WhatsApp message templates (confirm, reminder, directions)", starter: null, growth: true, pro: true },
+      { label: "Payment reminder template",                  starter: null,  growth: true,  pro: true },
+    ],
+  },
+  {
+    category: "Support & Onboarding",
+    features: [
+      { label: "Self-serve setup",                           starter: true,  growth: true,  pro: true },
+      { label: "Guided onboarding support",                  starter: null,  growth: true,  pro: true },
+      { label: "Priority setup + dedicated WhatsApp support",starter: null,  growth: null,  pro: true },
+    ],
+  },
+];
+
+const TIER_META = [
+  { key: "starter", label: "Starter",name:"1–5 rooms", highlight: false },
+  { key: "growth",  label: "Growth", name:"6–10 rooms",highlight: true  },
+  { key: "pro",     label: "Pro",    name:"10+ rooms", highlight: false },
+];
+
+function FeatureCell({ val, highlight }: { val: true | string | null; highlight: boolean }) {
+  if (val === null) {
+    return <span style={{ color: highlight ? "rgba(255,255,255,.3)" : "#d1d5db", fontSize: "1rem" }}>—</span>;
+  }
+  if (typeof val === "string") {
+    return <span style={{ fontSize: "0.8125rem", color: highlight ? C.greenLight : C.green, fontWeight: 500 }}>{val}</span>;
+  }
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", justifyContent: "center",
+      width: 22, height: 22, borderRadius: "50%",
+      background: highlight ? "rgba(255,255,255,.18)" : C.greenLight,
+      color: highlight ? "#fff" : C.green,
+      fontSize: "0.75rem", fontWeight: 700,
+    }}>✓</span>
+  );
+}
+
 function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
   return (
     <section id="pricing" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="Simple, Transparent Pricing" sub="Commission ഇല്ല · Contract ഇല്ല · 14 days free trial" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-          {PRICING.map(({ rooms, setup, monthly, tier, highlight }) => (
+
+        {/* ── Tier cards ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end" style={{ marginBottom: "3rem" }}>
+          {[
+            { tier: "starter", label: "Starter", rooms: "1–5 മുറികൾ", setup: "₹5,000",  monthly: "₹1,000 / മാസം", highlight: false,
+              tagline: "ചെറിയ homestay-ന് perfect starting point" },
+            { tier: "growth",  label: "Growth",  rooms: "6–10 മുറികൾ", setup: "₹10,000", monthly: "₹1,500 / മാസം", highlight: true,
+              tagline: "Direct bookings grow ചെയ്യുന്ന active property-ന്" },
+            { tier: "pro",     label: "Pro",     rooms: "10+ മുറികൾ",  setup: "₹25,000", monthly: "₹2,000 / മാസം", highlight: false,
+              tagline: "Large property അല്ലെങ്കിൽ resort-style stay" },
+          ].map(({ tier, label, rooms, setup, monthly, highlight, tagline }) => (
             <div key={tier}
               className={highlight ? "md:scale-105" : ""}
               style={{
-              background:    highlight ? C.green : "#fff",
-              border:        highlight ? "2px solid #14532d" : `1px solid ${C.greenMid}`,
-              borderRadius:  "1.25rem",
-              padding:       "2rem",
-              display:       "flex",
-              flexDirection: "column",
-              gap:           "1.125rem",
-              boxShadow:     highlight ? "0 20px 50px rgba(22,101,52,.25)" : "none",
-              transition:    "transform .2s",
-            }}>
+                background:    highlight ? C.green : "#fff",
+                border:        highlight ? "2px solid #14532d" : `1px solid ${C.greenMid}`,
+                borderRadius:  "1.25rem",
+                padding:       "2rem",
+                display:       "flex",
+                flexDirection: "column",
+                gap:           "1rem",
+                boxShadow:     highlight ? "0 20px 50px rgba(22,101,52,.25)" : "none",
+                transition:    "transform .2s",
+              }}>
+
+              {/* Badge */}
               {highlight && (
-                <span style={{ fontSize: "0.8125rem", fontWeight: 700, background: C.amber, color: C.dark, padding: "0.3rem 0.875rem", borderRadius: 99, alignSelf: "flex-start" }}>
-                  Most Popular
+                <span style={{ fontSize: "0.75rem", fontWeight: 700, background: C.amber, color: C.dark, padding: "0.25rem 0.75rem", borderRadius: 99, alignSelf: "flex-start" }}>
+                  ⭐ Most Popular
                 </span>
               )}
-              <div style={{ fontSize: "1.0625rem", fontWeight: 600, color: highlight ? C.greenLight : C.text }}>{rooms}</div>
+
+              {/* Tier name */}
               <div>
-                <div style={{ ...serif, fontSize: "2.25rem", fontWeight: 700, color: highlight ? "#fff" : C.green }}>{setup}</div>
-                <div style={{ fontSize: "0.9375rem", color: highlight ? C.greenLight : C.muted, marginTop: 2 }}>one-time setup</div>
+                <div style={{ fontSize: "1.25rem", fontWeight: 700, color: highlight ? "#fff" : C.text, marginBottom: "0.125rem" }}>{label}</div>
+                <div style={{ fontSize: "0.875rem", color: highlight ? C.greenLight : C.muted }}>{rooms}</div>
               </div>
-              <div style={{ fontSize: "1.0625rem", fontWeight: 500, color: highlight ? "#f0fdf4" : C.text }}>
-                + {monthly}
+
+              {/* Tagline */}
+              <p style={{ fontSize: "0.875rem", color: highlight ? "rgba(255,255,255,.75)" : C.muted, lineHeight: 1.6 }}>{tagline}</p>
+
+              {/* Price */}
+              <div style={{ borderTop: `1px solid ${highlight ? "rgba(255,255,255,.15)" : "#f0fdf4"}`, paddingTop: "1rem" }}>
+                <div style={{ ...serif, fontSize: "2rem", fontWeight: 700, color: highlight ? "#fff" : C.green }}>{setup}</div>
+                <div style={{ fontSize: "0.8125rem", color: highlight ? C.greenLight : C.muted, marginBottom: "0.375rem" }}>one-time setup</div>
+                <div style={{ fontSize: "1rem", fontWeight: 600, color: highlight ? "#f0fdf4" : C.text }}>+ {monthly}</div>
               </div>
-              <a
-                href="#signup"
-                onClick={() => onSelectTier(tier)}
+
+              {/* CTA */}
+              <a href="#signup" onClick={() => onSelectTier(tier)}
                 style={{
                   textAlign: "center", padding: "0.9375rem 1rem", borderRadius: 99,
-                  fontSize: "0.9375rem", fontWeight: 700,
+                  fontSize: "0.9375rem", fontWeight: 700, display: "block", marginTop: "0.5rem",
                   background: highlight ? C.amber : C.green,
-                  color: highlight ? C.dark : "#fff",
-                  marginTop: "auto",
-                }}
-              >
-                Get Started
+                  color:      highlight ? C.dark  : "#fff",
+                }}>
+                Get Started — 14 days free
               </a>
             </div>
           ))}
         </div>
+
+        {/* ── Notion-style feature comparison table ── */}
+        <div style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", overflow: "hidden" }}>
+
+          {/* Table header */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderBottom: `2px solid ${C.greenMid}` }}>
+            <div style={{ padding: "1rem 1.25rem", fontSize: "0.8125rem", fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: "0.06em" }}>Feature</div>
+            {TIER_META.map(({ key, label, highlight }) => (
+              <div key={key} style={{
+                padding: "1rem 0.75rem", textAlign: "center", fontWeight: 700, fontSize: "0.9375rem",
+                background: highlight ? C.green : "transparent",
+                color:      highlight ? "#fff"   : C.text,
+                borderLeft: `1px solid ${C.greenMid}`,
+              }}>
+                {label}
+                {highlight && <div style={{ fontSize: "0.6875rem", color: C.greenLight, fontWeight: 500, marginTop: 2 }}>Most Popular</div>}
+              </div>
+            ))}
+          </div>
+
+          {/* Feature rows by category */}
+          {FEATURE_ROWS.map(({ category, features }, ci) => (
+            <div key={category}>
+              {/* Category header */}
+              <div style={{ padding: "0.75rem 1.25rem", background: "#f9fef9", borderTop: ci > 0 ? `1px solid ${C.greenMid}` : "none" }}>
+                <span style={{ fontSize: "0.8125rem", fontWeight: 700, color: C.green, textTransform: "uppercase", letterSpacing: "0.06em" }}>{category}</span>
+              </div>
+
+              {/* Feature rows */}
+              {features.map(({ label, starter, growth, pro }, fi) => (
+                <div key={label} style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr",
+                  borderTop: `1px solid #f0fdf4`,
+                  background: fi % 2 === 0 ? "#fff" : "#fafef9",
+                }}>
+                  <div style={{ padding: "0.875rem 1.25rem", fontSize: "0.9rem", color: C.text, display: "flex", alignItems: "center" }}>{label}</div>
+                  {[
+                    { val: starter, highlight: false },
+                    { val: growth,  highlight: true  },
+                    { val: pro,     highlight: false  },
+                  ].map(({ val, highlight }, i) => (
+                    <div key={i} style={{
+                      padding: "0.875rem 0.75rem", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center",
+                      borderLeft: `1px solid ${C.greenMid}`,
+                      background: highlight ? "#f0fdf4" : "transparent",
+                    }}>
+                      <FeatureCell val={val} highlight={false} />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+
+          {/* CTA row at bottom */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: `2px solid ${C.greenMid}`, background: "#f9fef9" }}>
+            <div style={{ padding: "1.25rem" }} />
+            {TIER_META.map(({ key, highlight }) => (
+              <div key={key} style={{ padding: "1rem 0.75rem", textAlign: "center", borderLeft: `1px solid ${C.greenMid}`, background: highlight ? C.greenLight : "transparent" }}>
+                <a href="#signup" onClick={() => onSelectTier(key)}
+                  style={{ display: "inline-block", padding: "0.625rem 1.25rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 700, background: highlight ? C.green : "transparent", color: highlight ? "#fff" : C.green, border: highlight ? "none" : `1.5px solid ${C.green}` }}>
+                  Get Started
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <p style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.9375rem", color: C.muted }}>
-          * Hidden charges ഇല്ല · Commission ഇല്ല · Contract ഇല്ല · 14 days free trial
+          * Hidden charges ഇല്ല · Commission ഇല്ല · Cancel anytime
         </p>
       </div>
     </section>
@@ -1179,7 +977,6 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   const [loading, setLoading]     = useState(false);
   const [form, setForm]           = useState({ name: "", phone: "", property: "", tier: preselectedTier });
 
-  // Sync tier if parent updates it (user clicked pricing button)
   if (form.tier !== preselectedTier && preselectedTier !== "") {
     setForm(f => ({ ...f, tier: preselectedTier }));
   }
@@ -1196,7 +993,7 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
     try {
       await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
     } catch {
-      // fail silently — never block the UX
+      // fail silently
     } finally {
       setLoading(false);
       setSubmitted(true);
@@ -1206,13 +1003,8 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   return (
     <section id="signup" style={{ background: "linear-gradient(155deg,#166534,#14532d)", padding: "5rem 1.25rem", textAlign: "center" }}>
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
-        <h2 style={{ ...serif, fontSize: "clamp(1.875rem,4vw,2.75rem)", fontWeight: 700, color: "#fff", marginBottom: "0.75rem" }}>
-          ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ
-        </h2>
-        <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "2.25rem" }}>
-          24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.
-        </p>
-
+        <h2 style={{ ...serif, fontSize: "clamp(1.875rem,4vw,2.75rem)", fontWeight: 700, color: "#fff", marginBottom: "0.75rem" }}>ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ</h2>
+        <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "2.25rem" }}>24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.</p>
         {submitted ? (
           <div style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "1.25rem", padding: "2.5rem", color: "#fff" }}>
             <div style={{ fontSize: "3rem", marginBottom: "0.875rem" }}>🌿</div>
@@ -1221,29 +1013,16 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ background: "rgba(255,255,255,.09)", border: "1px solid rgba(255,255,255,.18)", borderRadius: "1.25rem", padding: "2rem", display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-            <input type="text"  placeholder="നിങ്ങളുടെ പേര്"          required style={inputStyle} value={form.name}     onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            <input type="tel"   placeholder="WhatsApp Number"           required style={inputStyle} value={form.phone}    onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
-            <input type="text"  placeholder="Homestay name (optional)"          style={inputStyle} value={form.property} onChange={e => setForm(f => ({ ...f, property: e.target.value }))} />
-            <select
-              value={form.tier}
-              onChange={e => setForm(f => ({ ...f, tier: e.target.value }))}
-              style={{ ...inputStyle, appearance: "none" }}
-            >
+            <input type="text" placeholder="നിങ്ങളുടെ പേര്"          required style={inputStyle} value={form.name}     onChange={e => setForm(f=>({...f,name:e.target.value}))} />
+            <input type="tel"  placeholder="WhatsApp Number"           required style={inputStyle} value={form.phone}    onChange={e => setForm(f=>({...f,phone:e.target.value}))} />
+            <input type="text" placeholder="Homestay name (optional)"          style={inputStyle} value={form.property} onChange={e => setForm(f=>({...f,property:e.target.value}))} />
+            <select value={form.tier} onChange={e => setForm(f=>({...f,tier:e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
               <option value="">Plan select ചെയ്യൂ (optional)</option>
               <option value="starter">Starter — 1–5 rooms · ₹5,000 setup</option>
               <option value="growth">Growth — 6–10 rooms · ₹10,000 setup</option>
               <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
             </select>
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                background: C.amber, color: C.dark, border: "none",
-                padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem",
-                fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-                fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem",
-              }}
-            >
+            <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
               {loading ? "Submitting..." : "Free Demo ബുക്ക് ചെയ്യൂ →"}
             </button>
           </form>
@@ -1262,8 +1041,7 @@ function Footer() {
     <footer style={{ background: C.dark, color: C.muted, borderTop: "1px solid #292524", padding: "2.5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem", fontSize: "0.9375rem" }}>
         <span style={{ ...serif, color: "#a8a29e", fontSize: "1.0625rem" }}>
-          <span style={{ color: "#4ade80" }}>stay</span>idom
-          <span style={{ color: C.amber }}>.in</span>
+          <span style={{ color: "#4ade80" }}>stay</span>idom<span style={{ color: C.amber }}>.in</span>
         </span>
         <span>Built for Vattavada 🌿 · Kerala · India</span>
         <span>© {new Date().getFullYear()} stayidom.in · All rights reserved</span>
@@ -1278,9 +1056,8 @@ function Footer() {
 
 export default function LandingPage() {
   const [selectedTier, setSelectedTier] = useState("");
-
   return (
-    <main style={{ fontFamily: "'Noto Sans Malayalam','Segoe UI',system-ui,sans-serif" }}>
+    <main style={{ fontFamily: "'Noto Sans Malayalam','Segoe UI',system-ui,sans-serif", overflowX: "hidden", width: "100%", maxWidth: "100vw" }}>
       <Navbar />
       <Hero />
       <TrustBar />
