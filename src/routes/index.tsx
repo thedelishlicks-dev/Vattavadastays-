@@ -95,6 +95,11 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   return (
     <div className="min-h-screen bg-background">
+      {subdomain === 'demo' && (
+        <div style={{ background: '#fef3c7', borderBottom: '1px solid #fcd34d', color: '#92400e', textAlign: 'center', fontSize: '13px', padding: '8px 16px' }}>
+          You're viewing a demo — no real booking will be made.
+        </div>
+      )}
       <SeoTags subdomain={subdomain} />
       <Header />
       <main>
