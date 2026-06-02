@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
+import { getSubdomain } from "../lib/subdomain";
 
 interface BookingData {
   property_id: string;
@@ -18,8 +19,14 @@ interface BookingData {
 
 export const useCreateBooking = () => {
   const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async (data: BookingData): Promise<string> => {
+      if (getSubdomain() === 'demo') {
+        await new Promise(r => setTimeout(r, 800));
+        return 'demo-booking-id';
+      }
+
       const payload = {
         property_id: data.property_id,
         room_id: data.room_id,
@@ -50,6 +57,7 @@ export const useCreateBooking = () => {
 
       return inserted.id as string;
     },
+
     onSuccess: (_id, variables) => {
       queryClient.invalidateQueries({
         queryKey: ["availability", variables.room_id],
