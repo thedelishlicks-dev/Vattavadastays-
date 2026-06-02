@@ -23,6 +23,17 @@ export const Route = createFileRoute("/")({
 function Index() {
   const hostname = window.location.hostname;
 
+  // If ?slug= is present (Vercel preview testing), always go to GuestPage
+  const params = new URLSearchParams(window.location.search);
+  const slugParam = params.get("slug");
+  if (slugParam) {
+    return <GuestPage subdomain={slugParam} />;
+  }
+
+  // Check hostname directly — do NOT rely on getSubdomain() here because
+  // stayidom.in does not end with .stayidom.in, so getSubdomain() falls
+  // through to the VITE_PROPERTY_SUBDOMAIN env var and returns a property
+  // slug instead of indicating root domain.
   const isRootDomain =
     hostname === "stayidom.in" ||
     hostname === "www.stayidom.in" ||
