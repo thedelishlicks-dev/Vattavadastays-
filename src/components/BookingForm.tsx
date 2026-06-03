@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Check, ExternalLink, MessageCircle } from "lucide-react";
+import { Check, ExternalLink, MessageCircle, Copy, CheckCheck } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink } from "@/lib/whatsapp";
@@ -31,6 +31,7 @@ export function BookingForm({ selection, subdomain }: Props) {
   const [bookingId, setBookingId] = useState<string | null>(null);
   const [ownerNotifyLink, setOwnerNotifyLink] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
 
   // Hidden anchor ref — clicking an <a> tag is not blocked by mobile popup blockers
   const waRef = useRef<HTMLAnchorElement>(null);
@@ -44,6 +45,17 @@ export function BookingForm({ selection, subdomain }: Props) {
     } else {
       setPhone(val);
     }
+  };
+
+  // Short reference shown to guest — first 8 chars of UUID, uppercased
+  const shortRef = bookingId ? `#${bookingId.slice(0, 8).toUpperCase()}` : null;
+
+  const handleCopyRef = () => {
+    if (!shortRef) return;
+    navigator.clipboard.writeText(shortRef).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -64,20 +76,20 @@ export function BookingForm({ selection, subdomain }: Props) {
     }
 
     try {
-      const id = await createBooking({
-        property_id: propertyId,
-        room_id: selection.room.id,
-        guest_name: name,
-        guest_phone: phone,
-        guest_email: email || undefined,
-        guest_count: selection.adults + (selection.children ?? 0),
-        check_in: selection.checkIn,
-        check_out: selection.checkOut,
-        room_price: selection.room.base_price * selection.nights,
-        extra_guest_charge: selection.extraGuestCharge ?? 0,
-        total_amount: selection.total,
-        payment_method: payment,
+      // useCreateBooking now calls the atomic RPC — interface uses camelCase
+      const result = await createBooking({
+        propertyId,
+        roomId: selection.room.id,
+        guestName: name,
+        guestPhone: phone,
+        guestEmail: email || undefined,
+        guestCount: selection.adults + (selection.children ?? 0),
+        checkIn: selection.checkIn,
+        checkOut: selection.checkOut,
+        paymentMethod: payment,
       });
+
+      const id = result.bookingId;
 
       setSubmittedName(name);
       setSubmittedPhone(phone);
@@ -94,7 +106,7 @@ export function BookingForm({ selection, subdomain }: Props) {
           checkIn: selection.checkIn,
           checkOut: selection.checkOut,
           guests: selection.adults + (selection.children ?? 0),
-          total: selection.total,
+          total: result.totalAmount,
           bookingId: id,
         });
         setOwnerNotifyLink(link);
@@ -110,7 +122,7 @@ export function BookingForm({ selection, subdomain }: Props) {
       setSubmitted(true);
     } catch (err: unknown) {
       const msg =
-        err instanceof Error && err.message ? err.message : "Insert failed — check Supabase logs";
+        err instanceof Error && err.message ? err.message : "Booking failed — please try again.";
       setError(msg);
     }
   };
@@ -130,7 +142,7 @@ export function BookingForm({ selection, subdomain }: Props) {
         })
       : null;
 
-  // Phone-based tracking URL — no booking ID needed
+  // Phone-based tracking URL
   const trackingUrl = submittedPhone
     ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}`
     : null;
@@ -191,6 +203,34 @@ export function BookingForm({ selection, subdomain }: Props) {
                     {property?.owner_name ?? "The host"} will confirm your booking shortly.
                   </p>
                 </div>
+
+                {/* ── BOOKING REFERENCE ── */}
+                {shortRef && (
+                  <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-4 text-center space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                      Booking reference
+                    </p>
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="font-mono text-2xl font-semibold text-primary tracking-widest">
+                        {shortRef}
+                      </span>
+                      <button
+                        onClick={handleCopyRef}
+                        className="text-muted-foreground hover:text-primary transition-colors p-1 rounded"
+                        aria-label="Copy booking reference"
+                      >
+                        {copied ? (
+                          <CheckCheck className="h-4 w-4 text-primary" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Quote this number when contacting the host.
+                    </p>
+                  </div>
+                )}
 
                 {/* WhatsApp CTA — shown as fallback if auto-open was blocked */}
                 {ownerNotifyLink && (
