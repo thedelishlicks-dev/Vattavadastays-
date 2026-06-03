@@ -10,7 +10,7 @@ export interface CreateBookingInput {
   roomId: string;
   guestName: string;
   guestPhone: string;
-  guestEmail: string;
+  guestEmail?: string;  // optional — omitted from RPC call when not provided
   guestCount: number;
   checkIn: string;   // "YYYY-MM-DD"
   checkOut: string;  // "YYYY-MM-DD"
@@ -56,7 +56,9 @@ export function useCreateBooking() {
         p_room_id:        input.roomId,
         p_guest_name:     input.guestName,
         p_guest_phone:    input.guestPhone,
-        p_guest_email:    input.guestEmail,
+        // Only include p_guest_email when provided — sending undefined causes
+        // PostgREST to drop it, breaking the function signature match.
+        ...(input.guestEmail ? { p_guest_email: input.guestEmail } : {}),
         p_guest_count:    input.guestCount,
         p_check_in:       input.checkIn,
         p_check_out:      input.checkOut,
