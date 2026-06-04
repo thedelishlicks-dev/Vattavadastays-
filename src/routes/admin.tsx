@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, redirect, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Outlet, redirect, useNavigate, useSearch } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdminEmail } from '@/lib/subdomain'
@@ -6,26 +6,33 @@ import { AdminLayout } from '@/admin/AdminLayout'
 
 export const Route = createFileRoute('/admin')({
   component: AdminGuard,
+  validateSearch: (search: Record<string, unknown>) => ({
+    // Superadmin passes ?property=subdomain to manage a specific property
+    property: (search.property as string) ?? '',
+  }),
 })
 
 function AdminGuard() {
   const { user, isAuthenticated, isLoading } = useAuth()
   const navigate = useNavigate()
+  const { property: propertySubdomain } = useSearch({ from: '/admin' })
+
+  const isSuperAdmin = isSuperAdminEmail(user?.email)
+  // Superadmin is allowed into admin layout only when ?property=subdomain is set
+  const superAdminManaging = isSuperAdmin && !!propertySubdomain
 
   useEffect(() => {
     if (isLoading) return
-
     if (!isAuthenticated) {
       navigate({ to: '/login' })
       return
     }
-
-    // Superadmin goes to superadmin dashboard
-    if (isSuperAdminEmail(user?.email)) {
+    // Superadmin without a ?property= param → go to superadmin dashboard
+    if (isSuperAdmin && !propertySubdomain) {
       navigate({ to: '/superadmin' })
       return
     }
-  }, [isAuthenticated, isLoading, user, navigate])
+  }, [isAuthenticated, isLoading, isSuperAdmin, propertySubdomain, navigate])
 
   if (isLoading) {
     return (
@@ -37,8 +44,8 @@ function AdminGuard() {
 
   if (!isAuthenticated) return null
 
-  // Superadmin — don't render admin layout, redirect handled above
-  if (isSuperAdminEmail(user?.email)) return null
+  // Superadmin without property param — redirect handled above
+  if (isSuperAdmin && !superAdminManaging) return null
 
   return (
     <AdminLayout>
