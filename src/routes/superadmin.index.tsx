@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
-import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle } from 'lucide-react'
+import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
 
 export const Route = createFileRoute('/superadmin/')({
   component: SuperAdminIndex,
@@ -58,17 +58,10 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function AddPropertyModal({
-  onClose,
-}: {
-  onClose: () => void
-}) {
+function AddPropertyModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState<NewPropertyForm>(emptyForm())
-  const [inviteResult, setInviteResult] = useState<{
-    invite_link: string
-    subdomain: string
-    expires_at: string
-  } | null>(null)
+  const [createdEmail, setCreatedEmail] = useState<string | null>(null)
+  const [createdSubdomain, setCreatedSubdomain] = useState<string | null>(null)
   const [error, setError] = useState('')
   const { mutateAsync: createProperty, isPending } = useCreateProperty()
 
@@ -84,7 +77,7 @@ function AddPropertyModal({
     if (!form.owner_email.trim()) { setError('Owner email is required'); return }
     setError('')
     try {
-      const result = await createProperty({
+      await createProperty({
         name: form.name,
         subdomain: form.subdomain,
         owner_email: form.owner_email,
@@ -92,21 +85,25 @@ function AddPropertyModal({
         owner_phone: form.owner_phone || undefined,
         area: form.area || undefined,
       })
-      setInviteResult(result)
+      setCreatedEmail(form.owner_email)
+      setCreatedSubdomain(form.subdomain)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Failed to create property')
     }
   }
 
+  // Supabase dashboard deep link to the Authentication > Users page
+  const supabaseUsersUrl = 'https://supabase.com/dashboard/project/vzzfqgqxnodlrvnaxpbw/auth/users'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={!inviteResult ? onClose : undefined} />
+      <div className="absolute inset-0 bg-black/40" onClick={!createdEmail ? onClose : undefined} />
       <div className="relative w-full max-w-lg bg-card rounded-2xl shadow-xl flex flex-col max-h-[95vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-display text-lg font-semibold">
-            {inviteResult ? 'Property Created' : 'Add New Property'}
+            {createdEmail ? 'Property Created' : 'Add New Property'}
           </h2>
-          {!inviteResult && (
+          {!createdEmail && (
             <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
               <X className="h-4 w-4" />
             </button>
@@ -114,56 +111,105 @@ function AddPropertyModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5">
-          {inviteResult ? (
-            /* Success screen */
+          {createdEmail ? (
+            /* ── SUCCESS — show next steps instead of invite link ── */
             <div className="space-y-4">
+              {/* Property live */}
               <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
-                <div className="font-semibold mb-1">Property live at:</div>
-                <a href={`https://${inviteResult.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
-                  className="inline-flex items-center gap-1 underline text-green-700">
-                  {inviteResult.subdomain}.stayidom.in
+                <div className="font-semibold mb-1">✅ Property created</div>
+                <a
+                  href={`https://${createdSubdomain}.stayidom.in`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 underline text-green-700"
+                >
+                  {createdSubdomain}.stayidom.in
                   <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
 
-              <div className="rounded-xl border border-border p-4 space-y-2">
+              {/* Next steps */}
+              <div className="rounded-xl border border-border p-4 space-y-4">
                 <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Owner Setup Link — share this with the owner
+                  Next steps to activate the owner
                 </div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 break-all">
-                    {inviteResult.invite_link}
-                  </code>
-                  <CopyButton text={inviteResult.invite_link} />
+
+                {/* Step 1 */}
+                <div className="flex gap-3">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">1</div>
+                  <div className="space-y-2 flex-1">
+                    <p className="text-sm font-medium">Send the owner a Supabase invite</p>
+                    <p className="text-xs text-muted-foreground">
+                      Go to Supabase → Authentication → Users, click <strong>Invite user</strong> and enter:
+                    </p>
+                    <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+                      <code className="text-sm font-mono text-primary flex-1">{createdEmail}</code>
+                      <CopyButton text={createdEmail} />
+                    </div>
+                    <a
+                      href={supabaseUsersUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline font-medium"
+                    >
+                      Open Supabase Auth dashboard
+                      <ArrowRight className="h-3 w-3" />
+                    </a>
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Expires: {new Date(inviteResult.expires_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                </p>
+
+                {/* Step 2 */}
+                <div className="flex gap-3">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">2</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Set up the property</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Add rooms, availability, pricing, UPI ID, and policies in the admin dashboard while the owner sets their password.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex gap-3">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">3</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Activate once setup fee is paid</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Come back to this dashboard and click <strong>Activate</strong> on the property row.
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                Send this link to the owner via WhatsApp. They click it, set a password, and their admin dashboard is ready.
-              </p>
-
-              <button onClick={onClose} className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90">
+              <button
+                onClick={onClose}
+                className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90"
+              >
                 Done
               </button>
             </div>
           ) : (
-            /* Form */
+            /* ── FORM ── */
             <div className="space-y-4">
               <div>
                 <label className={labelCls}>Property name *</label>
-                <input value={form.name} onChange={(e) => set('name', e.target.value)}
-                  className={inputCls} placeholder="e.g. Green Valley Homestay" />
+                <input
+                  value={form.name}
+                  onChange={(e) => set('name', e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. Green Valley Homestay"
+                />
               </div>
 
               <div>
                 <label className={labelCls}>Subdomain *</label>
                 <div className="flex items-center gap-0">
-                  <input value={form.subdomain} onChange={(e) => handleSubdomain(e.target.value)}
+                  <input
+                    value={form.subdomain}
+                    onChange={(e) => handleSubdomain(e.target.value)}
                     className="flex-1 rounded-l-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    placeholder="greenvalley" />
+                    placeholder="greenvalley"
+                  />
                   <span className="rounded-r-lg border border-l-0 border-border bg-muted px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                     .stayidom.in
                   </span>
@@ -173,41 +219,65 @@ function AddPropertyModal({
 
               <div>
                 <label className={labelCls}>Owner email *</label>
-                <input type="email" value={form.owner_email} onChange={(e) => set('owner_email', e.target.value)}
-                  className={inputCls} placeholder="owner@example.com" />
+                <input
+                  type="email"
+                  value={form.owner_email}
+                  onChange={(e) => set('owner_email', e.target.value)}
+                  className={inputCls}
+                  placeholder="owner@example.com"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={labelCls}>Owner name</label>
-                  <input value={form.owner_name} onChange={(e) => set('owner_name', e.target.value)}
-                    className={inputCls} placeholder="Full name" />
+                  <input
+                    value={form.owner_name}
+                    onChange={(e) => set('owner_name', e.target.value)}
+                    className={inputCls}
+                    placeholder="Full name"
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Owner phone</label>
-                  <input type="tel" value={form.owner_phone} onChange={(e) => set('owner_phone', e.target.value)}
-                    className={inputCls} placeholder="98765 43210" />
+                  <input
+                    type="tel"
+                    value={form.owner_phone}
+                    onChange={(e) => set('owner_phone', e.target.value)}
+                    className={inputCls}
+                    placeholder="98765 43210"
+                  />
                 </div>
               </div>
 
               <div>
                 <label className={labelCls}>Area / Location</label>
-                <input value={form.area} onChange={(e) => set('area', e.target.value)}
-                  className={inputCls} placeholder="e.g. Upper Vattavada" />
+                <input
+                  value={form.area}
+                  onChange={(e) => set('area', e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. Upper Vattavada"
+                />
               </div>
             </div>
           )}
         </div>
 
-        {!inviteResult && (
+        {!createdEmail && (
           <div className="px-5 py-4 border-t border-border space-y-2">
             {error && <p className="text-xs text-destructive">{error}</p>}
             <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
+              <button
+                onClick={onClose}
+                className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted"
+              >
                 Cancel
               </button>
-              <button onClick={handleSave} disabled={isPending}
-                className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={isPending}
+                className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
                 {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Create property
               </button>
@@ -251,8 +321,10 @@ function SuperAdminIndex() {
           <h1 className="font-display text-2xl md:text-3xl font-semibold">Properties</h1>
           <p className="text-sm text-muted-foreground">All properties on the platform</p>
         </div>
-        <button onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+        >
           <Plus className="h-4 w-4" /> Add property
         </button>
       </div>
@@ -302,7 +374,7 @@ function SuperAdminIndex() {
                     propertyId: p.id,
                     subscription_status: 'active',
                     setup_fee_paid: true,
-                    subscription_end_date: thirtyDaysLater.toISOString()
+                    subscription_end_date: thirtyDaysLater.toISOString(),
                   })
                 }
 
@@ -311,7 +383,7 @@ function SuperAdminIndex() {
                   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
                   updateSubscription({
                     propertyId: p.id,
-                    subscription_end_date: thirtyDaysLater.toISOString()
+                    subscription_end_date: thirtyDaysLater.toISOString(),
                   })
                 }
 
@@ -322,8 +394,12 @@ function SuperAdminIndex() {
                       {p.area && <div className="text-xs text-muted-foreground">{p.area}</div>}
                     </td>
                     <td className="px-4 py-3">
-                      <a href={`https://${p.subdomain}.stayidom.in`} target="_blank" rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs">
+                      <a
+                        href={`https://${p.subdomain}.stayidom.in`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline text-xs"
+                      >
                         {p.subdomain}.stayidom.in
                         <ExternalLink className="h-3 w-3" />
                       </a>
@@ -331,8 +407,12 @@ function SuperAdminIndex() {
                     <td className="px-4 py-3">
                       <div>{p.owner_name ?? '—'}</div>
                       {p.owner_phone && (
-                        <a href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
-                          className="text-xs text-muted-foreground hover:text-primary">
+                        <a
+                          href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs text-muted-foreground hover:text-primary"
+                        >
                           {p.owner_phone}
                         </a>
                       )}
@@ -367,41 +447,55 @@ function SuperAdminIndex() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => { window.location.href = `/admin/dashboard?property=${p.subdomain}` }} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium">Manage</button>
                         {p.owner_whatsapp && (
-                          <a href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
-                            className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border hover:bg-muted text-[#25D366]" title="WhatsApp Owner">
+                          <a
+                            href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border hover:bg-muted text-[#25D366]"
+                            title="WhatsApp Owner"
+                          >
                             <MessageCircle className="h-3.5 w-3.5" />
                           </a>
                         )}
                         {p.subscription_status === 'pending_setup' && (
-                          <button onClick={handleActivate}
-                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
+                          <button
+                            onClick={handleActivate}
+                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200"
+                          >
                             Activate
                           </button>
                         )}
                         {p.subscription_status === 'active' && (
                           <>
-                            <button onClick={handleRenew}
-                              className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">
+                            <button
+                              onClick={handleRenew}
+                              className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                            >
                               Mark Renewed
                             </button>
-                            <button onClick={() => {
-                              if (window.confirm(`Suspend ${p.name}?`)) {
-                                updateSubscription({ propertyId: p.id, subscription_status: 'suspended' })
-                              }
-                            }}
-                              className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Suspend ${p.name}?`)) {
+                                  updateSubscription({ propertyId: p.id, subscription_status: 'suspended' })
+                                }
+                              }}
+                              className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
+                            >
                               Suspend
                             </button>
                           </>
                         )}
                         {p.subscription_status === 'suspended' && (
-                          <button onClick={() => {
-                            if (window.confirm(`Re-activate ${p.name}?`)) {
-                              updateSubscription({ propertyId: p.id, subscription_status: 'active' })
-                            }
-                          }}
-                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Re-activate ${p.name}?`)) {
+                                updateSubscription({ propertyId: p.id, subscription_status: 'active' })
+                              }
+                            }}
+                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200"
+                          >
                             Activate
                           </button>
                         )}
@@ -412,7 +506,7 @@ function SuperAdminIndex() {
               })}
               {properties.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
                     No properties yet. Add your first one.
                   </td>
                 </tr>

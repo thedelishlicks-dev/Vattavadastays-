@@ -1,12 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
+import { isSuperAdminEmail } from "@/lib/subdomain";
 
 export const useOwnerProperty = () => {
   const { user, isAuthenticated } = useAuth();
+  const isSuperAdmin = isSuperAdminEmail(user?.email);
+
+  const propertySubdomain = isSuperAdmin
+    ? new URLSearchParams(window.location.search).get('property') ?? ''
+    : '';
+
   return useQuery({
-    queryKey: ["ownerProperty", user?.id],
+    queryKey: ["ownerProperty", user?.id, propertySubdomain],
     queryFn: async () => {
+      if (isSuperAdmin && propertySubdomain) {
+        const { data, error } = await supabase
+          .from("properties")
+          .select(`*, rooms(*)`)
+          .eq("subdomain", propertySubdomain)
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
       const { data, error } = await supabase
         .from("properties")
         .select(`*, rooms(*)`)
