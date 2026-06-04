@@ -447,7 +447,7 @@ function SuperAdminIndex() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <Link to="/admin" search={{ property: p.subdomain }} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium">Manage</Link>
+                        <button onClick={() => { window.location.href = `/admin/dashboard?property=${p.subdomain}` }} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium">Manage</button>
                         {p.owner_whatsapp && (
                           <a
                             href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`}
