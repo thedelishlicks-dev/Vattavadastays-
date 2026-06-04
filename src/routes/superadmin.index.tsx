@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
 import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
@@ -447,7 +447,7 @@ function SuperAdminIndex() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <a href={`/admin?property=${p.subdomain}`} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium" title="Manage this property">Manage</a>
+                        <Link to="/admin" search={{ property: p.subdomain }} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium">Manage</Link>
                         {p.owner_whatsapp && (
                           <a
                             href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`}
