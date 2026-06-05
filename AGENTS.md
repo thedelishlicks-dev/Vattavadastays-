@@ -59,7 +59,7 @@ export const supabase = createClient(
 );
 ```
 
-Import `supabase` directly in server functions and hooks.
+Import `supabase` directly in hooks and components.
 Never instantiate a new client anywhere else.
 
 ---
@@ -171,7 +171,7 @@ PRIMARY KEY (room_id, date)
 id, property_id, room_id, guest_name, guest_phone, guest_email,
 guest_count, check_in, check_out, nights (generated),
 room_price, extra_guest_charge, total_amount,
-status, payment_method, payment_reference, is_paid, created_at
+status, payment_method, payment_reference, is_paid, advance_amount, created_at
 ```
 
 Valid booking statuses: pending, confirmed, cancelled, completed
@@ -254,30 +254,79 @@ Never hardcode. Never commit .env files.
 
 ---
 
-## /setup Route — Current Status & Workaround
+## Booking Flow — Current Implementation
 
-**What works:**
+### useCreateBooking hook (src/hooks/useCreateBooking.ts)
 
-- Token validation via `get_invite_by_token` RPC ✅
-- Edge Function `create-owner` correctly creates user and links property ✅
+Does NOT use an RPC. Uses direct Supabase client calls in sequence:
 
-**Known issue:**
+1. Load room details (pricing, max_guests)
+2. Check availability for all requested dates client-side
+3. Calculate price (respects price_override and weekend_multiplier)
+4. Insert booking with status = 'pending'
+5. Mark all dates is_available = false
 
-- Auto-sign-in after account creation in `setup.tsx` fails with "Invalid credentials".
+**Why not RPC:** The `create_booking_atomic` Postgres RPC was built but removed
+due to Supabase Free tier PostgREST schema cache issues (404 on RPC calls).
+Re-enable when upgraded to Supabase Pro.
 
-**Current workaround:**
+### Availability auto-blocking trigger (trg_booking_status_change)
 
-- Redirect the owner to `/login` with their email pre-filled.
-- Use `/login?email=xxx` to help the owner.
+A Postgres trigger fires AFTER UPDATE of status on bookings:
+- status → 'confirmed': marks all booking dates is_available = false (upsert)
+- status → 'cancelled' or 'pending' (from confirmed): re-opens dates,
+  but only if no other confirmed booking covers those dates
+
+This trigger is the primary double-booking protection layer.
+
+### Booking reference
+
+Guest sees a short reference (#XXXXXXXX = first 8 chars of booking UUID uppercased)
+on the success screen. Same ref is included in the WhatsApp message to owner.
+
+---
+
+## Superadmin — Managing a Property Dashboard
+
+Superadmin can access any property's admin dashboard directly:
+
+```
+/admin/dashboard?property={subdomain}
+```
+
+- The Manage button on each property row in /superadmin navigates here
+- `admin.tsx` reads `?property=` from `window.location.search` directly
+- `useOwnerProperty` detects superadmin + `?property=` and fetches by subdomain instead of owner_id
+- All admin sub-routes (bookings, rooms, calendar etc.) work normally
+
+NEVER use TanStack Router's useSearch/validateSearch for the property param —
+it does not propagate to child routes. Always use `window.location.search`.
+
+---
+
+## Superadmin Onboarding Flow (current — June 2026)
+
+The /setup token flow is DEPRECATED. Use this flow instead:
+
+1. Superadmin creates property in /superadmin dashboard (fills name, subdomain, owner details)
+2. Superadmin clicks **Manage** on the new property row
+3. Superadmin sets up rooms, availability, pricing, UPI ID, policies in the admin dashboard
+4. Superadmin goes to Supabase → Authentication → Users → **Invite user** with owner email
+5. Owner receives Supabase invite email, clicks link, sets their own password
+6. Owner logs in at stayidom.in/login
+7. Superadmin clicks **Activate** on the property once setup fee is paid
+
+The /setup route still exists but is no longer used. Safe to delete in a future cleanup.
 
 ---
 
 ## Payment & Recording Logic
 
-- **Part Payments**: The `advance_amount` in the `bookings` table stores the _cumulative_ total paid so far.
+- **Part Payments**: The `advance_amount` in the `bookings` table stores the cumulative total paid so far.
 - **Recording Payment**: When the owner records a new payment (instalment) in the admin dashboard, the frontend adds this new amount to the existing `advance_amount` and saves the result.
 - **Payment Methods**: Supported methods are "UPI", "Bank Transfer", and "Cash on Arrival".
-- **Notifications**: Guests are encouraged to notify the owner via a WhatsApp deep link after submitting a booking request. The owner can send payment reminders (asking for 25% advance if nothing paid, or the balance if part-paid) via WhatsApp deep links from the booking details.
+- **UPI Flow**: Guest taps Pay → `upi://` deep link opens their payment app → pays → WhatsApp prompt appears automatically → guest sends payment screenshot to owner via WhatsApp.
+- **Notifications**: Guests notify owner via WhatsApp deep link after booking. Owner sends payment reminders via WhatsApp deep links from booking details.
 
 ---
 
@@ -295,6 +344,12 @@ Never hardcode. Never commit .env files.
 - [x] Booking form wired to createBooking mutation
 - [x] Multi-tenant architecture with subdomain routing
 - [x] Superadmin dashboard for property management
+- [x] Superadmin can manage any property via /admin/dashboard?property={subdomain}
 - [x] Cumulative part-payment recording logic
 - [x] WhatsApp notification flow for guests and owners
 - [x] vercel.json configured correctly
+- [x] Booking reference shown on guest success screen
+- [x] Auto-block availability on booking confirm (DB trigger)
+- [x] Auto-reopen availability on booking cancel (DB trigger)
+- [x] Simplified onboarding — Supabase invite flow (no /setup token needed)
+- [x] Demo property availability seeded for 1 year
