@@ -1,8 +1,7 @@
-# stayidom.in — Session Handover v4
+# stayidom.in — Session Handover v5
 
-**Date:** May 2026
+**Date:** June 2026
 **Handover from:** Claude Sonnet (Anthropic)
-**Handover to:** Minimax Agent
 **Branch:** main (active, deployed to Vercel)
 
 ---
@@ -15,20 +14,50 @@ stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala
 - Owner side: `/admin` — protected dashboard
 - Superadmin side: `/superadmin` — platform management
 - Stack: Vite + React + TypeScript + TanStack Router 1.166.7 + Supabase + Tailwind CSS v4
-- Hosting: Vercel (static SPA) — production URL: `stayidom.vercel.app`
+- Hosting: Vercel (static SPA)
 - Repo: `github.com/thedelishlicks-dev/Vattavadastays-`
-- Domain: NOT purchased yet — all links use `stayidom.vercel.app`
 
 ---
 
 ## Environment Variables (Vercel)
 
-| Key                       | Value                                          |
-| ------------------------- | ---------------------------------------------- |
-| `VITE_SUPABASE_URL`       | `https://vzzfqgqxnodlrvnaxpbw.supabase.co`     |
-| `VITE_SUPABASE_ANON_KEY`  | Legacy anon key from Supabase → Settings → API |
-| `VITE_PROPERTY_SUBDOMAIN` | `bleafmudhouse` (dev fallback)                 |
-| `VITE_SUPERADMIN_EMAIL`   | Superadmin email address                       |
+| Key                       | Value                                           |
+| ------------------------- | ----------------------------------------------- |
+| `VITE_SUPABASE_URL`       | `https://vzzfqgqxnodlrvnaxpbw.supabase.co`      |
+| `VITE_SUPABASE_ANON_KEY`  | See Supabase → Settings → API Keys              |
+| `VITE_PROPERTY_SUBDOMAIN` | `bleafmudhouse` (dev fallback)                  |
+| `VITE_SUPERADMIN_EMAIL`   | Superadmin email address                        |
+
+---
+
+## Round 5 Changes — June 2026
+
+### Fixed
+- **Double-booking race condition** — availability trigger (`trg_booking_status_change`) auto-blocks dates when booking is confirmed and re-opens on cancel
+- **Booking reference on success screen** — guest sees `#XXXXXXXX` ref after submitting, with copy button. Same ref in WhatsApp message to owner
+- **Superadmin property management** — Manage button on each property row navigates to `/admin/dashboard?property={subdomain}`. Superadmin can set up rooms, availability, pricing for any property
+- **Simplified onboarding** — removed /setup invite token flow. Now uses Supabase Auth invite email. Superadmin sets up property via Manage, then invites owner via Supabase dashboard
+- **Demo property** — availability seeded for 1 year so demo.stayidom.in works for guests
+
+### Attempted but reverted
+- `create_booking_atomic` Postgres RPC — built, tested in SQL Editor, but Supabase Free tier PostgREST schema cache returns 404 on RPC calls. Reverted to direct insert in `useCreateBooking.ts`. Re-enable on Pro upgrade.
+
+### Known issues carried forward
+- `/setup` route still exists but is no longer used — safe to delete
+- Supabase Free tier pauses after inactivity — first request after pause may be slow
+- `create_booking_atomic` function exists in DB but is not called by the app
+
+---
+
+## Current Properties in Production
+
+| Property          | Subdomain     | Status        |
+| ----------------- | ------------- | ------------- |
+| Bleaf Mud House   | bleafmudhouse | active        |
+| Mist Valley       | demo          | trial (demo)  |
+| MistyMountain     | mistymountain | pending       |
+| Greenforest       | greenforest   | pending       |
+| Green Valley      | greenvalley   | pending       |
 
 ---
 
@@ -40,21 +69,10 @@ stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala
 - **NEVER** upgrade `@tanstack/react-router` — pinned at 1.166.7
 - **NEVER** use Google Maps JS SDK — use `maps.google.com/?q=lat,lng` deep links only
 - **NEVER** use video embeds — too heavy for Vattavada's 2G network
-- **NEVER** use `localStorage` or `sessionStorage` in artifacts
 - Auth is client-side only via `supabase.auth` and `onAuthStateChange`
 - Login is at `/login` (standalone, outside admin tree)
-- `src/routes/__root.tsx` renders NO html/body tags — QueryClientProvider + Outlet + CSS import only
 - All `<a>` tags in JSX must be on a single line — GitHub web editor corrupts multi-line JSX attributes
-- Always commit to `main` branch — Vercel deploys from main
-
----
-
-## Current Properties in Production
-
-| Property        | Subdomain     | Owner Email               | Status |
-| --------------- | ------------- | ------------------------- | ------ |
-| Bleaf Mud House | bleafmudhouse | (superadmin knows)        | active |
-| Green Valley    | greenvalley   | vitalminded2025@gmail.com | trial  |
+- For `?property=` param in admin routes: ALWAYS use `window.location.search` directly, NOT TanStack `useSearch` — it does not propagate to child routes
 
 ---
 
@@ -65,33 +83,22 @@ stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala
 | `src/routes/__root.tsx`             | Root — QueryClientProvider + Outlet only                         |
 | `src/routes/index.tsx`              | Guest booking page                                               |
 | `src/routes/login.tsx`              | Standalone login at `/login`                                     |
-| `src/routes/setup.tsx`              | Owner onboarding via invite token                                |
-| `src/routes/admin.tsx`              | Auth guard — redirects to `/login` or `/superadmin`              |
+| `src/routes/setup.tsx`              | DEPRECATED — no longer used. Safe to delete.                     |
+| `src/routes/admin.tsx`              | Auth guard — reads ?property= from window.location.search        |
 | `src/routes/superadmin.tsx`         | Superadmin layout + auth guard                                   |
-| `src/routes/superadmin.index.tsx`   | Superadmin dashboard — all properties                            |
+| `src/routes/superadmin.index.tsx`   | Superadmin dashboard — all properties + Manage button            |
 | `src/admin/AdminLayout.tsx`         | Admin shell with sidebar                                         |
 | `src/lib/supabase.ts`               | Single Supabase client instance                                  |
 | `src/lib/subdomain.ts`              | `getSubdomain()` + `isSuperAdminEmail()`                         |
 | `src/lib/whatsapp.ts`               | WhatsApp deep link helpers (wa.me only)                          |
 | `src/hooks/useAuth.ts`              | `onAuthStateChange` pattern                                      |
 | `src/hooks/useProperty.ts`          | Guest property + rooms query                                     |
-| `src/hooks/useOwnerProperty.ts`     | Owner property query — queryKey: `['ownerProperty', user?.id]`   |
+| `src/hooks/useOwnerProperty.ts`     | Owner property query — fetches by subdomain when superadmin      |
 | `src/hooks/useBookings.ts`          | Bookings query                                                   |
-| `src/hooks/useCreateBooking.ts`     | Guest booking mutation                                           |
+| `src/hooks/useCreateBooking.ts`     | Guest booking mutation — direct insert (no RPC)                  |
 | `src/hooks/useSuperAdmin.ts`        | `useAllProperties`, `useCreateProperty`, `useUpdateSubscription` |
-| `src/hooks/useAvailabilityRange.ts` | Calendar availability query                                      |
-| `src/components/BookingForm.tsx`    | Guest booking form + WhatsApp CTA                                |
-| `src/components/Footer.tsx`         | Real property data — phone, WhatsApp, maps                       |
-| `src/routes/admin.rooms.tsx`        | Add/edit rooms (drawer)                                          |
-| `src/routes/admin.bookings.tsx`     | Bookings table + add booking modal + WhatsApp templates          |
-| `src/routes/admin.dashboard.tsx`    | Dashboard with real stats + room names                           |
-| `src/routes/admin.settings.tsx`     | Property settings — invalidates `['ownerProperty']`              |
-| `src/routes/admin.calendar.tsx`     | Availability calendar per room                                   |
-| `src/routes/admin.pricing.tsx`      | Per-room pricing editor (drawer)                                 |
-| `src/routes/admin.meals.tsx`        | Meal packages + breakfast config                                 |
-| `src/routes/admin.amenities.tsx`    | Property + room amenities editor                                 |
-| `src/routes/admin.policies.tsx`     | Check-in/out times, cancellation, house rules                    |
-| `src/routes/admin.payments.tsx`     | UPI config, outstanding payments, mark paid                      |
+| `src/components/BookingForm.tsx`    | Guest booking form + booking reference + WhatsApp CTA            |
+| `src/components/UPIPaymentSection.tsx` | UPI deep link + WhatsApp screenshot prompt                    |
 
 ---
 
@@ -104,7 +111,7 @@ id, owner_id, name, name_ml, subdomain, area, location_lat, location_lng,
 shared_amenities (text[]), description, description_ml, hero_image,
 owner_name, owner_phone, owner_whatsapp, check_in_time, check_out_time,
 is_active, subscription_status ('trial'|'active'|'suspended'),
-subscription_end_date, landmark_description, static_map_image_url, created_at
+subscription_end_date, created_at
 ```
 
 ### rooms
@@ -120,7 +127,7 @@ room_amenities (text[]), images (text[]), is_active, created_at
 ```
 id, property_id, room_id, guest_name, guest_phone, guest_email,
 guest_count, check_in, check_out, nights (generated),
-room_price, extra_guest_charge, total_amount,
+room_price, extra_guest_charge, total_amount, advance_amount,
 status ('pending'|'confirmed'|'cancelled'|'completed'),
 payment_method, payment_reference, is_paid, created_at
 ```
@@ -140,14 +147,25 @@ id, token, email, property_id, used_at, expires_at, created_at
 
 ---
 
+## Database Triggers
+
+### trg_booking_status_change
+
+Fires AFTER UPDATE of status on bookings table.
+
+- Booking confirmed → upserts availability rows to is_available = false for all dates in range
+- Booking cancelled/pending (from confirmed) → sets is_available = true for dates not covered by another confirmed booking
+
+This is the primary double-booking protection. Do not remove.
+
+---
+
 ## CRITICAL: Sentinel Key Pattern in shared_amenities
 
 `properties.shared_amenities` is a `text[]` column used for TWO purposes:
 
 1. Real amenity tags like `"parking"`, `"wifi"`, `"bonfire"` — shown to guests
 2. Sentinel keys prefixed with `__` — used to store config without new DB columns
-
-**Sentinel keys currently in use:**
 
 | Prefix        | Stores                        | Used by            |
 | ------------- | ----------------------------- | ------------------ |
@@ -157,88 +175,50 @@ id, token, email, property_id, used_at, expires_at, created_at
 | `__upi:`      | UPI ID string                 | admin.payments.tsx |
 | `__pmethods:` | JSON array of payment methods | admin.payments.tsx |
 
-**CRITICAL rules for sentinel keys:**
+**Rules:**
+- Filter sentinels before showing to guests: `.filter(a => !a.startsWith('__'))`
+- Preserve sentinels when saving amenities — never overwrite the whole array
+- Values encoded: `encodeURIComponent(JSON.stringify(value))`
 
-- Always filter sentinels out before displaying amenities to guests: `.filter(a => !a.startsWith('__'))`
-- Always preserve sentinels when saving amenities: keep `__` prefixed items, replace the rest
-- Values are `encodeURIComponent(JSON.stringify(value))` encoded
-- See `admin.amenities.tsx` for the exact preserve pattern
+---
+
+## Superadmin Flow
+
+### Adding a new property
+
+1. /superadmin → Add property (fills name, subdomain, owner details)
+2. Click **Manage** on the new row → navigates to `/admin/dashboard?property={subdomain}`
+3. Set up rooms, availability, pricing, UPI ID, policies
+4. Supabase → Authentication → Users → **Invite user** → enter owner email
+5. Owner receives email, sets password, logs in at stayidom.in/login
+6. Back in /superadmin → click **Activate** once setup fee paid
+
+### Manage button
+
+- Navigates via `window.location.href = /admin/dashboard?property={subdomain}`
+- `admin.tsx` reads property param from `window.location.search`
+- `useOwnerProperty` detects superadmin mode and fetches by subdomain
 
 ---
 
 ## Supabase Functions (RPC)
 
-### `create_property_with_invite(p_name, p_subdomain, p_owner_email, p_area, p_owner_name, p_owner_phone)`
+### `create_property_with_invite` — still used by superadmin dashboard to create properties
 
-- Creates property with `subscription_status = 'trial'`
-- Generates invite token
-- Returns: `{ property_id, subdomain, invite_token, invite_link, expires_at }`
-- invite_link points to `stayidom.vercel.app/setup?token=xxx`
-- **When domain is purchased:** update this function's invite_link to use the real domain
+### `create_booking_atomic` — EXISTS in DB but NOT CALLED by app
 
-### `get_invite_by_token(p_token TEXT)`
+Was built to prevent double-booking race conditions atomically.
+Removed from app due to Supabase Free tier PostgREST schema cache 404 issue.
+The function is still in the DB. To re-enable:
+1. Upgrade to Supabase Pro (prevents schema cache issues)
+2. Update `useCreateBooking.ts` to call `supabase.rpc('create_booking_atomic', {...})`
+3. Remove the direct insert + availability update code
 
-- Returns: `{ email, property_name, property_id, used_at, expires_at }`
-- Callable by `anon` role (unauthenticated)
-- Returns a TABLE — comes back as array in JS, always use `data[0]`
-
-### `get_invite_by_token` JS usage pattern:
-
-```typescript
-const { data } = await supabase.rpc("get_invite_by_token", { p_token: token });
-const row = Array.isArray(data) ? data[0] : data; // ALWAYS do this
-```
-
-### `consume_invite_token(p_token TEXT)` — marks token used_at
-
-### `create_owner_auth_user(p_email, p_password, p_property_id, p_token)` — SQL only, has issues (see below)
+### `get_invite_by_token` — still used by /setup (deprecated but functional)
 
 ---
 
-## Edge Function
-
-### `create-owner`
-
-- URL: `https://vzzfqgqxnodlrvnaxpbw.supabase.co/functions/v1/create-owner`
-- JWT verification: **OFF** (unauthenticated callers need access)
-- Uses service role to call `supabase.auth.admin.createUser()`
-- Creates auth user + marks token used + links property owner_id
-- Called from `setup.tsx` handleSetPassword
-
----
-
-## /setup Route — Current Status & Known Issue
-
-**What works:**
-
-- Token validation via `get_invite_by_token` RPC ✅
-- Displays owner email and property name correctly ✅
-- Edge Function creates the auth user correctly ✅
-- Property gets linked to owner_id correctly ✅
-- Token gets marked as used ✅
-
-**What is broken:**
-
-- `supabase.auth.signInWithPassword()` returns "Invalid login credentials" immediately after `create-owner` Edge Function creates the user
-- Root cause: Unknown — user exists, identity exists, email confirmed, but sign-in fails
-- Suspected cause: Supabase free tier may have a propagation delay between admin user creation and sign-in availability
-
-**Current workaround for onboarding new owners:**
-
-1. Superadmin creates property via superadmin dashboard
-2. Superadmin goes to Supabase → Authentication → Users → Add user → Create new user (with Auto Confirm checked)
-3. Run SQL to link property: `UPDATE properties SET owner_id = (SELECT id FROM auth.users WHERE email = 'owner@email.com') WHERE subdomain = 'propertysubdomain';`
-4. Share login URL and credentials with owner via WhatsApp: `stayidom.vercel.app/login`
-
-**Fix needed:**
-
-- Option A: Add a retry loop in `setup.tsx` — wait 2 seconds then retry `signInWithPassword`
-- Option B: After Edge Function call, redirect to `/login` with email pre-filled instead of auto-signing in
-- Option B is cleaner — just show a success screen and tell owner to log in with their new password
-
----
-
-## RLS Policies (8 active)
+## RLS Policies
 
 | Table        | Policy                        | Rule                                                              |
 | ------------ | ----------------------------- | ----------------------------------------------------------------- |
@@ -253,99 +233,50 @@ const row = Array.isArray(data) ? data[0] : data; // ALWAYS do this
 
 ---
 
-## Completed Phases
-
-### Phase 0 ✅
-
-- Guest booking form end-to-end
-- WhatsApp CTA on booking confirmation
-- "Book via WhatsApp" button on guest page
-- WhatsApp message templates in admin booking row (confirm, directions, payment reminder, day-before)
-- Footer with real property data (phone, WhatsApp, Google Maps deep link)
-- Add/edit rooms (drawer)
-- Add booking from admin (modal with live price calc)
-- Confirm/cancel booking status buttons
-- Room name shown on dashboard
-- Settings cache key fix
-
-### Phase 1 ✅
-
-- SQL migrations (property_id on all tables, RLS policies)
-- `subscription_status` field on properties
-- `invite_tokens` table
-- `create_property_with_invite` DB function
-- Dynamic subdomain detection (`src/lib/subdomain.ts`)
-- Superadmin dashboard (all properties, stats, add property, invite link)
-- Admin redirect for superadmin users
-- Pricing page — per-room editor with live preview
-- Meals page — breakfast toggle + meal packages
-- Amenities page — property-wide toggle grid + room summary
-- Policies page — check-in/out times, cancellation presets, house rules
-- Payments page — UPI config, outstanding payments, mark paid
-- `/setup` route — owner onboarding (partial — sign-in step broken, workaround in place)
-- `create-owner` Edge Function deployed
-
----
-
 ## What Needs Doing Next
 
-### Fix /setup sign-in (Priority 1 — small fix)
-
-- Change `setup.tsx` to redirect to `/login` after Edge Function succeeds instead of auto sign-in
-- Show success message: "Account created! Please log in with your new password."
-- Pre-fill email on the login page via URL param: `/login?email=xxx`
+### High priority
+- [ ] Payment guard — prevent owner recording more than total_amount
+- [ ] First-time owner onboarding checklist (empty dashboard state)
+- [ ] Confirm status change dialog on mobile (prevent accidental taps)
 
 ### Phase 2 — Guest Experience & SEO
-
-- [ ] Static map image + directions deep links on guest page (no Google Maps JS SDK)
-- [ ] SEO meta tags + Open Graph per property (`<title>`, `<meta description>`, `og:image`)
-- [ ] `schema.org/LodgingBusiness` structured data JSON-LD per property
-- [ ] PWA manifest + Service Worker (shell caching for 2G users)
+- [ ] Static map image + directions deep links on guest page
+- [ ] SEO meta tags + Open Graph per property
+- [ ] `schema.org/LodgingBusiness` structured data JSON-LD
+- [ ] PWA manifest + Service Worker (shell caching for 2G)
 - [ ] Performance audit: guest page on simulated 2G
-- [ ] Superadmin "Resend invite" button for existing properties
 
 ### Phase 3 — WhatsApp Business (Future)
-
 - [ ] Meta Business verification
 - [ ] WhatsApp Business API for server-initiated messages
-- [ ] Automated booking confirmations
 
 ### Phase 4 — Billing
-
 - [ ] Trial → active flow UI
-- [ ] Razorpay subscription API (V2)
+- [ ] Razorpay subscription API
 
-### Phase 5 — Central Listing Page
-
-- [ ] `stayidom.in` landing with property cards
+### Phase 5 — Central Listing
+- [ ] stayidom.in landing with property cards
 - [ ] Filter by dates, guests, price
 
-### Domain (When purchased)
-
-- Buy `stayidom.in` (or `.in`)
-- Add to Vercel → Domains → add `stayidom.in` + `*.stayidom.in`
-- Update `src/lib/subdomain.ts` — already handles `.stayidom.in` subdomains
-- Update `create_property_with_invite` SQL function — change invite_link domain
-- Add production URL to Supabase Auth → URL Configuration → allowed redirect URLs
+### Cleanup
+- [ ] Delete /setup route (deprecated)
+- [ ] Upgrade Supabase to Pro → re-enable create_booking_atomic RPC
 
 ---
 
 ## Known Issues / Watch Points
 
-- `useOwnerProperty` queryKey is `['ownerProperty', user?.id]` — any invalidation must use this exact key
+- `useOwnerProperty` queryKey is `['ownerProperty', user?.id, propertySubdomain]` — invalidation must use exact key
 - GitHub web editor corrupts multi-line JSX `<a>` tag attributes — always single line
 - `@tanstack/react-router` must stay at 1.166.7
-- No Google Maps JS SDK — use deep links only
-- No video embeds
-- Superadmin user must be a separate Supabase auth user with no property linked
+- Supabase Free tier pauses after inactivity — cold start may cause first request to fail
 - `shared_amenities` array contains sentinel keys — NEVER overwrite the whole array without preserving `__` prefixed items
-- `get_invite_by_token` returns an array — always use `data[0]`
-- `create_owner_auth_user` SQL function exists but has sign-in issues — use Edge Function instead
-- Green Valley property owner was manually created — setup flow auto-sign-in is not working yet
+- Superadmin `?property=` param must be read via `window.location.search`, NOT TanStack `useSearch`
 
 ---
 
-## Network Reality (Critical for all feature decisions)
+## Network Reality
 
 Vattavada has weak Jio and BSNL only. Every feature must pass:
 
@@ -358,51 +289,9 @@ Vattavada has weak Jio and BSNL only. Every feature must pass:
 
 ---
 
-## Guidance for Minimax Agent
-
-### How to work on this project
-
-1. Always read the file before editing — don't guess at existing code
-2. Check `HANDOVER_v4.md` before starting any task
-3. Run the dev server and check for TypeScript errors after changes
-4. Test on mobile viewport — most owners use phones
-5. Commit to `main` branch — Vercel auto-deploys
-
-### Suggested first task
-
-Fix `/setup` sign-in — change `setup.tsx` so that after the Edge Function succeeds, instead of calling `signInWithPassword`, it shows a success screen and redirects to `/login?email=xxx`. Update `login.tsx` to pre-fill email from URL params.
-
-### File editing pattern (from admin.rooms.tsx — use as reference)
-
-- Drawer pattern for edit forms (right-side slide-in panel)
-- `inputCls` and `labelCls` constants for consistent form styling
-- Direct `supabase` calls (no server functions)
-- `queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })` after property updates
-- `queryClient.invalidateQueries({ queryKey: ['bookings', property?.id] })` after booking updates
-
-### Supabase client usage
-
-```typescript
-import { supabase } from "@/lib/supabase";
-// Direct table operations
-const { data, error } = await supabase.from("rooms").select("*").eq("property_id", id);
-// RPC
-const { data } = await supabase.rpc("function_name", { param: value });
-// Remember: RPC returning TABLE comes back as array — use data[0]
-```
-
-### Adding a new admin route
-
-1. Create `src/routes/admin.{name}.tsx`
-2. Export `Route = createFileRoute('/admin/{name}')({ component: YourComponent })`
-3. Add to `NAV` array in `src/admin/AdminLayout.tsx`
-4. TanStack Router auto-discovers routes — no manual registration needed
-
----
-
 ## Supabase Project Details
 
 - Project URL: `https://vzzfqgqxnodlrvnaxpbw.supabase.co`
 - Edge Function base URL: `https://vzzfqgqxnodlrvnaxpbw.supabase.co/functions/v1/`
-- Deployed Edge Functions: `create-owner`
-- pgcrypto extension: enabled (needed for password hashing in SQL functions)
+- Deployed Edge Functions: `create-owner` (used by deprecated /setup only)
+- pgcrypto extension: enabled
