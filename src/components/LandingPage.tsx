@@ -33,7 +33,7 @@
  *     import { submitLead } from '../lib/leads'
  */
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // ─── Design tokens — mirrors AGENTS.md ───────────────────────────────────────
 const C = {
@@ -128,6 +128,251 @@ function SectionHeader({ title, sub, light = false }: { title: string; sub?: str
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CARD CAROUSEL — reusable, touch + dot nav, desktop shows full grid
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function CardCarousel({ children, itemCount }: { children: React.ReactNode; itemCount: number }) {
+  const [current, setCurrent] = useState(0);
+
+  const prev = useCallback(() => setCurrent(i => Math.max(0, i - 1)), []);
+  const next = useCallback(() => setCurrent(i => Math.min(itemCount - 1, i + 1)), [itemCount]);
+
+  return (
+    <>
+      {/* Mobile carousel */}
+      <div className="md:hidden" style={{ position: "relative" }}>
+        <div
+          style={{
+            display: "flex",
+            overflowX: "hidden",
+            scrollSnapType: "x mandatory",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              width: "100%",
+              transition: "transform 0.35s cubic-bezier(.4,0,.2,1)",
+              transform: `translateX(calc(-${current} * (100% + 12px)))`,
+              gap: 12,
+            }}
+          >
+            {children}
+          </div>
+        </div>
+
+        {/* Prev / Next arrows */}
+        {current > 0 && (
+          <button
+            onClick={prev}
+            aria-label="Previous"
+            style={{
+              position: "absolute", left: -4, top: "50%", transform: "translateY(-50%)",
+              width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`,
+              background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex",
+              alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+              zIndex: 2,
+            }}
+          >‹</button>
+        )}
+        {current < itemCount - 1 && (
+          <button
+            onClick={next}
+            aria-label="Next"
+            style={{
+              position: "absolute", right: -4, top: "50%", transform: "translateY(-50%)",
+              width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`,
+              background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex",
+              alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)",
+              zIndex: 2,
+            }}
+          >›</button>
+        )}
+
+        {/* Dot indicators */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: "1.25rem" }}>
+          {Array.from({ length: itemCount }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              style={{
+                width: i === current ? 20 : 8, height: 8, borderRadius: 99, border: "none",
+                cursor: "pointer", padding: 0,
+                background: i === current ? C.green : C.greenMid,
+                transition: "all 0.25s",
+              }}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop grid — children rendered as-is via CSS */}
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {children}
+      </div>
+    </>
+  );
+}
+
+// Carousel slide wrapper — enforces full-width on mobile so only one shows
+function Slide({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ minWidth: "100%", width: "100%" }}>
+      {children}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DEMO MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onClose: () => void; preselectedTier: string }) {
+  const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [form, setForm]           = useState({ name: "", phone: "", property: "", tier: preselectedTier });
+
+  // Sync tier if preselectedTier changes from outside
+  useEffect(() => {
+    if (preselectedTier) setForm(f => ({ ...f, tier: preselectedTier }));
+  }, [preselectedTier]);
+
+  // Lock body scroll while open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isOpen]);
+
+  // Close on Escape key
+  useEffect(() => {
+    if (!isOpen) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [isOpen, onClose]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
+    } catch {
+      // fail silently
+    } finally {
+      setLoading(false);
+      setSubmitted(true);
+    }
+  };
+
+  const handleClose = () => {
+    onClose();
+    // Reset after close animation settles
+    setTimeout(() => { setSubmitted(false); setForm({ name: "", phone: "", property: "", tier: "" }); }, 300);
+  };
+
+  if (!isOpen) return null;
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem",
+    border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)",
+    color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit",
+    boxSizing: "border-box",
+  };
+
+  return (
+    // Backdrop
+    <div
+      onClick={handleClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        background: "rgba(0,0,0,.55)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1.25rem",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+      }}
+    >
+      {/* Modal panel — stop propagation so clicks inside don't close */}
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: "100%", maxWidth: 460,
+          background: "linear-gradient(155deg,#166534,#14532d)",
+          borderRadius: "1.5rem",
+          padding: "2rem",
+          boxShadow: "0 32px 80px rgba(0,0,0,.45)",
+          position: "relative",
+          maxHeight: "90vh",
+          overflowY: "auto",
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          aria-label="Close"
+          style={{
+            position: "absolute", top: "1rem", right: "1rem",
+            width: 32, height: 32, borderRadius: "50%",
+            border: "1px solid rgba(255,255,255,.3)",
+            background: "rgba(255,255,255,.1)",
+            color: "#fff", fontSize: "1rem", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            lineHeight: 1,
+          }}
+        >✕</button>
+
+        <h2 style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", marginBottom: "0.5rem", paddingRight: "2rem" }}>
+          ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ
+        </h2>
+        <p style={{ color: C.greenLight, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>
+          24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.
+        </p>
+
+        {submitted ? (
+          <div style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "1.25rem", padding: "2rem", color: "#fff", textAlign: "center" }}>
+            <div style={{ fontSize: "3rem", marginBottom: "0.875rem" }}>🌿</div>
+            <p style={{ fontWeight: 700, fontSize: "1.125rem", marginBottom: "0.5rem" }}>നന്ദി!</p>
+            <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "1.5rem" }}>ഞങ്ങൾ 24 hours-ൽ WhatsApp-ൽ reach ചെയ്യും.</p>
+            <button
+              onClick={handleClose}
+              style={{ background: C.amber, color: C.dark, border: "none", padding: "0.75rem 2rem", borderRadius: 99, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: "0.9375rem" }}
+            >
+              Continue exploring →
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
+            <input type="text" placeholder="നിങ്ങളുടെ പേര്"         required style={inputStyle} value={form.name}     onChange={e => setForm(f=>({...f,name:e.target.value}))} />
+            <input type="tel"  placeholder="WhatsApp Number"          required style={inputStyle} value={form.phone}    onChange={e => setForm(f=>({...f,phone:e.target.value}))} />
+            <input type="text" placeholder="Homestay name (optional)"         style={inputStyle} value={form.property} onChange={e => setForm(f=>({...f,property:e.target.value}))} />
+            <select value={form.tier} onChange={e => setForm(f=>({...f,tier:e.target.value}))} style={{ ...inputStyle, appearance: "none", WebkitAppearance: "none" }}>
+              <option value="">Plan select ചെയ്യൂ (optional)</option>
+              <option value="starter">Starter — 1–5 rooms · ₹5,000 setup</option>
+              <option value="growth">Growth — 6–10 rooms · ₹10,000 setup</option>
+              <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
+            </select>
+            <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
+              {loading ? "Submitting..." : "Free Demo ബുക്ക് ചെയ്യൂ →"}
+            </button>
+          </form>
+        )}
+
+        {/* Trust note */}
+        <p style={{ textAlign: "center", fontSize: "0.8125rem", color: "rgba(255,255,255,.5)", marginTop: "1.25rem" }}>
+          🔒 No spam · No commitment · Cancel anytime
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // HERO SVG BACKGROUND
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -150,7 +395,7 @@ function HeroBg() {
 // NAVBAR
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function Navbar() {
+function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50 }}>
@@ -162,7 +407,8 @@ function Navbar() {
           {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
             <a key={h} href={h} style={{ color: C.muted }} onMouseEnter={e => (e.currentTarget.style.color=C.text)} onMouseLeave={e => (e.currentTarget.style.color=C.muted)}>{l}</a>
           ))}
-          <a href="#signup" style={{ background: C.green, color: "#fff", padding: "0.5rem 1.25rem", borderRadius: 99, fontWeight: 700, fontSize: "0.9375rem" }}>Free Demo</a>
+          {/* ── Free Demo now opens the modal instead of jumping to #signup ── */}
+          <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.5rem 1.25rem", borderRadius: 99, fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo</button>
         </div>
         <button
           className="md:hidden"
@@ -180,7 +426,7 @@ function Navbar() {
           {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
             <a key={h} href={h} onClick={()=>setOpen(false)} style={{ color: C.muted, fontSize: "1rem" }}>{l}</a>
           ))}
-          <a href="#signup" onClick={()=>setOpen(false)} style={{ background: C.green, color: "#fff", padding: "0.75rem 1.25rem", borderRadius: 99, fontWeight: 700, textAlign: "center", fontSize: "1rem" }}>Free Demo</a>
+          <button onClick={() => { setOpen(false); onDemoClick(); }} style={{ background: C.green, color: "#fff", padding: "0.75rem 1.25rem", borderRadius: 99, fontWeight: 700, textAlign: "center", fontSize: "1rem", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo</button>
         </div>
       )}
     </nav>
@@ -191,7 +437,7 @@ function Navbar() {
 // HERO
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function Hero() {
+function Hero({ onDemoClick }: { onDemoClick: () => void }) {
   return (
     <section style={{ background: "linear-gradient(155deg,#f0fdf4 0%,#fafaf9 55%,#fef3c7 100%)", padding: "5.5rem 1.25rem 4.5rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
       <HeroBg />
@@ -207,7 +453,8 @@ function Hero() {
           Branded booking website · Direct UPI payments · Guest invoicing · WhatsApp integration · Accounts tracking — എല്ലാം ഒരിടത്ത്. Booking.com &amp; MakeMyTrip-ന് കൊടുക്കുന്ന 15–25% commission ഇനി നിങ്ങളുടെ business-ലേക്ക്.
         </p>
         <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "3.5rem" }}>
-          <a href="#signup" style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)" }}>Free Demo — ഇന്ന് തന്നെ</a>
+          {/* ── Primary CTA now opens modal ── */}
+          <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo — ഇന്ന് തന്നെ</button>
           <a href="https://demo.stayidom.in" target="_blank" rel="noopener noreferrer" style={{ color: C.green, border: `1.5px solid ${C.green}`, padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 600, fontSize: "1rem" }}>View Sample Site ↗</a>
         </div>
         <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center", flexWrap: "wrap", rowGap: "1rem" }}>
@@ -457,7 +704,7 @@ function ComparisonTable() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// GUEST TRUST SIGNALS
+// GUEST TRUST SIGNALS — carousel on mobile, 3-col grid on desktop
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function GuestTrustSignals() {
@@ -465,25 +712,27 @@ function GuestTrustSignals() {
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="Guests-ന് trust ചെയ്യാൻ കാരണം" sub="Booking.com ഇല്ലാതെ guest book ചെയ്യുമോ? — ഈ trust signals ഉണ്ടെങ്കിൽ, yes." />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <CardCarousel itemCount={TRUST_CARDS.length}>
           {TRUST_CARDS.map(({ icon, title, desc, badges }) => (
-            <div key={title} style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "1.75rem" }}>
-              <div style={{ fontSize: "2rem", marginBottom: "0.875rem" }}>{icon}</div>
-              <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem" }}>{title}</h3>
-              <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.7, marginBottom: "0.875rem" }}>{desc}</p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
-                {badges.map(b => <span key={b} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.25rem 0.625rem", borderRadius: 99, background: C.greenLight, color: C.green }}>{b}</span>)}
+            <Slide key={title}>
+              <div style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "1.75rem", height: "100%", boxSizing: "border-box" }}>
+                <div style={{ fontSize: "2rem", marginBottom: "0.875rem" }}>{icon}</div>
+                <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem" }}>{title}</h3>
+                <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.7, marginBottom: "0.875rem" }}>{desc}</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem" }}>
+                  {badges.map(b => <span key={b} style={{ fontSize: "0.75rem", fontWeight: 600, padding: "0.25rem 0.625rem", borderRadius: 99, background: C.greenLight, color: C.green }}>{b}</span>)}
+                </div>
               </div>
-            </div>
+            </Slide>
           ))}
-        </div>
+        </CardCarousel>
       </div>
     </section>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// FEATURES GRID
+// FEATURES GRID — carousel on mobile, 3-col grid on desktop
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function FeaturesGrid() {
@@ -491,15 +740,17 @@ function FeaturesGrid() {
     <section id="features" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
         <SectionHeader title="എല്ലാം ഒരു platform-ൽ" sub="Vattavada-ക്കായി design ചെയ്‌ത features" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <CardCarousel itemCount={FEATURES.length}>
           {FEATURES.map(({ icon, title, desc }) => (
-            <div key={title} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.125rem", padding: "1.625rem" }}>
-              <div style={{ fontSize: "2.25rem", marginBottom: "0.875rem" }}>{icon}</div>
-              <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem" }}>{title}</h3>
-              <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.7 }}>{desc}</p>
-            </div>
+            <Slide key={title}>
+              <div style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.125rem", padding: "1.625rem", height: "100%", boxSizing: "border-box" }}>
+                <div style={{ fontSize: "2.25rem", marginBottom: "0.875rem" }}>{icon}</div>
+                <h3 style={{ fontSize: "1.0625rem", fontWeight: 700, color: C.text, marginBottom: "0.5rem" }}>{title}</h3>
+                <p style={{ fontSize: "0.9375rem", color: C.muted, lineHeight: 1.7 }}>{desc}</p>
+              </div>
+            </Slide>
           ))}
-        </div>
+        </CardCarousel>
       </div>
     </section>
   );
@@ -807,9 +1058,10 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
                 <div style={{ fontSize: "0.8125rem", color: highlight ? C.greenLight : C.muted, marginBottom: "0.375rem" }}>one-time setup</div>
                 <div style={{ fontSize: "1rem", fontWeight: 600, color: highlight ? "#f0fdf4" : C.text }}>+ {monthly}</div>
               </div>
-              <a href="#signup" onClick={() => onSelectTier(tier)} style={{ textAlign: "center", padding: "0.9375rem 1rem", borderRadius: 99, fontSize: "0.9375rem", fontWeight: 700, display: "block", marginTop: "0.5rem", background: highlight ? C.amber : C.green, color: highlight ? C.dark : "#fff" }}>
+              {/* Pricing CTA now triggers modal with preselected tier */}
+              <button onClick={() => onSelectTier(tier)} style={{ textAlign: "center", padding: "0.9375rem 1rem", borderRadius: 99, fontSize: "0.9375rem", fontWeight: 700, display: "block", marginTop: "0.5rem", background: highlight ? C.amber : C.green, color: highlight ? C.dark : "#fff", border: "none", cursor: "pointer", fontFamily: "inherit", width: "100%" }}>
                 Get Started — 14 days free
-              </a>
+              </button>
             </div>
           ))}
         </div>
@@ -844,9 +1096,9 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
             <div style={{ padding: "1.25rem" }} />
             {TIER_META.map(({ key, highlight }) => (
               <div key={key} style={{ padding: "1rem 0.75rem", textAlign: "center", borderLeft: `1px solid ${C.greenMid}`, background: highlight ? C.greenLight : "transparent" }}>
-                <a href="#signup" onClick={() => onSelectTier(key)} style={{ display: "inline-block", padding: "0.625rem 1.25rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 700, background: highlight ? C.green : "transparent", color: highlight ? "#fff" : C.green, border: highlight ? "none" : `1.5px solid ${C.green}` }}>
+                <button onClick={() => onSelectTier(key)} style={{ display: "inline-block", padding: "0.625rem 1.25rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 700, background: highlight ? C.green : "transparent", color: highlight ? "#fff" : C.green, border: highlight ? "none" : `1.5px solid ${C.green}`, cursor: "pointer", fontFamily: "inherit" }}>
                   Get Started
-                </a>
+                </button>
               </div>
             ))}
           </div>
@@ -860,7 +1112,7 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SIGNUP CTA
+// SIGNUP CTA — stays in page for direct #signup link visits
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
@@ -876,6 +1128,7 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
     width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem",
     border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)",
     color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit",
+    boxSizing: "border-box",
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -907,7 +1160,7 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
             <input type="text" placeholder="നിങ്ങളുടെ പേര്"         required style={inputStyle} value={form.name}     onChange={e => setForm(f=>({...f,name:e.target.value}))} />
             <input type="tel"  placeholder="WhatsApp Number"          required style={inputStyle} value={form.phone}    onChange={e => setForm(f=>({...f,phone:e.target.value}))} />
             <input type="text" placeholder="Homestay name (optional)"         style={inputStyle} value={form.property} onChange={e => setForm(f=>({...f,property:e.target.value}))} />
-            <select value={form.tier} onChange={e => setForm(f=>({...f,tier:e.target.value}))} style={{ ...inputStyle, appearance: "none" }}>
+            <select value={form.tier} onChange={e => setForm(f=>({...f,tier:e.target.value}))} style={{ ...inputStyle, appearance: "none", WebkitAppearance: "none" }}>
               <option value="">Plan select ചെയ്യൂ (optional)</option>
               <option value="starter">Starter — 1–5 rooms · ₹5,000 setup</option>
               <option value="growth">Growth — 6–10 rooms · ₹10,000 setup</option>
@@ -947,10 +1200,25 @@ function Footer() {
 
 export default function LandingPage() {
   const [selectedTier, setSelectedTier] = useState("");
+  const [modalOpen, setModalOpen]       = useState(false);
+
+  // When a tier card's "Get Started" is clicked: set tier + open modal
+  const handleSelectTier = useCallback((tier: string) => {
+    setSelectedTier(tier);
+    setModalOpen(true);
+  }, []);
+
+  // Navbar / hero "Free Demo" button — open modal with no preselected tier
+  const handleDemoClick = useCallback(() => {
+    setSelectedTier("");
+    setModalOpen(true);
+  }, []);
+
   return (
     <main style={{ fontFamily: "'Noto Sans Malayalam','Segoe UI',system-ui,sans-serif", overflowX: "hidden", width: "100%", maxWidth: "100vw" }}>
-      <Navbar />
-      <Hero />
+      <DemoModal isOpen={modalOpen} onClose={() => setModalOpen(false)} preselectedTier={selectedTier} />
+      <Navbar onDemoClick={handleDemoClick} />
+      <Hero onDemoClick={handleDemoClick} />
       <TrustBar />
       <ProblemStrip />
       <PhoneMockup />
@@ -964,7 +1232,7 @@ export default function LandingPage() {
       <SavingsCalculator />
       <Testimonials />
       <FAQ />
-      <Pricing onSelectTier={setSelectedTier} />
+      <Pricing onSelectTier={handleSelectTier} />
       <SignupCTA preselectedTier={selectedTier} />
       <Footer />
     </main>
