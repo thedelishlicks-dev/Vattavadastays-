@@ -34,6 +34,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 // ─── Design tokens — mirrors AGENTS.md ───────────────────────────────────────
 const C = {
@@ -51,15 +52,7 @@ const serif: React.CSSProperties = {
   fontFamily: "'Playfair Display', Georgia, serif",
 };
 
-// ─── Stub — replace with: import { submitLead } from '../lib/leads' ──────────
-async function submitLead(data: {
-  name: string;
-  phone: string;
-  property_name?: string;
-  tier?: string;
-}) {
-  console.log("Lead captured:", data);
-}
+import { submitLead } from "../lib/leads";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATA
@@ -239,14 +232,12 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
     if (preselectedTier) setForm(f => ({ ...f, tier: preselectedTier }));
   }, [preselectedTier]);
 
-  // Lock body scroll while open
+  // Lock body scroll while open — always restore on unmount
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => { document.body.style.overflow = ""; };
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
   // Close on Escape key
