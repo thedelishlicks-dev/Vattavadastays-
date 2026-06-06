@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
-import { useLeads } from '@/hooks/useLeads'
+import { useLeads } from '../hooks/useLeads'
 import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
 
 export const Route = createFileRoute('/superadmin/')({
