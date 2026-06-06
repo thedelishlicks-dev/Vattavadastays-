@@ -157,7 +157,6 @@ function BookingCard({
           ))}
       </div>
 
-      {/* Gap 1 — nudge owner to record payment for pending bookings with no advance */}
       {booking.status === "pending" &&
         advance === 0 &&
         booking.payment_method !== "Cash on Arrival" && (
@@ -821,13 +820,14 @@ function ChargesTab({
           className={inputCls}
           placeholder="Description e.g. Dinner"
         />
+        {/* ── qty narrow, price gets remaining space ── */}
         <div className="flex gap-2">
           <input
             type="number"
             min={1}
             value={qty}
             onChange={(e) => setQty(e.target.value)}
-            className={`${inputCls} w-20`}
+            className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
             placeholder="Qty"
           />
           <input
@@ -835,8 +835,8 @@ function ChargesTab({
             min={0}
             value={price}
             onChange={(e) => setPrice(e.target.value)}
-            className={`${inputCls} flex-1`}
-            placeholder="Price ₹"
+            className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="₹ Price"
           />
           <button
             onClick={handleAdd}
@@ -1192,7 +1192,6 @@ function BookingsAdmin() {
       prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev,
     );
 
-    // Gap 5 — auto prompt WhatsApp confirmation when owner confirms a booking
     if (newStatus === "confirmed" && property) {
       const booking = bookings.find((b) => b.id === id);
       if (booking) {
