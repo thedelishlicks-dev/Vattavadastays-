@@ -18,19 +18,26 @@ type MealPackage = {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: string; // string so field can be cleared while typing
   per: "person" | "room";
 };
 
 type MealsConfig = {
   breakfast_included: boolean;
-  breakfast_price: number;
+  breakfast_price: string; // string so field can be cleared while typing
   packages: MealPackage[];
+};
+
+// Persisted shape — prices stored as numbers in DB
+type MealsConfigPersisted = {
+  breakfast_included: boolean;
+  breakfast_price: number;
+  packages: Array<Omit<MealPackage, "price"> & { price: number }>;
 };
 
 const defaultConfig = (): MealsConfig => ({
   breakfast_included: false,
-  breakfast_price: 0,
+  breakfast_price: "0",
   packages: [],
 });
 
@@ -38,17 +45,23 @@ const emptyPackage = (): MealPackage => ({
   id: crypto.randomUUID(),
   name: "",
   description: "",
-  price: 0,
+  price: "",
   per: "person",
 });
 
-// Stored as JSON in properties.shared_amenities under a sentinel key "__meals_config"
 function parseMealsConfig(shared_amenities: string[] | null): MealsConfig {
   if (!shared_amenities) return defaultConfig();
   const sentinel = shared_amenities.find((a) => a.startsWith("__meals:"));
   if (!sentinel) return defaultConfig();
   try {
-    return JSON.parse(decodeURIComponent(sentinel.slice("__meals:".length)));
+    const persisted: MealsConfigPersisted = JSON.parse(
+      decodeURIComponent(sentinel.slice("__meals:".length))
+    );
+    return {
+      breakfast_included: persisted.breakfast_included,
+      breakfast_price: String(persisted.breakfast_price ?? 0),
+      packages: persisted.packages.map((p) => ({ ...p, price: String(p.price) })),
+    };
   } catch {
     return defaultConfig();
   }
@@ -56,7 +69,12 @@ function parseMealsConfig(shared_amenities: string[] | null): MealsConfig {
 
 function encodeMealsConfig(config: MealsConfig, existing: string[]): string[] {
   const filtered = existing.filter((a) => !a.startsWith("__meals:"));
-  return [...filtered, `__meals:${encodeURIComponent(JSON.stringify(config))}`];
+  const persisted: MealsConfigPersisted = {
+    breakfast_included: config.breakfast_included,
+    breakfast_price: parseFloat(config.breakfast_price) || 0,
+    packages: config.packages.map((p) => ({ ...p, price: parseFloat(p.price) || 0 })),
+  };
+  return [...filtered, `__meals:${encodeURIComponent(JSON.stringify(persisted))}`];
 }
 
 function AdminMeals() {
@@ -92,6 +110,19 @@ function AdminMeals() {
 
   const handleSave = async () => {
     if (!property) return;
+
+    // Validate prices before saving
+    const breakfastPrice = parseFloat(config.breakfast_price);
+    if (!config.breakfast_included && (isNaN(breakfastPrice) || breakfastPrice < 0)) {
+      setError("Breakfast price must be 0 or more");
+      return;
+    }
+    for (const pkg of config.packages) {
+      if (!pkg.name.trim()) { setError("All packages need a name"); return; }
+      const p = parseFloat(pkg.price);
+      if (isNaN(p) || p < 0) { setError(`Invalid price for "${pkg.name || "package"}"`); return; }
+    }
+
     setSaving(true);
     setError("");
     try {
@@ -142,7 +173,9 @@ function AdminMeals() {
             ].join(" ")} />
           </div>
           <span className="text-sm font-medium">
-            {config.breakfast_included ? "Breakfast included in room rate" : "Breakfast not included"}
+            {config.breakfast_included
+              ? "Breakfast included in room rate"
+              : "Breakfast not included"}
           </span>
         </label>
 
@@ -150,8 +183,10 @@ function AdminMeals() {
           <div>
             <label className={labelCls}>Breakfast add-on price per person (₹)</label>
             <input
-              type="number" min={0} value={config.breakfast_price}
-              onChange={(e) => set("breakfast_price", parseInt(e.target.value) || 0)}
+              type="number"
+              min={0}
+              value={config.breakfast_price}
+              onChange={(e) => set("breakfast_price", e.target.value)}
               className={`${inputCls} max-w-[200px]`}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -196,14 +231,17 @@ function AdminMeals() {
                     <input
                       value={pkg.name}
                       onChange={(e) => updatePackage(pkg.id, "name", e.target.value)}
-                      className={inputCls} placeholder="e.g. Full Board"
+                      className={inputCls}
+                      placeholder="e.g. Full Board"
                     />
                   </div>
                   <div>
                     <label className={labelCls}>Price (₹) *</label>
                     <input
-                      type="number" min={0} value={pkg.price}
-                      onChange={(e) => updatePackage(pkg.id, "price", parseInt(e.target.value) || 0)}
+                      type="number"
+                      min={0}
+                      value={pkg.price}
+                      onChange={(e) => updatePackage(pkg.id, "price", e.target.value)}
                       className={inputCls}
                     />
                   </div>
@@ -214,7 +252,8 @@ function AdminMeals() {
                   <input
                     value={pkg.description}
                     onChange={(e) => updatePackage(pkg.id, "description", e.target.value)}
-                    className={inputCls} placeholder="e.g. Breakfast, lunch and dinner"
+                    className={inputCls}
+                    placeholder="e.g. Breakfast, lunch and dinner"
                   />
                 </div>
 
@@ -245,7 +284,8 @@ function AdminMeals() {
 
       <div className="flex items-center gap-3">
         <button
-          onClick={handleSave} disabled={saving}
+          onClick={handleSave}
+          disabled={saving}
           className="rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
