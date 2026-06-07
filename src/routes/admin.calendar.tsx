@@ -17,12 +17,13 @@ function AdminCalendar() {
   const rooms = property?.rooms ?? []
   const activeRoomId = selectedRoomId ?? rooms[0]?.id ?? null
 
-  const startDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1)
-    .toISOString()
-    .split('T')[0]
-  const endDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + 2, 0)
-    .toISOString()
-    .split('T')[0]
+  const year = viewDate.getFullYear()
+  const month = viewDate.getMonth()
+
+  // FIX: fetch only the current month, not two months
+  // month+1, day 0 = last day of current month
+  const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0]
 
   const { data: availability, isLoading: availLoading } = useAvailabilityRange(
     activeRoomId ?? '',
@@ -34,6 +35,15 @@ function AdminCalendar() {
     property?.id ?? ''
   )
 
+  // FIX: parse date strings as local dates to avoid UTC midnight timezone shift
+  const parseLocalDate = (dateStr: string) => {
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }
+
+  const toLocalDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   // Build a set of booked dates for the selected room
   const bookedDates = useMemo(() => {
     const dates = new Set<string>()
@@ -44,11 +54,11 @@ function AdminCalendar() {
           b.status !== 'cancelled'
       )
       .forEach((b) => {
-        const start = new Date(b.check_in)
-        const end = new Date(b.check_out)
+        const start = parseLocalDate(b.check_in)
+        const end = parseLocalDate(b.check_out)
         const cur = new Date(start)
         while (cur < end) {
-          dates.add(cur.toISOString().split('T')[0])
+          dates.add(toLocalDateStr(cur))
           cur.setDate(cur.getDate() + 1)
         }
       })
@@ -65,11 +75,11 @@ function AdminCalendar() {
           b.status !== 'cancelled'
       )
       .forEach((b) => {
-        const start = new Date(b.check_in)
-        const end = new Date(b.check_out)
+        const start = parseLocalDate(b.check_in)
+        const end = parseLocalDate(b.check_out)
         const cur = new Date(start)
         while (cur < end) {
-          const d = cur.toISOString().split('T')[0]
+          const d = toLocalDateStr(cur)
           map[d] = b.guest_name
           cur.setDate(cur.getDate() + 1)
         }
@@ -93,8 +103,6 @@ function AdminCalendar() {
     )
   }
 
-  const year = viewDate.getFullYear()
-  const month = viewDate.getMonth()
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstWeekday = new Date(year, month, 1).getDay()
 
@@ -176,7 +184,12 @@ function AdminCalendar() {
               const slot = availMap[dateStr]
               const isBooked = bookedDates.has(dateStr)
               const guestName = bookedGuestMap[dateStr]
-              const isManuallyBlocked = slot?.is_available === false
+
+              // FIX: a date with is_available=false AND a booking is "Booked" not "Closed"
+              // The DB trigger sets is_available=false on confirmed bookings, so we must
+              // check isBooked first before treating the slot as manually blocked.
+              const isManuallyBlocked = !isBooked && slot?.is_available === false
+
               const price = slot?.price_override
 
               const bgColor = isBooked

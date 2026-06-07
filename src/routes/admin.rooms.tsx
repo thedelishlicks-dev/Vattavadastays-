@@ -26,9 +26,9 @@ type RoomForm = {
   name: string
   room_type: string
   bed_type: string
-  max_guests: number
-  base_price: number
-  extra_guest_price: number
+  max_guests: string        // string so the field can be cleared while typing
+  base_price: string        // string so the field can be cleared while typing
+  extra_guest_price: string // string so the field can be cleared while typing
   weekend_multiplier: number
   room_amenities: string[]
   is_active: boolean
@@ -38,9 +38,9 @@ const emptyForm = (): RoomForm => ({
   name: '',
   room_type: 'deluxe',
   bed_type: 'king',
-  max_guests: 2,
-  base_price: 2500,
-  extra_guest_price: 500,
+  max_guests: '2',
+  base_price: '2500',
+  extra_guest_price: '500',
   weekend_multiplier: 1,
   room_amenities: [],
   is_active: true,
@@ -74,15 +74,11 @@ function RoomImageUpload({
     setProgress('Checking file…')
 
     try {
-      // validateAndCompress throws a user-friendly string on failure
       setProgress('Compressing…')
-      const result = 
-        await validateAndCompress(file, 'room')
+      const result = await validateAndCompress(file, 'room')
       const { file: compressed } = result
 
-      setProgress(
-        compressionSummary(result)
-      )
+      setProgress(compressionSummary(result))
 
       const path = `${propertyId}/${room.id}-${Date.now()}.webp`
 
@@ -161,7 +157,6 @@ function RoomImageUpload({
         </div>
       )}
 
-      {/* Progress shown after image exists too (replace flow) */}
       {uploading && currentImage && (
         <p className="text-xs text-muted-foreground">{progress}</p>
       )}
@@ -200,9 +195,9 @@ function RoomDrawer({
           name: room.name,
           room_type: room.room_type,
           bed_type: room.bed_type,
-          max_guests: room.max_guests,
-          base_price: room.base_price,
-          extra_guest_price: room.extra_guest_price,
+          max_guests: String(room.max_guests),
+          base_price: String(room.base_price),
+          extra_guest_price: String(room.extra_guest_price),
           weekend_multiplier: room.weekend_multiplier ?? 1,
           room_amenities: room.room_amenities ?? [],
           is_active: room.is_active,
@@ -233,17 +228,31 @@ function RoomDrawer({
 
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Room name is required'); return }
-    if (form.base_price <= 0) { setError('Base price must be greater than 0'); return }
+
+    const maxGuests = parseInt(form.max_guests)
+    const basePrice = parseFloat(form.base_price)
+    const extraGuestPrice = parseFloat(form.extra_guest_price)
+
+    if (isNaN(maxGuests) || maxGuests < 1) { setError('Max guests must be at least 1'); return }
+    if (!basePrice || basePrice <= 0) { setError('Base price must be greater than 0'); return }
+    if (isNaN(extraGuestPrice) || extraGuestPrice < 0) { setError('Extra guest price must be 0 or more'); return }
+
     setSaving(true)
     setError('')
     try {
+      const payload = {
+        ...form,
+        max_guests: maxGuests,
+        base_price: basePrice,
+        extra_guest_price: extraGuestPrice,
+      }
       if (room) {
-        const { error: err } = await supabase.from('rooms').update({ ...form }).eq('id', room.id)
+        const { error: err } = await supabase.from('rooms').update(payload).eq('id', room.id)
         if (err) throw err
       } else {
         const { error: err } = await supabase
           .from('rooms')
-          .insert({ ...form, property_id: propertyId, images: [] })
+          .insert({ ...payload, property_id: propertyId, images: [] })
         if (err) throw err
       }
       onSaved()
@@ -323,7 +332,7 @@ function RoomDrawer({
               min={1}
               max={20}
               value={form.max_guests}
-              onChange={(e) => set('max_guests', parseInt(e.target.value) || 1)}
+              onChange={(e) => set('max_guests', e.target.value)}
               className={inputCls}
             />
           </div>
@@ -335,7 +344,7 @@ function RoomDrawer({
                 type="number"
                 min={0}
                 value={form.base_price}
-                onChange={(e) => set('base_price', parseInt(e.target.value) || 0)}
+                onChange={(e) => set('base_price', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -345,7 +354,7 @@ function RoomDrawer({
                 type="number"
                 min={0}
                 value={form.extra_guest_price}
-                onChange={(e) => set('extra_guest_price', parseInt(e.target.value) || 0)}
+                onChange={(e) => set('extra_guest_price', e.target.value)}
                 className={inputCls}
               />
             </div>
@@ -391,7 +400,6 @@ function RoomDrawer({
               })}
             </div>
 
-            {/* Custom amenities already selected */}
             {form.room_amenities
               .filter((a) => !AMENITY_OPTIONS.includes(a))
               .map((a) => (
