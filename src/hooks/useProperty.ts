@@ -13,6 +13,9 @@ export type Property = {
   description: string | null
   description_ml: string | null
   hero_image: string | null
+  hero_tagline: string | null
+  about_image: string | null
+  logo_url: string | null          // property logo — shown in header, hero, favicon, PWA icon
   owner_name: string | null
   owner_phone: string | null
   owner_whatsapp: string | null
