@@ -26,7 +26,7 @@ type RoomForm = {
   name: string
   room_type: string
   bed_type: string
-  max_guests: number
+  max_guests: string        // string so the field can be cleared while typing
   base_price: string        // string so the field can be cleared while typing
   extra_guest_price: string // string so the field can be cleared while typing
   weekend_multiplier: number
@@ -38,7 +38,7 @@ const emptyForm = (): RoomForm => ({
   name: '',
   room_type: 'deluxe',
   bed_type: 'king',
-  max_guests: 2,
+  max_guests: '2',
   base_price: '2500',
   extra_guest_price: '500',
   weekend_multiplier: 1,
@@ -195,7 +195,7 @@ function RoomDrawer({
           name: room.name,
           room_type: room.room_type,
           bed_type: room.bed_type,
-          max_guests: room.max_guests,
+          max_guests: String(room.max_guests),
           base_price: String(room.base_price),
           extra_guest_price: String(room.extra_guest_price),
           weekend_multiplier: room.weekend_multiplier ?? 1,
@@ -229,9 +229,11 @@ function RoomDrawer({
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Room name is required'); return }
 
+    const maxGuests = parseInt(form.max_guests)
     const basePrice = parseFloat(form.base_price)
     const extraGuestPrice = parseFloat(form.extra_guest_price)
 
+    if (isNaN(maxGuests) || maxGuests < 1) { setError('Max guests must be at least 1'); return }
     if (!basePrice || basePrice <= 0) { setError('Base price must be greater than 0'); return }
     if (isNaN(extraGuestPrice) || extraGuestPrice < 0) { setError('Extra guest price must be 0 or more'); return }
 
@@ -240,6 +242,7 @@ function RoomDrawer({
     try {
       const payload = {
         ...form,
+        max_guests: maxGuests,
         base_price: basePrice,
         extra_guest_price: extraGuestPrice,
       }
@@ -329,7 +332,7 @@ function RoomDrawer({
               min={1}
               max={20}
               value={form.max_guests}
-              onChange={(e) => set('max_guests', parseInt(e.target.value) || 1)}
+              onChange={(e) => set('max_guests', e.target.value)}
               className={inputCls}
             />
           </div>
