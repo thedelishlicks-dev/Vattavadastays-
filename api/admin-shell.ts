@@ -1,18 +1,18 @@
 /**
  * /api/admin-shell.ts — Vercel Edge Function
  *
- * Serves a modified index.html for admin routes with the property name
- * and logo already baked into the HTML meta tags. This is the only way
- * to make iOS Safari read the correct PWA name at install time — iOS
- * reads apple-mobile-web-app-title once from the raw HTML response and
- * ignores any JavaScript changes made after page load.
+ * Fetches the built index.html from the same origin, then patches the
+ * meta tags with property-specific name and logo before serving it.
+ *
+ * This approach is correct because:
+ * - The built asset paths (/assets/index-abc123.js etc.) are preserved
+ * - iOS Safari reads the patched meta tags from the raw HTML response
+ * - The Vite bundle loads and boots React normally
  *
  * Subdomain detection order:
- *  1. Hostname: bleafmudhouse.stayidom.in  → subdomain = "bleafmudhouse"
+ *  1. Hostname: bleafmudhouse.stayidom.in
  *  2. ?property= param (superadmin Manage button)
  *  3. ?slug= param (Vercel preview testing)
- *
- * Deploy: place at api/admin-shell.ts in repo root (alongside manifest.ts)
  */
 
 export const config = { runtime: 'edge' }
@@ -23,19 +23,17 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
-  // 1. Try hostname first (production subdomains)
+  // ── Detect subdomain ──────────────────────────────────────────────────────
   let subdomain: string | null = null
+
   const hostname = url.hostname
   if (hostname.endsWith('.stayidom.in')) {
     const parts = hostname.split('.')
-    // parts = ['bleafmudhouse', 'stayidom', 'in'] → length >= 3
     if (parts.length >= 3 && parts[0] !== 'www') {
       subdomain = parts[0]
     }
   }
 
-  // 2. Fall back to ?property= (superadmin managing via Manage button)
-  //    or ?slug= (Vercel preview testing)
   if (!subdomain) {
     subdomain =
       url.searchParams.get('property') ||
@@ -43,8 +41,23 @@ export default async function handler(req: Request): Promise<Response> {
       null
   }
 
-  // Defaults used when no subdomain or Supabase fetch fails
-  let propertyName = 'stayidom.in'
+  // ── Fetch built index.html from own origin ────────────────────────────────
+  // This preserves the correct Vite-generated asset script paths.
+  const indexUrl = `${url.origin}/index.html`
+  let html: string
+
+  try {
+    const indexRes = await fetch(indexUrl)
+    if (!indexRes.ok) throw new Error(`index.html fetch failed: ${indexRes.status}`)
+    html = await indexRes.text()
+  } catch {
+    // If we can't fetch index.html, fall through to a plain redirect
+    // so the app still loads (without the patched meta tags)
+    return Response.redirect(`${url.origin}/index.html`, 302)
+  }
+
+  // ── Fetch property branding from Supabase ─────────────────────────────────
+  let propertyName: string | null = null
   let logoUrl: string | null = null
 
   if (subdomain) {
@@ -62,51 +75,47 @@ export default async function handler(req: Request): Promise<Response> {
       if (res.ok) {
         const rows = await res.json()
         if (rows?.[0]) {
-          propertyName = rows[0].name ?? propertyName
+          propertyName = rows[0].name ?? null
           logoUrl = rows[0].logo_url ?? null
         }
       }
     } catch {
-      // Fall through to defaults — page still loads, React sets title later
+      // Fall through — unpatched index.html still loads the app correctly
     }
   }
 
-  const iconHref = logoUrl ?? '/icons/icon-192.png'
+  // ── Patch meta tags in the HTML ───────────────────────────────────────────
+  // Only patch what we have — leave the rest of index.html untouched
+  if (propertyName) {
+    // <title>
+    html = html.replace(
+      /<title>[^<]*<\/title>/,
+      `<title>${escapeHtml(propertyName)}</title>`
+    )
 
-  // Manifest link: include ?property= if that's how we detected the subdomain
-  // so the manifest edge function also gets the right subdomain
-  const manifestSubdomain = subdomain ?? ''
-  const manifestHref = manifestSubdomain
-    ? `/api/manifest?subdomain=${encodeURIComponent(manifestSubdomain)}`
-    : '/manifest.json'
+    // apple-mobile-web-app-title content=""
+    html = html.replace(
+      /(<meta\s+name="apple-mobile-web-app-title"\s+content=")[^"]*(")/,
+      `$1${escapeHtml(propertyName)}$2`
+    )
+  }
 
-  // Forward all original query params in the page's start URL so TanStack
-  // Router and admin.tsx still see ?property=bleafmudhouse after the shell loads
-  const forwardedSearch = url.search // e.g. "?property=bleafmudhouse"
+  if (logoUrl) {
+    // apple-touch-icon href
+    html = html.replace(
+      /(<link\s+rel="apple-touch-icon"\s+href=")[^"]*(")/,
+      `$1${escapeHtml(logoUrl)}$2`
+    )
+  }
 
-  const html = `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${escapeHtml(propertyName)}</title>
-    <link rel="manifest" href="${escapeHtml(manifestHref)}" />
-    <meta name="theme-color" content="#166534" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="${escapeHtml(propertyName)}" />
-    <link rel="apple-touch-icon" href="${escapeHtml(iconHref)}" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Noto+Sans+Malayalam:wght@400;500;600&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`
+  // manifest link — point to dynamic manifest for this subdomain
+  if (subdomain) {
+    const manifestHref = `/api/manifest?subdomain=${encodeURIComponent(subdomain)}`
+    html = html.replace(
+      /(<link\s+rel="manifest"\s+href=")[^"]*(")/,
+      `$1${escapeHtml(manifestHref)}$2`
+    )
+  }
 
   return new Response(html, {
     headers: {
