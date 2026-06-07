@@ -22,19 +22,28 @@ function DashboardPage() {
   );
   const [modal, setModal] = useState<Modal>(null);
 
-  const today = new Date().toISOString().split("T")[0];
+  // FIX: use local date, not UTC, to avoid showing yesterday's date until 5:30 AM IST
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
 
   const stats = useMemo(() => {
     const upcoming = bookings.filter(
       (b) => b.check_in >= today && b.status !== "cancelled"
     ).length;
+
+    // FIX: only count confirmed and completed bookings in revenue, not pending
     const monthlyRevenue = bookings
       .filter((b) => {
-        const thisMonth = new Date().toISOString().slice(0, 7);
-        return b.check_in?.slice(0, 7) === thisMonth &&
-               b.status !== "cancelled";
+        const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+        return (
+          b.check_in?.slice(0, 7) === thisMonth &&
+          (b.status === "confirmed" || b.status === "completed")
+        );
       })
       .reduce((sum, b) => sum + Number(b.total_amount), 0);
+
     return { upcoming, monthlyRevenue };
   }, [bookings, today]);
 
@@ -43,6 +52,7 @@ function DashboardPage() {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
     .slice(0, 6);
+
   const isLoading = propLoading || bookLoading;
 
   const roomNameMap = useMemo(() => {
@@ -53,7 +63,6 @@ function DashboardPage() {
     return map;
   }, [property]);
 
-  // Rooms shaped for modals
   const activeRooms = useMemo(
     () =>
       (property?.rooms ?? [])
@@ -102,8 +111,8 @@ function DashboardPage() {
           Quick actions
         </div>
         <div className="flex flex-wrap gap-2">
-          <ActionBtn icon={Ban}  label="Block dates"           onClick={() => setModal("block")} />
-          <ActionBtn icon={Plus} label="Add booking"           onClick={() => setModal("add")} />
+          <ActionBtn icon={Ban}  label="Block dates"            onClick={() => setModal("block")} />
+          <ActionBtn icon={Plus} label="Add booking"            onClick={() => setModal("add")} />
           <ActionBtn icon={Send} label="Send WhatsApp reminder" onClick={() => setModal("whatsapp")} />
         </div>
       </div>
@@ -159,7 +168,6 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* Modals */}
       {modal === "block" && property && (
         <BlockDatesModal
           propertyId={property.id}
