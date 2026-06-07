@@ -29,10 +29,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
       ? property.description.slice(0, 160)
       : `Book your stay at ${property.name ?? "this property"} in Vattavada, Kerala. Beautiful homestay experience in the mountains.`;
 
-    // hero_image is the correct column name
     const imageUrl = property.hero_image ? property.hero_image : `${baseUrl}/og-default.jpg`;
-
-    // shared_amenities is the correct column name
     const keywords = filterAmenities(property.shared_amenities).join(", ");
 
     document.title = title;
@@ -80,7 +77,24 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     updateTwitter("description", description);
     updateTwitter("image", imageUrl);
 
-    // Update favicon if logo exists
+    // --- Dynamic PWA manifest per subdomain ---
+    // Points to the edge function which returns the correct name + logo icon.
+    // Only inject on admin pages where the owner installs the PWA.
+    if (window.location.pathname.startsWith("/admin")) {
+      const manifestHref = `/api/manifest?subdomain=${encodeURIComponent(subdomain)}`;
+      let manifestLink = document.querySelector('link[rel="manifest"]') as HTMLLinkElement | null;
+      if (!manifestLink) {
+        manifestLink = document.createElement("link");
+        manifestLink.rel = "manifest";
+        document.head.appendChild(manifestLink);
+      }
+      manifestLink.href = manifestHref;
+
+      // Apple PWA title — shows under the icon on iOS home screen
+      updateMeta("apple-mobile-web-app-title", property.name ?? "stayidom");
+    }
+
+    // --- Per-property favicon and apple-touch-icon ---
     if (property.logo_url) {
       const updateIcon = (rel: string, sizes?: string) => {
         let link = document.querySelector(
@@ -99,6 +113,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
       updateIcon("apple-touch-icon");
     }
 
+    // --- Canonical URL ---
     let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!canonical) {
       canonical = document.createElement("link");
@@ -107,6 +122,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
     }
     canonical.href = baseUrl;
 
+    // --- JSON-LD structured data ---
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "LodgingBusiness",
@@ -145,7 +161,7 @@ export function SeoTags({ subdomain }: SeoTagsProps) {
       document.head.appendChild(scriptEl);
     }
     scriptEl.textContent = JSON.stringify(jsonLd);
-  }, [property]);
+  }, [property, subdomain]);
 
   return null;
 }
