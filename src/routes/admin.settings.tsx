@@ -1,10 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router'
+ import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone } from 'lucide-react'
+import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
 
@@ -23,15 +23,10 @@ const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 interface ImageUploadProps {
   label: string
   hint: string
-  /** Supabase Storage bucket name */
   bucket: string
-  /** Path prefix inside the bucket — typically the property id */
   pathPrefix: string
-  /** File name stem before the timestamp, e.g. "hero" | "about" | "logo" */
   stem: string
-  /** imageUtils preset controlling resize + quality targets */
   preset: ImagePreset
-  /** Current public URL (if any) */
   currentUrl: string | null
   previewClassName?: string
   onUploaded: (publicUrl: string) => void
@@ -65,13 +60,10 @@ function ImageUploadField({
 
     try {
       setProgress('Compressing…')
-      const result = 
-        await validateAndCompress(file, preset)
+      const result = await validateAndCompress(file, preset)
       const { file: compressed } = result
 
-      setProgress(
-        compressionSummary(result)
-      )
+      setProgress(compressionSummary(result))
 
       const path = `${pathPrefix}/${stem}-${Date.now()}.webp`
 
@@ -120,7 +112,6 @@ function ImageUploadField({
           >
             <X className={isLogo ? 'h-3 w-3' : 'h-4 w-4'} />
           </button>
-          {/* Replace button overlaid on bottom-right */}
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
@@ -187,6 +178,7 @@ function AdminSettings() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const { data: property, isLoading } = useOwnerProperty()
+  const [linkCopied, setLinkCopied] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -232,7 +224,6 @@ function AdminSettings() {
     }
   }, [property])
 
-  // Helper to persist a single image URL to the DB and update local form state
   const persistImage = async (column: string, url: string | null) => {
     if (!property?.id) return
     await supabase
@@ -250,15 +241,9 @@ function AdminSettings() {
       const payload: Record<string, unknown> = { ...updates }
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
-
-      // Save directly to dedicated columns
       payload.theme = theme
       payload.heading_font = font
-
-      // Also maintain sentinel for backward compatibility if needed,
-      // but primarily we use the dedicated column now.
       payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
-
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)
       if (error) throw error
     },
@@ -275,6 +260,20 @@ function AdminSettings() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     mutation.mutate({ updates: form, theme: selectedTheme, font: selectedFont })
+  }
+
+  // FIX: build the dashboard URL using the property's own subdomain
+  // so the edge function can detect it and bake the correct name + logo
+  // into the HTML — making iOS show the right app name on install.
+  // Falls back to window.location.origin for non-production environments.
+  const dashboardUrl = property?.subdomain
+    ? `https://${property.subdomain}.stayidom.in/admin/dashboard`
+    : `${window.location.origin}/admin/dashboard`
+
+  const handleCopyLink = () => {
+    navigator.clipboard?.writeText(dashboardUrl).catch(() => {})
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2500)
   }
 
   if (isLoading) {
@@ -356,7 +355,6 @@ function AdminSettings() {
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Branding & Appearance</h2>
 
-          {/* Theme Picker */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Color Theme</h3>
@@ -364,7 +362,6 @@ function AdminSettings() {
                 Choose a color palette for your guest booking page.
               </p>
             </div>
-
             <div className="grid grid-cols-5 gap-3">
               {(Object.entries(THEMES) as [ThemeName, typeof THEMES.forest][]).map(([key, theme]) => (
                 <button
@@ -390,7 +387,6 @@ function AdminSettings() {
             </div>
           </div>
 
-          {/* Font Picker */}
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Heading Font</h3>
@@ -398,7 +394,6 @@ function AdminSettings() {
                 Pick a typography style for headings and titles.
               </p>
             </div>
-
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {Object.entries(FONTS).map(([key, font]) => (
                 <button
@@ -412,10 +407,7 @@ function AdminSettings() {
                       : 'border-transparent hover:border-border hover:bg-muted/30'
                   ].join(' ')}
                 >
-                  <span
-                    className="text-lg leading-tight"
-                    style={{ fontFamily: font.family }}
-                  >
+                  <span className="text-lg leading-tight" style={{ fontFamily: font.family }}>
                     {font.name}
                   </span>
                   {selectedFont === key && <Check className="h-3.5 w-3.5 text-primary" />}
@@ -425,87 +417,44 @@ function AdminSettings() {
           </div>
         </div>
 
-
         {/* ── Basic info ── */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Basic Info</h2>
-
           <div>
             <label className={labelCls}>Property Name</label>
-            <input
-              type="text"
-              name="name"
-              value={form.name}
-              onChange={handleChange}
-              className={inputCls}
-            />
+            <input type="text" name="name" value={form.name} onChange={handleChange} className={inputCls} />
           </div>
-
           <div>
             <label className={labelCls}>Hero Tagline</label>
             <input
-              type="text"
-              name="hero_tagline"
-              value={form.hero_tagline}
-              onChange={handleChange}
+              type="text" name="hero_tagline" value={form.hero_tagline} onChange={handleChange}
               placeholder="Short tagline for hero banner (e.g. A 3-room mountain retreat…)"
               className={inputCls}
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Shown on the hero banner. Keep it short and punchy.
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">Shown on the hero banner. Keep it short and punchy.</p>
           </div>
-
           <div>
             <label className={labelCls}>Description</label>
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={handleChange}
-              rows={4}
-              className={inputCls + ' resize-none'}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Shown in the About section. Can be longer and more detailed.
-            </p>
+            <textarea name="description" value={form.description} onChange={handleChange} rows={4} className={inputCls + ' resize-none'} />
+            <p className="text-xs text-muted-foreground mt-1">Shown in the About section. Can be longer and more detailed.</p>
           </div>
         </div>
 
         {/* ── Owner info ── */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Owner Info</h2>
-
           <div>
             <label className={labelCls}>Owner Name</label>
-            <input
-              type="text"
-              name="owner_name"
-              value={form.owner_name}
-              onChange={handleChange}
-              className={inputCls}
-            />
+            <input type="text" name="owner_name" value={form.owner_name} onChange={handleChange} className={inputCls} />
           </div>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone</label>
-              <input
-                type="tel"
-                name="owner_phone"
-                value={form.owner_phone}
-                onChange={handleChange}
-                className={inputCls}
-              />
+              <input type="tel" name="owner_phone" value={form.owner_phone} onChange={handleChange} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>WhatsApp</label>
-              <input
-                type="tel"
-                name="owner_whatsapp"
-                value={form.owner_whatsapp}
-                onChange={handleChange}
-                className={inputCls}
-              />
+              <input type="tel" name="owner_whatsapp" value={form.owner_whatsapp} onChange={handleChange} className={inputCls} />
             </div>
           </div>
         </div>
@@ -513,27 +462,14 @@ function AdminSettings() {
         {/* ── Check-in / out ── */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-stone-900">Check-in / Check-out</h2>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Check-in Time</label>
-              <input
-                type="time"
-                name="check_in_time"
-                value={form.check_in_time}
-                onChange={handleChange}
-                className={inputCls}
-              />
+              <input type="time" name="check_in_time" value={form.check_in_time} onChange={handleChange} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Check-out Time</label>
-              <input
-                type="time"
-                name="check_out_time"
-                value={form.check_out_time}
-                onChange={handleChange}
-                className={inputCls}
-              />
+              <input type="time" name="check_out_time" value={form.check_out_time} onChange={handleChange} className={inputCls} />
             </div>
           </div>
         </div>
@@ -541,44 +477,19 @@ function AdminSettings() {
         {/* ── Location ── */}
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-stone-900">Location</h2>
-
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Latitude</label>
-              <input
-                type="text"
-                name="location_lat"
-                inputMode="decimal"
-                value={form.location_lat}
-                onChange={handleChange}
-                placeholder="e.g. 10.12"
-                className={inputCls}
-              />
+              <input type="text" name="location_lat" inputMode="decimal" value={form.location_lat} onChange={handleChange} placeholder="e.g. 10.12" className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Longitude</label>
-              <input
-                type="text"
-                name="location_lng"
-                inputMode="decimal"
-                value={form.location_lng}
-                onChange={handleChange}
-                placeholder="e.g. 77.15"
-                className={inputCls}
-              />
+              <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.15" className={inputCls} />
             </div>
           </div>
-
           <div>
             <label className={labelCls}>Landmark Description</label>
-            <input
-              type="text"
-              name="landmark_description"
-              value={form.landmark_description}
-              onChange={handleChange}
-              placeholder="e.g. Near St. Mary's Church, 500m from main road"
-              className={inputCls}
-            />
+            <input type="text" name="landmark_description" value={form.landmark_description} onChange={handleChange} placeholder="e.g. Near St. Mary's Church, 500m from main road" className={inputCls} />
           </div>
         </div>
 
@@ -591,37 +502,50 @@ function AdminSettings() {
             <div>
               <h2 className="text-sm font-semibold">Add to Home Screen</h2>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Use your dashboard like a native app
+                Use your dashboard like a native app with your property's name and logo
               </p>
             </div>
           </div>
 
           <div className="space-y-3">
+            {/* Show the exact URL they'll use — makes it clear it's their subdomain */}
+            <div className="rounded-lg bg-primary-light/40 border border-primary/20 px-3 py-2">
+              <p className="text-xs text-muted-foreground mb-0.5">Your dashboard link</p>
+              <p className="text-xs font-mono text-primary break-all">{dashboardUrl}</p>
+            </div>
+
             <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
               <p className="text-xs font-medium text-foreground">iPhone / iPad</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Open your dashboard in Safari → tap the Share icon (□↑) at the bottom → tap <span className="font-medium text-foreground">Add to Home Screen</span>
+                Open your dashboard link in Safari → tap the Share icon (□↑) → tap{' '}
+                <span className="font-medium text-foreground">Add to Home Screen</span>
               </p>
             </div>
 
             <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
               <p className="text-xs font-medium text-foreground">Android</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Open your dashboard in Chrome → tap the ⋮ menu → tap <span className="font-medium text-foreground">Add to Home Screen</span>
+                Open your dashboard link in Chrome → tap the ⋮ menu → tap{' '}
+                <span className="font-medium text-foreground">Add to Home Screen</span>
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(
-                  `${window.location.origin}/admin/dashboard`
-                ).catch(() => {});
-              }}
+              onClick={handleCopyLink}
               className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2"
             >
-              <Smartphone className="h-4 w-4" />
-              Copy dashboard link
+              {linkCopied ? (
+                <>
+                  <Check className="h-4 w-4 text-primary" />
+                  <span className="text-primary">Copied!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy dashboard link
+                </>
+              )}
             </button>
           </div>
         </div>
