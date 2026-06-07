@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Sparkles, Check, Loader2, X } from "lucide-react";
+import { Check, Loader2, X } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
@@ -44,21 +44,23 @@ function AdminAmenities() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Filter out internal sentinel keys like __meals:...
-  const rawAmenities = (property?.shared_amenities ?? []).filter(
-    (a) => !a.startsWith("__")
-  );
-
   const [selected, setSelected] = useState<string[]>([]);
   const [custom, setCustom] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
+  // FIX: depend on both property?.id and property?.shared_amenities so the
+  // list re-syncs if the query refetches after a save (id stays the same but
+  // shared_amenities content changes).
   useEffect(() => {
-    if (property) setSelected(rawAmenities);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [property?.id]);
+    if (property) {
+      const real = (property.shared_amenities ?? []).filter(
+        (a) => !a.startsWith("__")
+      );
+      setSelected(real);
+    }
+  }, [property?.id, property?.shared_amenities]);
 
   const toggle = (key: string) =>
     setSelected((s) =>
@@ -82,7 +84,7 @@ function AdminAmenities() {
     setSaving(true);
     setError("");
     try {
-      // Preserve sentinel keys (meals config etc.)
+      // Preserve sentinel keys (meals config, policies, UPI etc.)
       const sentinels = (property.shared_amenities ?? []).filter((a) => a.startsWith("__"));
       const { error: err } = await supabase
         .from("properties")
@@ -139,7 +141,6 @@ function AdminAmenities() {
           })}
         </div>
 
-        {/* Custom amenities */}
         {customAmenities.length > 0 && (
           <div className="flex flex-wrap gap-2 pt-1">
             {customAmenities.map((a) => (
