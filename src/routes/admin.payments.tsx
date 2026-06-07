@@ -17,7 +17,6 @@ const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const PAYMENT_METHODS = ["UPI", "Bank Transfer", "Cash on Arrival"];
 
-// UPI ID stored as a sentinel in shared_amenities
 function parseUpiId(shared_amenities: string[] | null): string {
   const entry = (shared_amenities ?? []).find((a) => a.startsWith("__upi:"));
   return entry ? decodeURIComponent(entry.slice("__upi:".length)) : "";
@@ -58,7 +57,7 @@ function AdminPayments() {
         }
       }
     }
-  }, [property?.id]);
+  }, [property?.id, property?.shared_amenities]);
 
   const toggleMethod = (m: string) =>
     setAcceptedMethods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
@@ -90,13 +89,9 @@ function AdminPayments() {
 
   const togglePaid = async (bookingId: string, currentlyPaid: boolean) => {
     setTogglingId(bookingId);
-    const booking = bookings.find((b) => b.id === bookingId);
-    const updates = currentlyPaid
-      ? { is_paid: false }
-      : {
-          is_paid: true,
-          advance_amount: booking ? Number(booking.total_amount) : undefined,
-        };
+    // FIX: never overwrite advance_amount — it holds the cumulative partial
+    // payments recorded in admin.bookings.tsx. Only flip the is_paid flag.
+    const updates = { is_paid: !currentlyPaid };
     await supabase.from("bookings").update(updates).eq("id", bookingId);
     queryClient.invalidateQueries({
       queryKey: ["bookings", property?.id],
