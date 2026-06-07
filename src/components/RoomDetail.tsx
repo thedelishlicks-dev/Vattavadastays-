@@ -10,7 +10,6 @@ const MEAL_PRICES: Record<MealPlan, number> = {
   "Half Board": 450,
   "Full Board": 700,
 };
-const CLEANING = 300;
 
 type Props = {
   room: Room;
@@ -50,7 +49,7 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
       Math.max(0, adults - 2) * (room.extra_guest_price ?? 0) * nights;
     const extraBedCost = extraBeds * (room.extra_guest_price ?? 0) * nights;
     const mealCost = MEAL_PRICES[meal] * (adults + children) * nights;
-    const total = roomCost + extraGuestCharge + extraBedCost + mealCost + CLEANING;
+    const total = roomCost + extraGuestCharge + extraBedCost + mealCost;
     return { roomCost, extraGuestCharge, extraBedCost, mealCost, total };
   }, [room, nights, extraBeds, meal, adults, children]);
 
@@ -184,10 +183,6 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
                 <span>₹{totals.mealCost.toLocaleString("en-IN")}</span>
               </div>
             )}
-            <div className="flex justify-between text-muted-foreground">
-              <span>Cleaning fee</span>
-              <span>₹{CLEANING}</span>
-            </div>
             <div className="border-t border-border pt-2 flex justify-between font-display text-lg font-semibold">
               <span>Total</span>
               <span>₹{totals.total.toLocaleString("en-IN")}</span>
