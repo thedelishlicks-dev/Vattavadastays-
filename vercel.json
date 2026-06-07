@@ -3,10 +3,10 @@
   "outputDirectory": "dist",
   "framework": "vite",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/api/:path*", "destination": "/api/:path*" },
+    { "source": "/admin/:path*", "destination": "/api/admin-shell" },
     { "source": "/admin", "destination": "/api/admin-shell" },
-    { "source": "/admin/(.*)", "destination": "/api/admin-shell" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/:path*", "destination": "/index.html" }
   ],
   "headers": [
     {
