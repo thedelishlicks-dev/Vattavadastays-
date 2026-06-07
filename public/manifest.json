@@ -1,6 +1,6 @@
 {
-  "name": "Bleaf Mud House",
-  "short_name": "Bleaf",
+  "name": "stayidom.in",
+  "short_name": "stayidom",
   "description": "Manage your property bookings",
   "start_url": "/admin/dashboard",
   "scope": "/admin",
