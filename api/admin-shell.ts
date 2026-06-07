@@ -7,8 +7,12 @@
  * reads apple-mobile-web-app-title once from the raw HTML response and
  * ignores any JavaScript changes made after page load.
  *
- * Usage: admin routes are rewritten to this function via vercel.json
- * Deploy: place at api/admin-shell.ts in repo root
+ * Subdomain detection order:
+ *  1. Hostname: bleafmudhouse.stayidom.in  → subdomain = "bleafmudhouse"
+ *  2. ?property= param (superadmin Manage button)
+ *  3. ?slug= param (Vercel preview testing)
+ *
+ * Deploy: place at api/admin-shell.ts in repo root (alongside manifest.ts)
  */
 
 export const config = { runtime: 'edge' }
@@ -19,21 +23,27 @@ const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!
 export default async function handler(req: Request): Promise<Response> {
   const url = new URL(req.url)
 
-  // Get subdomain from hostname (bleafmudhouse.stayidom.in)
-  // or from ?property= param (superadmin managing via preview URL)
+  // 1. Try hostname first (production subdomains)
   let subdomain: string | null = null
-
   const hostname = url.hostname
   if (hostname.endsWith('.stayidom.in')) {
     const parts = hostname.split('.')
-    if (parts.length >= 3) subdomain = parts[0]
+    // parts = ['bleafmudhouse', 'stayidom', 'in'] → length >= 3
+    if (parts.length >= 3 && parts[0] !== 'www') {
+      subdomain = parts[0]
+    }
   }
 
+  // 2. Fall back to ?property= (superadmin managing via Manage button)
+  //    or ?slug= (Vercel preview testing)
   if (!subdomain) {
-    subdomain = url.searchParams.get('property') || url.searchParams.get('slug')
+    subdomain =
+      url.searchParams.get('property') ||
+      url.searchParams.get('slug') ||
+      null
   }
 
-  // Defaults — used when no subdomain or fetch fails
+  // Defaults used when no subdomain or Supabase fetch fails
   let propertyName = 'stayidom.in'
   let logoUrl: string | null = null
 
@@ -57,25 +67,30 @@ export default async function handler(req: Request): Promise<Response> {
         }
       }
     } catch {
-      // Fall through to defaults
+      // Fall through to defaults — page still loads, React sets title later
     }
   }
 
   const iconHref = logoUrl ?? '/icons/icon-192.png'
-  const manifestHref = subdomain
-    ? `/api/manifest?subdomain=${encodeURIComponent(subdomain)}`
+
+  // Manifest link: include ?property= if that's how we detected the subdomain
+  // so the manifest edge function also gets the right subdomain
+  const manifestSubdomain = subdomain ?? ''
+  const manifestHref = manifestSubdomain
+    ? `/api/manifest?subdomain=${encodeURIComponent(manifestSubdomain)}`
     : '/manifest.json'
 
-  // Serve a minimal HTML shell — same as index.html but with
-  // property name and logo baked in before any JS runs.
-  // The Vite bundle (src/main.tsx) loads normally from /assets/.
+  // Forward all original query params in the page's start URL so TanStack
+  // Router and admin.tsx still see ?property=bleafmudhouse after the shell loads
+  const forwardedSearch = url.search // e.g. "?property=bleafmudhouse"
+
   const html = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(propertyName)}</title>
-    <link rel="manifest" href="${manifestHref}" />
+    <link rel="manifest" href="${escapeHtml(manifestHref)}" />
     <meta name="theme-color" content="#166534" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -96,7 +111,6 @@ export default async function handler(req: Request): Promise<Response> {
   return new Response(html, {
     headers: {
       'Content-Type': 'text/html; charset=utf-8',
-      // Don't cache — each owner needs their own fresh shell
       'Cache-Control': 'no-cache, no-store, must-revalidate',
     },
   })
