@@ -1,5 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { CalendarDays, IndianRupee, Percent, MessageSquare, Ban, Plus, Send } from "lucide-react";
+import {
+  CalendarDays, IndianRupee, Percent, MessageSquare,
+  Ban, Plus, Send, CheckCircle2, Circle, ChevronRight,
+  Image, BedDouble, CalendarCheck, CreditCard, ScrollText, Sparkles,
+} from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings } from "@/hooks/useBookings";
@@ -8,12 +12,174 @@ import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
 import { extractUPIId } from "@/utils/upi";
+import type { Property } from "@/hooks/useProperty";
 
 export const Route = createFileRoute("/admin/dashboard")({
   component: DashboardPage,
 });
 
 type Modal = "block" | "add" | "whatsapp" | null;
+
+// ---------------------------------------------------------------------------
+// Onboarding checklist
+// ---------------------------------------------------------------------------
+
+type ChecklistItem = {
+  id: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  done: boolean;
+  href: string;
+};
+
+function buildChecklist(property: Property | undefined): ChecklistItem[] {
+  const amenities = property?.shared_amenities ?? [];
+  const rooms = property?.rooms ?? [];
+  const hasRoomPhoto = rooms.some((r) => r.images && r.images.length > 0);
+  const hasAvailability = rooms.length > 0;
+  const hasUpi = amenities.some((a) => a.startsWith("__upi:"));
+  const hasCancelPolicy = amenities.some((a) => a.startsWith("__cancel:"));
+
+  return [
+    {
+      id: "logo",
+      label: "Upload your logo",
+      description: "Shown in the header and as your app icon",
+      icon: Sparkles,
+      done: !!property?.logo_url,
+      href: "/admin/settings",
+    },
+    {
+      id: "hero",
+      label: "Add a hero image",
+      description: "Full-width photo guests see first on your booking page",
+      icon: Image,
+      done: !!property?.hero_image,
+      href: "/admin/settings",
+    },
+    {
+      id: "rooms",
+      label: "Add at least one room",
+      description: "Guests can't book without rooms",
+      icon: BedDouble,
+      done: rooms.length > 0,
+      href: "/admin/rooms",
+    },
+    {
+      id: "room_photo",
+      label: "Upload a room photo",
+      description: "Photos increase bookings significantly",
+      icon: Image,
+      done: hasRoomPhoto,
+      href: "/admin/rooms",
+    },
+    {
+      id: "availability",
+      label: "Set room availability",
+      description: "Open dates so guests can book",
+      icon: CalendarCheck,
+      done: hasAvailability,
+      href: "/admin/calendar",
+    },
+    {
+      id: "upi",
+      label: "Add your UPI ID",
+      description: "Required for guests to pay advance online",
+      icon: CreditCard,
+      done: hasUpi,
+      href: "/admin/payments",
+    },
+    {
+      id: "policy",
+      label: "Set cancellation policy",
+      description: "Guests see this before booking",
+      icon: ScrollText,
+      done: hasCancelPolicy,
+      href: "/admin/policies",
+    },
+  ];
+}
+
+function OnboardingChecklist({ property }: { property: Property | undefined }) {
+  const items = buildChecklist(property);
+  const doneCount = items.filter((i) => i.done).length;
+  const allDone = doneCount === items.length;
+
+  if (allDone) return null;
+
+  const pct = Math.round((doneCount / items.length) * 100);
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="font-semibold text-sm">Get your property ready</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {doneCount} of {items.length} steps complete
+            </p>
+          </div>
+          <span className="text-sm font-semibold text-primary">{pct}%</span>
+        </div>
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="divide-y divide-border">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.id}
+              to={item.href}
+              className={[
+                "flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors",
+                item.done ? "opacity-50" : "",
+              ].join(" ")}
+            >
+              <div className="shrink-0">
+                {item.done ? (
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>
+                  {item.label}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {item.description}
+                </div>
+              </div>
+              {!item.done && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="px-4 py-3 bg-primary-light/30 border-t border-border">
+        <p className="text-xs text-muted-foreground">
+          Complete all steps to start accepting bookings from guests.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard page
+// ---------------------------------------------------------------------------
 
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
@@ -22,7 +188,6 @@ function DashboardPage() {
   );
   const [modal, setModal] = useState<Modal>(null);
 
-  // FIX: use local date, not UTC, to avoid showing yesterday's date until 5:30 AM IST
   const today = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -33,7 +198,6 @@ function DashboardPage() {
       (b) => b.check_in >= today && b.status !== "cancelled"
     ).length;
 
-    // FIX: only count confirmed and completed bookings in revenue, not pending
     const monthlyRevenue = bookings
       .filter((b) => {
         const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
@@ -94,6 +258,8 @@ function DashboardPage() {
           Snapshot of bookings, revenue, and inquiries.
         </p>
       </div>
+
+      <OnboardingChecklist property={property as Property | undefined} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard icon={CalendarDays} label="Upcoming bookings" value={stats.upcoming} />
