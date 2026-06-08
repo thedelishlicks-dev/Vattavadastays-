@@ -4,9 +4,7 @@
   "framework": "vite",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api/:path*" },
-    { "source": "/admin/:path*", "destination": "/api/admin-shell" },
-    { "source": "/admin", "destination": "/api/admin-shell" },
-    { "source": "/:path*", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
