@@ -1,221 +1,414 @@
-import { useState } from "react";
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  LayoutDashboard,
-  BedDouble,
-  CalendarDays,
-  ClipboardList,
-  Tag,
-  UtensilsCrossed,
-  Sparkles,
-  ScrollText,
-  Wallet,
-  Settings,
-  LogOut,
-  Menu,
-  X,
+  CalendarDays, IndianRupee, Percent, MessageSquare,
+  Ban, Plus, Send, CheckCircle2, Circle, ChevronRight,
+  Image, BedDouble, CalendarCheck, CreditCard, ScrollText, Sparkles,
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { supabase } from "@/lib/supabase";
-import { DynamicManifest } from "@/components/DynamicManifest";
+import { useBookings } from "@/hooks/useBookings";
+import { useMemo, useState } from "react";
+import { BlockDatesModal } from "@/components/BlockDatesModal";
+import { AddBookingModal } from "@/components/AddBookingModal";
+import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
+import { extractUPIId } from "@/utils/upi";
+import type { Property } from "@/hooks/useProperty";
 
-type NavItemDef = {
-  to: string;
+export const Route = createFileRoute("/admin/dashboard")({
+  component: DashboardPage,
+});
+
+type Modal = "block" | "add" | "whatsapp" | null;
+
+// ---------------------------------------------------------------------------
+// Onboarding checklist
+// ---------------------------------------------------------------------------
+
+type ChecklistItem = {
+  id: string;
   label: string;
+  description: string;
   icon: React.ComponentType<{ className?: string }>;
-  disabled?: boolean;
+  done: boolean;
+  href: string;
 };
 
-const NAV: NavItemDef[] = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
-  { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
-  { to: "/admin/pricing", label: "Pricing", icon: Tag },
-  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
-  { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
-  { to: "/admin/policies", label: "Policies", icon: ScrollText },
-  { to: "/admin/payments", label: "Payments", icon: Wallet },
-  { to: "/admin/settings", label: "Settings", icon: Settings },
-];
+function buildChecklist(property: Property | undefined): ChecklistItem[] {
+  const amenities = property?.shared_amenities ?? [];
+  const rooms = property?.rooms ?? [];
+  const hasRoomPhoto = rooms.some((r) => r.images && r.images.length > 0);
+  const hasAvailability = rooms.length > 0; // availability is seeded on room creation in this project
+  const hasUpi = amenities.some((a) => a.startsWith("__upi:"));
+  const hasCancelPolicy = amenities.some((a) => a.startsWith("__cancel:"));
 
-export function AdminLayout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const navigate = useNavigate();
-  const path = useRouterState({ select: (s) => s.location.pathname });
-  const { user } = useAuth();
-  const { data: property } = useOwnerProperty();
+  return [
+    {
+      id: "logo",
+      label: "Upload your logo",
+      description: "Shown in the header and as your app icon",
+      icon: Sparkles,
+      done: !!property?.logo_url,
+      href: "/admin/settings",
+    },
+    {
+      id: "hero",
+      label: "Add a hero image",
+      description: "Full-width photo guests see first on your booking page",
+      icon: Image,
+      done: !!property?.hero_image,
+      href: "/admin/settings",
+    },
+    {
+      id: "rooms",
+      label: "Add at least one room",
+      description: "Guests can't book without rooms",
+      icon: BedDouble,
+      done: rooms.length > 0,
+      href: "/admin/rooms",
+    },
+    {
+      id: "room_photo",
+      label: "Upload a room photo",
+      description: "Photos increase bookings significantly",
+      icon: Image,
+      done: hasRoomPhoto,
+      href: "/admin/rooms",
+    },
+    {
+      id: "availability",
+      label: "Set room availability",
+      description: "Open dates so guests can book",
+      icon: CalendarCheck,
+      done: hasAvailability,
+      href: "/admin/calendar",
+    },
+    {
+      id: "upi",
+      label: "Add your UPI ID",
+      description: "Required for guests to pay advance online",
+      icon: CreditCard,
+      done: hasUpi,
+      href: "/admin/payments",
+    },
+    {
+      id: "policy",
+      label: "Set cancellation policy",
+      description: "Guests see this before booking",
+      icon: ScrollText,
+      done: hasCancelPolicy,
+      href: "/admin/policies",
+    },
+  ];
+}
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate({ to: "/login" });
-  };
+function OnboardingChecklist({ property }: { property: Property | undefined }) {
+  const items = buildChecklist(property);
+  const doneCount = items.filter((i) => i.done).length;
+  const allDone = doneCount === items.length;
 
-  const ownerInitial = user?.email?.[0]?.toUpperCase() ?? "O";
-  const ownerEmail = user?.email ?? "";
-  const propertyName = property?.name ?? "stayidom.in";
+  // Don't render once everything is complete
+  if (allDone) return null;
+
+  const pct = Math.round((doneCount / items.length) * 100);
 
   return (
-    <div className="min-h-screen bg-muted/40 flex w-full">
-      <DynamicManifest />
-      <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
-        <div className="h-14 px-5 flex items-center border-b border-border">
-          <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
-        </div>
-        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          {NAV.map((item) => (
-            <NavItem
-              key={item.to}
-              to={item.to}
-              label={item.label}
-              icon={item.icon}
-              active={path === item.to}
-              disabled={item.disabled}
-            />
-          ))}
-        </nav>
-        <button
-          onClick={handleLogout}
-          className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <LogOut className="h-4 w-4" /> Log out
-        </button>
-      </aside>
-
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
-          <button
-            className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
-          <div className="font-medium text-sm md:text-base truncate">{propertyName}</div>
-          <div className="ml-auto flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end leading-tight">
-              <span className="text-sm font-medium">{ownerEmail}</span>
-              <span className="text-[11px] text-muted-foreground">Owner</span>
-            </div>
-            <div className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-              {ownerInitial}
-            </div>
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      {/* Header */}
+      <div className="p-4 border-b border-border">
+        <div className="flex items-center justify-between mb-2">
+          <div>
+            <h2 className="font-semibold text-sm">Get your property ready</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {doneCount} of {items.length} steps complete
+            </p>
           </div>
-        </header>
-
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
-          <Outlet />
-        </main>
-
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
-          {NAV.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            const active = path === item.to;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={[
-                  "flex flex-col items-center justify-center py-2 text-[10px]",
-                  active ? "text-primary" : "text-muted-foreground",
-                ].join(" ")}
-              >
-                <Icon className="h-5 w-5 mb-0.5" />
-                {item.label}
-              </Link>
-            );
-          })}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground"
-          >
-            <Menu className="h-5 w-5 mb-0.5" />
-            More
-          </button>
-        </nav>
+          <span className="text-sm font-semibold text-primary">{pct}%</span>
+        </div>
+        {/* Progress bar */}
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
       </div>
 
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col">
-            <div className="h-14 px-5 flex items-center border-b border-border justify-between">
-              <span className="font-display text-lg font-semibold text-primary">
-                {propertyName}
-              </span>
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="p-2 -mr-2 rounded-md hover:bg-muted"
-                aria-label="Close menu"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-              {NAV.map((item) => (
-                <NavItem
-                  key={item.to}
-                  to={item.to}
-                  label={item.label}
-                  icon={item.icon}
-                  active={path === item.to}
-                  disabled={item.disabled}
-                  onClick={() => setMobileOpen(false)}
-                />
-              ))}
-            </nav>
-            <button
-              onClick={handleLogout}
-              className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+      {/* Steps */}
+      <div className="divide-y divide-border">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.id}
+              to={item.href}
+              className={[
+                "flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors",
+                item.done ? "opacity-50" : "",
+              ].join(" ")}
             >
-              <LogOut className="h-4 w-4" /> Log out
-            </button>
-          </aside>
+              <div className="shrink-0">
+                {item.done ? (
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>
+                  {item.label}
+                </div>
+                <div className="text-xs text-muted-foreground truncate">
+                  {item.description}
+                </div>
+              </div>
+              {!item.done && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Footer nudge */}
+      <div className="px-4 py-3 bg-primary-light/30 border-t border-border">
+        <p className="text-xs text-muted-foreground">
+          Complete all steps to start accepting bookings from guests.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard page
+// ---------------------------------------------------------------------------
+
+function DashboardPage() {
+  const { data: property, isLoading: propLoading } = useOwnerProperty();
+  const { data: bookings = [], isLoading: bookLoading } = useBookings(
+    property?.id ?? "",
+  );
+  const [modal, setModal] = useState<Modal>(null);
+
+  // Use local date, not UTC, to avoid showing yesterday's date until 5:30 AM IST
+  const today = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
+  const stats = useMemo(() => {
+    const upcoming = bookings.filter(
+      (b) => b.check_in >= today && b.status !== "cancelled"
+    ).length;
+
+    // Only count confirmed and completed bookings in revenue, not pending
+    const monthlyRevenue = bookings
+      .filter((b) => {
+        const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+        return (
+          b.check_in?.slice(0, 7) === thisMonth &&
+          (b.status === "confirmed" || b.status === "completed")
+        );
+      })
+      .reduce((sum, b) => sum + Number(b.total_amount), 0);
+
+    return { upcoming, monthlyRevenue };
+  }, [bookings, today]);
+
+  const recent = [...bookings]
+    .sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )
+    .slice(0, 6);
+
+  const isLoading = propLoading || bookLoading;
+
+  const roomNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => {
+      map[r.id] = r.name;
+    });
+    return map;
+  }, [property]);
+
+  const activeRooms = useMemo(
+    () =>
+      (property?.rooms ?? [])
+        .filter((r) => r.is_active)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          base_price: r.base_price ?? 0,
+          max_guests: r.max_guests ?? 2,
+        })),
+    [property]
+  );
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Dashboard</h1>
+        <p className="text-sm text-muted-foreground">
+          Snapshot of bookings, revenue, and inquiries.
+        </p>
+      </div>
+
+      {/* Onboarding checklist — disappears once all steps are done */}
+      <OnboardingChecklist property={property as Property | undefined} />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+        <StatCard icon={CalendarDays} label="Upcoming bookings" value={stats.upcoming} />
+        <StatCard
+          icon={IndianRupee}
+          label="Monthly revenue"
+          value={`₹${stats.monthlyRevenue.toLocaleString("en-IN")}`}
+        />
+        <StatCard icon={Percent} label="Occupancy rate" value="—" />
+        <StatCard icon={MessageSquare} label="Total bookings" value={bookings.length} />
+      </div>
+
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          Quick actions
         </div>
+        <div className="flex flex-wrap gap-2">
+          <ActionBtn icon={Ban}  label="Block dates"            onClick={() => setModal("block")} />
+          <ActionBtn icon={Plus} label="Add booking"            onClick={() => setModal("add")} />
+          <ActionBtn icon={Send} label="Send WhatsApp reminder" onClick={() => setModal("whatsapp")} />
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h2 className="font-medium">Recent bookings</h2>
+          <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
+            View all →
+          </Link>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+              <tr>
+                <th className="px-4 py-2.5 font-medium">Guest</th>
+                <th className="px-4 py-2.5 font-medium">Room</th>
+                <th className="px-4 py-2.5 font-medium">Dates</th>
+                <th className="px-4 py-2.5 font-medium">Status</th>
+                <th className="px-4 py-2.5 font-medium text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recent.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                    No bookings yet.
+                  </td>
+                </tr>
+              )}
+              {recent.map((b) => (
+                <tr key={b.id} className="border-t border-border">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{b.guest_name}</div>
+                    <div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {roomNameMap[b.room_id] ?? b.room_id.slice(0, 8)}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    {b.check_in} → {b.check_out}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={b.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {modal === "block" && property && (
+        <BlockDatesModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "add" && property && (
+        <AddBookingModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+        />
+      )}
+      {modal === "whatsapp" && property && (
+        <WhatsAppReminderModal
+          bookings={bookings}
+          roomNameMap={roomNameMap}
+          property={{
+            name: property.name,
+            owner_phone: property.owner_phone ?? null,
+            owner_whatsapp: property.owner_whatsapp ?? null,
+            upiId: extractUPIId(property.shared_amenities ?? []),
+          }}
+          onClose={() => setModal(null)}
+        />
       )}
     </div>
   );
 }
 
-function NavItem({
-  to,
-  label,
+function StatCard({
   icon: Icon,
-  active,
-  disabled,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4">
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <div className="mt-2 font-display text-2xl md:text-3xl font-semibold text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function ActionBtn({
+  icon: Icon,
+  label,
   onClick,
 }: {
-  to: string;
-  label: string;
   icon: React.ComponentType<{ className?: string }>;
-  active: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
+  label: string;
+  onClick: () => void;
 }) {
-  if (disabled) {
-    return (
-      <div
-        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground/60 cursor-not-allowed"
-        title="Coming soon"
-      >
-        <Icon className="h-4 w-4" />
-        <span className="flex-1">{label}</span>
-        <span className="text-[10px] uppercase tracking-wider">Soon</span>
-      </div>
-    );
-  }
   return (
-    <Link
-      to={to}
+    <button
       onClick={onClick}
-      className={[
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted",
-      ].join(" ")}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted transition-colors"
     >
-      <Icon className="h-4 w-4" />
-      {label}
-    </Link>
+      <Icon className="h-4 w-4 text-primary" /> {label}
+    </button>
   );
 }
