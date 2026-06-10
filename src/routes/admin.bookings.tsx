@@ -147,7 +147,7 @@ function BookingCard({
                   ₹{balance.toLocaleString("en-IN")} due
                 </span>
               ) : (
-                <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py.0.5">
+                <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">
                   Paid ✓
                 </span>
               )}
@@ -476,7 +476,8 @@ function OverviewTab({
         </div>
       </Section>
 
-      {!showPaymentForm ? (
+      {/* Hide payment button when booking is already fully paid */}
+      {balance > 0 && !showPaymentForm && (
         <button
           onClick={() => setShowPaymentForm(true)}
           className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"
@@ -484,7 +485,13 @@ function OverviewTab({
           <IndianRupee className="h-4 w-4" />
           {advance > 0 ? "Record part payment" : "Record advance payment"}
         </button>
-      ) : (
+      )}
+      {balance === 0 && !showPaymentForm && (
+        <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">
+          Fully paid ✓
+        </div>
+      )}
+      {showPaymentForm && (
         <RecordPaymentForm
           booking={booking}
           advance={advance}
@@ -606,10 +613,21 @@ function RecordPaymentForm({
   const newPayment = parseFloat(amount) || 0;
   const newAdvanceTotal = advance + newPayment;
   const bal = Math.max(0, Number(booking.total_amount) - newAdvanceTotal);
+  // Maximum the owner can record — remaining balance
+  const maxAllowed = Math.max(0, Number(booking.total_amount) - advance);
 
   const handleSave = async () => {
     if (!newPayment || newPayment <= 0) {
       setError("Enter a valid amount");
+      return;
+    }
+    // Payment guard — prevent recording more than the remaining balance
+    if (newPayment > maxAllowed) {
+      setError(
+        maxAllowed <= 0
+          ? "This booking is already fully paid"
+          : `Maximum you can record is ₹${maxAllowed.toLocaleString("en-IN")} (remaining balance)`
+      );
       return;
     }
     setSaving(true);
@@ -653,6 +671,12 @@ function RecordPaymentForm({
         <span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span>
       </div>
 
+      {/* Show remaining balance so owner knows the cap */}
+      <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+        <span className="text-muted-foreground">Remaining balance</span>
+        <span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span>
+      </div>
+
       <div>
         <label className={labelCls}>
           {advance > 0 ? "New payment received (₹) *" : "Amount received (₹) *"}
@@ -660,6 +684,7 @@ function RecordPaymentForm({
         <input
           type="number"
           min={0}
+          max={maxAllowed}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className={inputCls}
@@ -820,7 +845,6 @@ function ChargesTab({
           className={inputCls}
           placeholder="Description e.g. Dinner"
         />
-        {/* ── qty narrow, price gets remaining space ── */}
         <div className="flex gap-2">
           <input
             type="number"
