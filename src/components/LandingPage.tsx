@@ -213,17 +213,24 @@ function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   return (
     <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {/* FIX: logo image with text fallback */}
-        <a href="#" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+        {/* Logo only — no text */}
+        <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <img
             src={LOGO_URL}
             alt="stayidom.in"
-            style={{ height: 36, width: "auto", objectFit: "contain", borderRadius: "0.375rem" }}
-            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+            style={{ height: 44, width: "auto", objectFit: "contain", borderRadius: "0.5rem" }}
+            onError={e => {
+              // Fallback to text if image fails
+              const el = e.currentTarget as HTMLImageElement;
+              el.style.display = "none";
+              const span = document.createElement("span");
+              span.innerHTML = `<span style="color:${C.green}">stay</span><span style="color:${C.text}">idom</span><span style="color:${C.amber}">.in</span>`;
+              span.style.fontFamily = "'Playfair Display', Georgia, serif";
+              span.style.fontSize = "1.25rem";
+              span.style.fontWeight = "700";
+              el.parentElement?.appendChild(span);
+            }}
           />
-          <span style={{ ...serif, fontSize: "1.125rem", fontWeight: 700 }}>
-            <span style={{ color: C.green }}>stay</span><span style={{ color: C.text }}>idom</span><span style={{ color: C.amber }}>.in</span>
-          </span>
         </a>
         <div className="hidden md:flex" style={{ gap: "1.5rem", alignItems: "center", fontSize: "0.9375rem", color: C.muted }}>
           {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
