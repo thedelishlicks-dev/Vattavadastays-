@@ -932,26 +932,28 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <main style={{ fontFamily: "'Noto Sans Malayalam','Segoe UI',system-ui,sans-serif", overflowX: "hidden", width: "100%", maxWidth: "100vw" }}>
+    <>
       <DemoModal isOpen={modalOpen} onClose={() => setModalOpen(false)} preselectedTier={selectedTier} />
       <Navbar onDemoClick={handleDemoClick} />
-      <Hero onDemoClick={handleDemoClick} />
-      <TrustBar />
-      <ProblemStrip />
-      <PhoneMockup />
-      <WhatsAppFlow />
-      <DirectPayment />
-      <ComparisonTable />
-      <GuestTrustSignals />
-      <FeaturesGrid />
-      <AccountsPanel />
-      <TwoGSimulator />
-      <SavingsCalculator />
-      <Testimonials />
-      <FAQ />
-      <Pricing onSelectTier={handleSelectTier} />
-      <SignupCTA preselectedTier={selectedTier} />
-      <Footer />
-    </main>
+      <main style={{ fontFamily: "'Noto Sans Malayalam','Segoe UI',system-ui,sans-serif", overflowX: "hidden", width: "100%", maxWidth: "100vw" }}>
+        <Hero onDemoClick={handleDemoClick} />
+        <TrustBar />
+        <ProblemStrip />
+        <PhoneMockup />
+        <WhatsAppFlow />
+        <DirectPayment />
+        <ComparisonTable />
+        <GuestTrustSignals />
+        <FeaturesGrid />
+        <AccountsPanel />
+        <TwoGSimulator />
+        <SavingsCalculator />
+        <Testimonials />
+        <FAQ />
+        <Pricing onSelectTier={handleSelectTier} />
+        <SignupCTA preselectedTier={selectedTier} />
+        <Footer />
+      </main>
+    </>
   );
 }
