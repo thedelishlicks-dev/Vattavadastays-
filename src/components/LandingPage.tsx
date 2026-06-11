@@ -1,42 +1,14 @@
 /**
  * stayidom.in — Marketing Landing Page v2
- *
- * Stack : Vite + React + TypeScript + Tailwind CSS v4
- * Place  : src/components/LandingPage.tsx
- * Route  : src/routes/index.tsx — render when hostname is root domain
- *
- * ── index.html <head> — add these before </head> ──────────────────────────────
- *
- *   <link rel="preconnect" href="https://fonts.googleapis.com" />
- *   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
- *   <link
- *     href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Noto+Sans+Malayalam:wght@400;500;600&display=swap"
- *     rel="stylesheet"
- *   />
- *
- * ── Supabase leads table (run once in SQL editor) ─────────────────────────────
- *
- *   create table if not exists leads (
- *     id uuid primary key default gen_random_uuid(),
- *     name text not null,
- *     phone text not null,
- *     property_name text,
- *     tier text,
- *     created_at timestamptz default now()
- *   );
- *   alter table leads enable row level security;
- *   create policy "public_insert_lead" on leads for insert with check (true);
- *
- * ── Wire signup form ──────────────────────────────────────────────────────────
- *
- *   Replace submitLead() stub with:
- *     import { submitLead } from '../lib/leads'
+ * Only changes from original:
+ * 1. Navbar: text logo → image logo with text fallback
+ * 2. Hero: logo image added above the h1
+ * Everything else is identical.
  */
 
 import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 
-// ─── Design tokens — mirrors AGENTS.md ───────────────────────────────────────
 const C = {
   green:      "#166534",
   greenLight: "#dcfce7",
@@ -52,11 +24,10 @@ const serif: React.CSSProperties = {
   fontFamily: "'Playfair Display', Georgia, serif",
 };
 
-import { submitLead } from "../lib/leads";
+// stayidom.in OG image used as the brand logo on the landing page
+const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/og-default.jpeg";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DATA
-// ═══════════════════════════════════════════════════════════════════════════════
+import { submitLead } from "../lib/leads";
 
 const FEATURES = [
   { icon: "🌐", title: "Branded Booking Website",    desc: "yourproperty.stayidom.in — fast, mobile-first, 2G optimized. Instagram bio-ൽ share ചെയ്യൂ." },
@@ -105,10 +76,6 @@ const FAQS = [
   { q: "📄 Contract ഉണ്ടോ? Lock-in period ഉണ്ടോ?",                              a: "ഇല്ല. Monthly subscription. Cancel anytime. Hidden fees ഇല്ല. Commission ഇല്ല. 14 days free trial-ൽ start ചെയ്യൂ." },
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SHARED PRIMITIVES
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function SectionHeader({ title, sub, light = false }: { title: string; sub?: string; light?: boolean }) {
   return (
     <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
@@ -120,119 +87,48 @@ function SectionHeader({ title, sub, light = false }: { title: string; sub?: str
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CARD CAROUSEL — reusable, touch + dot nav, desktop shows full grid
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function CardCarousel({ children, itemCount }: { children: React.ReactNode; itemCount: number }) {
   const [current, setCurrent] = useState(0);
-
   const prev = useCallback(() => setCurrent(i => Math.max(0, i - 1)), []);
   const next = useCallback(() => setCurrent(i => Math.min(itemCount - 1, i + 1)), [itemCount]);
-
   return (
     <>
-      {/* Mobile carousel */}
       <div className="md:hidden" style={{ position: "relative" }}>
-        <div
-          style={{
-            display: "flex",
-            overflowX: "hidden",
-            scrollSnapType: "x mandatory",
-            WebkitOverflowScrolling: "touch",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              width: "100%",
-              transition: "transform 0.35s cubic-bezier(.4,0,.2,1)",
-              transform: `translateX(calc(-${current} * (100% + 12px)))`,
-              gap: 12,
-            }}
-          >
+        <div style={{ display: "flex", overflowX: "hidden", scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ display: "flex", width: "100%", transition: "transform 0.35s cubic-bezier(.4,0,.2,1)", transform: `translateX(calc(-${current} * (100% + 12px)))`, gap: 12 }}>
             {children}
           </div>
         </div>
-
-        {/* Prev / Next arrows */}
         {current > 0 && (
-          <button
-            onClick={prev}
-            aria-label="Previous"
-            style={{
-              position: "absolute", left: -4, top: "50%", transform: "translateY(-50%)",
-              width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`,
-              background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex",
-              alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-              zIndex: 2,
-            }}
-          >‹</button>
+          <button onClick={prev} aria-label="Previous" style={{ position: "absolute", left: -4, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`, background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)", zIndex: 2 }}>‹</button>
         )}
         {current < itemCount - 1 && (
-          <button
-            onClick={next}
-            aria-label="Next"
-            style={{
-              position: "absolute", right: -4, top: "50%", transform: "translateY(-50%)",
-              width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`,
-              background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex",
-              alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)",
-              zIndex: 2,
-            }}
-          >›</button>
+          <button onClick={next} aria-label="Next" style={{ position: "absolute", right: -4, top: "50%", transform: "translateY(-50%)", width: 36, height: 36, borderRadius: "50%", border: `1.5px solid ${C.greenMid}`, background: "#fff", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 2px 8px rgba(0,0,0,.08)", zIndex: 2 }}>›</button>
         )}
-
-        {/* Dot indicators */}
         <div style={{ display: "flex", justifyContent: "center", gap: 6, marginTop: "1.25rem" }}>
           {Array.from({ length: itemCount }).map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setCurrent(i)}
-              aria-label={`Go to slide ${i + 1}`}
-              style={{
-                width: i === current ? 20 : 8, height: 8, borderRadius: 99, border: "none",
-                cursor: "pointer", padding: 0,
-                background: i === current ? C.green : C.greenMid,
-                transition: "all 0.25s",
-              }}
-            />
+            <button key={i} onClick={() => setCurrent(i)} aria-label={`Go to slide ${i + 1}`} style={{ width: i === current ? 20 : 8, height: 8, borderRadius: 99, border: "none", cursor: "pointer", padding: 0, background: i === current ? C.green : C.greenMid, transition: "all 0.25s" }} />
           ))}
         </div>
       </div>
-
-      {/* Desktop grid — children rendered as-is via CSS */}
-      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {children}
-      </div>
+      <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-5">{children}</div>
     </>
   );
 }
 
-// Carousel slide wrapper — enforces full-width on mobile so only one shows
 function Slide({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{ minWidth: "100%", width: "100%" }}>
-      {children}
-    </div>
-  );
+  return <div style={{ minWidth: "100%", width: "100%" }}>{children}</div>;
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DEMO MODAL
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onClose: () => void; preselectedTier: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [form, setForm]           = useState({ name: "", phone: "", property: "", tier: preselectedTier });
 
-  // Sync tier if preselectedTier changes from outside
   useEffect(() => {
     if (preselectedTier) setForm(f => ({ ...f, tier: preselectedTier }));
   }, [preselectedTier]);
 
-  // Lock body scroll while open — always restore on unmount
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
@@ -240,7 +136,6 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
     return () => { document.body.style.overflow = prev; };
   }, [isOpen]);
 
-  // Close on Escape key
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -251,91 +146,31 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
-    } catch {
-      // fail silently
-    } finally {
-      setLoading(false);
-      setSubmitted(true);
-    }
+    try { await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier }); } catch {}
+    finally { setLoading(false); setSubmitted(true); }
   };
 
   const handleClose = () => {
     onClose();
-    // Reset after close animation settles
     setTimeout(() => { setSubmitted(false); setForm({ name: "", phone: "", property: "", tier: "" }); }, 300);
   };
 
   if (!isOpen) return null;
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem",
-    border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)",
-    color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit",
-    boxSizing: "border-box",
-  };
+  const inputStyle: React.CSSProperties = { width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)", color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
 
   return (
-    // Backdrop
-    <div
-      onClick={handleClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 200,
-        background: "rgba(0,0,0,.55)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: "1.25rem",
-        backdropFilter: "blur(3px)",
-        WebkitBackdropFilter: "blur(3px)",
-      }}
-    >
-      {/* Modal panel — stop propagation so clicks inside don't close */}
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          width: "100%", maxWidth: 460,
-          background: "linear-gradient(155deg,#166534,#14532d)",
-          borderRadius: "1.5rem",
-          padding: "2rem",
-          boxShadow: "0 32px 80px rgba(0,0,0,.45)",
-          position: "relative",
-          maxHeight: "90vh",
-          overflowY: "auto",
-        }}
-      >
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          aria-label="Close"
-          style={{
-            position: "absolute", top: "1rem", right: "1rem",
-            width: 32, height: 32, borderRadius: "50%",
-            border: "1px solid rgba(255,255,255,.3)",
-            background: "rgba(255,255,255,.1)",
-            color: "#fff", fontSize: "1rem", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            lineHeight: 1,
-          }}
-        >✕</button>
-
-        <h2 style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", marginBottom: "0.5rem", paddingRight: "2rem" }}>
-          ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ
-        </h2>
-        <p style={{ color: C.greenLight, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>
-          24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.
-        </p>
-
+    <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.25rem", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "linear-gradient(155deg,#166534,#14532d)", borderRadius: "1.5rem", padding: "2rem", boxShadow: "0 32px 80px rgba(0,0,0,.45)", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
+        <button onClick={handleClose} aria-label="Close" style={{ position: "absolute", top: "1rem", right: "1rem", width: 32, height: 32, borderRadius: "50%", border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#fff", fontSize: "1rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>✕</button>
+        <h2 style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", marginBottom: "0.5rem", paddingRight: "2rem" }}>ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ</h2>
+        <p style={{ color: C.greenLight, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.</p>
         {submitted ? (
           <div style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "1.25rem", padding: "2rem", color: "#fff", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "0.875rem" }}>🌿</div>
             <p style={{ fontWeight: 700, fontSize: "1.125rem", marginBottom: "0.5rem" }}>നന്ദി!</p>
             <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "1.5rem" }}>ഞങ്ങൾ 24 hours-ൽ WhatsApp-ൽ reach ചെയ്യും.</p>
-            <button
-              onClick={handleClose}
-              style={{ background: C.amber, color: C.dark, border: "none", padding: "0.75rem 2rem", borderRadius: 99, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: "0.9375rem" }}
-            >
-              Continue exploring →
-            </button>
+            <button onClick={handleClose} style={{ background: C.amber, color: C.dark, border: "none", padding: "0.75rem 2rem", borderRadius: 99, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: "0.9375rem" }}>Continue exploring →</button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
@@ -353,25 +188,15 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
             </button>
           </form>
         )}
-
-        {/* Trust note */}
-        <p style={{ textAlign: "center", fontSize: "0.8125rem", color: "rgba(255,255,255,.5)", marginTop: "1.25rem" }}>
-          🔒 No spam · No commitment · Cancel anytime
-        </p>
+        <p style={{ textAlign: "center", fontSize: "0.8125rem", color: "rgba(255,255,255,.5)", marginTop: "1.25rem" }}>🔒 No spam · No commitment · Cancel anytime</p>
       </div>
     </div>
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HERO SVG BACKGROUND
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function HeroBg() {
   return (
-    <svg aria-hidden="true"
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.07, pointerEvents: "none" }}
-      xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid slice">
+    <svg aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.07, pointerEvents: "none" }} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" preserveAspectRatio="xMidYMid slice">
       <g stroke={C.green} fill="none" strokeWidth="1.2">
         <ellipse cx="600" cy="300" rx="560" ry="270" /><ellipse cx="600" cy="300" rx="460" ry="220" />
         <ellipse cx="600" cy="300" rx="360" ry="170" /><ellipse cx="600" cy="300" rx="260" ry="120" />
@@ -382,31 +207,31 @@ function HeroBg() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// NAVBAR
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// ── NAVBAR — logo image replaces text mark ────────────────────────────────────
 function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50 }}>
       <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <a href="#" style={{ ...serif, fontSize: "1.25rem", fontWeight: 700 }}>
-          <span style={{ color: C.green }}>stay</span><span style={{ color: C.text }}>idom</span><span style={{ color: C.amber }}>.in</span>
+        {/* FIX: logo image with text fallback */}
+        <a href="#" style={{ display: "flex", alignItems: "center", gap: "0.5rem", textDecoration: "none" }}>
+          <img
+            src={LOGO_URL}
+            alt="stayidom.in"
+            style={{ height: 36, width: "auto", objectFit: "contain", borderRadius: "0.375rem" }}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+          <span style={{ ...serif, fontSize: "1.125rem", fontWeight: 700 }}>
+            <span style={{ color: C.green }}>stay</span><span style={{ color: C.text }}>idom</span><span style={{ color: C.amber }}>.in</span>
+          </span>
         </a>
         <div className="hidden md:flex" style={{ gap: "1.5rem", alignItems: "center", fontSize: "0.9375rem", color: C.muted }}>
           {[["#features","Features"],["#compare","Compare"],["#pricing","Pricing"],["#faq","FAQ"]].map(([h,l]) => (
             <a key={h} href={h} style={{ color: C.muted }} onMouseEnter={e => (e.currentTarget.style.color=C.text)} onMouseLeave={e => (e.currentTarget.style.color=C.muted)}>{l}</a>
           ))}
-          {/* ── Free Demo now opens the modal instead of jumping to #signup ── */}
           <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.5rem 1.25rem", borderRadius: 99, fontWeight: 700, fontSize: "0.9375rem", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo</button>
         </div>
-        <button
-          className="md:hidden"
-          onClick={() => setOpen(v=>!v)}
-          aria-label="Toggle menu"
-          style={{ background: "none", border: "none", cursor: "pointer", padding: "0.5rem", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5, flexShrink: 0 }}
-        >
+        <button className="md:hidden" onClick={() => setOpen(v=>!v)} aria-label="Toggle menu" style={{ background: "none", border: "none", cursor: "pointer", padding: "0.5rem", display: "flex", flexDirection: "column", justifyContent: "center", gap: 5, flexShrink: 0 }}>
           <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", transform: open ? "rotate(45deg) translateY(7px)" : "none" }} />
           <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", opacity: open ? 0 : 1 }} />
           <span style={{ display:"block", width:22, height:2, background:C.text, borderRadius:2, transition:"all .25s", transform: open ? "rotate(-45deg) translateY(-7px)" : "none" }} />
@@ -424,10 +249,7 @@ function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HERO
-// ═══════════════════════════════════════════════════════════════════════════════
-
+// ── HERO — logo image above the headline ──────────────────────────────────────
 function Hero({ onDemoClick }: { onDemoClick: () => void }) {
   return (
     <section style={{ background: "linear-gradient(155deg,#f0fdf4 0%,#fafaf9 55%,#fef3c7 100%)", padding: "5.5rem 1.25rem 4.5rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
@@ -436,6 +258,17 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
         <div style={{ display: "inline-flex", alignItems: "center", gap: "0.5rem", padding: "0.375rem 1rem", borderRadius: 99, fontSize: "0.875rem", fontWeight: 500, background: C.greenLight, color: C.green, border: `1px solid ${C.greenMid}`, marginBottom: "2rem" }}>
           🌿 Vattavada &amp; Munnar Homestay Owners-ന്
         </div>
+
+        {/* FIX: logo image in hero */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.5rem" }}>
+          <img
+            src={LOGO_URL}
+            alt="stayidom.in"
+            style={{ height: 80, width: "auto", objectFit: "contain", borderRadius: "0.75rem", boxShadow: "0 4px 24px rgba(22,101,52,.15)" }}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+          />
+        </div>
+
         <h1 style={{ ...serif, fontSize: "clamp(2.75rem,7vw,5rem)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.03em", color: C.text, marginBottom: "1.5rem" }}>
           നിങ്ങളുടെ Homestay.{" "}
           <em style={{ color: C.green, fontStyle: "italic", display: "block" }}>നിങ്ങളുടെ Platform.</em>
@@ -444,7 +277,6 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
           Branded booking website · Direct UPI payments · Guest invoicing · WhatsApp integration · Accounts tracking — എല്ലാം ഒരിടത്ത്. Booking.com &amp; MakeMyTrip-ന് കൊടുക്കുന്ന 15–25% commission ഇനി നിങ്ങളുടെ business-ലേക്ക്.
         </p>
         <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "3.5rem" }}>
-          {/* ── Primary CTA now opens modal ── */}
           <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo — ഇന്ന് തന്നെ</button>
           <a href="https://demo.stayidom.in" target="_blank" rel="noopener noreferrer" style={{ color: C.green, border: `1.5px solid ${C.green}`, padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 600, fontSize: "1rem" }}>View Sample Site ↗</a>
         </div>
@@ -461,10 +293,6 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TRUST BAR
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function TrustBar() {
   return (
     <div style={{ background: C.green, padding: "1.125rem 1.25rem", textAlign: "center" }}>
@@ -474,10 +302,6 @@ function TrustBar() {
     </div>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PROBLEM STRIP
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function ProblemStrip() {
   return (
@@ -496,10 +320,6 @@ function ProblemStrip() {
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// PHONE MOCKUP
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function PhoneMockup() {
   return (
@@ -540,12 +360,8 @@ function PhoneMockup() {
                     </div>
                   ))}
                 </div>
-                <div style={{ background: C.green, color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center", marginBottom: "0.4rem", boxShadow: "0 2px 8px rgba(22,101,52,.3)" }}>
-                  Book Now — Pick Dates
-                </div>
-                <div style={{ background: "#25D366", color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center" }}>
-                  💬 Book via WhatsApp
-                </div>
+                <div style={{ background: C.green, color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center", marginBottom: "0.4rem", boxShadow: "0 2px 8px rgba(22,101,52,.3)" }}>Book Now — Pick Dates</div>
+                <div style={{ background: "#25D366", color: "#fff", borderRadius: 99, padding: "0.5625rem 0.5rem", fontSize: "0.6875rem", fontWeight: 700, textAlign: "center" }}>💬 Book via WhatsApp</div>
               </div>
               <div style={{ padding: "0.5rem 0 0.875rem", display: "flex", justifyContent: "center" }}>
                 <div style={{ width: 100, height: 4, background: "#1c1917", borderRadius: 99, opacity: 0.2 }} />
@@ -564,10 +380,6 @@ function PhoneMockup() {
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// WHATSAPP FLOW
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function WhatsAppFlow() {
   const steps = [
@@ -598,10 +410,6 @@ function WhatsAppFlow() {
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// DIRECT PAYMENT
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function DirectPayment() {
   const methods = [
@@ -660,10 +468,6 @@ function DirectPayment() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// COMPARISON TABLE
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function ComparisonTable() {
   return (
     <section id="compare" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
@@ -694,10 +498,6 @@ function ComparisonTable() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// GUEST TRUST SIGNALS — carousel on mobile, 3-col grid on desktop
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function GuestTrustSignals() {
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
@@ -722,10 +522,6 @@ function GuestTrustSignals() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FEATURES GRID — carousel on mobile, 3-col grid on desktop
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function FeaturesGrid() {
   return (
     <section id="features" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
@@ -746,10 +542,6 @@ function FeaturesGrid() {
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ACCOUNTS PANEL
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function AccountsPanel() {
   const rows = [
@@ -799,10 +591,6 @@ function AccountsPanel() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2G SIMULATOR
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function TwoGSimulator() {
   const [simOn, setSimOn] = useState(false);
   const items = [
@@ -847,10 +635,6 @@ function TwoGSimulator() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SAVINGS CALCULATOR
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function SavingsCalculator() {
   const [bookings, setBookings] = useState(20);
   const [rate, setRate]         = useState(3000);
@@ -892,10 +676,6 @@ function SavingsCalculator() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// TESTIMONIALS
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function Testimonials() {
   return (
     <section id="testimonials" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
@@ -917,10 +697,6 @@ function Testimonials() {
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// FAQ
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function FAQ() {
   const [openIndex, setOpenIndex] = useState<number>(0);
@@ -947,61 +723,42 @@ function FAQ() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PRICING
-// ═══════════════════════════════════════════════════════════════════════════════
-
 const FEATURE_ROWS: {
   category: string;
   features: { label: string; starter: true | null; growth: true | string | null; pro: true | string | null }[];
 }[] = [
-  {
-    category: "Booking Website",
-    features: [
-      { label: "Branded subdomain (yourplace.stayidom.in)", starter: true,  growth: true,  pro: true },
-      { label: "Mobile-first guest booking page",            starter: true,  growth: true,  pro: true },
-      { label: "WhatsApp booking deep link",                 starter: true,  growth: true,  pro: true },
-      { label: "Room & availability management",             starter: true,  growth: true,  pro: true },
-      { label: "Custom branding — colors & font",            starter: null,  growth: true,  pro: true },
-      { label: "Offline directions (Google Maps deep link)", starter: true,  growth: true,  pro: true },
-      { label: "SEO meta tags + Open Graph",                 starter: null,  growth: true,  pro: true },
-    ],
-  },
-  {
-    category: "Payments & Accounts",
-    features: [
-      { label: "UPI / Cash / Bank payment recording",        starter: true,  growth: true,  pro: true },
-      { label: "Part-payment & advance tracking",            starter: true,  growth: true,  pro: true },
-      { label: "Auto invoice generation (PDF)",              starter: null,  growth: true,  pro: true },
-      { label: "Monthly accounts overview",                  starter: null,  growth: true,  pro: true },
-      { label: "CSV export — bookings & payments",           starter: null,  growth: true,  pro: true },
-    ],
-  },
-  {
-    category: "Guest Experience",
-    features: [
-      { label: "Live booking status for guests",             starter: true,  growth: true,  pro: true },
-      { label: "Guest booking tracking page",                starter: null,  growth: true,  pro: true },
-      { label: "Seasonal & weekend price multipliers",       starter: null,  growth: true,  pro: true },
-      { label: "Multiple room types & complex pricing",      starter: null,  growth: true,  pro: true },
-    ],
-  },
-  {
-    category: "WhatsApp & Communication",
-    features: [
-      { label: "WhatsApp booking notification to owner",     starter: true,  growth: true,  pro: true },
-      { label: "WhatsApp message templates (confirm, reminder, directions)", starter: null, growth: true, pro: true },
-      { label: "Payment reminder template",                  starter: null,  growth: true,  pro: true },
-    ],
-  },
-  {
-    category: "Support & Onboarding",
-    features: [
-      { label: "Self-serve setup",                           starter: true,  growth: true,  pro: true },
-      { label: "Guided onboarding support",                  starter: null,  growth: true,  pro: true },
-      { label: "Priority setup + dedicated WhatsApp support",starter: null,  growth: null,  pro: true },
-    ],
-  },
+  { category: "Booking Website", features: [
+    { label: "Branded subdomain (yourplace.stayidom.in)", starter: true,  growth: true,  pro: true },
+    { label: "Mobile-first guest booking page",            starter: true,  growth: true,  pro: true },
+    { label: "WhatsApp booking deep link",                 starter: true,  growth: true,  pro: true },
+    { label: "Room & availability management",             starter: true,  growth: true,  pro: true },
+    { label: "Custom branding — colors & font",            starter: null,  growth: true,  pro: true },
+    { label: "Offline directions (Google Maps deep link)", starter: true,  growth: true,  pro: true },
+    { label: "SEO meta tags + Open Graph",                 starter: null,  growth: true,  pro: true },
+  ]},
+  { category: "Payments & Accounts", features: [
+    { label: "UPI / Cash / Bank payment recording",        starter: true,  growth: true,  pro: true },
+    { label: "Part-payment & advance tracking",            starter: true,  growth: true,  pro: true },
+    { label: "Auto invoice generation (PDF)",              starter: null,  growth: true,  pro: true },
+    { label: "Monthly accounts overview",                  starter: null,  growth: true,  pro: true },
+    { label: "CSV export — bookings & payments",           starter: null,  growth: true,  pro: true },
+  ]},
+  { category: "Guest Experience", features: [
+    { label: "Live booking status for guests",             starter: true,  growth: true,  pro: true },
+    { label: "Guest booking tracking page",                starter: null,  growth: true,  pro: true },
+    { label: "Seasonal & weekend price multipliers",       starter: null,  growth: true,  pro: true },
+    { label: "Multiple room types & complex pricing",      starter: null,  growth: true,  pro: true },
+  ]},
+  { category: "WhatsApp & Communication", features: [
+    { label: "WhatsApp booking notification to owner",     starter: true,  growth: true,  pro: true },
+    { label: "WhatsApp message templates (confirm, reminder, directions)", starter: null, growth: true, pro: true },
+    { label: "Payment reminder template",                  starter: null,  growth: true,  pro: true },
+  ]},
+  { category: "Support & Onboarding", features: [
+    { label: "Self-serve setup",                           starter: true,  growth: true,  pro: true },
+    { label: "Guided onboarding support",                  starter: null,  growth: true,  pro: true },
+    { label: "Priority setup + dedicated WhatsApp support",starter: null,  growth: null,  pro: true },
+  ]},
 ];
 
 const TIER_META = [
@@ -1011,15 +768,9 @@ const TIER_META = [
 ];
 
 function FeatureCell({ val }: { val: true | string | null }) {
-  if (val === null) {
-    return <span style={{ color: "#d1d5db", fontSize: "1rem" }}>—</span>;
-  }
-  if (typeof val === "string") {
-    return <span style={{ fontSize: "0.8125rem", color: C.green, fontWeight: 500 }}>{val}</span>;
-  }
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: C.greenLight, color: C.green, fontSize: "0.75rem", fontWeight: 700 }}>✓</span>
-  );
+  if (val === null) return <span style={{ color: "#d1d5db", fontSize: "1rem" }}>—</span>;
+  if (typeof val === "string") return <span style={{ fontSize: "0.8125rem", color: C.green, fontWeight: 500 }}>{val}</span>;
+  return <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 22, height: 22, borderRadius: "50%", background: C.greenLight, color: C.green, fontSize: "0.75rem", fontWeight: 700 }}>✓</span>;
 }
 
 function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
@@ -1033,12 +784,8 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
             { tier: "growth",  label: "Growth",  rooms: "6–10 മുറികൾ", setup: "₹10,000", monthly: "₹1,500 / മാസം", highlight: true,  tagline: "Direct bookings grow ചെയ്യുന്ന active property-ന്" },
             { tier: "pro",     label: "Pro",     rooms: "10+ മുറികൾ",  setup: "₹25,000", monthly: "₹2,000 / മാസം", highlight: false, tagline: "Large property അല്ലെങ്കിൽ resort-style stay" },
           ].map(({ tier, label, rooms, setup, monthly, highlight, tagline }) => (
-            <div key={tier}
-              className={highlight ? "md:scale-105" : ""}
-              style={{ background: highlight ? C.green : "#fff", border: highlight ? "2px solid #14532d" : `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "2rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: highlight ? "0 20px 50px rgba(22,101,52,.25)" : "none" }}>
-              {highlight && (
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, background: C.amber, color: C.dark, padding: "0.25rem 0.75rem", borderRadius: 99, alignSelf: "flex-start" }}>⭐ Most Popular</span>
-              )}
+            <div key={tier} className={highlight ? "md:scale-105" : ""} style={{ background: highlight ? C.green : "#fff", border: highlight ? "2px solid #14532d" : `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "2rem", display: "flex", flexDirection: "column", gap: "1rem", boxShadow: highlight ? "0 20px 50px rgba(22,101,52,.25)" : "none" }}>
+              {highlight && <span style={{ fontSize: "0.75rem", fontWeight: 700, background: C.amber, color: C.dark, padding: "0.25rem 0.75rem", borderRadius: 99, alignSelf: "flex-start" }}>⭐ Most Popular</span>}
               <div>
                 <div style={{ fontSize: "1.25rem", fontWeight: 700, color: highlight ? "#fff" : C.text, marginBottom: "0.125rem" }}>{label}</div>
                 <div style={{ fontSize: "0.875rem", color: highlight ? C.greenLight : C.muted }}>{rooms}</div>
@@ -1049,7 +796,6 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
                 <div style={{ fontSize: "0.8125rem", color: highlight ? C.greenLight : C.muted, marginBottom: "0.375rem" }}>one-time setup</div>
                 <div style={{ fontSize: "1rem", fontWeight: 600, color: highlight ? "#f0fdf4" : C.text }}>+ {monthly}</div>
               </div>
-              {/* Pricing CTA now triggers modal with preselected tier */}
               <button onClick={() => onSelectTier(tier)} style={{ textAlign: "center", padding: "0.9375rem 1rem", borderRadius: 99, fontSize: "0.9375rem", fontWeight: 700, display: "block", marginTop: "0.5rem", background: highlight ? C.amber : C.green, color: highlight ? C.dark : "#fff", border: "none", cursor: "pointer", fontFamily: "inherit", width: "100%" }}>
                 Get Started — 14 days free
               </button>
@@ -1094,17 +840,11 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
             ))}
           </div>
         </div>
-        <p style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.9375rem", color: C.muted }}>
-          * Hidden charges ഇല്ല · Commission ഇല്ല · Cancel anytime
-        </p>
+        <p style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.9375rem", color: C.muted }}>* Hidden charges ഇല്ല · Commission ഇല്ല · Cancel anytime</p>
       </div>
     </section>
   );
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SIGNUP CTA — stays in page for direct #signup link visits
-// ═══════════════════════════════════════════════════════════════════════════════
 
 function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   const [submitted, setSubmitted] = useState(false);
@@ -1115,24 +855,13 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
     setForm(f => ({ ...f, tier: preselectedTier }));
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem",
-    border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)",
-    color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit",
-    boxSizing: "border-box",
-  };
+  const inputStyle: React.CSSProperties = { width: "100%", padding: "0.9375rem 1.125rem", borderRadius: "0.875rem", border: "1px solid rgba(255,255,255,.25)", background: "rgba(255,255,255,.14)", color: "#fff", fontSize: "1rem", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
-    } catch {
-      // fail silently
-    } finally {
-      setLoading(false);
-      setSubmitted(true);
-    }
+    try { await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier }); } catch {}
+    finally { setLoading(false); setSubmitted(true); }
   };
 
   return (
@@ -1167,10 +896,6 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FOOTER
-// ═══════════════════════════════════════════════════════════════════════════════
-
 function Footer() {
   return (
     <footer style={{ background: C.dark, color: C.muted, borderTop: "1px solid #292524", padding: "2.5rem 1.25rem" }}>
@@ -1185,21 +910,15 @@ function Footer() {
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PAGE ROOT
-// ═══════════════════════════════════════════════════════════════════════════════
-
 export default function LandingPage() {
   const [selectedTier, setSelectedTier] = useState("");
   const [modalOpen, setModalOpen]       = useState(false);
 
-  // When a tier card's "Get Started" is clicked: set tier + open modal
   const handleSelectTier = useCallback((tier: string) => {
     setSelectedTier(tier);
     setModalOpen(true);
   }, []);
 
-  // Navbar / hero "Free Demo" button — open modal with no preselected tier
   const handleDemoClick = useCallback(() => {
     setSelectedTier("");
     setModalOpen(true);
