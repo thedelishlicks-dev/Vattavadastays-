@@ -40,11 +40,10 @@ const NAV: NavItemDef[] = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-// Read the property param once — works both from URL and sessionStorage fallback
 function getPropertyParam(): string {
-  const fromUrl = new URLSearchParams(window.location.search).get('property') ?? '';
+  const fromUrl = new URLSearchParams(window.location.search).get("property") ?? "";
   if (fromUrl) return fromUrl;
-  return sessionStorage.getItem('adminPropertySubdomain') ?? '';
+  return sessionStorage.getItem("adminPropertySubdomain") ?? "";
 }
 
 export function AdminLayout() {
@@ -54,12 +53,11 @@ export function AdminLayout() {
   const { user } = useAuth();
   const { data: property } = useOwnerProperty();
 
-  // Preserve ?property= across all navigation
   const propertyParam = getPropertyParam();
-  const search = propertyParam ? `?property=${encodeURIComponent(propertyParam)}` : '';
+  const search = propertyParam ? `?property=${encodeURIComponent(propertyParam)}` : "";
 
   const handleLogout = async () => {
-    sessionStorage.removeItem('adminPropertySubdomain');
+    sessionStorage.removeItem("adminPropertySubdomain");
     await supabase.auth.signOut();
     navigate({ to: "/login" });
   };
@@ -77,32 +75,17 @@ export function AdminLayout() {
         </div>
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           {NAV.map((item) => (
-            <NavItem
-              key={item.to}
-              to={item.to}
-              label={item.label}
-              icon={item.icon}
-              active={path === item.to}
-              disabled={item.disabled}
-              search={search}
-            />
+            <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} active={path === item.to} disabled={item.disabled} search={search} />
           ))}
         </nav>
-        <button
-          onClick={handleLogout}
-          className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
+        <button onClick={handleLogout} className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
           <LogOut className="h-4 w-4" /> Log out
         </button>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 bg-card border-b border-border flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
-          <button
-            className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
+          <button className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </button>
           <div className="font-medium text-sm md:text-base truncate">{propertyName}</div>
@@ -126,23 +109,13 @@ export function AdminLayout() {
             const Icon = item.icon;
             const active = path === item.to;
             return (
-              
-                key={item.to}
-                href={`${item.to}${search}`}
-                className={[
-                  "flex flex-col items-center justify-center py-2 text-[10px]",
-                  active ? "text-primary" : "text-muted-foreground",
-                ].join(" ")}
-              >
+              <a key={item.to} href={`${item.to}${search}`} className={["flex flex-col items-center justify-center py-2 text-[10px]", active ? "text-primary" : "text-muted-foreground"].join(" ")}>
                 <Icon className="h-5 w-5 mb-0.5" />
                 {item.label}
               </a>
             );
           })}
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground"
-          >
+          <button onClick={() => setMobileOpen(true)} className="flex flex-col items-center justify-center py-2 text-[10px] text-muted-foreground">
             <Menu className="h-5 w-5 mb-0.5" />
             More
           </button>
@@ -154,35 +127,17 @@ export function AdminLayout() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col">
             <div className="h-14 px-5 flex items-center border-b border-border justify-between">
-              <span className="font-display text-lg font-semibold text-primary">
-                {propertyName}
-              </span>
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="p-2 -mr-2 rounded-md hover:bg-muted"
-                aria-label="Close menu"
-              >
+              <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
+              <button onClick={() => setMobileOpen(false)} className="p-2 -mr-2 rounded-md hover:bg-muted" aria-label="Close menu">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
               {NAV.map((item) => (
-                <NavItem
-                  key={item.to}
-                  to={item.to}
-                  label={item.label}
-                  icon={item.icon}
-                  active={path === item.to}
-                  disabled={item.disabled}
-                  search={search}
-                  onClick={() => setMobileOpen(false)}
-                />
+                <NavItem key={item.to} to={item.to} label={item.label} icon={item.icon} active={path === item.to} disabled={item.disabled} search={search} onClick={() => setMobileOpen(false)} />
               ))}
             </nav>
-            <button
-              onClick={handleLogout}
-              className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
+            <button onClick={handleLogout} className="m-3 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground">
               <LogOut className="h-4 w-4" /> Log out
             </button>
           </aside>
@@ -211,10 +166,7 @@ function NavItem({
 }) {
   if (disabled) {
     return (
-      <div
-        className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground/60 cursor-not-allowed"
-        title="Coming soon"
-      >
+      <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground/60 cursor-not-allowed" title="Coming soon">
         <Icon className="h-4 w-4" />
         <span className="flex-1">{label}</span>
         <span className="text-[10px] uppercase tracking-wider">Soon</span>
@@ -222,14 +174,7 @@ function NavItem({
     );
   }
   return (
-    
-      href={`${to}${search}`}
-      onClick={onClick}
-      className={[
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
-        active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted",
-      ].join(" ")}
-    >
+    <a href={`${to}${search}`} onClick={onClick} className={["flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors", active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"].join(" ")}>
       <Icon className="h-4 w-4" />
       {label}
     </a>
