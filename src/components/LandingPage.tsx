@@ -24,8 +24,8 @@ const serif: React.CSSProperties = {
   fontFamily: "'Playfair Display', Georgia, serif",
 };
 
-// stayidom.in OG image used as the brand logo on the landing page
-const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/og-default.jpeg";
+// Transparent PNG logo — used in navbar and hero
+const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/logo-transparent.png";
 
 import { submitLead } from "../lib/leads";
 
