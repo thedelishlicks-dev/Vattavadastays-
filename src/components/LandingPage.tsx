@@ -212,13 +212,13 @@ function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   const [open, setOpen] = useState(false);
   return (
     <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 72, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         {/* Logo only — no text */}
         <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
           <img
             src={LOGO_URL}
             alt="stayidom.in"
-            style={{ height: 52, width: "auto", objectFit: "contain", borderRadius: "0.5rem" }}
+            style={{ height: 64, width: "auto", objectFit: "contain", borderRadius: "0.5rem" }}
             onError={e => {
               // Fallback to text if image fails
               const el = e.currentTarget as HTMLImageElement;
@@ -271,7 +271,7 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
           <img
             src={LOGO_URL}
             alt="stayidom.in"
-            style={{ height: 80, width: "auto", objectFit: "contain", borderRadius: "0.75rem", boxShadow: "0 4px 24px rgba(22,101,52,.15)" }}
+            style={{ height: 120, width: "auto", objectFit: "contain" }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         </div>
