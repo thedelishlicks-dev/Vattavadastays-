@@ -24,8 +24,8 @@ const serif: React.CSSProperties = {
   fontFamily: "'Playfair Display', Georgia, serif",
 };
 
-// stayidom.in OG image used as the brand logo on the landing page
-const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/og-default.jpeg";
+// Transparent PNG logo — used in navbar and hero
+const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/logo-transparent.png";
 
 import { submitLead } from "../lib/leads";
 
@@ -211,14 +211,14 @@ function HeroBg() {
 function Navbar({ onDemoClick }: { onDemoClick: () => void }) {
   const [open, setOpen] = useState(false);
   return (
-    <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        {/* Logo only — no text */}
-        <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none" }}>
+    <nav style={{ background: C.bg, borderBottom: "1px solid #e7e5e4", position: "sticky", top: 0, zIndex: 50, backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", overflow: "visible" }}>
+      <div style={{ maxWidth: 940, margin: "0 auto", padding: "0 1.25rem", height: 72, display: "flex", alignItems: "center", justifyContent: "space-between", overflow: "visible" }}>
+        {/* Logo overflows navbar height for prominence */}
+        <a href="#" style={{ display: "flex", alignItems: "center", textDecoration: "none", overflow: "visible" }}>
           <img
             src={LOGO_URL}
             alt="stayidom.in"
-            style={{ height: 52, width: "auto", objectFit: "contain", borderRadius: "0.5rem" }}
+            style={{ height: 110, width: "auto", objectFit: "contain", position: "relative", zIndex: 51 }}
             onError={e => {
               // Fallback to text if image fails
               const el = e.currentTarget as HTMLImageElement;
@@ -271,7 +271,7 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
           <img
             src={LOGO_URL}
             alt="stayidom.in"
-            style={{ height: 80, width: "auto", objectFit: "contain", borderRadius: "0.75rem", boxShadow: "0 4px 24px rgba(22,101,52,.15)" }}
+            style={{ height: 120, width: "auto", objectFit: "contain" }}
             onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
           />
         </div>
