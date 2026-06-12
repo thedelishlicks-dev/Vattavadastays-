@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   BedDouble,
@@ -40,6 +40,13 @@ const NAV: NavItemDef[] = [
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
+// Read the property param once — works both from URL and sessionStorage fallback
+function getPropertyParam(): string {
+  const fromUrl = new URLSearchParams(window.location.search).get('property') ?? '';
+  if (fromUrl) return fromUrl;
+  return sessionStorage.getItem('adminPropertySubdomain') ?? '';
+}
+
 export function AdminLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
@@ -47,7 +54,12 @@ export function AdminLayout() {
   const { user } = useAuth();
   const { data: property } = useOwnerProperty();
 
+  // Preserve ?property= across all navigation
+  const propertyParam = getPropertyParam();
+  const search = propertyParam ? `?property=${encodeURIComponent(propertyParam)}` : '';
+
   const handleLogout = async () => {
+    sessionStorage.removeItem('adminPropertySubdomain');
     await supabase.auth.signOut();
     navigate({ to: "/login" });
   };
@@ -72,6 +84,7 @@ export function AdminLayout() {
               icon={item.icon}
               active={path === item.to}
               disabled={item.disabled}
+              search={search}
             />
           ))}
         </nav>
@@ -113,9 +126,9 @@ export function AdminLayout() {
             const Icon = item.icon;
             const active = path === item.to;
             return (
-              <Link
+              
                 key={item.to}
-                to={item.to}
+                href={`${item.to}${search}`}
                 className={[
                   "flex flex-col items-center justify-center py-2 text-[10px]",
                   active ? "text-primary" : "text-muted-foreground",
@@ -123,7 +136,7 @@ export function AdminLayout() {
               >
                 <Icon className="h-5 w-5 mb-0.5" />
                 {item.label}
-              </Link>
+              </a>
             );
           })}
           <button
@@ -161,6 +174,7 @@ export function AdminLayout() {
                   icon={item.icon}
                   active={path === item.to}
                   disabled={item.disabled}
+                  search={search}
                   onClick={() => setMobileOpen(false)}
                 />
               ))}
@@ -184,6 +198,7 @@ function NavItem({
   icon: Icon,
   active,
   disabled,
+  search,
   onClick,
 }: {
   to: string;
@@ -191,6 +206,7 @@ function NavItem({
   icon: React.ComponentType<{ className?: string }>;
   active: boolean;
   disabled?: boolean;
+  search: string;
   onClick?: () => void;
 }) {
   if (disabled) {
@@ -206,8 +222,8 @@ function NavItem({
     );
   }
   return (
-    <Link
-      to={to}
+    
+      href={`${to}${search}`}
       onClick={onClick}
       className={[
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors",
@@ -216,6 +232,6 @@ function NavItem({
     >
       <Icon className="h-4 w-4" />
       {label}
-    </Link>
+    </a>
   );
 }
