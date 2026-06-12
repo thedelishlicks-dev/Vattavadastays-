@@ -7,8 +7,16 @@ export const useOwnerProperty = () => {
   const { user, isAuthenticated } = useAuth();
   const isSuperAdmin = isSuperAdminEmail(user?.email);
 
-  const propertySubdomain = isSuperAdmin
+  const paramFromUrl = isSuperAdmin
     ? new URLSearchParams(window.location.search).get('property') ?? ''
+    : '';
+
+  if (isSuperAdmin && paramFromUrl) {
+    sessionStorage.setItem('adminPropertySubdomain', paramFromUrl);
+  }
+
+  const propertySubdomain = isSuperAdmin
+    ? paramFromUrl || sessionStorage.getItem('adminPropertySubdomain') || ''
     : '';
 
   return useQuery({
@@ -23,7 +31,6 @@ export const useOwnerProperty = () => {
         if (error) throw error;
         return data;
       }
-
       const { data, error } = await supabase
         .from("properties")
         .select(`*, rooms(*)`)
