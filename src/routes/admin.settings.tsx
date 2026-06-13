@@ -1,10 +1,10 @@
- import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy } from 'lucide-react'
+import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
 
@@ -96,38 +96,16 @@ function ImageUploadField({
 
       {currentUrl ? (
         <div className="relative rounded-xl overflow-hidden inline-block w-full">
-          <img
-            src={currentUrl}
-            alt={label}
-            className={isLogo ? 'h-20 w-20 object-cover rounded-full' : previewClassName}
-          />
-          <button
-            type="button"
-            onClick={onRemoved}
-            className={
-              isLogo
-                ? 'absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80'
-                : 'absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80'
-            }
-          >
+          <img src={currentUrl} alt={label} className={isLogo ? 'h-20 w-20 object-cover rounded-full' : previewClassName} />
+          <button type="button" onClick={onRemoved} className={isLogo ? 'absolute -top-2 -right-2 h-6 w-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80' : 'absolute top-2 right-2 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80'}>
             <X className={isLogo ? 'h-3 w-3' : 'h-4 w-4'} />
           </button>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs px-2.5 py-1 hover:bg-black/80"
-          >
+          <button type="button" onClick={() => inputRef.current?.click()} className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs px-2.5 py-1 hover:bg-black/80">
             <Upload className="h-3 w-3" /> Replace
           </button>
         </div>
       ) : (
-        <div
-          onClick={() => !uploading && inputRef.current?.click()}
-          className={[
-            'border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors',
-            isLogo ? 'h-32 w-32' : 'h-48',
-          ].join(' ')}
-        >
+        <div onClick={() => !uploading && inputRef.current?.click()} className={['border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors', isLogo ? 'h-32 w-32' : 'h-48'].join(' ')}>
           {uploading ? (
             <>
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -143,28 +121,137 @@ function ImageUploadField({
         </div>
       )}
 
-      {uploading && currentUrl && (
-        <p className="text-xs text-muted-foreground">{progress}</p>
-      )}
+      {uploading && currentUrl && <p className="text-xs text-muted-foreground">{progress}</p>}
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/heic"
-        className="hidden"
-        onChange={handleUpload}
-      />
+      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" className="hidden" onChange={handleUpload} />
 
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {!currentUrl && !uploading && (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted"
-        >
+        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
           <Upload className="h-4 w-4" /> Upload {label.toLowerCase()}
         </button>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Change Password section
+// ---------------------------------------------------------------------------
+
+function ChangePasswordSection({ email }: { email: string }) {
+  const [mode, setMode] = useState<'idle' | 'change' | 'reset_sent'>('idle')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const handleChangePassword = async () => {
+    setError('')
+    if (!currentPassword) { setError('Enter your current password'); return }
+    if (newPassword.length < 8) { setError('New password must be at least 8 characters'); return }
+    if (newPassword !== confirmPassword) { setError('Passwords do not match'); return }
+    setSaving(true)
+    try {
+      // Re-authenticate first to verify current password
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: currentPassword })
+      if (signInError) { setError('Current password is incorrect'); setSaving(false); return }
+      // Now update to new password
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+      if (updateError) throw updateError
+      setSuccess('Password changed successfully!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setMode('idle')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to change password')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSendReset = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/admin/settings` })
+      if (resetError) throw resetError
+      setMode('reset_sent')
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to send reset email')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <KeyRound className="h-5 w-5 text-primary" />
+        </div>
+        <div>
+          <h2 className="text-sm font-semibold">Password</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">{email}</p>
+        </div>
+      </div>
+
+      {mode === 'idle' && (
+        <>
+          {success && (
+            <div className="rounded-lg bg-green-50 border border-green-200 px-3 py-2 text-xs text-green-800 flex items-center gap-2">
+              <Check className="h-3.5 w-3.5 shrink-0" /> {success}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { setMode('change'); setSuccess(''); setError('') }} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted flex items-center justify-center gap-2">
+              <KeyRound className="h-4 w-4" /> Change password
+            </button>
+            <button type="button" onClick={handleSendReset} disabled={saving} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted flex items-center justify-center gap-2 disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Email reset link
+            </button>
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </>
+      )}
+
+      {mode === 'change' && (
+        <div className="space-y-3">
+          <div>
+            <label className={labelCls}>Current password *</label>
+            <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className={inputCls} placeholder="Your current password" autoFocus />
+          </div>
+          <div>
+            <label className={labelCls}>New password *</label>
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className={inputCls} placeholder="At least 8 characters" />
+          </div>
+          <div>
+            <label className={labelCls}>Confirm new password *</label>
+            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className={inputCls} placeholder="Repeat new password" />
+          </div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button type="button" onClick={() => { setMode('idle'); setError('') }} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
+            <button type="button" onClick={handleChangePassword} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save password
+            </button>
+          </div>
+        </div>
+      )}
+
+      {mode === 'reset_sent' && (
+        <div className="rounded-xl bg-green-50 border border-green-200 p-4 space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-green-800">
+            <Mail className="h-4 w-4 shrink-0" /> Reset link sent!
+          </div>
+          <p className="text-xs text-green-700">Check your email at <strong>{email}</strong>. Click the link to set a new password. The link expires in 1 hour.</p>
+          <button type="button" onClick={() => setMode('idle')} className="text-xs text-green-700 underline">Back</button>
+        </div>
       )}
     </div>
   )
@@ -226,10 +313,7 @@ function AdminSettings() {
 
   const persistImage = async (column: string, url: string | null) => {
     if (!property?.id) return
-    await supabase
-      .from('properties')
-      .update({ [column]: url })
-      .eq('id', property.id)
+    await supabase.from('properties').update({ [column]: url }).eq('id', property.id)
     queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
     queryClient.invalidateQueries({ queryKey: ['property'] })
     setForm((f) => ({ ...f, [column]: url ?? '' }))
@@ -262,10 +346,6 @@ function AdminSettings() {
     mutation.mutate({ updates: form, theme: selectedTheme, font: selectedFont })
   }
 
-  // FIX: build the dashboard URL using the property's own subdomain
-  // so the edge function can detect it and bake the correct name + logo
-  // into the HTML — making iOS show the right app name on install.
-  // Falls back to window.location.origin for non-production environments.
   const dashboardUrl = property?.subdomain
     ? `https://${property.subdomain}.stayidom.in/admin/dashboard`
     : `${window.location.origin}/admin/dashboard`
@@ -299,57 +379,16 @@ function AdminSettings() {
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* ── Logo ── */}
-        <ImageUploadField
-          label="Logo"
-          hint="Square image shown in the header. Recommended 120×120 px or larger square."
-          bucket="hero-images"
-          pathPrefix={property.id}
-          stem="logo"
-          preset="logo"
-          currentUrl={form.logo_url || null}
-          previewClassName="h-20 w-20 object-cover rounded-full"
-          onUploaded={(url) => persistImage('logo_url', url)}
-          onRemoved={() => persistImage('logo_url', null)}
-        />
+        <ImageUploadField label="Logo" hint="Square image shown in the header. Recommended 120×120 px or larger square." bucket="hero-images" pathPrefix={property.id} stem="logo" preset="logo" currentUrl={form.logo_url || null} previewClassName="h-20 w-20 object-cover rounded-full" onUploaded={(url) => persistImage('logo_url', url)} onRemoved={() => persistImage('logo_url', null)} />
 
         {/* ── Hero image ── */}
-        <ImageUploadField
-          label="Hero Image"
-          hint="Full-width banner at the top of your guest booking page. Compressed to ≤250 KB for fast loading on mobile."
-          bucket="hero-images"
-          pathPrefix={property.id}
-          stem="hero"
-          preset="hero"
-          currentUrl={form.hero_image || null}
-          onUploaded={(url) => persistImage('hero_image', url)}
-          onRemoved={() => persistImage('hero_image', null)}
-        />
+        <ImageUploadField label="Hero Image" hint="Full-width banner at the top of your guest booking page. Compressed to ≤250 KB for fast loading on mobile." bucket="hero-images" pathPrefix={property.id} stem="hero" preset="hero" currentUrl={form.hero_image || null} onUploaded={(url) => persistImage('hero_image', url)} onRemoved={() => persistImage('hero_image', null)} />
 
         {/* ── About image ── */}
-        <ImageUploadField
-          label="About Section Image"
-          hint="Shown beside your property description. Landscape photo works best."
-          bucket="hero-images"
-          pathPrefix={property.id}
-          stem="about"
-          preset="about"
-          currentUrl={form.about_image || null}
-          onUploaded={(url) => persistImage('about_image', url)}
-          onRemoved={() => persistImage('about_image', null)}
-        />
+        <ImageUploadField label="About Section Image" hint="Shown beside your property description. Landscape photo works best." bucket="hero-images" pathPrefix={property.id} stem="about" preset="about" currentUrl={form.about_image || null} onUploaded={(url) => persistImage('about_image', url)} onRemoved={() => persistImage('about_image', null)} />
 
         {/* ── Static map ── */}
-        <ImageUploadField
-          label="Static Map Image"
-          hint="A screenshot of your property location on Google Maps. Used instead of a map embed — loads in under 1 second on 2G."
-          bucket="hero-images"
-          pathPrefix={property.id}
-          stem="map"
-          preset="staticMap"
-          currentUrl={form.static_map_image_url || null}
-          onUploaded={(url) => persistImage('static_map_image_url', url)}
-          onRemoved={() => persistImage('static_map_image_url', null)}
-        />
+        <ImageUploadField label="Static Map Image" hint="A screenshot of your property location on Google Maps. Used instead of a map embed — loads in under 1 second on 2G." bucket="hero-images" pathPrefix={property.id} stem="map" preset="staticMap" currentUrl={form.static_map_image_url || null} onUploaded={(url) => persistImage('static_map_image_url', url)} onRemoved={() => persistImage('static_map_image_url', null)} />
 
         {/* ── Branding & Appearance ── */}
         <div className="space-y-4">
@@ -358,27 +397,12 @@ function AdminSettings() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Color Theme</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Choose a color palette for your guest booking page.
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Choose a color palette for your guest booking page.</p>
             </div>
             <div className="grid grid-cols-5 gap-3">
               {(Object.entries(THEMES) as [ThemeName, typeof THEMES.forest][]).map(([key, theme]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedTheme(key)}
-                  className={[
-                    'flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all',
-                    selectedTheme === key
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent hover:border-border hover:bg-muted/30'
-                  ].join(' ')}
-                >
-                  <div
-                    className="h-10 w-10 rounded-full shadow-sm flex items-center justify-center text-white"
-                    style={{ backgroundColor: theme.primary }}
-                  >
+                <button key={key} type="button" onClick={() => setSelectedTheme(key)} className={['flex flex-col items-center gap-2 p-2 rounded-xl border-2 transition-all', selectedTheme === key ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border hover:bg-muted/30'].join(' ')}>
+                  <div className="h-10 w-10 rounded-full shadow-sm flex items-center justify-center text-white" style={{ backgroundColor: theme.primary }}>
                     {selectedTheme === key && <Check className="h-5 w-5" />}
                   </div>
                   <span className="text-[10px] font-medium uppercase tracking-wider">{theme.name}</span>
@@ -390,26 +414,12 @@ function AdminSettings() {
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Heading Font</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Pick a typography style for headings and titles.
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Pick a typography style for headings and titles.</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {Object.entries(FONTS).map(([key, font]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => setSelectedFont(key)}
-                  className={[
-                    'flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center',
-                    selectedFont === key
-                      ? 'border-primary bg-primary/5'
-                      : 'border-transparent hover:border-border hover:bg-muted/30'
-                  ].join(' ')}
-                >
-                  <span className="text-lg leading-tight" style={{ fontFamily: font.family }}>
-                    {font.name}
-                  </span>
+                <button key={key} type="button" onClick={() => setSelectedFont(key)} className={['flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-center', selectedFont === key ? 'border-primary bg-primary/5' : 'border-transparent hover:border-border hover:bg-muted/30'].join(' ')}>
+                  <span className="text-lg leading-tight" style={{ fontFamily: font.family }}>{font.name}</span>
                   {selectedFont === key && <Check className="h-3.5 w-3.5 text-primary" />}
                 </button>
               ))}
@@ -426,11 +436,7 @@ function AdminSettings() {
           </div>
           <div>
             <label className={labelCls}>Hero Tagline</label>
-            <input
-              type="text" name="hero_tagline" value={form.hero_tagline} onChange={handleChange}
-              placeholder="Short tagline for hero banner (e.g. A 3-room mountain retreat…)"
-              className={inputCls}
-            />
+            <input type="text" name="hero_tagline" value={form.hero_tagline} onChange={handleChange} placeholder="Short tagline for hero banner (e.g. A 3-room mountain retreat…)" className={inputCls} />
             <p className="text-xs text-muted-foreground mt-1">Shown on the hero banner. Keep it short and punchy.</p>
           </div>
           <div>
@@ -501,14 +507,11 @@ function AdminSettings() {
             </div>
             <div>
               <h2 className="text-sm font-semibold">Add to Home Screen</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Use your dashboard like a native app with your property's name and logo
-              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">Use your dashboard like a native app with your property's name and logo</p>
             </div>
           </div>
 
           <div className="space-y-3">
-            {/* Show the exact URL they'll use — makes it clear it's their subdomain */}
             <div className="rounded-lg bg-primary-light/40 border border-primary/20 px-3 py-2">
               <p className="text-xs text-muted-foreground mb-0.5">Your dashboard link</p>
               <p className="text-xs font-mono text-primary break-all">{dashboardUrl}</p>
@@ -516,52 +519,31 @@ function AdminSettings() {
 
             <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
               <p className="text-xs font-medium text-foreground">iPhone / iPad</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Open your dashboard link in Safari → tap the Share icon (□↑) → tap{' '}
-                <span className="font-medium text-foreground">Add to Home Screen</span>
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Open your dashboard link in Safari → tap the Share icon (□↑) → tap <span className="font-medium text-foreground">Add to Home Screen</span></p>
             </div>
 
             <div className="rounded-lg bg-muted/50 border border-border p-3 space-y-1">
               <p className="text-xs font-medium text-foreground">Android</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Open your dashboard link in Chrome → tap the ⋮ menu → tap{' '}
-                <span className="font-medium text-foreground">Add to Home Screen</span>
-              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Open your dashboard link in Chrome → tap the ⋮ menu → tap <span className="font-medium text-foreground">Add to Home Screen</span></p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleCopyLink}
-              className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2"
-            >
+            <button type="button" onClick={handleCopyLink} className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
               {linkCopied ? (
-                <>
-                  <Check className="h-4 w-4 text-primary" />
-                  <span className="text-primary">Copied!</span>
-                </>
+                <><Check className="h-4 w-4 text-primary" /><span className="text-primary">Copied!</span></>
               ) : (
-                <>
-                  <Copy className="h-4 w-4" />
-                  Copy dashboard link
-                </>
+                <><Copy className="h-4 w-4" />Copy dashboard link</>
               )}
             </button>
           </div>
         </div>
 
+        {/* ── Change Password ── */}
+        <ChangePasswordSection email={user?.email ?? ''} />
+
         {/* ── Save ── */}
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="submit"
-            disabled={mutation.isPending}
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60"
-          >
-            {mutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Save className="h-4 w-4" />
-            )}
+          <button type="submit" disabled={mutation.isPending} className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-full text-sm font-medium hover:opacity-90 disabled:opacity-60">
+            {mutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Changes
           </button>
 
@@ -572,12 +554,11 @@ function AdminSettings() {
           )}
 
           {mutation.isError && (
-            <span className="text-sm text-destructive">
-              Save failed — please try again.
-            </span>
+            <span className="text-sm text-destructive">Save failed — please try again.</span>
           )}
         </div>
       </form>
     </div>
   )
 }
+ 
