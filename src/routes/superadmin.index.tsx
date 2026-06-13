@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
 import { useLeads } from '../hooks/useLeads'
-import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight } from 'lucide-react'
+import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight, Link2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 export const Route = createFileRoute('/superadmin/')({
   component: SuperAdminIndex,
@@ -83,7 +84,78 @@ function whatsappLink(phone: string, name: string) {
   return `https://wa.me/${number}?text=${msg}`
 }
 
-// ─── Add Property Modal (unchanged) ──────────────────────────────────────────
+// ─── Link Owner Modal ─────────────────────────────────────────────────────────
+
+function LinkOwnerModal({ propertyId, propertyName, currentEmail, onClose, onLinked }: { propertyId: string; propertyName: string; currentEmail: string; onClose: () => void; onLinked: () => void }) {
+  const [email, setEmail] = useState(currentEmail)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState(false)
+
+  const handleLink = async () => {
+    if (!email.trim()) { setError('Email is required'); return }
+    setSaving(true)
+    setError('')
+    try {
+      const { error: rpcError } = await supabase.rpc('link_property_owner', { p_property_id: propertyId, p_email: email.trim().toLowerCase() })
+      if (rpcError) throw rpcError
+      setSuccess(true)
+      setTimeout(() => { onLinked(); onClose() }, 1500)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to link owner'
+      if (msg.includes('No user found')) {
+        setError(`No Supabase user found with email "${email}". Make sure they have accepted the invite first.`)
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-card rounded-2xl shadow-xl">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h2 className="font-display text-base font-semibold">Link Owner Account</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{propertyName}</p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="rounded-xl bg-muted/50 border border-border p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">How this works</p>
+            <p>Enter the email the manager used to accept their Supabase invite. This links their login account to this property so they can access the owner dashboard.</p>
+          </div>
+
+          {success ? (
+            <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 text-center font-medium">✅ Owner linked successfully!</div>
+          ) : (
+            <>
+              <div>
+                <label className={labelCls}>Manager's email (must have accepted invite) *</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} placeholder="manager@example.com" autoFocus />
+              </div>
+              {error && <p className="text-xs text-destructive">{error}</p>}
+              <div className="flex gap-2">
+                <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
+                <button onClick={handleLink} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+                  {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  Link owner
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Add Property Modal ───────────────────────────────────────────────────────
 
 function AddPropertyModal({ onClose }: { onClose: () => void }) {
   const [form, setForm] = useState<NewPropertyForm>(emptyForm())
@@ -176,6 +248,14 @@ function AddPropertyModal({ onClose }: { onClose: () => void }) {
 
                 <div className="flex gap-3">
                   <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">3</div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Link the owner account</p>
+                    <p className="text-xs text-muted-foreground mt-1">Once the manager has accepted the invite and set their password, click <strong>Link Owner</strong> on the property row to connect their login to this property.</p>
+                  </div>
+                </div>
+
+                <div className="flex gap-3">
+                  <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">4</div>
                   <div className="flex-1">
                     <p className="text-sm font-medium">Activate once setup fee is paid</p>
                     <p className="text-xs text-muted-foreground mt-1">Come back to this dashboard and click <strong>Activate</strong> on the property row.</p>
@@ -282,12 +362,7 @@ function LeadsTab() {
         <p className="text-sm text-muted-foreground">
           {leads.length} request{leads.length !== 1 ? 's' : ''} · Newest first
         </p>
-        <button
-          onClick={() => refetch()}
-          className="text-xs px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-accent font-medium"
-        >
-          ↻ Refresh
-        </button>
+        <button onClick={() => refetch()} className="text-xs px-3 py-1.5 rounded-full bg-muted border border-border hover:bg-accent font-medium">↻ Refresh</button>
       </div>
 
       {/* Desktop table */}
@@ -309,18 +384,11 @@ function LeadsTab() {
                 <td className="px-4 py-3 text-muted-foreground">{lead.property_name || '—'}</td>
                 <td className="px-4 py-3">
                   {lead.tier ? (
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                      {TIER_LABEL[lead.tier] ?? lead.tier}
-                    </span>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">{TIER_LABEL[lead.tier] ?? lead.tier}</span>
                   ) : <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3">
-                  <a
-                    href={whatsappLink(lead.phone, lead.name)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-[#25D366] font-medium hover:underline"
-                  >
+                  <a href={whatsappLink(lead.phone, lead.name)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-[#25D366] font-medium hover:underline">
                     <MessageCircle className="h-3.5 w-3.5" />
                     {lead.phone}
                   </a>
@@ -342,19 +410,12 @@ function LeadsTab() {
                 <p className="text-xs text-muted-foreground">{lead.property_name || 'No property name'}</p>
               </div>
               {lead.tier && (
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 shrink-0">
-                  {TIER_LABEL[lead.tier] ?? lead.tier}
-                </span>
+                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 shrink-0">{TIER_LABEL[lead.tier] ?? lead.tier}</span>
               )}
             </div>
             <div className="flex items-center justify-between pt-1">
               <p className="text-xs text-muted-foreground">{formatDate(lead.created_at)}</p>
-              <a
-                href={whatsappLink(lead.phone, lead.name)}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366] text-white px-3 py-1.5 rounded-full"
-              >
+              <a href={whatsappLink(lead.phone, lead.name)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[#25D366] text-white px-3 py-1.5 rounded-full">
                 <MessageCircle className="h-3 w-3" />
                 {lead.phone}
               </a>
@@ -366,20 +427,19 @@ function LeadsTab() {
   )
 }
 
-// ─── Properties Tab (unchanged logic, extracted) ──────────────────────────────
+// ─── Properties Tab ───────────────────────────────────────────────────────────
 
 function PropertiesTab() {
-  const { data: properties = [], isLoading } = useAllProperties()
+  const { data: properties = [], isLoading, refetch } = useAllProperties()
   const { mutate: updateSubscription } = useUpdateSubscription()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [linkOwnerProperty, setLinkOwnerProperty] = useState<{ id: string; name: string; email: string } | null>(null)
 
   const stats = {
     total: properties.length,
     active: properties.filter((p) => p.subscription_status === 'active').length,
     pending: properties.filter((p) => p.subscription_status === 'pending_setup').length,
-    mrr: properties
-      .filter((p) => p.subscription_status === 'active')
-      .reduce((sum, p) => sum + (p.monthly_fee || 0), 0),
+    mrr: properties.filter((p) => p.subscription_status === 'active').reduce((sum, p) => sum + (p.monthly_fee || 0), 0),
   }
 
   if (isLoading) {
@@ -435,21 +495,13 @@ function PropertiesTab() {
                   if (!window.confirm(`Activate ${p.name}? This will mark setup fee as paid and set renewal to 30 days from now.`)) return
                   const thirtyDaysLater = new Date()
                   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
-                  updateSubscription({
-                    propertyId: p.id,
-                    subscription_status: 'active',
-                    setup_fee_paid: true,
-                    subscription_end_date: thirtyDaysLater.toISOString(),
-                  })
+                  updateSubscription({ propertyId: p.id, subscription_status: 'active', setup_fee_paid: true, subscription_end_date: thirtyDaysLater.toISOString() })
                 }
 
                 const handleRenew = () => {
                   const thirtyDaysLater = new Date()
                   thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
-                  updateSubscription({
-                    propertyId: p.id,
-                    subscription_end_date: thirtyDaysLater.toISOString(),
-                  })
+                  updateSubscription({ propertyId: p.id, subscription_end_date: thirtyDaysLater.toISOString() })
                 }
 
                 return (
@@ -465,19 +517,25 @@ function PropertiesTab() {
                       </a>
                     </td>
                     <td className="px-4 py-3">
-                      <div>{p.owner_name ?? '—'}</div>
-                      {p.owner_phone && (
-                        <a href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-primary">
-                          {p.owner_phone}
-                        </a>
-                      )}
+                      <div className="flex items-center gap-1.5">
+                        <div>
+                          <div>{p.owner_name ?? '—'}</div>
+                          {p.owner_phone && (
+                            <a href={`https://wa.me/91${p.owner_phone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-primary">
+                              {p.owner_phone}
+                            </a>
+                          )}
+                        </div>
+                        {/* Show linked indicator */}
+                        {p.owner_id ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 font-medium shrink-0">linked</span>
+                        ) : (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium shrink-0">unlinked</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border font-semibold ${
-                        p.subscription_tier === 'large'
-                          ? 'border-amber-200/50 bg-amber-50 text-amber-700'
-                          : 'border-[#166534]/20 bg-[#dcfce7] text-[#166534]'
-                      }`}>
+                      <span className={`text-[10px] uppercase px-1.5 py-0.5 rounded border font-semibold ${p.subscription_tier === 'large' ? 'border-amber-200/50 bg-amber-50 text-amber-700' : 'border-[#166534]/20 bg-[#dcfce7] text-[#166534]'}`}>
                         {p.subscription_tier ?? 'small'}
                       </span>
                     </td>
@@ -491,14 +549,16 @@ function PropertiesTab() {
                     <td className="px-4 py-3"><StatusBadge status={p.subscription_status} /></td>
                     <td className="px-4 py-3 text-xs">
                       {p.subscription_status === 'active' && daysRemaining !== null ? (
-                        <span className={daysRemaining < 7 ? 'text-destructive font-medium' : 'text-muted-foreground'}>
-                          in {daysRemaining} days
-                        </span>
+                        <span className={daysRemaining < 7 ? 'text-destructive font-medium' : 'text-muted-foreground'}>in {daysRemaining} days</span>
                       ) : '—'}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
                         <button onClick={() => { window.location.href = `/admin/dashboard?property=${p.subdomain}` }} className="text-xs px-2.5 py-1 rounded-full bg-muted border border-border hover:bg-accent font-medium">Manage</button>
+                        <button onClick={() => setLinkOwnerProperty({ id: p.id, name: p.name, email: p.owner_email ?? '' })} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted font-medium" title="Link owner account">
+                          <Link2 className="h-3 w-3" />
+                          {p.owner_id ? 'Re-link' : 'Link Owner'}
+                        </button>
                         {p.owner_whatsapp && (
                           <a href={`https://wa.me/91${p.owner_whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-border hover:bg-muted text-[#25D366]" title="WhatsApp Owner">
                             <MessageCircle className="h-3.5 w-3.5" />
@@ -510,17 +570,11 @@ function PropertiesTab() {
                         {p.subscription_status === 'active' && (
                           <>
                             <button onClick={handleRenew} className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">Mark Renewed</button>
-                            <button
-                              onClick={() => { if (window.confirm(`Suspend ${p.name}?`)) updateSubscription({ propertyId: p.id, subscription_status: 'suspended' }) }}
-                              className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200"
-                            >Suspend</button>
+                            <button onClick={() => { if (window.confirm(`Suspend ${p.name}?`)) updateSubscription({ propertyId: p.id, subscription_status: 'suspended' }) }} className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">Suspend</button>
                           </>
                         )}
                         {p.subscription_status === 'suspended' && (
-                          <button
-                            onClick={() => { if (window.confirm(`Re-activate ${p.name}?`)) updateSubscription({ propertyId: p.id, subscription_status: 'active' }) }}
-                            className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200"
-                          >Activate</button>
+                          <button onClick={() => { if (window.confirm(`Re-activate ${p.name}?`)) updateSubscription({ propertyId: p.id, subscription_status: 'active' }) }} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">Activate</button>
                         )}
                       </div>
                     </td>
@@ -538,6 +592,15 @@ function PropertiesTab() {
       </div>
 
       {showAddModal && <AddPropertyModal onClose={() => setShowAddModal(false)} />}
+      {linkOwnerProperty && (
+        <LinkOwnerModal
+          propertyId={linkOwnerProperty.id}
+          propertyName={linkOwnerProperty.name}
+          currentEmail={linkOwnerProperty.email}
+          onClose={() => setLinkOwnerProperty(null)}
+          onLinked={() => { refetch(); setLinkOwnerProperty(null) }}
+        />
+      )}
     </div>
   )
 }
@@ -551,7 +614,6 @@ function SuperAdminIndex() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">
@@ -562,36 +624,23 @@ function SuperAdminIndex() {
           </p>
         </div>
         {tab === 'properties' && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
-          >
+          <button onClick={() => setShowAddModal(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
             <Plus className="h-4 w-4" /> Add property
           </button>
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 border-b border-border">
         {([
           { key: 'properties', label: 'Properties' },
-          { key: 'leads',      label: `Demo Requests${leads.length ? ` (${leads.length})` : ''}` },
+          { key: 'leads', label: `Demo Requests${leads.length ? ` (${leads.length})` : ''}` },
         ] as { key: Tab; label: string }[]).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${
-              tab === key
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
+          <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             {label}
           </button>
         ))}
       </div>
 
-      {/* Tab content */}
       {tab === 'properties' ? <PropertiesTab /> : <LeadsTab />}
 
       {showAddModal && <AddPropertyModal onClose={() => setShowAddModal(false)} />}
