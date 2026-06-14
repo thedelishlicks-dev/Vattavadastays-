@@ -75,6 +75,7 @@ export interface Booking {
   advance_amount: number;
   discount_amount: number;
   discount_reason?: string;
+  group_id?: string;
   status: BookingStatus;
   payment_method?: string;
   payment_reference?: string;
@@ -92,4 +93,26 @@ export interface BookingCharge {
   qty: number;
   unit_price: number;
   created_at: string;
+}
+export interface BookingGroup {
+  id: string;
+  property_id: string;
+  group_reference: string;
+  guest_name: string;
+  guest_phone: string;
+  guest_email?: string;
+  check_in: string;
+  check_out: string;
+  guest_count: number;
+  total_amount: number;
+  advance_amount: number;
+  discount_amount: number;
+  discount_reason?: string;
+  status: BookingStatus;
+  payment_method?: string;
+  payment_reference?: string;
+  is_paid: boolean;
+  created_at: string;
+  // joined
+  bookings?: Booking[];
 }
