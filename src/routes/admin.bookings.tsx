@@ -1,4 +1,4 @@
- import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Search, Plus, Loader2, X, IndianRupee, Utensils, MessageCircle, Check, LogOut,
@@ -7,7 +7,10 @@ import {
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
-import { useBookingCharges, useAddCharge, useDeleteCharge } from "@/hooks/useBookingCharges";
+import {
+  useBookingCharges, useAddCharge, useDeleteCharge,
+  useGroupCharges, useAddGroupCharge, useDeleteGroupCharge,
+} from "@/hooks/useBookingCharges";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink } from "@/lib/whatsapp";
@@ -53,11 +56,77 @@ function StatusPill({ status }: { status: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Shared charges list component (used by both single + group)
+// ---------------------------------------------------------------------------
+
+function ChargesList({
+  charges, chargesTotal, onDelete, groupId, bookingId,
+}: {
+  charges: BookingCharge[];
+  chargesTotal: number;
+  onDelete: (id: string) => void;
+  groupId?: string;
+  bookingId?: string;
+}) {
+  const { mutateAsync: addCharge, isPending: adding } = groupId ? useAddGroupCharge() : useAddCharge();
+  const [desc, setDesc] = useState(""); const [qty, setQty] = useState("1"); const [price, setPrice] = useState(""); const [error, setError] = useState("");
+
+  const handleAdd = async () => {
+    if (!desc.trim()) { setError("Description required"); return; }
+    const q = parseFloat(qty); const p = parseFloat(price);
+    if (!q || q <= 0 || !p || p < 0) { setError("Valid qty and price required"); return; }
+    setError("");
+    try {
+      if (groupId) {
+        await (addCharge as ReturnType<typeof useAddGroupCharge>["mutateAsync"])({ group_id: groupId, description: desc, qty: q, unit_price: p });
+      } else if (bookingId) {
+        await (addCharge as ReturnType<typeof useAddCharge>["mutateAsync"])({ booking_id: bookingId, description: desc, qty: q, unit_price: p });
+      }
+      setDesc(""); setQty("1"); setPrice("");
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed"); }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
+        <div className="flex flex-wrap gap-1.5">
+          {CHARGE_PRESETS.map((p) => <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors">{p.description} · ₹{p.unit_price}</button>)}
+        </div>
+      </div>
+      <div className="rounded-xl border border-border p-3 space-y-2">
+        <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
+        <div className="flex gap-2">
+          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
+          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
+          <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">{adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add</button>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+      </div>
+      {charges.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground"><Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />No extra charges yet</div>
+      ) : (
+        <div className="space-y-2">
+          {charges.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3">
+              <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{c.description}</div><div className="text-xs text-muted-foreground mt-0.5">{c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}</div></div>
+              <div className="font-semibold text-sm shrink-0">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</div>
+              <button onClick={() => onDelete(c.id)} className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+          <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100"><span className="text-sm text-amber-800">Extras total</span><span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Add Multi-Room Booking Modal
 // ---------------------------------------------------------------------------
 
 function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propertyId: string; rooms: { id: string; name: string; base_price: number; extra_guest_price: number }[]; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ guest_name: "", guest_phone: "+91 ", guest_email: "", check_in: "", check_out: "", guest_count: 2, status: "confirmed" as BookingStatus });
+  const [form, setForm] = useState({ guest_name: "", guest_phone: "+91 ", guest_email: "", check_in: "", check_out: "", guest_count: 2 as number | string, status: "confirmed" as BookingStatus });
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -70,20 +139,16 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
   }, [form.check_in, form.check_out]);
 
   const toggleRoom = (roomId: string) => {
-    setSelectedRoomIds((prev) =>
-      prev.includes(roomId)
-        ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev
-        : [...prev, roomId]
-    );
+    setSelectedRoomIds((prev) => prev.includes(roomId) ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev : [...prev, roomId]);
   };
 
+  const guestCount = Number(form.guest_count) || 1;
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
-
   const roomTotals = useMemo(() => selectedRooms.map((r) => {
     const base = r.base_price * nights;
-    const extra = Math.max(0, form.guest_count - 2) * (r.extra_guest_price ?? 0) * nights;
+    const extra = Math.max(0, guestCount - 2) * (r.extra_guest_price ?? 0) * nights;
     return { room: r, roomPrice: base, extraCharge: extra, total: base + extra };
-  }), [selectedRooms, nights, form.guest_count]);
+  }), [selectedRooms, nights, guestCount]);
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
 
@@ -91,59 +156,23 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
-    setSaving(true);
-    setError("");
+    setSaving(true); setError("");
     try {
       if (selectedRoomIds.length === 1) {
-        // Single room — create a plain booking, no group needed
         const rt = roomTotals[0];
-        const { error: err } = await supabase.from("bookings").insert({
-          property_id: propertyId, room_id: rt.room.id,
-          guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: form.guest_count,
-          check_in: form.check_in, check_out: form.check_out,
-          room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total, advance_amount: 0, discount_amount: 0,
-          status: form.status, is_paid: false,
-        });
+        const { error: err } = await supabase.from("bookings").insert({ property_id: propertyId, room_id: rt.room.id, guest_name: form.guest_name, guest_phone: form.guest_phone, guest_email: form.guest_email || null, guest_count: guestCount, check_in: form.check_in, check_out: form.check_out, room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge, total_amount: rt.total, advance_amount: 0, discount_amount: 0, status: form.status, is_paid: false });
         if (err) throw err;
       } else {
-        // Multiple rooms — create booking_group first then individual bookings
-        const { data: groupData, error: groupErr } = await supabase
-          .from("booking_groups")
-          .insert({
-            property_id: propertyId,
-            group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
-            guest_name: form.guest_name, guest_phone: form.guest_phone,
-            guest_email: form.guest_email || null, guest_count: form.guest_count,
-            check_in: form.check_in, check_out: form.check_out,
-            total_amount: grandTotal, advance_amount: 0, discount_amount: 0,
-            status: form.status, is_paid: false,
-          })
-          .select()
-          .single();
+        const { data: groupData, error: groupErr } = await supabase.from("booking_groups").insert({ property_id: propertyId, group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(), guest_name: form.guest_name, guest_phone: form.guest_phone, guest_email: form.guest_email || null, guest_count: guestCount, check_in: form.check_in, check_out: form.check_out, total_amount: grandTotal, advance_amount: 0, discount_amount: 0, status: form.status, is_paid: false }).select().single();
         if (groupErr) throw groupErr;
-
-        const bookingInserts = roomTotals.map((rt) => ({
-          property_id: propertyId, room_id: rt.room.id,
-          guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: form.guest_count,
-          check_in: form.check_in, check_out: form.check_out,
-          room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total, advance_amount: 0, discount_amount: 0,
-          status: form.status, is_paid: false, group_id: groupData.id,
-        }));
+        const bookingInserts = roomTotals.map((rt) => ({ property_id: propertyId, room_id: rt.room.id, guest_name: form.guest_name, guest_phone: form.guest_phone, guest_email: form.guest_email || null, guest_count: guestCount, check_in: form.check_in, check_out: form.check_out, room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge, total_amount: rt.total, advance_amount: 0, discount_amount: 0, status: form.status, is_paid: false, group_id: groupData.id }));
         const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
         if (bookErr) throw bookErr;
       }
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
       onSaved();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
   };
 
   return (
@@ -155,8 +184,6 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
           <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-
-          {/* Guest details */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest details</p>
             <div className="grid grid-cols-2 gap-3">
@@ -165,8 +192,6 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
             </div>
             <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
           </div>
-
-          {/* Dates */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
             <div className="grid grid-cols-2 gap-3">
@@ -174,17 +199,16 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
               <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", parseInt(e.target.value) || 1)} className={inputCls} /></div>
+              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
               <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
             </div>
           </div>
-
-          {/* Room selection */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
             <div className="space-y-2">
               {rooms.map((r) => {
                 const selected = selectedRoomIds.includes(r.id);
+                const roomTotal = nights > 0 ? (r.base_price + Math.max(0, guestCount - 2) * r.extra_guest_price) * nights : 0;
                 return (
                   <button key={r.id} type="button" onClick={() => toggleRoom(r.id)} className={["w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all", selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"].join(" ")}>
                     <div className={["h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors", selected ? "border-primary bg-primary" : "border-border"].join(" ")}>
@@ -194,35 +218,22 @@ function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: { propert
                       <div className="text-sm font-medium truncate">{r.name}</div>
                       <div className="text-xs text-muted-foreground">₹{r.base_price.toLocaleString("en-IN")}/night{r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}</div>
                     </div>
-                    {selected && nights > 0 && (
-                      <div className="text-sm font-semibold text-primary shrink-0">₹{((r.base_price + Math.max(0, form.guest_count - 2) * r.extra_guest_price) * nights).toLocaleString("en-IN")}</div>
-                    )}
+                    {selected && nights > 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
                   </button>
                 );
               })}
             </div>
           </div>
-
-          {/* Summary */}
           {nights > 0 && selectedRooms.length > 0 && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
               {roomTotals.map((rt) => (
-                <div key={rt.room.id} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground truncate mr-2">{rt.room.name}</span>
-                  <span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span>
-                </div>
+                <div key={rt.room.id} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{rt.room.name}</span><span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span></div>
               ))}
-              {selectedRooms.length > 1 && (
-                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1">
-                  <span>Total</span>
-                  <span>₹{grandTotal.toLocaleString("en-IN")}</span>
-                </div>
-              )}
+              {selectedRooms.length > 1 && <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>}
             </div>
           )}
         </div>
-
         <div className="px-5 py-4 border-t border-border space-y-2">
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2">
@@ -251,7 +262,6 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
 
   return (
     <div className="bg-card border border-primary/20 rounded-2xl overflow-hidden shadow-sm">
-      {/* Group header — tappable to open detail */}
       <button onClick={onClick} className="w-full text-left p-4 hover:bg-muted/30 transition-colors group">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
@@ -282,8 +292,6 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
           ) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>}
         </div>
       </button>
-
-      {/* Expandable room list */}
       <div className="border-t border-border">
         <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
           <span>{expanded ? "Hide" : "Show"} {bookings.length} rooms</span>
@@ -293,10 +301,7 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
           <div className="px-4 pb-3 space-y-2">
             {bookings.map((b) => (
               <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                <div className="flex items-center gap-2">
-                  <BedDouble className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span>
-                </div>
+                <div className="flex items-center gap-2"><BedDouble className="h-3.5 w-3.5 text-muted-foreground shrink-0" /><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span></div>
                 <span className="text-muted-foreground">₹{Number(b.total_amount).toLocaleString("en-IN")}</span>
               </div>
             ))}
@@ -308,25 +313,31 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
 }
 
 // ---------------------------------------------------------------------------
-// Group booking detail modal
+// Group booking detail modal — with Charges + Invoice tabs
 // ---------------------------------------------------------------------------
 
+type GroupModalTab = "overview" | "charges" | "invoice";
+
 function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefresh }: { group: BookingGroup; roomNameMap: Record<string, string>; property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onRefresh: () => void }) {
+  const [tab, setTab] = useState<GroupModalTab>("overview");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const queryClient = useQueryClient();
+  const { data: charges = [] } = useGroupCharges(group.id);
+  const { mutateAsync: deleteGroupCharge } = useDeleteGroupCharge();
+
   const bookings = group.bookings ?? [];
   const discount = Number(group.discount_amount ?? 0);
   const advance = Number(group.advance_amount ?? 0);
-  const balance = Math.max(0, Number(group.total_amount) - discount - advance);
+  const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+  const balance = Math.max(0, Number(group.total_amount) + chargesTotal - discount - advance);
   const ownerPhone = property?.owner_phone ?? "";
+  const canAct = !["cancelled", "completed"].includes(group.status);
 
   const handleStatus = async (status: string) => {
     setUpdatingStatus(true);
-    // Update group status
     await supabase.from("booking_groups").update({ status }).eq("id", group.id);
-    // Update all individual bookings in the group
     await supabase.from("bookings").update({ status }).eq("group_id", group.id);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
@@ -336,12 +347,10 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
 
   const handleSavePayment = async (amount: number, method: string, ref: string) => {
     const newAdvance = advance + amount;
-    const isPaid = newAdvance >= Number(group.total_amount) - discount;
+    const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
     const newStatus = group.status === "pending" ? "confirmed" : group.status;
     await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus }).eq("id", group.id);
-    if (newStatus !== group.status) {
-      await supabase.from("bookings").update({ status: newStatus }).eq("group_id", group.id);
-    }
+    if (newStatus !== group.status) await supabase.from("bookings").update({ status: newStatus }).eq("group_id", group.id);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     onRefresh();
@@ -355,7 +364,24 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     setShowDiscountForm(false);
   };
 
-  const canAct = !["cancelled", "completed"].includes(group.status);
+  // Build a fake booking-like object for BookingInvoice
+  const invoiceBooking = {
+    ...bookings[0],
+    guest_name: group.guest_name,
+    guest_phone: group.guest_phone,
+    guest_email: group.guest_email,
+    check_in: group.check_in,
+    check_out: group.check_out,
+    guest_count: group.guest_count,
+    total_amount: group.total_amount,
+    advance_amount: group.advance_amount,
+    discount_amount: group.discount_amount,
+    discount_reason: group.discount_reason,
+    payment_method: group.payment_method,
+    payment_reference: group.payment_reference,
+    is_paid: group.is_paid,
+    status: group.status,
+  } as Booking;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
@@ -370,10 +396,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                 <h2 className="font-display text-lg font-semibold">{group.guest_name}</h2>
                 <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span>
               </div>
-              <div className="flex items-center gap-2 mt-1">
-                <StatusPill status={group.status} />
-                <span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span>
-              </div>
+              <div className="flex items-center gap-2 mt-1"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span></div>
             </div>
             <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button>
           </div>
@@ -381,81 +404,117 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
             {group.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updatingStatus} icon={<Check className="h-3.5 w-3.5" />} label="Confirm all" color="green" />}
             {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
             {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
+            {group.guest_phone && <a href={`https://wa.me/${group.guest_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>}
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Stay details */}
-          <Section title="Stay details">
-            <Row label="Check-in" value={group.check_in} />
-            <Row label="Check-out" value={group.check_out} />
-            <Row label="Guests" value={`${group.guest_count}`} />
-            {group.guest_phone && <Row label="Phone" value={group.guest_phone} />}
-            {group.guest_email && <Row label="Email" value={group.guest_email} />}
-          </Section>
+        {/* Tabs */}
+        <div className="flex border-b border-border px-5">
+          {([
+            { key: "overview", label: "Overview" },
+            { key: "charges", label: "Charges" },
+            { key: "invoice", label: "Invoice" },
+          ] as { key: GroupModalTab; label: string }[]).map((t) => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
+              {t.label}
+              {t.key === "charges" && charges.length > 0 && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>}
+            </button>
+          ))}
+        </div>
 
-          {/* Rooms breakdown */}
-          <Section title={`Rooms (${bookings.length})`}>
-            {bookings.map((b, i) => (
-              <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span>
-                  <span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-0.5">{b.nights} night{b.nights > 1 ? "s" : ""} · <StatusPill status={b.status} /></div>
-              </div>
-            ))}
-          </Section>
+        <div className="flex-1 overflow-y-auto">
+          {tab === "overview" && (
+            <div className="p-5 space-y-4">
+              <Section title="Stay details">
+                <Row label="Check-in" value={group.check_in} />
+                <Row label="Check-out" value={group.check_out} />
+                <Row label="Guests" value={`${group.guest_count}`} />
+                {group.guest_phone && <Row label="Phone" value={group.guest_phone} />}
+                {group.guest_email && <Row label="Email" value={group.guest_email} />}
+              </Section>
 
-          {/* Payment summary */}
-          <Section title="Payment summary">
-            <Row label="Rooms total" value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`} />
-            {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
-            {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
-            {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
-            <div className="border-t border-border pt-2 mt-1">
-              <Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold />
+              <Section title={`Rooms (${bookings.length})`}>
+                {bookings.map((b, i) => (
+                  <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
+                    <div className="flex justify-between text-sm"><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>{b.nights} night{b.nights > 1 ? "s" : ""}</span><StatusPill status={b.status} /></div>
+                  </div>
+                ))}
+              </Section>
+
+              <Section title="Payment summary">
+                <Row label="Rooms total" value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`} />
+                {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
+                {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
+                {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
+                {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
+                <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
+              </Section>
+
+              {canAct && !showDiscountForm && !showPaymentForm && (
+                <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2">
+                  <Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}
+                </button>
+              )}
+              {showDiscountForm && <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />}
+
+              {!showPaymentForm && !showDiscountForm && balance > 0 && (
+                <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
+                  <IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}
+                </button>
+              )}
+              {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
+              {showPaymentForm && <GroupPaymentForm group={group} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />}
+
+              {group.guest_phone && (
+                <Section title="Send to guest">
+                  <div className="space-y-2">
+                    <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone })} label="💰 Payment reminder" />
+                    <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
+                  </div>
+                </Section>
+              )}
+
+              {canAct && <GroupCancelButton groupId={group.id} onCancelled={() => { onRefresh(); onClose(); }} />}
             </div>
-          </Section>
-
-          {/* Discount */}
-          {canAct && !showDiscountForm && !showPaymentForm && (
-            <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2">
-              <Tag className="h-4 w-4" />
-              {discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}
-            </button>
-          )}
-          {showDiscountForm && (
-            <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />
           )}
 
-          {/* Payment */}
-          {!showPaymentForm && !showDiscountForm && balance > 0 && (
-            <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
-              <IndianRupee className="h-4 w-4" />
-              {advance > 0 ? "Record part payment" : "Record advance payment"}
-            </button>
-          )}
-          {!showPaymentForm && !showDiscountForm && balance === 0 && (
-            <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>
-          )}
-          {showPaymentForm && (
-            <GroupPaymentForm group={group} advance={advance} discount={discount} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />
-          )}
-
-          {/* WhatsApp */}
-          {group.guest_phone && (
-            <Section title="Send to guest">
-              <div className="space-y-2">
-                <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone })} label="💰 Payment reminder" />
-                <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
+          {tab === "charges" && (
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Rooms</div><div className="font-semibold text-sm mt-0.5">₹{Number(group.total_amount).toLocaleString("en-IN")}</div></div>
+                <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
+                <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
               </div>
-            </Section>
+              {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
+              <ChargesList
+                charges={charges}
+                chargesTotal={chargesTotal}
+                groupId={group.id}
+                onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })}
+              />
+            </div>
           )}
 
-          {/* Cancel group */}
-          {canAct && (
-            <GroupCancelButton groupId={group.id} onCancelled={() => { onRefresh(); onClose(); }} />
+          {tab === "invoice" && (
+            <div className="p-5">
+              <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Group booking · {group.group_reference}</p>
+                {bookings.map((b) => (
+                  <div key={b.id} className="flex justify-between text-sm"><span className="text-muted-foreground">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
+                ))}
+              </div>
+              <BookingInvoice
+                booking={invoiceBooking}
+                roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")}
+                property={property ?? null}
+                charges={charges}
+                chargesTotal={chargesTotal}
+                advance={advance}
+                balance={balance}
+                guestView={false}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -477,7 +536,7 @@ function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: Book
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
       <div className="text-sm font-medium text-green-900">{discount > 0 ? "Edit discount" : "Add discount"}</div>
       <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 1000" autoFocus /></div>
-      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Regular guest" /></div>
+      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Group booking" /></div>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
@@ -487,15 +546,16 @@ function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: Book
   );
 }
 
-function GroupPaymentForm({ group, advance, discount, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; onSaved: (amount: number, method: string, ref: string) => void; onCancel: () => void }) {
+function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; chargesTotal: number; onSaved: (amount: number, method: string, ref: string) => void; onCancel: () => void }) {
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState(group.payment_method ?? "UPI");
   const [ref, setRef] = useState("");
   const [error, setError] = useState("");
   const newPayment = parseFloat(amount) || 0;
-  const maxAllowed = Math.max(0, Number(group.total_amount) - discount - advance);
+  const grandTotal = Number(group.total_amount) + chargesTotal;
+  const maxAllowed = Math.max(0, grandTotal - discount - advance);
   const newAdvance = advance + newPayment;
-  const bal = Math.max(0, Number(group.total_amount) - discount - newAdvance);
+  const bal = Math.max(0, grandTotal - discount - newAdvance);
   const handleSave = () => {
     if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     if (newPayment > maxAllowed) { setError(`Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
@@ -506,6 +566,7 @@ function GroupPaymentForm({ group, advance, discount, onSaved, onCancel }: { gro
       <div className="text-sm font-medium">{advance > 0 ? "Record part payment" : "Record advance payment"}</div>
       {advance > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Already recorded</span><span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span></div>}
       {discount > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Discount</span><span className="font-medium text-green-600">-₹{discount.toLocaleString("en-IN")}</span></div>}
+      {chargesTotal > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Extra charges</span><span className="font-medium text-amber-700">+₹{chargesTotal.toLocaleString("en-IN")}</span></div>}
       <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Remaining balance</span><span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span></div>
       <div><label className={labelCls}>Amount received (₹) *</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
       <div className="grid grid-cols-2 gap-2">
@@ -539,7 +600,7 @@ function GroupCancelButton({ groupId, onCancelled }: { groupId: string; onCancel
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel all rooms</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
-      <p className="text-sm text-destructive font-medium">Cancel all {`rooms`} in this booking? Cannot be undone.</p>
+      <p className="text-sm text-destructive font-medium">Cancel all rooms in this booking? Cannot be undone.</p>
       <div className="flex gap-2">
         <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button>
         <button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all</button>
@@ -549,7 +610,7 @@ function GroupCancelButton({ groupId, onCancelled }: { groupId: string; onCancel
 }
 
 // ---------------------------------------------------------------------------
-// Single booking card + detail modal (unchanged from before)
+// Single booking card + detail modal
 // ---------------------------------------------------------------------------
 
 function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomName: string; onClick: () => void }) {
@@ -557,7 +618,6 @@ function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomNam
   const advance = Number(booking.advance_amount ?? 0);
   const balance = Math.max(0, Number(booking.total_amount) - discount - advance);
   const isActive = !["cancelled", "completed"].includes(booking.status);
-
   return (
     <button onClick={onClick} className="w-full text-left bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/30 transition-all active:scale-[0.99] group">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -565,10 +625,7 @@ function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomNam
           <div className="font-semibold text-foreground truncate">{booking.guest_name}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{booking.guest_phone || <span className="italic text-amber-600">No phone — tap to edit</span>}</div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <StatusPill status={booking.status} />
-          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-        </div>
+        <div className="flex items-center gap-2 shrink-0"><StatusPill status={booking.status} /><ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /></div>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><BedDouble className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{roomName}</span></div>
@@ -579,10 +636,7 @@ function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomNam
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <div className="text-xs text-muted-foreground">Total <span className="font-semibold text-foreground">₹{(Number(booking.total_amount) - discount).toLocaleString("en-IN")}</span>{discount > 0 && <span className="ml-1.5 text-green-600 font-medium">-₹{discount.toLocaleString("en-IN")} disc</span>}</div>
         {isActive && (advance > 0 ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
-            {balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
-          </div>
+          <div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>
         ) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
       </div>
       {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (
@@ -600,13 +654,13 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
   const [showEditGuest, setShowEditGuest] = useState(false);
   const [showEditStay, setShowEditStay] = useState(false);
   const { data: charges = [] } = useBookingCharges(booking.id);
+  const { mutateAsync: deleteCharge } = useDeleteCharge();
   const discount = Number(booking.discount_amount ?? 0);
   const advance = Number(booking.advance_amount ?? 0);
   const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
   const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
   const ownerPhone = property?.owner_phone ?? "";
-  const lat = property?.location_lat;
-  const lng = property?.location_lng;
+  const lat = property?.location_lat; const lng = property?.location_lng;
   const canEditStay = !["completed", "cancelled"].includes(booking.status);
   const upiId = (() => { const entry = (property?.shared_amenities ?? []).find((a) => a.startsWith("__upi:")); return entry ? decodeURIComponent(entry.slice("__upi:".length)) : undefined; })();
   const handleStatus = async (status: string) => { setUpdating(true); await onStatusChange(booking.id, status); setUpdating(false); };
@@ -619,10 +673,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
           <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
           <div className="px-5 pt-3 pb-4 border-b border-border">
             <div className="flex items-start justify-between">
-              <div>
-                <h2 className="font-display text-lg font-semibold">{booking.guest_name}</h2>
-                <div className="flex items-center gap-2 mt-1"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div>
-              </div>
+              <div><h2 className="font-display text-lg font-semibold">{booking.guest_name}</h2><div className="flex items-center gap-2 mt-1"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div></div>
               <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button>
             </div>
             <div className="flex gap-2 mt-3 flex-wrap">
@@ -644,7 +695,17 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
           </div>
           <div className="flex-1 overflow-y-auto">
             {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
-            {tab === "charges" && <ChargesTab booking={booking} charges={charges} chargesTotal={chargesTotal} discount={discount} advance={advance} balance={balance} />}
+            {tab === "charges" && (
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Room</div><div className="font-semibold text-sm mt-0.5">₹{Number(booking.total_amount).toLocaleString("en-IN")}</div></div>
+                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
+                  <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
+                </div>
+                {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
+                <ChargesList charges={charges} chargesTotal={chargesTotal} bookingId={booking.id} onDelete={(id) => deleteCharge({ id, bookingId: booking.id })} />
+              </div>
+            )}
             {tab === "invoice" && <div className="p-5"><BookingInvoice booking={booking} roomName={roomName} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} /></div>}
           </div>
         </div>
@@ -661,16 +722,15 @@ function ActionChip({ onClick, loading, icon, label, color }: { onClick: () => v
 }
 
 function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ guest_name: booking.guest_name ?? "", guest_phone: booking.guest_phone ?? "", guest_email: booking.guest_email ?? "", guest_count: booking.guest_count });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [form, setForm] = useState({ guest_name: booking.guest_name ?? "", guest_phone: booking.guest_phone ?? "", guest_email: booking.guest_email ?? "", guest_count: booking.guest_count as number | string });
+  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const handleSave = async () => {
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
     setSaving(true); setError("");
     try {
-      const { error: err } = await supabase.from("bookings").update({ guest_name: form.guest_name.trim(), guest_phone: form.guest_phone.trim(), guest_email: form.guest_email.trim() || null, guest_count: form.guest_count }).eq("id", booking.id);
+      const { error: err } = await supabase.from("bookings").update({ guest_name: form.guest_name.trim(), guest_phone: (form.guest_phone as string).trim(), guest_email: (form.guest_email as string).trim() || null, guest_count: Number(form.guest_count) || 1 }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onSaved();
@@ -681,20 +741,14 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{booking.id.slice(0, 8).toUpperCase()}</p></div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{booking.id.slice(0, 8).toUpperCase()}</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-5 space-y-3">
           <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
           <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
           <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
-          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", parseInt(e.target.value) || 1)} className={inputCls} /></div>
+          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
           {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button>
-          </div>
+          <div className="flex gap-2 pt-1"><button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
         </div>
       </div>
     </div>
@@ -702,20 +756,20 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
 }
 
 function EditStayModal({ booking, rooms, onClose, onSaved }: { booking: Booking; rooms: { id: string; name: string; base_price: number; extra_guest_price: number }[]; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ room_id: booking.room_id ?? rooms[0]?.id ?? "", check_in: booking.check_in ?? "", check_out: booking.check_out ?? "", guest_count: booking.guest_count });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [form, setForm] = useState({ room_id: booking.room_id ?? rooms[0]?.id ?? "", check_in: booking.check_in ?? "", check_out: booking.check_out ?? "", guest_count: booking.guest_count as number | string });
+  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
-  const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out).getTime() - new Date(form.check_in).getTime()) / 86400000); }, [form.check_in, form.check_out]);
+  const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
-  const newTotal = useMemo(() => { if (!selectedRoom || nights === 0) return 0; return (selectedRoom.base_price + Math.max(0, form.guest_count - 2) * (selectedRoom.extra_guest_price ?? 0)) * nights; }, [selectedRoom, nights, form.guest_count]);
-  const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || form.guest_count !== booking.guest_count;
+  const guestCount = Number(form.guest_count) || 1;
+  const newTotal = useMemo(() => { if (!selectedRoom || nights === 0) return 0; return (selectedRoom.base_price + Math.max(0, guestCount - 2) * (selectedRoom.extra_guest_price ?? 0)) * nights; }, [selectedRoom, nights, guestCount]);
+  const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
   const handleSave = async () => {
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     setSaving(true); setError("");
     try {
-      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: form.guest_count, room_price: (selectedRoom?.base_price ?? 0) * nights, extra_guest_charge: Math.max(0, form.guest_count - 2) * (selectedRoom?.extra_guest_price ?? 0) * nights, total_amount: newTotal }).eq("id", booking.id);
+      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: (selectedRoom?.base_price ?? 0) * nights, extra_guest_charge: Math.max(0, guestCount - 2) * (selectedRoom?.extra_guest_price ?? 0) * nights, total_amount: newTotal }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onSaved();
@@ -726,21 +780,15 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: { booking: Booking;
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div><h2 className="font-display text-base font-semibold">Edit Stay Details</h2><p className="text-xs text-muted-foreground mt-0.5">Total will be recalculated</p></div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Stay Details</h2><p className="text-xs text-muted-foreground mt-0.5">Total will be recalculated</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-5 space-y-3">
           <div><label className={labelCls}>Room</label><select value={form.room_id} onChange={(e) => set("room_id", e.target.value)} className={inputCls}>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night</option>)}</select></div>
-          <div className="grid grid-cols-2 gap-3"><div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div><div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div></div>
-          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", parseInt(e.target.value) || 1)} className={inputCls} /></div>
-          {nights > 0 && selectedRoom && <div className="rounded-xl border border-border p-3 flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · {form.guest_count} guests</span><span className="font-semibold text-primary">₹{newTotal.toLocaleString("en-IN")}</span></div>}
+          <div className="grid grid-cols-2 gap-3"><div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in as string} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div><div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out as string} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div></div>
+          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+          {nights > 0 && selectedRoom && <div className="rounded-xl border border-border p-3 flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · {guestCount} guests</span><span className="font-semibold text-primary">₹{newTotal.toLocaleString("en-IN")}</span></div>}
           {Number(booking.advance_amount) > 0 && hasChanges && nights > 0 && <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">⚠️ Advance of ₹{Number(booking.advance_amount).toLocaleString("en-IN")} already recorded. New balance will be ₹{Math.max(0, newTotal - Number(booking.discount_amount ?? 0) - Number(booking.advance_amount)).toLocaleString("en-IN")}.</div>}
           {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving || !hasChanges} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save changes</button>
-          </div>
+          <div className="flex gap-2 pt-1"><button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving || !hasChanges} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save changes</button></div>
         </div>
       </div>
     </div>
@@ -748,52 +796,34 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: { booking: Booking;
 }
 
 function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booking; discount: number; onSaved: () => void; onCancel: () => void }) {
-  const [amount, setAmount] = useState(discount > 0 ? String(discount) : "");
-  const [reason, setReason] = useState(booking.discount_reason ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [amount, setAmount] = useState(discount > 0 ? String(discount) : ""); const [reason, setReason] = useState(booking.discount_reason ?? ""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const handleSave = async () => {
     const amt = parseFloat(amount) || 0;
-    if (amt < 0) { setError("Cannot be negative"); return; }
-    if (amt > Number(booking.total_amount)) { setError("Cannot exceed total"); return; }
+    if (amt < 0) { setError("Cannot be negative"); return; } if (amt > Number(booking.total_amount)) { setError("Cannot exceed total"); return; }
     setSaving(true); setError("");
-    try {
-      const { error: err } = await supabase.from("bookings").update({ discount_amount: amt, discount_reason: reason.trim() || null }).eq("id", booking.id);
-      if (err) throw err;
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-      onSaved();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    try { const { error: err } = await supabase.from("bookings").update({ discount_amount: amt, discount_reason: reason.trim() || null }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
   };
   const handleRemove = async () => { setSaving(true); await supabase.from("bookings").update({ discount_amount: 0, discount_reason: null }).eq("id", booking.id); queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
       <div className="text-sm font-medium text-green-900">{discount > 0 ? "Edit discount" : "Add discount"}</div>
       <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} max={Number(booking.total_amount)} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 500" autoFocus /></div>
-      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Regular guest, Long stay" /></div>
+      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Regular guest" /></div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2">
-        {discount > 0 && <button onClick={handleRemove} disabled={saving} className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50">Remove</button>}
-        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
-        <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button>
-      </div>
+      <div className="flex gap-2">{discount > 0 && <button onClick={handleRemove} disabled={saving} className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50">Remove</button>}<button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
     </div>
   );
 }
 
 function OverviewTab({ booking, roomName, property, advance, discount, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: { booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string; upiId?: string }) {
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
-  const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false); const [showDiscountForm, setShowDiscountForm] = useState(false);
   return (
     <div className="p-5 space-y-4">
       <Section title="Stay details">
-        <Row label="Room" value={roomName} />
-        <Row label="Check-in" value={booking.check_in} />
-        <Row label="Check-out" value={booking.check_out} />
-        <Row label="Nights" value={`${booking.nights}`} />
-        <Row label="Guests" value={`${booking.guest_count}`} />
-        {booking.guest_phone && <Row label="Phone" value={booking.guest_phone} />}
-        {booking.guest_email && <Row label="Email" value={booking.guest_email} />}
+        <Row label="Room" value={roomName} /><Row label="Check-in" value={booking.check_in} /><Row label="Check-out" value={booking.check_out} /><Row label="Nights" value={`${booking.nights}`} /><Row label="Guests" value={`${booking.guest_count}`} />
+        {booking.guest_phone && <Row label="Phone" value={booking.guest_phone} />}{booking.guest_email && <Row label="Email" value={booking.guest_email} />}
         {booking.payment_method && <Row label="Payment method" value={booking.payment_method} />}
         {booking.checked_in_at && <Row label="Checked in at" value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
         {booking.checked_out_at && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
@@ -806,9 +836,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
         {booking.payment_reference && <Row label="Reference" value={booking.payment_reference} small />}
         <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
       </Section>
-      {!showDiscountForm && !showPaymentForm && !["cancelled", "completed"].includes(booking.status) && (
-        <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>
-      )}
+      {!showDiscountForm && !showPaymentForm && !["cancelled", "completed"].includes(booking.status) && <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>}
       {showDiscountForm && <DiscountForm booking={booking} discount={discount} onSaved={() => { setShowDiscountForm(false); onPaymentSaved(); }} onCancel={() => setShowDiscountForm(false)} />}
       {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
       {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
@@ -829,43 +857,28 @@ function WALink({ href, label }: { href: string; label: string }) {
 }
 
 function CancelButton({ bookingId, onCancelled }: { bookingId: string; onCancelled: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false);
   const handleCancel = async () => { setLoading(true); await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId); onCancelled(); };
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel booking</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Are you sure? This cannot be undone.</p>
-      <div className="flex gap-2">
-        <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button>
-        <button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button>
-      </div>
+      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button></div>
     </div>
   );
 }
 
 function RecordPaymentForm({ booking, advance, discount, onSaved, onCancel }: { booking: Booking; advance: number; discount: number; onSaved: () => void; onCancel: () => void }) {
   const suggested = Math.round(Number(booking.total_amount) * 0.25);
-  const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState(booking.payment_method ?? "UPI");
-  const [ref, setRef] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [amount, setAmount] = useState(""); const [method, setMethod] = useState(booking.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient();
-  const newPayment = parseFloat(amount) || 0;
-  const newAdvanceTotal = advance + newPayment;
-  const maxAllowed = Math.max(0, Number(booking.total_amount) - discount - advance);
-  const bal = Math.max(0, Number(booking.total_amount) - discount - newAdvanceTotal);
+  const newPayment = parseFloat(amount) || 0; const newAdvanceTotal = advance + newPayment; const maxAllowed = Math.max(0, Number(booking.total_amount) - discount - advance); const bal = Math.max(0, Number(booking.total_amount) - discount - newAdvanceTotal);
   const handleSave = async () => {
     if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     if (newPayment > maxAllowed) { setError(maxAllowed <= 0 ? "Already fully paid" : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
     setSaving(true); setError("");
-    try {
-      const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= Number(booking.total_amount) - discount, status: booking.status === "pending" ? "confirmed" : booking.status }).eq("id", booking.id);
-      if (err) throw err;
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-      onSaved();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= Number(booking.total_amount) - discount, status: booking.status === "pending" ? "confirmed" : booking.status }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
+    catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
   };
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
@@ -875,86 +888,21 @@ function RecordPaymentForm({ booking, advance, discount, onSaved, onCancel }: { 
       <div className="text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 flex justify-between"><span>Suggested (25%)</span><span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span></div>
       <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Remaining balance</span><span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span></div>
       <div><label className={labelCls}>{advance > 0 ? "New payment (₹) *" : "Amount received (₹) *"}</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
-      <div className="grid grid-cols-2 gap-2">
-        <div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div>
-        <div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div>
-      </div>
+      <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvanceTotal.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button>
-        <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button>
-      </div>
-    </div>
-  );
-}
-
-function ChargesTab({ booking, charges, chargesTotal, discount, advance, balance }: { booking: Booking; charges: BookingCharge[]; chargesTotal: number; discount: number; advance: number; balance: number }) {
-  const { mutateAsync: addCharge, isPending: adding } = useAddCharge();
-  const { mutateAsync: deleteCharge } = useDeleteCharge();
-  const [desc, setDesc] = useState(""); const [qty, setQty] = useState("1"); const [price, setPrice] = useState(""); const [error, setError] = useState("");
-  const handleAdd = async () => {
-    if (!desc.trim()) { setError("Description required"); return; }
-    const q = parseFloat(qty); const p = parseFloat(price);
-    if (!q || q <= 0 || !p || p < 0) { setError("Valid qty and price required"); return; }
-    setError("");
-    try { await addCharge({ booking_id: booking.id, description: desc, qty: q, unit_price: p }); setDesc(""); setQty("1"); setPrice(""); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed"); }
-  };
-  return (
-    <div className="p-5 space-y-4">
-      <div className="grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Room</div><div className="font-semibold text-sm mt-0.5">₹{Number(booking.total_amount).toLocaleString("en-IN")}</div></div>
-        <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
-        <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
-      </div>
-      {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-      <div>
-        <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
-        <div className="flex flex-wrap gap-1.5">{CHARGE_PRESETS.map((p) => <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors">{p.description} · ₹{p.unit_price}</button>)}</div>
-      </div>
-      <div className="rounded-xl border border-border p-3 space-y-2">
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
-        <div className="flex gap-2">
-          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
-          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
-          <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">{adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add</button>
-        </div>
-        {error && <p className="text-xs text-destructive">{error}</p>}
-      </div>
-      {charges.length === 0 ? <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground"><Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />No extra charges yet</div> : (
-        <div className="space-y-2">
-          {charges.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3">
-              <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{c.description}</div><div className="text-xs text-muted-foreground mt-0.5">{c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}</div></div>
-              <div className="font-semibold text-sm shrink-0">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</div>
-              <button onClick={() => deleteCharge({ id: c.id, bookingId: booking.id })} className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
-            </div>
-          ))}
-          <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100"><span className="text-sm text-amber-800">Extras total</span><span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span></div>
-        </div>
-      )}
+      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{title}</div>
-      <div className="bg-muted/30 rounded-xl border border-border px-4 py-3 space-y-2">{children}</div>
-    </div>
-  );
+  return <div className="space-y-2"><div className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{title}</div><div className="bg-muted/30 rounded-xl border border-border px-4 py-3 space-y-2">{children}</div></div>;
 }
 
 function Row({ label, value, highlight, bold, small }: { label: string; value: string; highlight?: "green" | "amber"; bold?: boolean; small?: boolean }) {
   const valColor = highlight === "green" ? "text-primary" : highlight === "amber" ? "text-amber-700" : "text-foreground";
-  return (
-    <div className={`flex justify-between items-center ${small ? "text-xs" : "text-sm"}`}>
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`${valColor} ${bold ? "font-semibold" : "font-medium"}`}>{value}</span>
-    </div>
-  );
+  return <div className={`flex justify-between items-center ${small ? "text-xs" : "text-sm"}`}><span className="text-muted-foreground">{label}</span><span className={`${valColor} ${bold ? "font-semibold" : "font-medium"}`}>{value}</span></div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -973,19 +921,9 @@ function BookingsAdmin() {
   const [q, setQ] = useState("");
 
   const rooms = property?.rooms ?? [];
-  const roomNameMap = useMemo(() => {
-    const map: Record<string, string> = {};
-    rooms.forEach((r) => { map[r.id] = r.name; });
-    return map;
-  }, [rooms]);
+  const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; rooms.forEach((r) => { map[r.id] = r.name; }); return map; }, [rooms]);
 
-  // Standalone bookings — those not part of a group
-  const groupBookingIds = useMemo(() => {
-    const ids = new Set<string>();
-    groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id)));
-    return ids;
-  }, [groups]);
-
+  const groupBookingIds = useMemo(() => { const ids = new Set<string>(); groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id))); return ids; }, [groups]);
   const standaloneBookings = useMemo(() => bookings.filter((b) => !groupBookingIds.has(b.id)), [bookings, groupBookingIds]);
 
   const filteredStandalone = useMemo(() => standaloneBookings.filter((b) => {
@@ -1029,39 +967,24 @@ function BookingsAdmin() {
   };
 
   const isLoading = bookingsLoading || groupsLoading;
+  const totalItems = filteredGroups.length + filteredStandalone.length;
 
   if (isLoading) return <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;
-
-  const totalItems = filteredGroups.length + filteredStandalone.length;
 
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Bookings</h1>
-          <p className="text-sm text-muted-foreground">Tap any booking to view details.</p>
-        </div>
-        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
-          <Plus className="h-4 w-4" /> Add
-        </button>
+        <div><h1 className="font-display text-2xl md:text-3xl font-semibold">Bookings</h1><p className="text-sm text-muted-foreground">Tap any booking to view details.</p></div>
+        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"><Plus className="h-4 w-4" /> Add</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-primary" /></div>
-          <div><div className="text-xs text-muted-foreground">Active</div><div className="font-display text-2xl font-semibold">{stats.active}</div></div>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-amber-600" /></div>
-          <div><div className="text-xs text-muted-foreground">Outstanding</div><div className="font-display text-xl font-semibold text-amber-700">₹{stats.outstanding.toLocaleString("en-IN")}</div></div>
-        </div>
+        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-primary" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="font-display text-2xl font-semibold">{stats.active}</div></div></div>
+        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-amber-600" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="font-display text-xl font-semibold text-amber-700">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
       </div>
 
       <div className="space-y-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm" />
-        </div>
+        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm" /></div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((s) => (
             <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
@@ -1075,28 +998,14 @@ function BookingsAdmin() {
         <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">No bookings match these filters.</div>
       ) : (
         <div className="space-y-3">
-          {/* Group bookings first */}
-          {filteredGroups.map((g) => (
-            <GroupBookingCard key={g.id} group={g as BookingGroup} roomNameMap={roomNameMap} onClick={() => setActiveGroup(g as BookingGroup)} />
-          ))}
-          {/* Then standalone */}
-          {filteredStandalone.map((b) => (
-            <BookingCard key={b.id} booking={b as Booking} roomName={roomNameMap[b.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(b as Booking)} />
-          ))}
+          {filteredGroups.map((g) => <GroupBookingCard key={g.id} group={g as BookingGroup} roomNameMap={roomNameMap} onClick={() => setActiveGroup(g as BookingGroup)} />)}
+          {filteredStandalone.map((b) => <BookingCard key={b.id} booking={b as Booking} roomName={roomNameMap[b.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(b as Booking)} />)}
         </div>
       )}
 
-      {showAdd && property && (
-        <AddGroupBookingModal propertyId={property.id} rooms={rooms.filter((r) => r.is_active)} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />
-      )}
-
-      {activeBooking && (
-        <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms.filter((r) => r.is_active)} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleRefresh} />
-      )}
-
-      {activeGroup && (
-        <GroupBookingDetailModal group={activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} />
-      )}
+      {showAdd && property && <AddGroupBookingModal propertyId={property.id} rooms={rooms.filter((r) => r.is_active)} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
+      {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms.filter((r) => r.is_active)} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleRefresh} />}
+      {activeGroup && <GroupBookingDetailModal group={activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} />}
     </div>
   );
 }
