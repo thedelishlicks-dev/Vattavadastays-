@@ -1,5 +1,6 @@
 export type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
+
 export interface Property {
   id: string;
   owner_id: string;
@@ -35,6 +36,7 @@ export interface Property {
   billing_notes: string | null;
   subscription_end_date: string | null;
 }
+
 export interface Room {
   id: string;
   property_id: string;
@@ -51,6 +53,7 @@ export interface Room {
   is_active: boolean;
   created_at: string;
 }
+
 export interface Availability {
   room_id: string;
   date: string;
@@ -58,6 +61,7 @@ export interface Availability {
   price_override?: number;
   note?: string;
 }
+
 export interface Booking {
   id: string;
   property_id: string;
@@ -75,6 +79,7 @@ export interface Booking {
   advance_amount: number;
   discount_amount: number;
   discount_reason?: string;
+  group_id?: string;
   status: BookingStatus;
   payment_method?: string;
   payment_reference?: string;
@@ -84,12 +89,37 @@ export interface Booking {
   invoice_notes?: string;
   created_at: string;
 }
+
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
+
 export interface BookingCharge {
   id: string;
-  booking_id: string;
+  booking_id?: string;
+  group_id?: string;
   description: string;
   qty: number;
   unit_price: number;
   created_at: string;
+}
+
+export interface BookingGroup {
+  id: string;
+  property_id: string;
+  group_reference: string;
+  guest_name: string;
+  guest_phone: string;
+  guest_email?: string;
+  check_in: string;
+  check_out: string;
+  guest_count: number;
+  total_amount: number;
+  advance_amount: number;
+  discount_amount: number;
+  discount_reason?: string;
+  status: BookingStatus;
+  payment_method?: string;
+  payment_reference?: string;
+  is_paid: boolean;
+  created_at: string;
+  bookings?: Booking[];
 }
