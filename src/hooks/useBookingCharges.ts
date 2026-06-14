@@ -1,69 +1,93 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
-import type { BookingCharge } from "../types/database";
 
-export function useBookingCharges(bookingId: string) {
+// ── Single booking charges ──────────────────────────────────────────────────
+
+export const useBookingCharges = (bookingId: string) => {
   return useQuery({
-    queryKey: ["booking-charges", bookingId],
+    queryKey: ["bookingCharges", bookingId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking_charges")
         .select("*")
         .eq("booking_id", bookingId)
-        .order("created_at");
+        .order("created_at", { ascending: true });
       if (error) throw error;
-      return (data ?? []) as BookingCharge[];
+      return data ?? [];
     },
     enabled: !!bookingId,
   });
-}
+};
 
-export function useAddCharge() {
+export const useAddCharge = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (charge: {
-      booking_id: string;
-      description: string;
-      qty: number;
-      unit_price: number;
-    }) => {
+    mutationFn: async (charge: { booking_id: string; description: string; qty: number; unit_price: number }) => {
+      const { error } = await supabase.from("booking_charges").insert(charge);
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.booking_id], exact: false });
+    },
+  });
+};
+
+export const useDeleteCharge = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, bookingId }: { id: string; bookingId?: string; groupId?: string }) => {
+      const { error } = await supabase.from("booking_charges").delete().eq("id", id);
+      if (error) throw error;
+      return { id, bookingId };
+    },
+    onSuccess: (_data, variables) => {
+      if (variables.bookingId) queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.bookingId], exact: false });
+      if (variables.groupId) queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.groupId], exact: false });
+    },
+  });
+};
+
+// ── Group charges ───────────────────────────────────────────────────────────
+
+export const useGroupCharges = (groupId: string) => {
+  return useQuery({
+    queryKey: ["groupCharges", groupId],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("booking_charges")
-        .insert(charge)
-        .select()
-        .single();
+        .select("*")
+        .eq("group_id", groupId)
+        .order("created_at", { ascending: true });
       if (error) throw error;
-      return data as BookingCharge;
+      return data ?? [];
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["booking-charges", variables.booking_id],
-      });
-    },
+    enabled: !!groupId,
   });
-}
+};
 
-export function useDeleteCharge() {
+export const useAddGroupCharge = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      bookingId,
-    }: {
-      id: string;
-      bookingId: string;
-    }) => {
-      const { error } = await supabase
-        .from("booking_charges")
-        .delete()
-        .eq("id", id);
+    mutationFn: async (charge: { group_id: string; description: string; qty: number; unit_price: number }) => {
+      const { error } = await supabase.from("booking_charges").insert(charge);
       if (error) throw error;
-      return bookingId;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["booking-charges", variables.bookingId],
-      });
+      queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.group_id], exact: false });
     },
   });
-}
+};
+
+export const useDeleteGroupCharge = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, groupId }: { id: string; groupId: string }) => {
+      const { error } = await supabase.from("booking_charges").delete().eq("id", id);
+      if (error) throw error;
+      return { id, groupId };
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.groupId], exact: false });
+    },
+  });
+};
