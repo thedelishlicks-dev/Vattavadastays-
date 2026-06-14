@@ -18,18 +18,27 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
         .select("*")
         .eq("property_id", propertyId)
         .order("check_in", { ascending: false });
-
-      if (filters?.status) {
-        query = query.eq("status", filters.status);
-      }
-      if (filters?.from) {
-        query = query.gte("check_in", filters.from);
-      }
-      if (filters?.to) {
-        query = query.lte("check_in", filters.to);
-      }
-
+      if (filters?.status) query = query.eq("status", filters.status);
+      if (filters?.from) query = query.gte("check_in", filters.from);
+      if (filters?.to) query = query.lte("check_in", filters.to);
       const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!propertyId && isAuthenticated,
+  });
+};
+
+export const useBookingGroups = (propertyId: string) => {
+  const { isAuthenticated } = useAuth();
+  return useQuery({
+    queryKey: ["bookingGroups", propertyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("booking_groups")
+        .select("*, bookings(*)")
+        .eq("property_id", propertyId)
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
