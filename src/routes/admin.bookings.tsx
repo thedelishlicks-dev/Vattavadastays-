@@ -919,6 +919,7 @@ function BookingsAdmin() {
   const [activeGroup, setActiveGroup] = useState<BookingGroup | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [q, setQ] = useState("");
+  const [hideCancelled, setHideCancelled] = useState(true);
 
   const rooms = property?.rooms ?? [];
   const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; rooms.forEach((r) => { map[r.id] = r.name; }); return map; }, [rooms]);
@@ -927,16 +928,18 @@ function BookingsAdmin() {
   const standaloneBookings = useMemo(() => bookings.filter((b) => !groupBookingIds.has(b.id)), [bookings, groupBookingIds]);
 
   const filteredStandalone = useMemo(() => standaloneBookings.filter((b) => {
+    if (hideCancelled && b.status === "cancelled") return false;
     if (filterStatus !== "all" && b.status !== filterStatus) return false;
     if (q && !`${b.guest_name} ${b.guest_phone}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
-  }), [standaloneBookings, filterStatus, q]);
+  }), [standaloneBookings, filterStatus, q, hideCancelled]);
 
   const filteredGroups = useMemo(() => groups.filter((g) => {
+    if (hideCancelled && g.status === "cancelled") return false;
     if (filterStatus !== "all" && g.status !== filterStatus) return false;
     if (q && !`${g.guest_name} ${g.guest_phone}`.toLowerCase().includes(q.toLowerCase())) return false;
     return true;
-  }), [groups, filterStatus, q]);
+  }), [groups, filterStatus, q, hideCancelled]);
 
   const stats = useMemo(() => {
     const activeStandalone = standaloneBookings.filter((b) => !["cancelled", "completed"].includes(b.status));
@@ -992,6 +995,9 @@ function BookingsAdmin() {
             </button>
           ))}
         </div>
+        <button onClick={() => setHideCancelled((v) => !v)} className={["self-start text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", hideCancelled ? "bg-muted border-border text-muted-foreground" : "bg-red-50 border-red-200 text-red-600"].join(" ")}>
+          {hideCancelled ? "Show cancelled" : "Hide cancelled"}
+        </button>
       </div>
 
       {totalItems === 0 ? (
