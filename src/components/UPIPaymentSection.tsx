@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from 'lucide-react'
 import { buildUPILink } from '@/utils/upi'
 
@@ -32,13 +32,19 @@ export function UPIPaymentSection({
   const isFirstPayment = advancePaid === 0
   const remaining = totalAmount - advancePaid
 
-  const [selectedAmount, setSelectedAmount] = useState(
-    isFirstPayment ? Math.round(totalAmount * 0.25) : remaining
-  )
+  const defaultAmount = isFirstPayment ? Math.round(totalAmount * 0.25) : remaining
+
+  const [selectedAmount, setSelectedAmount] = useState(defaultAmount)
   const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Recomputed every time selectedAmount changes
+  // Reset selected amount whenever totalAmount or advancePaid changes
+  // This fixes the stale amount shown when re-opening the payment modal
+  useEffect(() => {
+    setSelectedAmount(isFirstPayment ? Math.round(totalAmount * 0.25) : remaining)
+    setShowWhatsAppPrompt(false)
+  }, [totalAmount, advancePaid])
+
   const upiLink = useMemo(() => buildUPILink({
     upiId,
     payeeName,
@@ -84,13 +90,11 @@ export function UPIPaymentSection({
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-[var(--shadow-soft)]">
-      {/* Header */}
       <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground font-medium">
         <IndianRupee className="h-3.5 w-3.5" />
         Pay via UPI
       </div>
 
-      {/* Amount chips — first payment only */}
       {isFirstPayment ? (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">Select advance amount:</p>
@@ -120,7 +124,6 @@ export function UPIPaymentSection({
         </div>
       )}
 
-      {/* Pay button — href always reflects current selectedAmount via useMemo */}
       <a
         href={upiLink}
         onClick={handleUPIClick}
@@ -132,11 +135,8 @@ export function UPIPaymentSection({
           : `Pay ₹${remaining.toLocaleString('en-IN')} balance via UPI`}
       </a>
 
-      {/* UPI ID copy fallback */}
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground text-center">
-          Or copy UPI ID and pay manually
-        </p>
+        <p className="text-xs text-muted-foreground text-center">Or copy UPI ID and pay manually</p>
         <div className="p-3 bg-muted/50 rounded-xl border border-border flex items-center justify-between gap-3">
           <code className="text-sm font-mono text-primary font-medium">{upiId}</code>
           <button
@@ -145,21 +145,14 @@ export function UPIPaymentSection({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-xs font-medium shrink-0"
           >
             {copied ? (
-              <>
-                <Check className="h-3.5 w-3.5 text-primary" />
-                Copied!
-              </>
+              <><Check className="h-3.5 w-3.5 text-primary" />Copied!</>
             ) : (
-              <>
-                <Copy className="h-3.5 w-3.5" />
-                Copy
-              </>
+              <><Copy className="h-3.5 w-3.5" />Copy</>
             )}
           </button>
         </div>
       </div>
 
-      {/* WhatsApp follow-up — appears only after Pay or Copy is tapped */}
       {showWhatsAppPrompt && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-3">
