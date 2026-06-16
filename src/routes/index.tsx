@@ -23,17 +23,12 @@ export const Route = createFileRoute("/")({
 function Index() {
   const hostname = window.location.hostname;
 
-  // If ?slug= is present (Vercel preview testing), always go to GuestPage
   const params = new URLSearchParams(window.location.search);
   const slugParam = params.get("slug");
   if (slugParam) {
     return <GuestPage subdomain={slugParam} />;
   }
 
-  // Check hostname directly — do NOT rely on getSubdomain() here because
-  // stayidom.in does not end with .stayidom.in, so getSubdomain() falls
-  // through to the VITE_PROPERTY_SUBDOMAIN env var and returns a property
-  // slug instead of indicating root domain.
   const isRootDomain =
     hostname === "stayidom.in" ||
     hostname === "www.stayidom.in" ||
@@ -61,23 +56,52 @@ function GuestPage({ subdomain }: { subdomain: string }) {
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
   const [openRoom, setOpenRoom] = useState<Room | null>(null);
-  const [selection, setSelection] = useState<BookingDetails | null>(null);
+
+  // Multi-room cart: list of confirmed room selections
+  const [selections, setSelections] = useState<BookingDetails[]>([]);
+
+  const handleRoomConfirm = (details: BookingDetails) => {
+    setSelections((prev) => {
+      // Replace if same room is already in cart, otherwise append
+      const exists = prev.findIndex((s) => s.room.id === details.room.id);
+      if (exists >= 0) {
+        const next = [...prev];
+        next[exists] = details;
+        return next;
+      }
+      return [...prev, details];
+    });
+    setOpenRoom(null);
+    // Scroll to booking form after a tick
+    setTimeout(() => {
+      document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
+
+  const handleRemoveRoom = (roomId: string) => {
+    setSelections((prev) => prev.filter((s) => s.room.id !== roomId));
+  };
+
+  // When dates change, clear the cart — room prices may differ
+  const handleSetCheckIn = (d: Date | null) => {
+    setCheckIn(d);
+    setSelections([]);
+  };
+  const handleSetCheckOut = (d: Date | null) => {
+    setCheckOut(d);
+    setSelections([]);
+  };
 
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <SeoTags subdomain={subdomain} />
-        <div className="text-sm text-muted-foreground animate-pulse">
-          Loading…
-        </div>
+        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
       </div>
     );
   }
 
-  if (
-    !isLoading &&
-    (!property || !property.rooms || property.rooms.length === 0)
-  ) {
+  if (!isLoading && (!property || !property.rooms || property.rooms.length === 0)) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <SeoTags subdomain={subdomain} />
@@ -95,8 +119,8 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   return (
     <div className="min-h-screen bg-background">
-      {subdomain === 'demo' && (
-        <div style={{ background: '#fef3c7', borderBottom: '1px solid #fcd34d', color: '#92400e', textAlign: 'center', fontSize: '13px', padding: '8px 16px' }}>
+      {subdomain === "demo" && (
+        <div style={{ background: "#fef3c7", borderBottom: "1px solid #fcd34d", color: "#92400e", textAlign: "center", fontSize: "13px", padding: "8px 16px" }}>
           You're viewing a demo — no real booking will be made.
         </div>
       )}
@@ -107,11 +131,20 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         <Availability
           checkIn={checkIn}
           checkOut={checkOut}
-          setCheckIn={setCheckIn}
-          setCheckOut={setCheckOut}
+          setCheckIn={handleSetCheckIn}
+          setCheckOut={handleSetCheckOut}
         />
-        <Rooms onSelect={setOpenRoom} checkIn={checkIn} checkOut={checkOut} />
-        <BookingForm selection={selection} subdomain={subdomain} />
+        <Rooms
+          onSelect={setOpenRoom}
+          checkIn={checkIn}
+          checkOut={checkOut}
+          selectedRoomIds={selections.map((s) => s.room.id)}
+        />
+        <BookingForm
+          selections={selections}
+          onRemoveRoom={handleRemoveRoom}
+          subdomain={subdomain}
+        />
         <About property={property} />
         <Amenities property={property} />
         <MapSection subdomain={subdomain} />
@@ -123,15 +156,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
           checkIn={checkIn}
           checkOut={checkOut}
           onClose={() => setOpenRoom(null)}
-          onConfirm={(details) => {
-            setSelection(details);
-            setOpenRoom(null);
-            setTimeout(() => {
-              document.getElementById("booking")?.scrollIntoView({
-                behavior: "smooth",
-              });
-            }, 50);
-          }}
+          onConfirm={handleRoomConfirm}
         />
       )}
     </div>
