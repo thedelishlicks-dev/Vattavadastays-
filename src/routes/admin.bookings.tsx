@@ -68,22 +68,44 @@ function ChargesList({
   groupId?: string;
   bookingId?: string;
 }) {
-  const { mutateAsync: addCharge, isPending: adding } = groupId ? useAddGroupCharge() : useAddCharge();
-  const [desc, setDesc] = useState(""); const [qty, setQty] = useState("1"); const [price, setPrice] = useState(""); const [error, setError] = useState("");
+  // NEVER call hooks conditionally — always call both, pick the right one
+  const groupChargeMutation = useAddGroupCharge();
+  const singleChargeMutation = useAddCharge();
+  const adding = groupId ? groupChargeMutation.isPending : singleChargeMutation.isPending;
+
+  const [desc, setDesc] = useState("");
+  const [qty, setQty] = useState("1");
+  const [price, setPrice] = useState("");
+  const [error, setError] = useState("");
 
   const handleAdd = async () => {
     if (!desc.trim()) { setError("Description required"); return; }
-    const q = parseFloat(qty); const p = parseFloat(price);
+    const q = parseFloat(qty);
+    const p = parseFloat(price);
     if (!q || q <= 0 || !p || p < 0) { setError("Valid qty and price required"); return; }
     setError("");
     try {
       if (groupId) {
-        await (addCharge as ReturnType<typeof useAddGroupCharge>["mutateAsync"])({ group_id: groupId, description: desc, qty: q, unit_price: p });
+        await groupChargeMutation.mutateAsync({
+          group_id: groupId,
+          description: desc,
+          qty: q,
+          unit_price: p,
+        });
       } else if (bookingId) {
-        await (addCharge as ReturnType<typeof useAddCharge>["mutateAsync"])({ booking_id: bookingId, description: desc, qty: q, unit_price: p });
+        await singleChargeMutation.mutateAsync({
+          booking_id: bookingId,
+          description: desc,
+          qty: q,
+          unit_price: p,
+        });
       }
-      setDesc(""); setQty("1"); setPrice("");
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Failed"); }
+      setDesc("");
+      setQty("1");
+      setPrice("");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to add charge");
+    }
   };
 
   return (
@@ -91,30 +113,78 @@ function ChargesList({
       <div>
         <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
         <div className="flex flex-wrap gap-1.5">
-          {CHARGE_PRESETS.map((p) => <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors">{p.description} · ₹{p.unit_price}</button>)}
+          {CHARGE_PRESETS.map((p) => (
+            <button
+              key={p.description}
+              onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }}
+              className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors"
+            >
+              {p.description} · ₹{p.unit_price}
+            </button>
+          ))}
         </div>
       </div>
       <div className="rounded-xl border border-border p-3 space-y-2">
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
+        <input
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          className={inputCls}
+          placeholder="Description e.g. Dinner"
+        />
         <div className="flex gap-2">
-          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
-          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
-          <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">{adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add</button>
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="Qty"
+          />
+          <input
+            type="number"
+            min={0}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="₹ Price"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0"
+          >
+            {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
+          </button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
       {charges.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground"><Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />No extra charges yet</div>
+        <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+          <Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />No extra charges yet
+        </div>
       ) : (
         <div className="space-y-2">
           {charges.map((c) => (
             <div key={c.id} className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3">
-              <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{c.description}</div><div className="text-xs text-muted-foreground mt-0.5">{c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}</div></div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">{c.description}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}
+                </div>
+              </div>
               <div className="font-semibold text-sm shrink-0">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</div>
-              <button onClick={() => onDelete(c.id)} className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() => onDelete(c.id)}
+                className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
-          <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100"><span className="text-sm text-amber-800">Extras total</span><span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span></div>
+          <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100">
+            <span className="text-sm text-amber-800">Extras total</span>
+            <span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span>
+          </div>
         </div>
       )}
     </div>
@@ -313,6 +383,89 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
 }
 
 // ---------------------------------------------------------------------------
+// Edit Group Guest Modal
+// ---------------------------------------------------------------------------
+
+function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    guest_name: group.guest_name ?? "",
+    guest_phone: group.guest_phone ?? "",
+    guest_email: group.guest_email ?? "",
+    guest_count: group.guest_count as number | string,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const { error: groupErr } = await supabase
+        .from("booking_groups")
+        .update({
+          guest_name: form.guest_name.trim(),
+          guest_phone: (form.guest_phone as string).trim(),
+          guest_email: (form.guest_email as string).trim() || null,
+          guest_count: Number(form.guest_count) || 1,
+        })
+        .eq("id", group.id);
+      if (groupErr) throw groupErr;
+
+      const { error: bookingsErr } = await supabase
+        .from("bookings")
+        .update({
+          guest_name: form.guest_name.trim(),
+          guest_phone: (form.guest_phone as string).trim(),
+          guest_email: (form.guest_email as string).trim() || null,
+          guest_count: Number(form.guest_count) || 1,
+        })
+        .eq("group_id", group.id);
+      if (bookingsErr) throw bookingsErr;
+
+      queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onSaved();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
+        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div>
+            <h2 className="font-display text-base font-semibold">Edit Guest Details</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{group.group_reference}</p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
+          <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
+          <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
+          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Group booking detail modal — with Charges + Invoice tabs
 // ---------------------------------------------------------------------------
 
@@ -322,6 +475,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const [tab, setTab] = useState<GroupModalTab>("overview");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const [showEditGroupGuest, setShowEditGroupGuest] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const queryClient = useQueryClient();
   const { data: charges = [] } = useGroupCharges(group.id);
@@ -364,7 +518,6 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     setShowDiscountForm(false);
   };
 
-  // Build a fake booking-like object for BookingInvoice
   const invoiceBooking = {
     ...bookings[0],
     guest_name: group.guest_name,
@@ -384,141 +537,152 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   } as Booking;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
-        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
+    <>
+      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+          <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
 
-        <div className="px-5 pt-3 pb-4 border-b border-border">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="font-display text-lg font-semibold">{group.guest_name}</h2>
-                <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span>
+          <div className="px-5 pt-3 pb-4 border-b border-border">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-display text-lg font-semibold">{group.guest_name}</h2>
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span></div>
               </div>
-              <div className="flex items-center gap-2 mt-1"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span></div>
+              <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button>
             </div>
-            <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button>
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {group.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updatingStatus} icon={<Check className="h-3.5 w-3.5" />} label="Confirm all" color="green" />}
+              {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
+              <button onClick={() => setShowEditGroupGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
+                <Pencil className="h-3.5 w-3.5" /> Edit Guest
+              </button>
+              {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
+              {group.guest_phone && <a href={`https://wa.me/${group.guest_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>}
+            </div>
           </div>
-          <div className="flex gap-2 mt-3 flex-wrap">
-            {group.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updatingStatus} icon={<Check className="h-3.5 w-3.5" />} label="Confirm all" color="green" />}
-            {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
-            {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
-            {group.guest_phone && <a href={`https://wa.me/${group.guest_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>}
+
+          <div className="flex border-b border-border px-5">
+            {([
+              { key: "overview", label: "Overview" },
+              { key: "charges", label: "Charges" },
+              { key: "invoice", label: "Invoice" },
+            ] as { key: GroupModalTab; label: string }[]).map((t) => (
+              <button key={t.key} onClick={() => setTab(t.key)} className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
+                {t.label}
+                {t.key === "charges" && charges.length > 0 && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-border px-5">
-          {([
-            { key: "overview", label: "Overview" },
-            { key: "charges", label: "Charges" },
-            { key: "invoice", label: "Invoice" },
-          ] as { key: GroupModalTab; label: string }[]).map((t) => (
-            <button key={t.key} onClick={() => setTab(t.key)} className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
-              {t.label}
-              {t.key === "charges" && charges.length > 0 && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex-1 overflow-y-auto">
-          {tab === "overview" && (
-            <div className="p-5 space-y-4">
-              <Section title="Stay details">
-                <Row label="Check-in" value={group.check_in} />
-                <Row label="Check-out" value={group.check_out} />
-                <Row label="Guests" value={`${group.guest_count}`} />
-                {group.guest_phone && <Row label="Phone" value={group.guest_phone} />}
-                {group.guest_email && <Row label="Email" value={group.guest_email} />}
-              </Section>
-
-              <Section title={`Rooms (${bookings.length})`}>
-                {bookings.map((b, i) => (
-                  <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
-                    <div className="flex justify-between text-sm"><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>{b.nights} night{b.nights > 1 ? "s" : ""}</span><StatusPill status={b.status} /></div>
-                  </div>
-                ))}
-              </Section>
-
-              <Section title="Payment summary">
-                <Row label="Rooms total" value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`} />
-                {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
-                {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
-                {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
-                {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
-                <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
-              </Section>
-
-              {canAct && !showDiscountForm && !showPaymentForm && (
-                <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2">
-                  <Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}
-                </button>
-              )}
-              {showDiscountForm && <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />}
-
-              {!showPaymentForm && !showDiscountForm && balance > 0 && (
-                <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
-                  <IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}
-                </button>
-              )}
-              {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
-              {showPaymentForm && <GroupPaymentForm group={group} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />}
-
-              {group.guest_phone && (
-                <Section title="Send to guest">
-                  <div className="space-y-2">
-                    <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone })} label="💰 Payment reminder" />
-                    <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
-                  </div>
+          <div className="flex-1 overflow-y-auto">
+            {tab === "overview" && (
+              <div className="p-5 space-y-4">
+                <Section title="Stay details">
+                  <Row label="Check-in" value={group.check_in} />
+                  <Row label="Check-out" value={group.check_out} />
+                  <Row label="Guests" value={`${group.guest_count}`} />
+                  {group.guest_phone && <Row label="Phone" value={group.guest_phone} />}
+                  {group.guest_email && <Row label="Email" value={group.guest_email} />}
                 </Section>
-              )}
 
-              {canAct && <GroupCancelButton groupId={group.id} onCancelled={() => { onRefresh(); onClose(); }} />}
-            </div>
-          )}
+                <Section title={`Rooms (${bookings.length})`}>
+                  {bookings.map((b, i) => (
+                    <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
+                      <div className="flex justify-between text-sm"><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>{b.nights} night{b.nights > 1 ? "s" : ""}</span><StatusPill status={b.status} /></div>
+                    </div>
+                  ))}
+                </Section>
 
-          {tab === "charges" && (
-            <div className="p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Rooms</div><div className="font-semibold text-sm mt-0.5">₹{Number(group.total_amount).toLocaleString("en-IN")}</div></div>
-                <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
-                <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
+                <Section title="Payment summary">
+                  <Row label="Rooms total" value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`} />
+                  {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
+                  {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
+                  {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
+                  {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
+                  <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
+                </Section>
+
+                {canAct && !showDiscountForm && !showPaymentForm && (
+                  <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2">
+                    <Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}
+                  </button>
+                )}
+                {showDiscountForm && <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />}
+
+                {!showPaymentForm && !showDiscountForm && balance > 0 && (
+                  <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2">
+                    <IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}
+                  </button>
+                )}
+                {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
+                {showPaymentForm && <GroupPaymentForm group={group} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />}
+
+                {group.guest_phone && (
+                  <Section title="Send to guest">
+                    <div className="space-y-2">
+                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone })} label="💰 Payment reminder" />
+                      <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
+                    </div>
+                  </Section>
+                )}
+
+                {canAct && <GroupCancelButton groupId={group.id} onCancelled={() => { onRefresh(); onClose(); }} />}
               </div>
-              {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-              <ChargesList
-                charges={charges}
-                chargesTotal={chargesTotal}
-                groupId={group.id}
-                onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })}
-              />
-            </div>
-          )}
+            )}
 
-          {tab === "invoice" && (
-            <div className="p-5">
-              <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Group booking · {group.group_reference}</p>
-                {bookings.map((b) => (
-                  <div key={b.id} className="flex justify-between text-sm"><span className="text-muted-foreground">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
-                ))}
+            {tab === "charges" && (
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Rooms</div><div className="font-semibold text-sm mt-0.5">₹{Number(group.total_amount).toLocaleString("en-IN")}</div></div>
+                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
+                  <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
+                </div>
+                {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
+                <ChargesList
+                  charges={charges}
+                  chargesTotal={chargesTotal}
+                  groupId={group.id}
+                  onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })}
+                />
               </div>
-              <BookingInvoice
-                booking={invoiceBooking}
-                roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")}
-                property={property ?? null}
-                charges={charges}
-                chargesTotal={chargesTotal}
-                advance={advance}
-                balance={balance}
-                guestView={false}
-              />
-            </div>
-          )}
+            )}
+
+            {tab === "invoice" && (
+              <div className="p-5">
+                <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Group booking · {group.group_reference}</p>
+                  {bookings.map((b) => (
+                    <div key={b.id} className="flex justify-between text-sm"><span className="text-muted-foreground">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
+                  ))}
+                </div>
+                <BookingInvoice
+                  booking={invoiceBooking}
+                  roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")}
+                  property={property ?? null}
+                  charges={charges}
+                  chargesTotal={chargesTotal}
+                  advance={advance}
+                  balance={balance}
+                  guestView={false}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+      {showEditGroupGuest && (
+        <EditGroupGuestModal
+          group={group}
+          onClose={() => setShowEditGroupGuest(false)}
+          onSaved={() => { setShowEditGroupGuest(false); onRefresh(); }}
+        />
+      )}
+    </>
   );
 }
 
