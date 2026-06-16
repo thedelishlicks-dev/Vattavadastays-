@@ -12,7 +12,6 @@ import {
   startOfMonth,
   startOfWeek,
   addDays,
-  parseISO,
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
@@ -47,50 +46,54 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
 
   const { data: property } = useProperty(subdomain);
 
-  const { data: bookings = [] } = useQuery({
-    queryKey: ["guest-bookings", property?.id],
-    queryFn: async () => {
-      if (!property?.id) return [];
-      const from = format(new Date(), "yyyy-MM-dd");
-      const to = format(addMonths(new Date(), 6), "yyyy-MM-dd");
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("check_in, check_out, room_id")
-        .eq("property_id", property.id)
-        .neq("status", "cancelled")
-        .gte("check_out", from)
-        .lte("check_in", to);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!property?.id,
-  });
-
-  const totalRooms = useMemo(
-    () => (property?.rooms ?? []).filter((r) => r.is_active).length,
+  const activeRooms = useMemo(
+    () => (property?.rooms ?? []).filter((r) => r.is_active),
     [property]
   );
 
-  const bookedDateCounts = useMemo(() => {
-    const counts: Record<string, Set<string>> = {};
-    bookings.forEach((b) => {
-      const start = parseISO(b.check_in);
-      const end = parseISO(b.check_out);
-      const cur = new Date(start);
-      while (cur < end) {
-        const d = format(cur, "yyyy-MM-dd");
-        if (!counts[d]) counts[d] = new Set();
-        counts[d].add(b.room_id);
-        cur.setDate(cur.getDate() + 1);
+  const roomIds = useMemo(() => activeRooms.map((r) => r.id), [activeRooms]);
+
+  // FIX: Query availability table directly — source of truth for both bookings (via trigger)
+  // and manually blocked dates (via admin dashboard)
+  const { data: availability = [] } = useQuery({
+    queryKey: ["guest-availability", property?.id, format(month, "yyyy-MM")],
+    queryFn: async () => {
+      if (!property?.id || roomIds.length === 0) return [];
+      const monthStart = format(startOfMonth(month), "yyyy-MM-dd");
+      const monthEnd = format(endOfMonth(month), "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("availability")
+        .select("date, is_available, room_id")
+        .in("room_id", roomIds)
+        .gte("date", monthStart)
+        .lte("date", monthEnd);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!property?.id && roomIds.length > 0,
+  });
+
+  // Compute dates where ALL rooms are unavailable
+  const fullyUnavailableDates = useMemo(() => {
+    const unavailableCounts: Record<string, number> = {};
+    availability.forEach((a) => {
+      if (!a.is_available) {
+        unavailableCounts[a.date] = (unavailableCounts[a.date] ?? 0) + 1;
       }
     });
-    return counts;
-  }, [bookings]);
+
+    const fullyUnavailable = new Set<string>();
+    Object.entries(unavailableCounts).forEach(([date, count]) => {
+      if (count >= activeRooms.length) {
+        fullyUnavailable.add(date);
+      }
+    });
+    return fullyUnavailable;
+  }, [availability, activeRooms]);
 
   const isFullyBooked = (date: Date) => {
-    if (totalRooms === 0) return false;
     const d = format(date, "yyyy-MM-dd");
-    return (bookedDateCounts[d]?.size ?? 0) >= totalRooms;
+    return fullyUnavailableDates.has(d);
   };
 
   const handlePick = (d: Date) => {
