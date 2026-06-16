@@ -1,4 +1,3 @@
-import { ClipboardList } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { getSubdomain } from "@/lib/subdomain";
 
@@ -82,21 +81,12 @@ export function Hero() {
           </div>
         </div>
 
-        <div className="flex flex-col items-center gap-4 mt-4">
+        <div className="flex flex-col items-center gap-6 mt-4">
           <a
             href="#availability"
             className="inline-flex items-center justify-center rounded-full bg-primary px-10 py-4 text-sm md:text-base font-semibold text-primary-foreground shadow-2xl hover:scale-[1.05] active:scale-95 transition-all duration-300"
           >
             Check Availability
-          </a>
-
-          {/* Track booking — always visible */}
-          <a
-            href="/booking-status"
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm px-6 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition-all duration-300"
-          >
-            <ClipboardList className="h-4 w-4" />
-            Track your booking
           </a>
 
           <div className="flex flex-col items-center gap-3 animate-in fade-in duration-1000 delay-500">

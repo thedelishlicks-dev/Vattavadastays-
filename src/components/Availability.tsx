@@ -177,7 +177,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                       "aspect-square rounded-lg text-sm font-medium transition-colors",
                       outOfMonth ? "text-muted-foreground/20 cursor-not-allowed" : "",
                       isPast && !outOfMonth ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
-                      fullyBooked && !outOfMonth ? "bg-red-50 text-red-400 cursor-not-allowed" : "",
+                      fullyBooked && !outOfMonth ? "bg-destructive/10 text-destructive/60 cursor-not-allowed" : "",
                       !disabled ? "hover:bg-primary-light" : "",
                       selected && !isStart && !isEnd ? "bg-primary-light text-primary" : "",
                       isStart || isEnd ? "bg-primary text-primary-foreground hover:bg-primary" : "",
@@ -195,7 +195,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                 Available
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-3 h-3 rounded-sm bg-red-100 border border-red-200" />
+                <span className="w-3 h-3 rounded-sm bg-destructive/10 border border-destructive/20" />
                 Fully booked
               </span>
             </div>
