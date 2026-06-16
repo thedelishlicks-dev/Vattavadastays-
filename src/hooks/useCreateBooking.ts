@@ -1,23 +1,41 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+export interface RoomBookingInput {
+  roomId: string;
+  guestCount: number; // guests assigned to this specific room
+}
+
 export interface CreateBookingInput {
   propertyId: string;
-  roomId: string;
+  /** For single-room bookings, pass one item. For group bookings, pass multiple. */
+  rooms: RoomBookingInput[];
   guestName: string;
   guestPhone: string;
   guestEmail?: string;
-  guestCount: number;
-  checkIn: string;   // "YYYY-MM-DD"
-  checkOut: string;  // "YYYY-MM-DD"
+  /** Total guest count across all rooms */
+  totalGuests: number;
+  checkIn: string;  // "YYYY-MM-DD"
+  checkOut: string; // "YYYY-MM-DD"
   paymentMethod?: "UPI" | "Bank Transfer" | "Cash on Arrival";
 }
 
-export interface CreateBookingResult {
+export interface RoomBookingResult {
   bookingId: string;
+  roomId: string;
+  roomName: string;
   totalAmount: number;
   roomPrice: number;
   extraGuestCharge: number;
+}
+
+export interface CreateBookingResult {
+  /** The first booking's ID — used as the primary reference shown to the guest */
+  bookingId: string;
+  /** Short group reference shown to guest: first 8 chars of first booking ID */
+  groupRef: string;
+  totalAmount: number;
+  rooms: RoomBookingResult[];
   nights: number;
 }
 
@@ -26,27 +44,13 @@ export function useCreateBooking() {
 
   return useMutation({
     mutationFn: async (input: CreateBookingInput): Promise<CreateBookingResult> => {
-      // Step 1: Load room to get pricing
-      const { data: room, error: roomError } = await supabase
-        .from("rooms")
-        .select("base_price, extra_guest_price, weekend_multiplier, max_guests")
-        .eq("id", input.roomId)
-        .eq("is_active", true)
-        .single();
-
-      if (roomError || !room) throw new Error("Room not found.");
-
-      if (input.guestCount > room.max_guests) {
-        throw new Error(`Maximum ${room.max_guests} guests allowed for this room.`);
-      }
-
-      // Step 2: Check availability for all requested dates
       const checkIn = new Date(input.checkIn);
       const checkOut = new Date(input.checkOut);
       const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000);
 
       if (nights < 1) throw new Error("Check-out must be after check-in.");
 
+      // Build the list of dates for the stay
       const dates: string[] = [];
       for (let i = 0; i < nights; i++) {
         const d = new Date(checkIn);
@@ -54,89 +58,154 @@ export function useCreateBooking() {
         dates.push(d.toISOString().split("T")[0]);
       }
 
-      const { data: availability, error: availError } = await supabase
+      const roomIds = input.rooms.map((r) => r.roomId);
+
+      // ── Step 1: Load all rooms' details in one query ──
+      const { data: roomDetails, error: roomsErr } = await supabase
+        .from("rooms")
+        .select("id, name, base_price, extra_guest_price, weekend_multiplier, max_guests")
+        .in("id", roomIds)
+        .eq("is_active", true);
+
+      if (roomsErr || !roomDetails) throw new Error("Could not load room details.");
+
+      // Validate guest counts per room
+      for (const ri of input.rooms) {
+        const room = roomDetails.find((r) => r.id === ri.roomId);
+        if (!room) throw new Error("One or more selected rooms are no longer available.");
+        if (ri.guestCount > room.max_guests) {
+          throw new Error(`"${room.name}" holds a maximum of ${room.max_guests} guests.`);
+        }
+      }
+
+      // ── Step 2: Check availability for ALL rooms in ONE query ──
+      const { data: avail, error: availErr } = await supabase
         .from("availability")
-        .select("date, is_available, price_override")
-        .eq("room_id", input.roomId)
+        .select("room_id, date, is_available, price_override")
+        .in("room_id", roomIds)
         .in("date", dates);
 
-      if (availError) throw new Error("Could not check availability.");
+      if (availErr) throw new Error("Could not check availability.");
 
-      // Every requested date must have a row with is_available = true
-      for (const date of dates) {
-        const row = availability?.find((a) => a.date === date);
-        if (!row || !row.is_available) {
-          throw new Error(`Room is not available on ${date}.`);
+      // Verify every room is available on every date
+      for (const ri of input.rooms) {
+        const room = roomDetails.find((r) => r.id === ri.roomId)!;
+        for (const date of dates) {
+          const row = avail?.find((a) => a.room_id === ri.roomId && a.date === date);
+          if (!row || !row.is_available) {
+            throw new Error(`"${room.name}" is not available on ${date}.`);
+          }
         }
       }
 
-      // Step 3: Calculate price
-      let roomPrice = 0;
-      for (const date of dates) {
-        const row = availability?.find((a) => a.date === date);
-        if (row?.price_override) {
-          roomPrice += Number(row.price_override);
-        } else {
-          const d = new Date(date);
-          const dow = d.getDay(); // 5=Fri, 6=Sat
-          const isWeekend = dow === 5 || dow === 6;
-          const multiplier = isWeekend ? (room.weekend_multiplier ?? 1) : 1;
-          roomPrice += room.base_price * multiplier;
+      // ── Step 3: Calculate price per room ──
+      const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
+
+      for (const ri of input.rooms) {
+        const room = roomDetails.find((r) => r.id === ri.roomId)!;
+        let roomPrice = 0;
+
+        for (const date of dates) {
+          const row = avail?.find((a) => a.room_id === ri.roomId && a.date === date);
+          if (row?.price_override) {
+            roomPrice += Number(row.price_override);
+          } else {
+            const d = new Date(date);
+            const dow = d.getDay();
+            const isWeekend = dow === 5 || dow === 6;
+            const multiplier = isWeekend ? (room.weekend_multiplier ?? 1) : 1;
+            roomPrice += room.base_price * multiplier;
+          }
         }
+
+        const extraGuestCharge =
+          Math.max(0, ri.guestCount - 2) * (room.extra_guest_price ?? 0) * nights;
+
+        roomPrices.push({
+          roomId: ri.roomId,
+          roomPrice,
+          extraGuestCharge,
+          totalAmount: roomPrice + extraGuestCharge,
+        });
       }
 
-      const extraGuestCharge =
-        Math.max(0, input.guestCount - 2) *
-        (room.extra_guest_price ?? 0) *
-        nights;
-
-      const totalAmount = roomPrice + extraGuestCharge;
-
-      // Step 4: Insert booking
-      const { data: booking, error: bookingError } = await supabase
-        .from("bookings")
-        .insert({
+      // ── Step 4: Insert one booking row per room ──
+      const bookingInserts = input.rooms.map((ri, idx) => {
+        const pricing = roomPrices[idx];
+        return {
           property_id: input.propertyId,
-          room_id: input.roomId,
+          room_id: ri.roomId,
           guest_name: input.guestName,
           guest_phone: input.guestPhone,
           guest_email: input.guestEmail ?? null,
-          guest_count: input.guestCount,
+          guest_count: ri.guestCount,
           check_in: input.checkIn,
           check_out: input.checkOut,
-          room_price: roomPrice,
-          extra_guest_charge: extraGuestCharge,
-          total_amount: totalAmount,
+          room_price: pricing.roomPrice,
+          extra_guest_charge: pricing.extraGuestCharge,
+          total_amount: pricing.totalAmount,
           status: "pending",
           payment_method: input.paymentMethod ?? "Cash on Arrival",
           is_paid: false,
-        })
-        .select("id")
-        .single();
+        };
+      });
 
-      if (bookingError || !booking) {
+      const { data: insertedBookings, error: bookingErr } = await supabase
+        .from("bookings")
+        .insert(bookingInserts)
+        .select("id, room_id");
+
+      if (bookingErr || !insertedBookings || insertedBookings.length === 0) {
         throw new Error("Booking failed. Please try again.");
       }
 
-      // Step 5: Mark dates unavailable
+      // ── Step 5: Mark all dates unavailable for all rooms ──
+      // Build upsert rows for every room × date combination
+      const unavailRows = roomIds.flatMap((roomId) =>
+        dates.map((date) => ({
+          room_id: roomId,
+          date,
+          is_available: false,
+        }))
+      );
+
       await supabase
         .from("availability")
-        .update({ is_available: false })
-        .eq("room_id", input.roomId)
-        .in("date", dates);
+        .upsert(unavailRows, { onConflict: "room_id,date" });
+
+      // ── Build result ──
+      const grandTotal = roomPrices.reduce((sum, r) => sum + r.totalAmount, 0);
+      const firstBookingId = insertedBookings[0].id;
+
+      const roomResults: RoomBookingResult[] = insertedBookings.map((b) => {
+        const pricing = roomPrices.find((p) => p.roomId === b.room_id)!;
+        const room = roomDetails.find((r) => r.id === b.room_id)!;
+        return {
+          bookingId: b.id,
+          roomId: b.room_id,
+          roomName: room.name,
+          totalAmount: pricing.totalAmount,
+          roomPrice: pricing.roomPrice,
+          extraGuestCharge: pricing.extraGuestCharge,
+        };
+      });
 
       return {
-        bookingId: booking.id,
-        totalAmount,
-        roomPrice,
-        extraGuestCharge,
+        bookingId: firstBookingId,
+        groupRef: `#${firstBookingId.slice(0, 8).toUpperCase()}`,
+        totalAmount: grandTotal,
+        rooms: roomResults,
         nights,
       };
     },
 
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["availability", variables.roomId] });
+      variables.rooms.forEach((r) => {
+        queryClient.invalidateQueries({ queryKey: ["availability", r.roomId] });
+      });
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["guest-bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["guestAvailability"] });
     },
   });
 }
