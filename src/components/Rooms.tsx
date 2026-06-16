@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { useProperty } from '@/hooks/useProperty'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { Loader2, BedDouble, Users } from 'lucide-react'
+import { Loader2, BedDouble, Users, CheckCircle2 } from 'lucide-react'
 import { getSubdomain } from '@/lib/subdomain'
 import type { Room } from '@/types/database'
 
@@ -11,9 +11,10 @@ interface RoomsProps {
   onSelect: (room: Room) => void
   checkIn: Date | null
   checkOut: Date | null
+  selectedRoomIds?: string[]
 }
 
-export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
+export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: RoomsProps) {
   const subdomain = getSubdomain()
   const { data: property, isLoading, error } = useProperty(subdomain)
 
@@ -38,6 +39,7 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
   })
 
   const bookedSet = useMemo(() => new Set(bookedRoomIds), [bookedRoomIds])
+  const selectedSet = useMemo(() => new Set(selectedRoomIds), [selectedRoomIds])
 
   if (isLoading) {
     return (
@@ -65,17 +67,39 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
     )
   }
 
+  // Show group hint if multiple rooms are available and dates are picked
+  const showGroupHint = activeRooms.length > 1 && !!checkInStr && selectedRoomIds.length === 0
+
   return (
     <section id="rooms" className="py-12 px-4 max-w-6xl mx-auto">
-      <h2 className="text-2xl font-bold text-stone-900 mb-2">Our Rooms</h2>
-      {checkInStr && checkOutStr && (
-        <p className="text-sm text-stone-500 mb-6">
-          Showing availability for {checkInStr} → {checkOutStr}
+      <div className="flex items-start justify-between mb-2 flex-wrap gap-2">
+        <div>
+          <h2 className="text-2xl font-bold text-stone-900">Our Rooms</h2>
+          {checkInStr && checkOutStr && (
+            <p className="text-sm text-stone-500 mt-1">
+              Showing availability for {checkInStr} → {checkOutStr}
+            </p>
+          )}
+        </div>
+        {selectedRoomIds.length > 0 && (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-primary bg-primary-light px-3 py-1.5 rounded-full">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {selectedRoomIds.length} room{selectedRoomIds.length > 1 ? 's' : ''} in your booking
+          </div>
+        )}
+      </div>
+
+      {showGroupHint && (
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-5 inline-block">
+          Coming as a group? You can select multiple rooms and book them together.
         </p>
       )}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-6">
         {activeRooms.map((room: Room) => {
           const isBooked = bookedSet.has(room.id)
+          const isSelected = selectedSet.has(room.id)
+
           return (
             <div
               key={room.id}
@@ -83,6 +107,8 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
                 'rounded-2xl border bg-white overflow-hidden shadow-sm transition-shadow',
                 isBooked
                   ? 'opacity-60 cursor-not-allowed border-stone-200'
+                  : isSelected
+                  ? 'hover:shadow-md cursor-pointer border-primary ring-2 ring-primary/20'
                   : 'hover:shadow-md cursor-pointer border-stone-200',
               ].join(' ')}
               onClick={() => !isBooked && onSelect(room)}
@@ -98,6 +124,14 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
                     <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center">
                       <span className="bg-white text-stone-800 text-xs font-semibold px-3 py-1.5 rounded-full">
                         Not available
+                      </span>
+                    </div>
+                  )}
+                  {isSelected && !isBooked && (
+                    <div className="absolute top-2 right-2">
+                      <span className="bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Added
                       </span>
                     </div>
                   )}
@@ -148,9 +182,14 @@ export function Rooms({ onSelect, checkIn, checkOut }: RoomsProps) {
                     <span className="text-sm font-normal text-stone-500">/night</span>
                   </span>
                   {isBooked ? (
-                    <span className="text-xs text-stone-400 font-medium">
-                      Unavailable
-                    </span>
+                    <span className="text-xs text-stone-400 font-medium">Unavailable</span>
+                  ) : isSelected ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onSelect(room) }}
+                      className="text-sm bg-primary-light text-primary border border-primary/30 px-4 py-1.5 rounded-full hover:bg-primary/10 transition-colors font-medium"
+                    >
+                      Edit
+                    </button>
                   ) : (
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelect(room) }}
