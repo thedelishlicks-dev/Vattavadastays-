@@ -146,8 +146,18 @@ DO NOT recreate the schema. DO NOT run CREATE TABLE statements.
 ```
 id, owner_id, name, name_ml, subdomain, area, location_lat, location_lng,
 shared_amenities (text[]), description, description_ml, hero_image,
+logo_url, hero_tagline, about_image, static_map_image_url, landmark_description,
 owner_name, owner_phone, owner_whatsapp, check_in_time, check_out_time,
-is_active, created_at
+is_active, theme, heading_font, created_at,
+subscription_status ('pending_setup'|'active'|'suspended'),
+subscription_tier ('small'|'large'),
+monthly_fee, setup_fee_paid, setup_fee_amount, billing_notes, subscription_end_date
+```
+
+### leads
+
+```
+id, name, phone, property_name, tier, created_at
 ```
 
 ### rooms
@@ -244,6 +254,7 @@ Never hardcode. Never commit .env files.
 | `__rules:`    | House rules text              | admin.policies.tsx |
 | `__upi:`      | UPI ID string                 | admin.payments.tsx |
 | `__pmethods:` | JSON array of payment methods | admin.payments.tsx |
+| `__theme:`    | Selected theme name string    | ThemeProvider.tsx  |
 
 **CRITICAL rules for sentinel keys:**
 
@@ -314,7 +325,10 @@ The /setup token flow is DEPRECATED. Use this flow instead:
 4. Superadmin goes to Supabase → Authentication → Users → **Invite user** with owner email
 5. Owner receives Supabase invite email, clicks link, sets their own password
 6. Owner logs in at stayidom.in/login
-7. Superadmin clicks **Activate** on the property once setup fee is paid
+7. Superadmin clicks **Link Owner** on the property row in /superadmin to connect the Supabase account
+8. Superadmin clicks **Activate** on the property once setup fee is paid
+
+An onboarding checklist on the admin dashboard helps owners track their setup progress.
 
 The /setup route still exists but is no longer used. Safe to delete in a future cleanup.
 

@@ -1,7 +1,7 @@
-# stayidom.in — Session Handover v5
+# stayidom.in — Session Handover v6
 
 **Date:** June 2026
-**Handover from:** Claude Sonnet (Anthropic)
+**Handover from:** Jules (Software Engineer)
 **Branch:** main (active, deployed to Vercel)
 
 ---
@@ -30,22 +30,20 @@ stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala
 
 ---
 
-## Round 5 Changes — June 2026
+## Round 6 Changes — June 2026
+
+### Added
+- **Onboarding Checklist** — Added a dynamic checklist on the admin dashboard to guide owners through property setup (logo, hero image, rooms, availability, UPI, policies).
+- **Link Owner Functionality** — Superadmin can now explicitly link a Supabase user account to a property via the `Link Owner` button in the superadmin dashboard.
+- **Marketing Leads** — Documented and confirmed the `leads` table for capturing demo requests from the landing page.
+- **Enhanced Property Schema** — Included billing fields (setup fee, monthly fee) and additional branding fields (logo_url, static maps).
 
 ### Fixed
-- **Double-booking race condition** — availability trigger (`trg_booking_status_change`) auto-blocks dates when booking is confirmed and re-opens on cancel
-- **Booking reference on success screen** — guest sees `#XXXXXXXX` ref after submitting, with copy button. Same ref in WhatsApp message to owner
-- **Superadmin property management** — Manage button on each property row navigates to `/admin/dashboard?property={subdomain}`. Superadmin can set up rooms, availability, pricing for any property
-- **Simplified onboarding** — removed /setup invite token flow. Now uses Supabase Auth invite email. Superadmin sets up property via Manage, then invites owner via Supabase dashboard
-- **Demo property** — availability seeded for 1 year so demo.stayidom.in works for guests
+- **Revenue Calculation** — Monthly revenue in the dashboard now correctly filters by `check_in` month.
+- **Payment Method Consistency** — Standardized payment methods to "UPI", "Bank Transfer", and "Cash on Arrival".
 
 ### Attempted but reverted
 - `create_booking_atomic` Postgres RPC — built, tested in SQL Editor, but Supabase Free tier PostgREST schema cache returns 404 on RPC calls. Reverted to direct insert in `useCreateBooking.ts`. Re-enable on Pro upgrade.
-
-### Known issues carried forward
-- `/setup` route still exists but is no longer used — safe to delete
-- Supabase Free tier pauses after inactivity — first request after pause may be slow
-- `create_booking_atomic` function exists in DB but is not called by the app
 
 ---
 
@@ -109,9 +107,12 @@ stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala
 ```
 id, owner_id, name, name_ml, subdomain, area, location_lat, location_lng,
 shared_amenities (text[]), description, description_ml, hero_image,
+logo_url, hero_tagline, about_image, static_map_image_url, landmark_description,
 owner_name, owner_phone, owner_whatsapp, check_in_time, check_out_time,
-is_active, subscription_status ('trial'|'active'|'suspended'),
-subscription_end_date, created_at
+is_active, theme, heading_font, created_at,
+subscription_status ('pending_setup'|'active'|'suspended'),
+subscription_tier ('small'|'large'),
+monthly_fee, setup_fee_paid, setup_fee_amount, billing_notes, subscription_end_date
 ```
 
 ### rooms
