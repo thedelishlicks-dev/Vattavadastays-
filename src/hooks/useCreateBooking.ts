@@ -86,9 +86,9 @@ export function useCreateBooking() {
       }
 
       const extraGuestCharge =
-        input.guestCount > 1
-          ? (input.guestCount - 1) * (room.extra_guest_price ?? 0) * nights
-          : 0;
+        Math.max(0, input.guestCount - 2) *
+        (room.extra_guest_price ?? 0) *
+        nights;
 
       const totalAmount = roomPrice + extraGuestCharge;
 
