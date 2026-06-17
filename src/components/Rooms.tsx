@@ -118,7 +118,7 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
                   <img
                     src={room.images[0]}
                     alt={room.name}
-                    className="h-48 w-full object-cover"
+                    className="aspect-[4/5] w-full object-cover"
                   />
                   {isBooked && (
                     <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center">
