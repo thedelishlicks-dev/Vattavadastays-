@@ -129,7 +129,43 @@ export function useCreateBooking() {
         });
       }
 
-      // ── Step 4: Insert one booking row per room ──
+      // ── Step 4: Insert booking(s) ──
+      // Single room: plain booking, same as before.
+      // Multiple rooms: create a booking_groups row first (same shape the
+      // owner-side AddGroupBookingModal uses), then insert bookings with
+      // group_id set so the owner dashboard renders one group card instead
+      // of N separate cards.
+      const grandTotal = roomPrices.reduce((sum, r) => sum + r.totalAmount, 0);
+      let groupId: string | null = null;
+
+      if (input.rooms.length > 1) {
+        const { data: groupData, error: groupErr } = await supabase
+          .from("booking_groups")
+          .insert({
+            property_id: input.propertyId,
+            group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+            guest_name: input.guestName,
+            guest_phone: input.guestPhone,
+            guest_email: input.guestEmail ?? null,
+            guest_count: input.totalGuests,
+            check_in: input.checkIn,
+            check_out: input.checkOut,
+            total_amount: grandTotal,
+            advance_amount: 0,
+            discount_amount: 0,
+            status: "pending",
+            payment_method: input.paymentMethod ?? "Cash on Arrival",
+            is_paid: false,
+          })
+          .select("id")
+          .single();
+
+        if (groupErr || !groupData) {
+          throw new Error("Could not create group booking. Please try again.");
+        }
+        groupId = groupData.id;
+      }
+
       const bookingInserts = input.rooms.map((ri, idx) => {
         const pricing = roomPrices[idx];
         return {
@@ -147,6 +183,7 @@ export function useCreateBooking() {
           status: "pending",
           payment_method: input.paymentMethod ?? "Cash on Arrival",
           is_paid: false,
+          ...(groupId ? { group_id: groupId } : {}),
         };
       });
 
@@ -156,6 +193,11 @@ export function useCreateBooking() {
         .select("id, room_id");
 
       if (bookingErr || !insertedBookings || insertedBookings.length === 0) {
+        // Roll back the group row if booking insert failed, so we don't leave
+        // an orphaned empty group behind.
+        if (groupId) {
+          await supabase.from("booking_groups").delete().eq("id", groupId);
+        }
         throw new Error("Booking failed. Please try again.");
       }
 
@@ -174,8 +216,21 @@ export function useCreateBooking() {
         .upsert(unavailRows, { onConflict: "room_id,date" });
 
       // ── Build result ──
-      const grandTotal = roomPrices.reduce((sum, r) => sum + r.totalAmount, 0);
       const firstBookingId = insertedBookings[0].id;
+
+      // For group bookings, look up the group_reference we just created so the
+      // guest sees the same reference the owner sees on their dashboard.
+      let displayRef = `#${firstBookingId.slice(0, 8).toUpperCase()}`;
+      if (groupId) {
+        const { data: groupRow } = await supabase
+          .from("booking_groups")
+          .select("group_reference")
+          .eq("id", groupId)
+          .single();
+        if (groupRow?.group_reference) {
+          displayRef = groupRow.group_reference;
+        }
+      }
 
       const roomResults: RoomBookingResult[] = insertedBookings.map((b) => {
         const pricing = roomPrices.find((p) => p.roomId === b.room_id)!;
@@ -192,7 +247,7 @@ export function useCreateBooking() {
 
       return {
         bookingId: firstBookingId,
-        groupRef: `#${firstBookingId.slice(0, 8).toUpperCase()}`,
+        groupRef: displayRef,
         totalAmount: grandTotal,
         rooms: roomResults,
         nights,
@@ -204,6 +259,7 @@ export function useCreateBooking() {
         queryClient.invalidateQueries({ queryKey: ["availability", r.roomId] });
       });
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["bookingGroups"] });
       queryClient.invalidateQueries({ queryKey: ["guest-bookings"] });
       queryClient.invalidateQueries({ queryKey: ["guestAvailability"] });
     },
