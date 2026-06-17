@@ -33,7 +33,7 @@ export type BookingDetails = {
 };
 
 export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Props) {
-  const [adults, setAdults] = useState(2);
+  const [adults, setAdults] = useState(room.max_guests);
   const [children, setChildren] = useState(0);
   const [extraBeds, setExtraBeds] = useState(0);
   const [meal, setMeal] = useState<MealPlan>("None");
@@ -45,8 +45,9 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
 
   const totals = useMemo(() => {
     const roomCost = room.base_price * nights;
+    // Extra charge applies only above max_guests (the included capacity the owner set)
     const extraGuestCharge =
-      Math.max(0, adults - 2) * (room.extra_guest_price ?? 0) * nights;
+      Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
     const extraBedCost = extraBeds * (room.extra_guest_price ?? 0) * nights;
     const mealCost = MEAL_PRICES[meal] * (adults + children) * nights;
     const total = roomCost + extraGuestCharge + extraBedCost + mealCost;
@@ -93,7 +94,7 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
           <div>
             <h3 className="font-display text-xl font-semibold">{room.name}</h3>
             <p className="text-xs text-muted-foreground">
-              {room.room_type} · ₹{room.base_price}/night
+              {room.room_type} · ₹{room.base_price}/night · up to {room.max_guests} guests included
             </p>
           </div>
           <button
@@ -130,12 +131,14 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
 
           <div className="rounded-xl border border-border p-4 space-y-3">
             <h4 className="font-medium text-sm">Guests & meals</h4>
+
+            {/* Adults stepper — max is room.max_guests (included) + reasonable overflow */}
             <Stepper
               value={adults}
               set={setAdults}
               min={1}
-              max={room.max_guests}
-              label="Adults"
+              max={room.max_guests + 4}
+              label={`Adults (${room.max_guests} included in price)`}
             />
             <Stepper value={children} set={setChildren} max={4} label="Children" />
             <Stepper
@@ -144,6 +147,14 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
               max={3}
               label={`Extra beds (₹${room.extra_guest_price ?? 0}/night)`}
             />
+
+            {/* Show extra charge hint once adults exceed included capacity */}
+            {adults > room.max_guests && (
+              <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+                {adults - room.max_guests} extra guest{adults - room.max_guests > 1 ? "s" : ""} above included capacity · ₹{((adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")} charge
+              </div>
+            )}
+
             <div className="flex items-center justify-between pt-1">
               <span className="text-sm">Meal plan</span>
               <select
@@ -167,7 +178,7 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
             </div>
             {totals.extraGuestCharge > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Extra guest charge</span>
+                <span>Extra guests ({adults - room.max_guests} × ₹{room.extra_guest_price}/night)</span>
                 <span>₹{totals.extraGuestCharge.toLocaleString("en-IN")}</span>
               </div>
             )}
