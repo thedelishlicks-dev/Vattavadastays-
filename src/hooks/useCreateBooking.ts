@@ -119,7 +119,7 @@ export function useCreateBooking() {
         }
 
         const extraGuestCharge =
-          Math.max(0, ri.guestCount - 2) * (room.extra_guest_price ?? 0) * nights;
+          Math.max(0, ri.guestCount - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
 
         roomPrices.push({
           roomId: ri.roomId,
