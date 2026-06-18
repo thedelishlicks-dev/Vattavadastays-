@@ -78,16 +78,6 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
     }
 
     try {
-      // TEMP DEBUG — remove after diagnosing the Misty Ridge issue
-      console.log("[booking-debug] selections cart:", selections.map((s) => ({
-        roomId: s.room.id,
-        roomName: s.room.name,
-        roomMaxGuests: s.room.max_guests,
-        adults: s.adults,
-        children: s.children,
-        computedGuestCount: s.adults + (s.children ?? 0),
-      })));
-
       const result = await createBooking({
         propertyId,
         rooms: selections.map((s) => ({
@@ -560,4 +550,3 @@ function buildOwnerNotifyLink({
 
   return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
 }
- 
