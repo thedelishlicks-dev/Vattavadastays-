@@ -587,7 +587,34 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     onRefresh(); setShowDiscountForm(false);
   };
 
-  const invoiceBooking = { ...bookings[0], guest_name: group.guest_name, guest_phone: group.guest_phone, guest_email: group.guest_email, check_in: group.check_in, check_out: group.check_out, guest_count: group.guest_count, total_amount: group.total_amount, advance_amount: group.advance_amount, discount_amount: group.discount_amount, discount_reason: group.discount_reason, payment_method: group.payment_method, payment_reference: group.payment_reference, is_paid: group.is_paid, status: group.status } as Booking;
+  // Sum room_price / extra_guest_charge across ALL rooms in the group —
+  // using only bookings[0] here would show one room's charges paired with
+  // the group's pooled guest_count/total_amount, which is misleading
+  // (e.g. "7 guests" next to a single room's ₹500 extra charge).
+  const groupRoomPriceTotal = bookings.reduce((sum, b) => sum + Number(b.room_price ?? 0), 0);
+  const groupExtraGuestTotal = bookings.reduce((sum, b) => sum + Number(b.extra_guest_charge ?? 0), 0);
+  const groupNights = bookings[0]?.nights ?? 0; // same stay dates across all rooms in a group
+
+  const invoiceBooking = {
+    ...bookings[0],
+    guest_name: group.guest_name,
+    guest_phone: group.guest_phone,
+    guest_email: group.guest_email,
+    check_in: group.check_in,
+    check_out: group.check_out,
+    guest_count: group.guest_count,
+    nights: groupNights,
+    room_price: groupRoomPriceTotal,
+    extra_guest_charge: groupExtraGuestTotal,
+    total_amount: group.total_amount,
+    advance_amount: group.advance_amount,
+    discount_amount: group.discount_amount,
+    discount_reason: group.discount_reason,
+    payment_method: group.payment_method,
+    payment_reference: group.payment_reference,
+    is_paid: group.is_paid,
+    status: group.status,
+  } as Booking;
 
   return (
     <>

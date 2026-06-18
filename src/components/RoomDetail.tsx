@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
 import { X, Minus, Plus } from "lucide-react";
 import type { Room } from "@/types/database";
@@ -37,6 +37,17 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
   const [children, setChildren] = useState(0);
   const [extraBeds, setExtraBeds] = useState(0);
   const [meal, setMeal] = useState<MealPlan>("None");
+
+  // Defensive resync: if this component instance is ever reused for a
+  // different room (e.g. no `key` prop upstream, or a future refactor),
+  // reset the guest/meal selections to that room's own defaults instead
+  // of carrying over stale values from whichever room was open before.
+  useEffect(() => {
+    setAdults(room.max_guests);
+    setChildren(0);
+    setExtraBeds(0);
+    setMeal("None");
+  }, [room.id, room.max_guests]);
 
   const nights =
     checkIn && checkOut

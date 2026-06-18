@@ -152,6 +152,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
       <Footer subdomain={subdomain} />
       {openRoom && (
         <RoomDetail
+          key={openRoom.id}
           room={openRoom}
           checkIn={checkIn}
           checkOut={checkOut}

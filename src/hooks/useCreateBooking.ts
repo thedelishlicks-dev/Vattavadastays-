@@ -69,12 +69,18 @@ export function useCreateBooking() {
 
       if (roomsErr || !roomDetails) throw new Error("Could not load room details.");
 
-      // Validate guest counts per room
+      // Validate guest counts per room.
+      // max_guests is the number of guests INCLUDED in the base price, not
+      // a hard cap — guests can exceed it up to EXTRA_GUEST_ALLOWANCE more,
+      // charged at extra_guest_price per night. This must match the ceiling
+      // used by the adults stepper in RoomDetail.tsx (room.max_guests + 4).
+      const EXTRA_GUEST_ALLOWANCE = 4;
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId);
         if (!room) throw new Error("One or more selected rooms are no longer available.");
-        if (ri.guestCount > room.max_guests) {
-          throw new Error(`"${room.name}" holds a maximum of ${room.max_guests} guests.`);
+        const absoluteCap = room.max_guests + EXTRA_GUEST_ALLOWANCE;
+        if (ri.guestCount > absoluteCap) {
+          throw new Error(`"${room.name}" can host a maximum of ${absoluteCap} guests (including extras).`);
         }
       }
 
