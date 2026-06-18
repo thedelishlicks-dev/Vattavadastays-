@@ -73,8 +73,6 @@ export function useCreateBooking() {
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId);
         if (!room) throw new Error("One or more selected rooms are no longer available.");
-        // TEMP DEBUG — remove after diagnosing the Misty Ridge issue
-        console.log("[booking-debug] room:", room.name, "room.id:", room.id, "room.max_guests:", room.max_guests, "| requested roomId:", ri.roomId, "requested guestCount:", ri.guestCount);
         if (ri.guestCount > room.max_guests) {
           throw new Error(`"${room.name}" holds a maximum of ${room.max_guests} guests.`);
         }
