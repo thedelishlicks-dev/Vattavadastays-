@@ -1,23 +1,57 @@
-/**
+ /**
  * /api/manifest.ts — Vercel Edge Function
  *
  * Returns a dynamic PWA manifest scoped to a specific property.
- * Called by SeoTags.tsx as:  /api/manifest?subdomain=bleafmudhouse
+ *
+ * Primary lookup: derives the subdomain from the request's Host header
+ * (e.g. originsoil.stayidom.in -> "originsoil"). This means index.html
+ * can point a static <link rel="manifest" href="/api/manifest"> tag at
+ * this endpoint on the VERY FIRST page load, with no JS-driven swap
+ * needed after mount — avoiding the installability race condition where
+ * Chrome/Safari evaluate the PWA manifest before SeoTags.tsx has had a
+ * chance to fetch the property and patch the <link> tag's href.
+ *
+ * Fallback lookup: still accepts ?subdomain=originsoil for backward
+ * compatibility with SeoTags.tsx's existing runtime swap, and for local
+ * dev / preview URLs where the Host header isn't a real property subdomain.
  *
  * Works on Vercel free tier — Edge Functions are included.
  *
  * Deploy note: this file must live at api/manifest.ts in the repo root
  * (not inside src/). Vercel auto-detects it.
  */
-
 export const config = { runtime: 'edge' }
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!
 
+// Hostnames that are never a property subdomain — root domain, previews, localhost.
+const NON_PROPERTY_HOSTS = new Set(['stayidom.in', 'www.stayidom.in', 'localhost'])
+
+function deriveSubdomainFromHost(host: string | null): string | null {
+  if (!host) return null
+  // Strip port if present (e.g. localhost:5173)
+  const hostname = host.split(':')[0].toLowerCase()
+
+  if (NON_PROPERTY_HOSTS.has(hostname)) return null
+  if (hostname.endsWith('.vercel.app')) return null // preview deployments
+
+  if (hostname.endsWith('.stayidom.in')) {
+    const sub = hostname.slice(0, -'.stayidom.in'.length)
+    return sub || null
+  }
+
+  return null
+}
+
 export default async function handler(req: Request): Promise<Response> {
   const { searchParams } = new URL(req.url)
-  const subdomain = searchParams.get('subdomain')?.trim().toLowerCase()
+  const queryParamSubdomain = searchParams.get('subdomain')?.trim().toLowerCase()
+  const hostSubdomain = deriveSubdomainFromHost(req.headers.get('host'))
+
+  // Host header takes priority — it's available on the very first request,
+  // before any client-side JS has run. Query param is a fallback only.
+  const subdomain = hostSubdomain || queryParamSubdomain || null
 
   // --- fallback manifest used when no subdomain or property not found ---
   const fallback = {
@@ -57,7 +91,6 @@ export default async function handler(req: Request): Promise<Response> {
 
     const rows = await res.json()
     const property = rows?.[0]
-
     if (!property) return jsonResponse(fallback)
 
     const shortName = property.name

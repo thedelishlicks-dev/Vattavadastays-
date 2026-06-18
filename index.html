@@ -4,14 +4,22 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>stayidom.in</title>
-    <link rel="manifest" href="/manifest.json" />
+    <!--
+      Points at the dynamic manifest Edge Function instead of a static file.
+      api/manifest.ts reads the Host header on this very first request and
+      returns that property's own name + logo as the manifest — so Chrome's
+      installability check (which runs on/near initial page load) sees the
+      correct per-property manifest immediately, with no JS-driven swap
+      needed after React mounts. Falls back to the generic stayidom.in
+      manifest for the root domain, previews, and unknown subdomains.
+    -->
+    <link rel="manifest" href="/api/manifest" />
     <meta name="theme-color" content="#166534" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
-
     <!-- Static OG tags — visible to crawlers before React loads -->
     <meta name="description" content="Book your stay directly with Vattavada homestays. No commission, no middlemen." />
     <meta property="og:type" content="website" />
@@ -23,7 +31,6 @@
     <meta name="twitter:title" content="stayidom.in — Book Direct" />
     <meta name="twitter:description" content="Book your stay directly with Vattavada homestays. No commission, no middlemen." />
     <meta name="twitter:image" content="https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/og-default.jpeg" />
-
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
