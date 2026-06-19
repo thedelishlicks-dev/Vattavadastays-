@@ -14,6 +14,7 @@ import {
   MessageCircle,
   IndianRupee,
   Receipt,
+  Hotel,
 } from "lucide-react";
 import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
@@ -39,6 +40,25 @@ function getStepIndex(status: string) {
   return i === -1 ? 0 : i;
 }
 
+// One entry per "thing the guest booked" — either a standalone booking row,
+// or a synthesized entry representing a whole group booking (multiple rooms
+// under one booking_groups row). The page only ever deals with this shape,
+// so the picker, status timeline, and payment summary work the same way
+// regardless of whether it's a single room or a group.
+interface BookingStatusEntry {
+  // Mirrors the subset of `bookings` fields the UI reads. For a group entry
+  // this is synthesized from `booking_groups` + the first room's nights.
+  booking: any;
+  charges: BookingCharge[];
+  chargesTotal: number;
+  advance: number;
+  discount: number;
+  balance: number;
+  isGroup: boolean;
+  groupReference?: string;
+  roomNames?: string[];
+}
+
 function BookingStatusPage() {
   const { phone: prefillPhone } = useSearch({ from: "/booking-status" });
 
@@ -50,36 +70,128 @@ function BookingStatusPage() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["booking-status-lookup", phone],
-    queryFn: async () => {
+    queryFn: async (): Promise<BookingStatusEntry[]> => {
       const digits = phone.replace(/\D/g, "");
       const last10 = digits.slice(-10);
       if (last10.length < 10) throw new Error("Enter a valid 10-digit phone number.");
 
-      const { data: bookings, error: err } = await supabase
+      const phoneFilter =
+        `guest_phone.eq.${last10},` +
+        `guest_phone.eq.91${last10},` +
+        `guest_phone.eq.+91${last10},` +
+        `guest_phone.eq.+91 ${last10}`;
+
+      // Fetch all individual room bookings matching this phone — this
+      // includes rooms that belong to a group booking (they each have their
+      // own row with group_id set).
+      const { data: bookingsRaw, error: bookingsErr } = await supabase
         .from("bookings")
         .select("*, booking_charges(*), rooms(name)")
-        .or(
-          `guest_phone.eq.${last10},` +
-            `guest_phone.eq.91${last10},` +
-            `guest_phone.eq.+91${last10},` +
-            `guest_phone.eq.+91 ${last10}`,
-        )
+        .or(phoneFilter)
         .order("created_at", { ascending: false });
 
-      if (err) throw new Error("Could not fetch bookings. Please try again.");
-      if (!bookings || bookings.length === 0)
-        throw new Error("No bookings found for this phone number.");
+      if (bookingsErr) throw new Error("Could not fetch bookings. Please try again.");
 
-      return bookings.map((booking) => {
-        const charges = (booking.booking_charges ?? []) as BookingCharge[];
-        const chargesTotal = charges.reduce(
-          (s: number, c: BookingCharge) => s + c.qty * c.unit_price,
-          0,
-        );
-        const advance = Number(booking.advance_amount ?? 0);
-        const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - advance);
-        return { booking, charges, chargesTotal, advance, balance };
-      });
+      // Also fetch any group booking rows matching this phone — these hold
+      // the pooled total/discount/advance for multi-room bookings, which
+      // individual `bookings` rows do NOT carry.
+      const { data: groupsRaw, error: groupsErr } = await supabase
+        .from("booking_groups")
+        .select("*")
+        .or(phoneFilter);
+
+      if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
+
+      if ((!bookingsRaw || bookingsRaw.length === 0) && (!groupsRaw || groupsRaw.length === 0)) {
+        throw new Error("No bookings found for this phone number.");
+      }
+
+      const groupsById = new Map((groupsRaw ?? []).map((g) => [g.id, g]));
+
+      const standaloneRows = (bookingsRaw ?? []).filter((b) => !b.group_id);
+      const groupedRoomRows = (bookingsRaw ?? []).filter((b) => b.group_id);
+
+      // One synthesized entry per group, pooling room charges across all
+      // rooms in that group and using booking_groups for total/advance/
+      // discount/status — the same fields the owner sees on their dashboard.
+      const groupIds = Array.from(new Set(groupedRoomRows.map((b) => b.group_id)));
+      const groupEntries: BookingStatusEntry[] = groupIds
+        .map((gid): BookingStatusEntry | null => {
+          const group = groupsById.get(gid);
+          const roomsInGroup = groupedRoomRows.filter((b) => b.group_id === gid);
+          const charges: BookingCharge[] = roomsInGroup.flatMap((b) => b.booking_charges ?? []);
+          const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+
+          if (!group) {
+            // Defensive fallback — group row missing for some reason.
+            // Treat each room as standalone rather than dropping it silently.
+            return null;
+          }
+
+          const discount = Number(group.discount_amount ?? 0);
+          const advance = Number(group.advance_amount ?? 0);
+          const balance = Math.max(0, Number(group.total_amount) + chargesTotal - discount - advance);
+
+          const synthesizedBooking = {
+            ...roomsInGroup[0],
+            id: group.id,
+            guest_name: group.guest_name,
+            guest_phone: group.guest_phone,
+            guest_email: group.guest_email,
+            check_in: group.check_in,
+            check_out: group.check_out,
+            guest_count: group.guest_count,
+            nights: roomsInGroup[0]?.nights ?? 0,
+            total_amount: group.total_amount,
+            advance_amount: group.advance_amount,
+            discount_amount: group.discount_amount,
+            discount_reason: group.discount_reason,
+            payment_method: group.payment_method,
+            payment_reference: group.payment_reference,
+            is_paid: group.is_paid,
+            status: group.status,
+            property_id: group.property_id,
+            rooms: { name: roomsInGroup.map((b) => b.rooms?.name ?? "Room").join(", ") },
+          };
+
+          return {
+            booking: synthesizedBooking,
+            charges,
+            chargesTotal,
+            advance,
+            discount,
+            balance,
+            isGroup: true,
+            groupReference: group.group_reference,
+            roomNames: roomsInGroup.map((b) => b.rooms?.name ?? "Room"),
+          };
+        })
+        .filter((e): e is BookingStatusEntry => e !== null);
+
+      // Any grouped rooms whose group row we couldn't find fall back to
+      // being shown standalone, so nothing silently disappears.
+      const orphanedGroupedRows = groupIds.includes(undefined as unknown as string)
+        ? []
+        : groupedRoomRows.filter((b) => !groupsById.has(b.group_id));
+
+      const standaloneEntries: BookingStatusEntry[] = [...standaloneRows, ...orphanedGroupedRows].map(
+        (booking): BookingStatusEntry => {
+          const charges: BookingCharge[] = booking.booking_charges ?? [];
+          const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+          const discount = Number(booking.discount_amount ?? 0);
+          const advance = Number(booking.advance_amount ?? 0);
+          const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
+          return { booking, charges, chargesTotal, advance, discount, balance, isGroup: false };
+        },
+      );
+
+      const combined = [...groupEntries, ...standaloneEntries].sort(
+        (a, b) => new Date(b.booking.check_in).getTime() - new Date(a.booking.check_in).getTime(),
+      );
+
+      if (combined.length === 0) throw new Error("No bookings found for this phone number.");
+
+      return combined;
     },
     enabled: false,
     retry: false,
@@ -197,11 +309,20 @@ function BookingStatusPage() {
                       : "border-border hover:bg-muted",
                   ].join(" ")}
                 >
-                  <div className="font-medium">
-                    {d.booking.check_in} → {d.booking.check_out}
+                  <div className="flex items-center gap-2">
+                    {d.isGroup && <Hotel className="h-3.5 w-3.5 text-primary shrink-0" />}
+                    <div className="font-medium">
+                      {d.booking.check_in} → {d.booking.check_out}
+                    </div>
+                    {d.isGroup && (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium shrink-0">
+                        {d.roomNames?.length ?? 1} rooms
+                      </span>
+                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-0.5">
                     ₹{Number(d.booking.total_amount).toLocaleString("en-IN")} · {d.booking.status}
+                    {d.isGroup && d.groupReference ? ` · ${d.groupReference}` : ""}
                   </div>
                 </button>
               ))}
@@ -225,8 +346,13 @@ function BookingStatusPage() {
               </div>
             ) : (
               <div className="bg-card border border-border rounded-2xl p-5">
-                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4">
-                  Booking status
+                <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-4 flex items-center justify-between">
+                  <span>Booking status</span>
+                  {selected.isGroup && selected.groupReference && (
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {selected.groupReference}
+                    </span>
+                  )}
                 </div>
                 <div className="space-y-0">
                   {STATUS_STEPS.map((step, idx) => {
@@ -274,6 +400,14 @@ function BookingStatusPage() {
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
                 Booking details
               </div>
+              {selected.isGroup && selected.roomNames && selected.roomNames.length > 0 && (
+                <div className="mb-1">
+                  <div className="text-xs text-muted-foreground">
+                    Rooms ({selected.roomNames.length})
+                  </div>
+                  <div className="text-sm font-medium mt-0.5">{selected.roomNames.join(", ")}</div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 <DetailRow label="Check-in" value={selected.booking.check_in} />
                 <DetailRow label="Check-out" value={selected.booking.check_out} />
@@ -290,13 +424,21 @@ function BookingStatusPage() {
                 </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Room total</span>
+                    <span className="text-muted-foreground">
+                      {selected.isGroup ? "Rooms total" : "Room total"}
+                    </span>
                     <span>₹{Number(selected.booking.total_amount).toLocaleString("en-IN")}</span>
                   </div>
                   {selected.chargesTotal > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Extra charges</span>
                       <span>₹{selected.chargesTotal.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  {selected.discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Discount{selected.booking.discount_reason ? ` (${selected.booking.discount_reason})` : ""}</span>
+                      <span>-₹{selected.discount.toLocaleString("en-IN")}</span>
                     </div>
                   )}
                   {selected.advance > 0 && (
@@ -367,8 +509,7 @@ function BookingStatusPage() {
                 chargesTotal={selected.chargesTotal}
                 advance={selected.advance}
                 balance={selected.balance}
-                totalAmount={Number(selected.booking.total_amount) + selected.chargesTotal}
-                advancePaid={selected.advance}
+                roomNameOverride={selected.isGroup ? selected.roomNames?.join(", ") : undefined}
               />
             )}
 
@@ -379,6 +520,7 @@ function BookingStatusPage() {
               totalAmount={Number(selected.booking.total_amount) + selected.chargesTotal}
               advancePaid={selected.advance}
               showUPI={!isCancelled && selected.booking.payment_method !== "Cash on Arrival"}
+              roomNameOverride={selected.isGroup ? selected.roomNames?.join(", ") : undefined}
             />
           </div>
         )}
@@ -404,8 +546,7 @@ function ContactPropertyWithInvoice({
   chargesTotal,
   advance,
   balance,
-  totalAmount,
-  advancePaid,
+  roomNameOverride,
 }: {
   propertyId: string;
   booking: any;
@@ -413,8 +554,7 @@ function ContactPropertyWithInvoice({
   chargesTotal: number;
   advance: number;
   balance: number;
-  totalAmount: number;
-  advancePaid: number;
+  roomNameOverride?: string;
 }) {
   const { data: property } = useQuery({
     queryKey: ["property-contact", propertyId],
@@ -434,8 +574,9 @@ function ContactPropertyWithInvoice({
 
   if (!property) return null;
 
-  // Room name — we don't have it easily here so use a fallback
-  const roomName = booking.rooms?.name ?? "Room";
+  // Room name — for group bookings use the combined room list passed in,
+  // otherwise fall back to the nested rooms relation, then a generic label.
+  const roomName = roomNameOverride ?? booking.rooms?.name ?? "Room";
 
   return (
     <BookingInvoice
@@ -457,12 +598,14 @@ function ContactProperty({
   totalAmount,
   advancePaid,
   showUPI,
+  roomNameOverride,
 }: {
   propertyId: string;
   booking: any;
   totalAmount: number;
   advancePaid: number;
   showUPI: boolean;
+  roomNameOverride?: string;
 }) {
   const { data: property } = useQuery({
     queryKey: ["property-contact", propertyId],
@@ -503,7 +646,7 @@ function ContactProperty({
           ownerWhatsapp={property.owner_whatsapp ?? ""}
           guestName={booking.guest_name}
           propertyName={property.name}
-          roomName={booking.rooms?.name ?? "Room"}
+          roomName={roomNameOverride ?? booking.rooms?.name ?? "Room"}
           checkIn={booking.check_in}
           bookingId={booking.id}
         />
