@@ -13,7 +13,7 @@ import {
 } from "@/hooks/useBookingCharges";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink } from "@/lib/whatsapp";
+import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 
@@ -676,7 +676,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                 {group.guest_phone && (
                   <Section title="Send to guest">
                     <div className="space-y-2">
-                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone })} label="💰 Payment reminder" />
+                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.guest_phone) })} label="💰 Payment reminder" />
                       <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
                     </div>
                   </Section>
@@ -814,7 +814,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
               <button onClick={() => setShowEditGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
               {canEditStay && <button onClick={() => setShowEditStay(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Stay</button>}
               <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>
-              <a href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
+              <a href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone) })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
               {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
             </div>
           </div>
@@ -981,7 +981,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
       {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />}
       <Section title="Send to guest">
         <div className="space-y-2">
-          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone })} label="💰 Payment reminder" />
+          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone) })} label="💰 Payment reminder" />
           <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
         </div>
       </Section>
@@ -1098,7 +1098,7 @@ function BookingsAdmin() {
     if (newStatus === "confirmed" && property) {
       const booking = bookings.find((b) => b.id === id);
       if (booking) {
-        const waUrl = confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property.name, roomName: roomNameMap[booking.room_id] ?? "your room", checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone: property.owner_phone ?? "" });
+        const waUrl = confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property.name, roomName: roomNameMap[booking.room_id] ?? "your room", checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone) });
         const a = document.createElement("a"); a.href = waUrl; a.target = "_blank"; a.rel = "noreferrer"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
       }
     }
