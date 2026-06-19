@@ -15,6 +15,14 @@ function link(phone: string, text: string): string {
   return `https://wa.me/${clean(phone)}?text=${encodeURIComponent(text)}`;
 }
 
+/**
+ * Builds the guest-facing booking tracking URL — status, invoice, and
+ * payment in one place. Pass window.location.origin as `origin`.
+ */
+export function guestTrackingUrl(origin: string, guestPhone: string): string {
+  return `${origin}/booking-status?phone=${encodeURIComponent(guestPhone)}`;
+}
+
 /** Guest taps "Book via WhatsApp" on the guest page */
 export function bookingInquiryLink({
   ownerWhatsapp,
@@ -54,6 +62,7 @@ export function confirmationLink({
   checkIn,
   checkOut,
   ownerPhone,
+  trackingUrl,
 }: {
   guestPhone: string;
   guestName: string;
@@ -62,12 +71,17 @@ export function confirmationLink({
   checkIn: string;
   checkOut: string;
   ownerPhone: string;
+  /** Optional link to the guest's booking-status page (status, invoice, payment) */
+  trackingUrl?: string;
 }): string {
   const text =
     `Dear ${guestName}, your booking at ${propertyName} is confirmed! ✅\n\n` +
     `Room: ${roomName}\n` +
     `Check-in: ${checkIn}\n` +
     `Check-out: ${checkOut}\n\n` +
+    (trackingUrl
+      ? `📋 View your booking status, invoice & make payments anytime here:\n${trackingUrl}\n\n`
+      : "") +
     `Any questions, call us: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`;
   return link(guestPhone, text);
 }
@@ -121,6 +135,7 @@ export function paymentReminderLink({
   propertyName,
   upiId,
   ownerPhone,
+  trackingUrl,
 }: {
   guestPhone: string;
   guestName: string;
@@ -130,6 +145,8 @@ export function paymentReminderLink({
   propertyName: string;
   upiId?: string;
   ownerPhone?: string;
+  /** Optional link to the guest's booking-status page (status, invoice, payment) */
+  trackingUrl?: string;
 }): string {
   const suggested25 = Math.round(totalAmount * 0.25);
   const balance     = Math.max(0, totalAmount - advancePaid);
@@ -147,6 +164,10 @@ export function paymentReminderLink({
     amountLine  = "fully paid ✓";
     contextLine = `Total: ₹${totalAmount.toLocaleString("en-IN")}`;
   }
+
+  const trackingBlock = trackingUrl
+    ? `📋 Check your invoice & payment status anytime:\n${trackingUrl}\n\n`
+    : "";
 
   const upiBlock = upiId
     ? (
@@ -166,6 +187,7 @@ export function paymentReminderLink({
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
     `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
     `${contextLine}\n\n` +
+    trackingBlock +
     upiBlock +
     helpLine;
 
