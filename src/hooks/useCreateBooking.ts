@@ -93,12 +93,29 @@ export function useCreateBooking() {
 
       if (availErr) throw new Error("Could not check availability.");
 
-      // Verify every room is available on every date
+      // Verify every room is available on every date.
+      //
+      // IMPORTANT: a MISSING row means no one has ever touched that date —
+      // it does NOT mean the room is blocked. Properties that haven't been
+      // pre-seeded with a full year of availability rows (anything other
+      // than the `demo` property) will have no row at all for most future
+      // dates. Treating "no row" as "unavailable" breaks booking for every
+      // property except the one that happens to be seeded.
+      //
+      // This must match the admin-side logic in admin.bookings.tsx's
+      // getUnavailableDates(), which only flags a date when a row exists
+      // AND explicitly has is_available === false:
+      //
+      //   return (data ?? []).filter((row) => row.is_available === false)...
+      //
+      // Previously this code did `if (!row || !row.is_available) throw`,
+      // which blocked bookings on properties with no seeded rows even
+      // though the owner-side flow allowed the exact same booking through.
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId)!;
         for (const date of dates) {
           const row = avail?.find((a) => a.room_id === ri.roomId && a.date === date);
-          if (!row || !row.is_available) {
+          if (row && row.is_available === false) {
             throw new Error(`"${room.name}" is not available on ${date}.`);
           }
         }
@@ -208,7 +225,10 @@ export function useCreateBooking() {
       }
 
       // ── Step 5: Mark all dates unavailable for all rooms ──
-      // Build upsert rows for every room × date combination
+      // Build upsert rows for every room × date combination. This upsert is
+      // also what creates the missing availability rows for properties that
+      // were never pre-seeded — after this, those dates will have an
+      // explicit row going forward.
       const unavailRows = roomIds.flatMap((roomId) =>
         dates.map((date) => ({
           room_id: roomId,
