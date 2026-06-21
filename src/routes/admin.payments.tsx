@@ -3,9 +3,10 @@ import { useState, useEffect, useMemo } from "react";
 import { Wallet, Loader2, Check, IndianRupee } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
-import { useBookings } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import type { Booking, BookingGroup } from "@/types/database";
 
 export const Route = createFileRoute("/admin/payments")({
   component: AdminPayments,
@@ -28,10 +29,37 @@ function encodeUpiId(upiId: string, existing: string[]): string[] {
   return [...filtered, `__upi:${encodeURIComponent(upiId.trim())}`];
 }
 
+// ---------------------------------------------------------------------------
+// Unified "outstanding item" shape so standalone bookings and booking_groups
+// can be rendered/toggled/summed identically. This is the core fix: the old
+// version only looked at useBookings() and silently ignored booking_groups
+// entirely, plus it forgot to subtract discount_amount.
+// ---------------------------------------------------------------------------
+
+type OutstandingItem = {
+  id: string;
+  kind: "booking" | "group";
+  guest_name: string;
+  guest_phone: string | null;
+  check_in: string;
+  total_amount: number;
+  discount_amount: number;
+  advance_amount: number;
+  payment_method: string | null;
+  is_paid: boolean;
+  status: string;
+  roomLabel: string; // "2 rooms" for groups, blank for single bookings
+};
+
+function balanceOf(item: Pick<OutstandingItem, "total_amount" | "discount_amount" | "advance_amount">) {
+  return Math.max(0, Number(item.total_amount) - Number(item.discount_amount) - Number(item.advance_amount));
+}
+
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
   const { user } = useAuth();
   const { data: bookings = [] } = useBookings(property?.id ?? "");
+  const { data: groups = [] } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
 
   const [upiId, setUpiId] = useState("");
@@ -87,38 +115,91 @@ function AdminPayments() {
     }
   };
 
-  const togglePaid = async (bookingId: string, currentlyPaid: boolean) => {
-    setTogglingId(bookingId);
-    // FIX: never overwrite advance_amount — it holds the cumulative partial
-    // payments recorded in admin.bookings.tsx. Only flip the is_paid flag.
-    const updates = { is_paid: !currentlyPaid };
-    await supabase.from("bookings").update(updates).eq("id", bookingId);
-    queryClient.invalidateQueries({
-      queryKey: ["bookings", property?.id],
-      exact: false,
-    });
-    setTogglingId(null);
-  };
+  // A booking that belongs to a group is represented by the group row, not
+  // its own row, so we don't double-count it in stats or the table below.
+  const groupBookingIds = useMemo(() => {
+    const ids = new Set<string>();
+    groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id)));
+    return ids;
+  }, [groups]);
 
-  const unpaidBookings = useMemo(
+  const standaloneBookings = useMemo(
+    () => (bookings as Booking[]).filter((b) => !groupBookingIds.has(b.id)),
+    [bookings, groupBookingIds],
+  );
+
+  // FIX: outstanding/collected now combine standalone bookings AND booking
+  // groups, subtract discount_amount, and use a consistent status filter
+  // (exclude cancelled only — matches the idea that a completed-but-unpaid
+  // stay is still money owed, not money written off).
+  const items: OutstandingItem[] = useMemo(() => {
+    const fromBookings: OutstandingItem[] = standaloneBookings
+      .filter((b) => b.status !== "cancelled")
+      .map((b) => ({
+        id: b.id,
+        kind: "booking",
+        guest_name: b.guest_name,
+        guest_phone: b.guest_phone,
+        check_in: b.check_in,
+        total_amount: Number(b.total_amount),
+        discount_amount: Number(b.discount_amount ?? 0),
+        advance_amount: Number(b.advance_amount ?? 0),
+        payment_method: b.payment_method,
+        is_paid: b.is_paid,
+        status: b.status,
+        roomLabel: "",
+      }));
+
+    const fromGroups: OutstandingItem[] = (groups as BookingGroup[])
+      .filter((g) => g.status !== "cancelled")
+      .map((g) => ({
+        id: g.id,
+        kind: "group",
+        guest_name: g.guest_name,
+        guest_phone: g.guest_phone,
+        check_in: g.check_in,
+        total_amount: Number(g.total_amount),
+        discount_amount: Number(g.discount_amount ?? 0),
+        advance_amount: Number(g.advance_amount ?? 0),
+        payment_method: g.payment_method,
+        is_paid: g.is_paid,
+        status: g.status,
+        roomLabel: `${(g.bookings ?? []).length} rooms`,
+      }));
+
+    return [...fromBookings, ...fromGroups];
+  }, [standaloneBookings, groups]);
+
+  const unpaidItems = useMemo(
     () =>
-      bookings
-        .filter((b) => !b.is_paid && b.status !== "cancelled")
+      items
+        .filter((i) => !i.is_paid)
         .sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime()),
-    [bookings],
+    [items],
   );
 
   const stats = useMemo(() => {
-    const active = bookings.filter((b) => b.status !== "cancelled");
-    const totalCollected = active.reduce((s, b) => s + Number(b.advance_amount ?? 0), 0);
-    const totalOutstanding = active.reduce(
-      (s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.advance_amount ?? 0)),
-      0,
-    );
-    const fullyPaid = active.filter((b) => b.is_paid).length;
-    const partPaid = active.filter((b) => !b.is_paid && Number(b.advance_amount ?? 0) > 0).length;
+    const totalCollected = items.reduce((s, i) => s + i.advance_amount, 0);
+    const totalOutstanding = items.reduce((s, i) => s + balanceOf(i), 0);
+    const fullyPaid = items.filter((i) => i.is_paid).length;
+    const partPaid = items.filter((i) => !i.is_paid && i.advance_amount > 0).length;
     return { totalCollected, totalOutstanding, fullyPaid, partPaid };
-  }, [bookings]);
+  }, [items]);
+
+  const togglePaid = async (item: OutstandingItem) => {
+    setTogglingId(item.id);
+    // FIX: never overwrite advance_amount — it holds the cumulative partial
+    // payments recorded in admin.bookings.tsx. Only flip the is_paid flag.
+    const table = item.kind === "group" ? "booking_groups" : "bookings";
+    await supabase.from(table).update({ is_paid: !item.is_paid }).eq("id", item.id);
+    if (item.kind === "group") {
+      // keep child bookings' is_paid flag in sync for consistency elsewhere
+      await supabase.from("bookings").update({ is_paid: !item.is_paid }).eq("group_id", item.id);
+    }
+    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
+    queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
+    setTogglingId(null);
+  };
 
   if (isLoading) {
     return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
@@ -211,7 +292,7 @@ function AdminPayments() {
       <div className="space-y-3">
         <h2 className="font-semibold text-sm">Outstanding Payments</h2>
 
-        {unpaidBookings.length === 0 ? (
+        {unpaidItems.length === 0 ? (
           <div className="bg-card border border-border rounded-xl p-8 text-center">
             <IndianRupee className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
             <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
@@ -230,37 +311,45 @@ function AdminPayments() {
                 </tr>
               </thead>
               <tbody>
-                {unpaidBookings.map((b) => (
-                  <tr key={b.id} className="border-t border-border">
+                {unpaidItems.map((item) => (
+                  <tr key={`${item.kind}-${item.id}`} className="border-t border-border">
                     <td className="px-4 py-3">
-                      <div className="font-medium">{b.guest_name}</div>
-                      <div className="text-xs text-muted-foreground">{b.guest_phone}</div>
+                      <div className="font-medium flex items-center gap-1.5">
+                        {item.guest_name}
+                        {item.roomLabel && (
+                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                            {item.roomLabel}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground">{item.guest_phone}</div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{b.check_in}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{item.check_in}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold">
-                        ₹
-                        {Math.max(
-                          0,
-                          Number(b.total_amount) - Number(b.advance_amount ?? 0),
-                        ).toLocaleString("en-IN")}
+                        ₹{balanceOf(item).toLocaleString("en-IN")}
                       </div>
-                      {Number(b.advance_amount ?? 0) > 0 && (
+                      {item.advance_amount > 0 && (
                         <div className="text-xs text-primary mt-0.5">
-                          Adv ₹{Number(b.advance_amount).toLocaleString("en-IN")}
+                          Adv ₹{item.advance_amount.toLocaleString("en-IN")}
+                        </div>
+                      )}
+                      {item.discount_amount > 0 && (
+                        <div className="text-xs text-green-600 mt-0.5">
+                          -₹{item.discount_amount.toLocaleString("en-IN")} disc
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {b.payment_method ?? "—"}
+                      {item.payment_method ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
-                        onClick={() => togglePaid(b.id, b.is_paid)}
-                        disabled={togglingId === b.id}
+                        onClick={() => togglePaid(item)}
+                        disabled={togglingId === item.id}
                         className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
                       >
-                        {togglingId === b.id ? (
+                        {togglingId === item.id ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
                         ) : (
                           <Check className="h-3 w-3" />
