@@ -1082,10 +1082,18 @@ function BookingsAdmin() {
   }), [groups, filterStatus, q, hideCancelled]);
 
   const stats = useMemo(() => {
+    // "Active" = currently in-progress stays (pending/confirmed) — a count
+    // of what needs attention right now. Deliberately excludes completed.
     const activeStandalone = standaloneBookings.filter((b) => !["cancelled", "completed"].includes(b.status));
     const activeGroups = groups.filter((g) => !["cancelled", "completed"].includes(g.status));
-    const outstandingStandalone = activeStandalone.reduce((s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0) - Number(b.advance_amount ?? 0)), 0);
-    const outstandingGroups = activeGroups.reduce((s, g) => s + Math.max(0, Number(g.total_amount) - Number(g.discount_amount ?? 0) - Number(g.advance_amount ?? 0)), 0);
+
+    // "Outstanding" = money still owed. A completed stay with an unpaid
+    // balance is still money owed, so this only excludes cancelled bookings
+    // — NOT completed ones. Kept in sync with admin.payments.tsx's stats.
+    const unpaidStandalone = standaloneBookings.filter((b) => b.status !== "cancelled");
+    const unpaidGroups = groups.filter((g) => g.status !== "cancelled");
+    const outstandingStandalone = unpaidStandalone.reduce((s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0) - Number(b.advance_amount ?? 0)), 0);
+    const outstandingGroups = unpaidGroups.reduce((s, g) => s + Math.max(0, Number(g.total_amount) - Number(g.discount_amount ?? 0) - Number(g.advance_amount ?? 0)), 0);
     return { active: activeStandalone.length + activeGroups.length, outstanding: outstandingStandalone + outstandingGroups };
   }, [standaloneBookings, groups]);
 
