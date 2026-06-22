@@ -117,7 +117,14 @@ function DashboardPage() {
     const monthlyRevenue = bookings.filter((b) => {
       const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
       return b.check_in?.slice(0, 7) === thisMonth && (b.status === "confirmed" || b.status === "completed");
-    }).reduce((sum, b) => sum + Number(b.total_amount), 0);
+    }).reduce(
+      // FIX: subtract discount_amount — was previously summing raw
+      // total_amount, which overstates revenue for any discounted booking.
+      // Kept in sync with the discount-subtraction fix applied to
+      // admin.bookings.tsx and admin.payments.tsx.
+      (sum, b) => sum + Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0)),
+      0,
+    );
     return { upcoming, monthlyRevenue };
   }, [bookings, today]);
 
