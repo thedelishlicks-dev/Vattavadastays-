@@ -30,26 +30,26 @@ const LOGO_URL = "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/pub
 import { submitLead } from "../lib/leads";
 
 const FEATURES = [
-  { icon: "🌐", title: "Branded Booking Website",    desc: "yourproperty.stayidom.in — fast, mobile-first, 2G optimized. Instagram bio-ൽ share ചെയ്യൂ." },
-  { icon: "💸", title: "Commission-Free Forever",    desc: "Booking.com & MakeMyTrip-ന് 15–25% കൊടുക്കേണ്ട. Flat monthly fee മാത്രം." },
-  { icon: "📲", title: "Direct UPI Payments",        desc: "Guest pay ചെയ്‌ത് seconds-ൽ നിങ്ങളുടെ account-ൽ. No middleman. No waiting." },
-  { icon: "🔍", title: "Live Booking Tracking",      desc: "Guest-ന് booking status real-time-ൽ കാണാം — confirmed, pending, cancelled." },
-  { icon: "🧾", title: "Auto Invoice Generation",    desc: "Professional invoices automatic. Part-payment, advance, balance — tracked." },
-  { icon: "📊", title: "Accounts Dashboard",         desc: "Monthly revenue, pending payments, collected — ഒറ്റ screen-ൽ. Tax-ready." },
-  { icon: "📥", title: "CSV Export",                 desc: "Bookings & payments Excel-ൽ export. Accountant-ന് share ചെയ്യൂ. No lock-in." },
+  { icon: "🗓️", title: "One Shared Calendar",        desc: "Agent bookings, direct guests, walk-ins — എല്ലാം ഒരു calendar-ൽ. Double-booking ഇനി ഇല്ല." },
+  { icon: "🧾", title: "Agent Commission Tracker",   desc: "ഓരോ agent-ന്റെയും commission automatic ആയി track ചെയ്യും. Spreadsheet വേണ്ട." },
+  { icon: "🔗", title: "Live Availability Link",     desc: "Agents-ന് call ചെയ്യാതെ തന്നെ availability check ചെയ്യാം. നിങ്ങൾക്ക് ഫോൺ കുറയും." },
+  { icon: "📲", title: "Optional Direct Booking",    desc: "Instagram-ൽ നിന്നോ Google-ൽ നിന്നോ വരുന്ന guests-ന് own booking page. Turn on when you want it." },
   { icon: "💬", title: "WhatsApp Deep Links",        desc: "Booking confirm, payment reminder, directions — ഒരു tap-ൽ guest-ന് message ready." },
+  { icon: "🧾", title: "Auto Invoice Generation",    desc: "Professional invoices automatic. Part-payment, advance, balance — tracked." },
+  { icon: "📊", title: "Accounts Dashboard",         desc: "Monthly revenue, pending payments, agent dues — ഒറ്റ screen-ൽ. Tax-ready." },
+  { icon: "📥", title: "CSV Export",                 desc: "Bookings & payments Excel-ൽ export. Accountant-ന് share ചെയ്യൂ. No lock-in." },
   { icon: "📡", title: "2G / Rural Optimized",       desc: "No heavy Maps SDK. System fonts. Lightweight SPA. Vattavada-ൽ works perfectly." },
 ];
 
 const COMPARISON = [
-  { feature: "Commission & Fees",        ota: "15–25% per booking. ₹10,000 booking → ₹2,500 gone.",                     stayidom: "₹0 commission. Flat monthly subscription. You keep 100%." },
-  { feature: "Payout Speed",             ota: "14–21 days after checkout. Cash flow problems during peak season.",        stayidom: "Instant. UPI hits your account seconds after guest pays." },
-  { feature: "Guest Data",               ota: "None. OTAs mask phone & email. You can't remarket or build loyalty.",      stayidom: "100% yours. Full name, phone, email in your dashboard." },
-  { feature: "Setup Time",               ota: "Days to weeks. Verification, document uploads, approval queue.",           stayidom: "5 minutes. Property info → live booking page. Done." },
-  { feature: "Network & Connectivity",   ota: "Heavy apps. Fails on 2G/Edge. Timeout errors in Vattavada frequently.",   stayidom: "2G optimized. Lightweight SPA built for mountain networks." },
-  { feature: "Guest Communication",      ota: "Masked channels only. No direct WhatsApp. No direct calls.",              stayidom: "WhatsApp integrated. Direct deep links to owner's number." },
-  { feature: "Financial Tracking",       ota: "No tracking of cash advances, partial payments, or food bills.",          stayidom: "Full accounts. Part-payment, balance, revenue, CSV export." },
-  { feature: "Data Portability",         ota: "Locked in. Lose booking history if you leave the platform.",              stayidom: "100% portable. Export everything to CSV anytime. No lock-in." },
+  { feature: "Double-Booking Risk",      ota: "Multiple agents calling separately. No shared view. Mistakes happen.",   stayidom: "One calendar, every channel. A room can't be booked twice." },
+  { feature: "Agent Commission",         ota: "Tracked by memory or a notebook. Easy to lose track by season end.",     stayidom: "Logged automatically per agent. Always know what you owe." },
+  { feature: "Confirming Availability",  ota: "Agent calls, you check the notebook, you call back.",                    stayidom: "Live link agents can check themselves. Fewer calls for you." },
+  { feature: "Direct Guests",            ota: "Instagram/Google enquiries mixed into the same notebook as agent bookings.", stayidom: "Own optional booking page, tracked separately — on if you want it." },
+  { feature: "Setup Time",               ota: "N/A — this is how it already works today.",                              stayidom: "We set it up with you, using your real bookings. No blank forms." },
+  { feature: "Network & Connectivity",   ota: "Phone calls work, but nothing is written down centrally.",               stayidom: "2G optimized. Lightweight SPA built for mountain networks." },
+  { feature: "Financial Tracking",       ota: "No record of advances, partial payments, or what's owed to whom.",       stayidom: "Full accounts. Part-payment, balance, agent dues, CSV export." },
+  { feature: "Data Portability",         ota: "Whatever's in the notebook or your head, stays there.",                  stayidom: "100% portable. Export everything to CSV anytime. No lock-in." },
 ];
 
 const TRUST_CARDS = [
@@ -61,19 +61,16 @@ const TRUST_CARDS = [
   { icon: "📍", title: "Offline Directions",             desc: "Google Maps deep link — guest offline map download ചെയ്‌താൽ Vattavada-ൽ no signal-ലും directions കിട്ടും.",                   badges: ["Works offline", "2G ready"] },
 ];
 
-const TESTIMONIALS = [
-  { name: "Rajesh M.",      property: "Vattavada Mudhouse · Peak season operator",   saving: "₹18,000 / month saved",   quote: "MMT requested 18% for our peak season weekend bookings. We shifted our Instagram traffic to stayidom.in, kept 100% of the revenue, and collected advances directly via Google Pay before guests even arrived." },
-  { name: "Suresh Kumar",   property: "Misty Valley Homestay, Vattavada",            saving: "₹12,000 / month save",    quote: "Booking.com-ൽ നിന്ന് ₹800 commission per booking. ഇപ്പോൾ ആ പണം ഞാൻ save ചെയ്യുന്നു. CSV export ചെയ്‌ത് accountant-ന് കൊടുക്കുന്നു — accounts neat ആണ്." },
-  { name: "Thomas Varghese",property: "Cardamom Estate Stay, Munnar",                saving: "100% direct bookings",    quote: "WhatsApp-ൽ link share ചെയ്‌താൽ guests directly book ചെയ്യും. Guest-ന് booking status phone-ൽ കാണാം. 2G-ൽ ഒക്കെ smooth ആണ്." },
-];
+
 
 const FAQS = [
+  { q: "🤝 എന്റെ agents-ന് ഇത് problem ആകുമോ?",                                 a: "ഇല്ല. Agent-sourced bookings-ന് stayidom ഒരു fee-യും എടുക്കില്ല — ₹0, always. Agents-ന് വേണ്ടി ഒരു live availability link കൂടി കൊടുക്കും, അതുകൊണ്ട് അവർക്ക് call ചെയ്യാതെ തന്നെ room free ആണോ എന്ന് നോക്കാം. Direct booking page optional ആണ് — നിങ്ങൾ turn on ചെയ്താൽ മാത്രം active ആകും." },
+  { q: "🧾 Agent commission എങ്ങനെ track ചെയ്യും?",                             a: "ഓരോ booking-ഉം ഏത് agent വഴി ആണ് വന്നത് എന്ന് mark ചെയ്യാം. Dashboard-ൽ ഓരോ agent-നും owed ആയ commission automatic ആയി കാണാം — spreadsheet-ൽ track ചെയ്യേണ്ട." },
   { q: "📡 Range കുറഞ്ഞിരിക്കുമ്പോഴും booking കിട്ടുമോ?",                     a: "Yes — guests city-ൽ ഇരുന്ന് book ചെയ്യും (good network). Guest page ഒരിക്കൽ load ആയാൽ PWA cache ചെയ്യും. Owner dashboard 2G-ൽ work ചെയ്യാൻ TanStack Query optimistic updates ഉപയോഗിക്കുന്നു — actions instant ആണ്, sync background-ൽ ആകും." },
   { q: "💸 stayidom-ന് എന്റെ payment-ൽ access ഉണ്ടോ?",                         a: "ഇല്ല. stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest നേരിട്ട് നിങ്ങളുടെ UPI ID-ലേക്ക് pay ചെയ്യും. V1-ൽ no payment gateway — direct P2P payment." },
-  { q: "👥 Guests stayidom-ൽ trust ചെയ്യുമോ? Booking.com ഇല്ലാതെ book ചെയ്യുമോ?", a: "Yes. Property page-ൽ owner verification, WhatsApp instant contact, transparent policies, professional invoice — ഇതെല്ലാം guest trust build ചെയ്യും. Instagram-ൽ നിന്ന് direct booking convert rate ഉയർന്നതാണ്." },
   { q: "📦 Platform ഒഴിഞ്ഞ് പോകണം എന്ന് തോന്നിയാൽ data കിട്ടുമോ?",            a: "100%. Booking history, guest database, billing ledger — ഒരു click-ൽ CSV export. No restrictions, no lock-in, no extraction fee. Data always yours." },
-  { q: "⏱️ Setup-ന് എത്ര time കൊടുക്കണം?",                                     a: "Property details fill ചെയ്‌ത് 5 minutes. stayidom team setup help ചെയ്യും. Domain live ആകും, WhatsApp link ready ആകും. ഇന്ന് register ചെയ്‌താൽ ഇന്ന് booking page live." },
-  { q: "📄 Contract ഉണ്ടോ? Lock-in period ഉണ്ടോ?",                              a: "ഇല്ല. Monthly subscription. Cancel anytime. Hidden fees ഇല്ല. Commission ഇല്ല. 14 days free trial-ൽ start ചെയ്യൂ." },
+  { q: "⏱️ Setup-ന് എത്ര time കൊടുക്കണം?",                                     a: "ഒന്നും fill ചെയ്യേണ്ട. നിങ്ങളുടെ real bookings ഉപയോഗിച്ച് stayidom team calendar together set up ചെയ്യും — ഒരു 15-minute call മതി. Blank forms ഇല്ല." },
+  { q: "📄 Contract ഉണ്ടോ? Lock-in period ഉണ്ടോ?",                              a: "ഇല്ല. Monthly subscription. Cancel anytime. Hidden fees ഇല്ല. Agent bookings-ന് commission ഇല്ല. 14 days free trial-ൽ start ചെയ്യൂ." },
 ];
 
 function SectionHeader({ title, sub, light = false }: { title: string; sub?: string; light?: boolean }) {
@@ -163,8 +160,8 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
     <div onClick={handleClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1.25rem", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, background: "linear-gradient(155deg,#166534,#14532d)", borderRadius: "1.5rem", padding: "2rem", boxShadow: "0 32px 80px rgba(0,0,0,.45)", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
         <button onClick={handleClose} aria-label="Close" style={{ position: "absolute", top: "1rem", right: "1rem", width: 32, height: 32, borderRadius: "50%", border: "1px solid rgba(255,255,255,.3)", background: "rgba(255,255,255,.1)", color: "#fff", fontSize: "1rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>✕</button>
-        <h2 style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", marginBottom: "0.5rem", paddingRight: "2rem" }}>ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ</h2>
-        <p style={{ color: C.greenLight, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.</p>
+        <h2 style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2rem)", fontWeight: 700, color: "#fff", marginBottom: "0.5rem", paddingRight: "2rem" }}>15-minute setup call ബുക്ക് ചെയ്യൂ</h2>
+        <p style={{ color: C.greenLight, fontSize: "0.9375rem", marginBottom: "1.75rem" }}>നിങ്ങളുടെ real bookings ഉപയോഗിച്ച് calendar together set up ചെയ്യാം. 24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും.</p>
         {submitted ? (
           <div style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "1.25rem", padding: "2rem", color: "#fff", textAlign: "center" }}>
             <div style={{ fontSize: "3rem", marginBottom: "0.875rem" }}>🌿</div>
@@ -184,7 +181,7 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
               <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
             </select>
             <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
-              {loading ? "Submitting..." : "Free Demo ബുക്ക് ചെയ്യൂ →"}
+              {loading ? "Submitting..." : "Setup Call ബുക്ക് ചെയ്യൂ →"}
             </button>
           </form>
         )}
@@ -277,18 +274,18 @@ function Hero({ onDemoClick }: { onDemoClick: () => void }) {
         </div>
 
         <h1 style={{ ...serif, fontSize: "clamp(2.75rem,7vw,5rem)", fontWeight: 700, lineHeight: 1.08, letterSpacing: "-0.03em", color: C.text, marginBottom: "1.5rem" }}>
-          നിങ്ങളുടെ Homestay.{" "}
-          <em style={{ color: C.green, fontStyle: "italic", display: "block" }}>നിങ്ങളുടെ Platform.</em>
+          One calendar for every guest.{" "}
+          <em style={{ color: C.green, fontStyle: "italic", display: "block" }}>Agents, direct, walk-ins.</em>
         </h1>
         <p style={{ fontSize: "1.125rem", color: C.muted, maxWidth: 600, margin: "0 auto 2.5rem", lineHeight: 1.8 }}>
-          Branded booking website · Direct UPI payments · Guest invoicing · WhatsApp integration · Accounts tracking — എല്ലാം ഒരിടത്ത്. Booking.com &amp; MakeMyTrip-ന് കൊടുക്കുന്ന 15–25% commission ഇനി നിങ്ങളുടെ business-ലേക്ക്.
+          Never double-book again. Track what you owe every agent, automatically — plus an optional direct-booking page for guests who find you on Instagram or Google. Works with your agents, not against them.
         </p>
         <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "3.5rem" }}>
-          <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)", border: "none", cursor: "pointer", fontFamily: "inherit" }}>Free Demo — ഇന്ന് തന്നെ</button>
+          <button onClick={onDemoClick} style={{ background: C.green, color: "#fff", padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 700, fontSize: "1rem", boxShadow: "0 4px 24px rgba(22,101,52,.3)", border: "none", cursor: "pointer", fontFamily: "inherit" }}>See it with your own bookings</button>
           <a href="https://demo.stayidom.in" target="_blank" rel="noopener noreferrer" style={{ color: C.green, border: `1.5px solid ${C.green}`, padding: "0.9375rem 2rem", borderRadius: 99, fontWeight: 600, fontSize: "1rem" }}>View Sample Site ↗</a>
         </div>
         <div style={{ display: "flex", gap: "1.5rem", justifyContent: "center", flexWrap: "wrap", rowGap: "1rem" }}>
-          {[["50+","Homestays live"],["₹0","Commission"],["Instant","UPI Payouts"],["2G","Ready"],["5 min","Setup"]].map(([n,l]) => (
+          {[["Zero","Double bookings"],["₹0","Fee on agent bookings"],["Live","Agent availability link"],["2G","Ready"],["Together","We set it up with you"]].map(([n,l]) => (
             <div key={l} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem" }}>
               <span style={{ ...serif, fontSize: "2rem", fontWeight: 700, color: C.green }}>{n}</span>
               <span style={{ fontSize: "0.9375rem", color: C.muted }}>{l}</span>
@@ -304,7 +301,7 @@ function TrustBar() {
   return (
     <div style={{ background: C.green, padding: "1.125rem 1.25rem", textAlign: "center" }}>
       <p style={{ color: C.greenLight, fontSize: "0.9375rem", letterSpacing: "0.02em" }}>
-        Trusted by <strong style={{ color: "#fff" }}>50+ properties</strong> across Vattavada, Munnar &amp; the Cardamom Hills &nbsp;·&nbsp; Recommended by <strong style={{ color: "#fff" }}>Vattavada Tourism Collective</strong>
+        Built with homestay owners in Vattavada &amp; the Cardamom Hills &nbsp;·&nbsp; Designed to work alongside your <strong style={{ color: "#fff" }}>existing agents</strong>, not replace them
       </p>
     </div>
   );
@@ -315,13 +312,13 @@ function ProblemStrip() {
     <section style={{ background: C.dark, padding: "4.5rem 1.25rem", textAlign: "center" }}>
       <div style={{ maxWidth: 640, margin: "0 auto" }}>
         <p style={{ ...serif, fontSize: "clamp(1.5rem,4vw,2.125rem)", fontWeight: 700, color: "#fafaf9", marginBottom: "1.125rem", lineHeight: 1.3 }}>
-          ₹10,000 booking-ൽ ₹2,500 Booking.com-ന്. 15 ദിവസം കഴിഞ്ഞ് payout.
+          രണ്ട് agents ഒരേ room ഒരേ dates-ന് confirm ചെയ്‌താൽ?
         </p>
         <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.75rem" }}>
-          Booking.com &amp; MakeMyTrip ഓരോ booking-ൽ 15–25% commission എടുക്കുന്നു. പണം 15 ദിവസം കഴിഞ്ഞ് transfer ആകും. Guest-ന്റെ phone number നിങ്ങൾക്ക് കിട്ടില്ല.
+          Multiple agents, direct guests, walk-ins — എല്ലാം ഒരേ room-ന് വേണ്ടി വരും. Notebook-ലോ WhatsApp-ലോ ട്രാക്ക് ചെയ്യുമ്പോൾ mistakes സംഭവിക്കും. ആരോട് commission owe ചെയ്യുന്നു എന്നും ഓർത്തിരിക്കണം.
         </p>
         <span style={{ background: C.amber, color: C.dark, fontSize: "0.9375rem", fontWeight: 700, padding: "0.5rem 1.375rem", borderRadius: 99, display: "inline-block" }}>
-          stayidom.in — ഈ cycle ഇന്ന് break ചെയ്യാം
+          stayidom.in — ഒരു calendar, ഒരു source of truth
         </span>
       </div>
     </section>
@@ -429,7 +426,7 @@ function DirectPayment() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12 items-center" style={{ maxWidth: 940, margin: "0 auto" }}>
         <div>
           <h2 style={{ ...serif, fontSize: "clamp(1.75rem,3.5vw,2.5rem)", fontWeight: 700, color: "#fff", marginBottom: "1rem", lineHeight: 1.2 }}>പണം നേരിട്ട് നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക്</h2>
-          <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.5rem" }}>stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Guest pay ചെയ്‌ത് 0 seconds-ൽ നിങ്ങളുടെ UPI-ൽ കിട്ടും. 15 ദിവസം wait ചെയ്യേണ്ടതില്ല.</p>
+          <p style={{ color: "#a8a29e", fontSize: "1.0625rem", lineHeight: 1.8, marginBottom: "1.5rem" }}>stayidom.in ഒരിക്കലും നിങ്ങളുടെ payment touch ചെയ്യില്ല. Direct guest pay ചെയ്‌ത് 0 seconds-ൽ നിങ്ങളുടെ UPI-ൽ കിട്ടും. Agent advances, cash — എല്ലാം ഒരിടത്ത് tracked ആകും.</p>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem", marginBottom: "1.25rem" }}>
             {methods.map(({ icon, label, desc }) => (
               <div key={label} style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "0.875rem", padding: "0.875rem 1.125rem", display: "flex", alignItems: "center", gap: "0.875rem" }}>
@@ -444,7 +441,7 @@ function DirectPayment() {
           <div style={{ background: "#2d2208", border: `1px solid ${C.amber}`, borderRadius: "1rem", padding: "1rem 1.25rem", display: "flex", alignItems: "center", gap: "0.875rem" }}>
             <span style={{ fontSize: "1.375rem", flexShrink: 0 }}>⏱️</span>
             <p style={{ fontSize: "0.9375rem", color: "#fef3c7", lineHeight: 1.6 }}>
-              Booking.com average payout: <strong style={{ color: C.amber }}>14–21 days after checkout.</strong> stayidom.in: <strong style={{ color: C.amber }}>Instant. No middleman.</strong>
+              No more wondering if a guest actually paid. <strong style={{ color: C.amber }}>Every payment logged the moment it happens</strong> — direct, agent advance, or cash on arrival.
             </p>
           </div>
         </div>
@@ -479,13 +476,13 @@ function ComparisonTable() {
   return (
     <section id="compare" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader title="stayidom.in vs Booking.com & MakeMyTrip" sub="ഓരോ row-ഉം compare ചെയ്ത് decide ചെയ്യൂ" />
+        <SectionHeader title="The notebook vs stayidom.in" sub="ഓരോ row-ഉം compare ചെയ്ത് decide ചെയ്യൂ" />
         <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", borderRadius: "0.75rem" }}>
           <table style={{ width: "100%", minWidth: 560, borderCollapse: "separate", borderSpacing: 0, fontSize: "0.9375rem" }}>
             <thead>
               <tr>
                 <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", width: "26%" }}>Feature</th>
-                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: "#fff1f2", color: "#991b1b", width: "37%" }}>🚫 Booking.com / MakeMyTrip</th>
+                <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: "#fff1f2", color: "#991b1b", width: "37%" }}>🚫 Notebook / WhatsApp / Calls</th>
                 <th style={{ padding: "1rem 1.125rem", textAlign: "left", fontWeight: 700, fontSize: "0.875rem", borderBottom: "2px solid #e7e5e4", background: C.greenLight, color: C.green, width: "37%" }}>✅ stayidom.in</th>
               </tr>
             </thead>
@@ -509,7 +506,7 @@ function GuestTrustSignals() {
   return (
     <section style={{ background: "#f0fdf4", padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader title="Guests-ന് trust ചെയ്യാൻ കാരണം" sub="Booking.com ഇല്ലാതെ guest book ചെയ്യുമോ? — ഈ trust signals ഉണ്ടെങ്കിൽ, yes." />
+        <SectionHeader title="Direct guests trust ചെയ്യാൻ കാരണം" sub="Direct booking optional ആയി turn on ചെയ്യുമ്പോൾ — ഈ trust signals guest confidence build ചെയ്യും." />
         <CardCarousel itemCount={TRUST_CARDS.length}>
           {TRUST_CARDS.map(({ icon, title, desc, badges }) => (
             <Slide key={title}>
@@ -642,20 +639,22 @@ function TwoGSimulator() {
   );
 }
 
-function SavingsCalculator() {
-  const [bookings, setBookings] = useState(20);
+function CommissionLedgerPreview() {
+  const [agents, setAgents]     = useState(4);
+  const [bookings, setBookings] = useState(15);
   const [rate, setRate]         = useState(3000);
-  const commission  = Math.round(bookings * rate * 0.2);
-  const stayidomFee = 1000;
-  const saved       = Math.max(0, commission - stayidomFee);
+  const commissionPct = 10;
+  const totalOwed = Math.round(bookings * rate * (commissionPct / 100));
+  const perAgent  = agents > 0 ? Math.round(totalOwed / agents) : 0;
   return (
     <section style={{ background: C.dark, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader light title="നിങ്ങൾ എത്ര save ചെയ്യും?" sub="Sliders move ചെയ്‌ത് നോക്കൂ" />
+        <SectionHeader light title="ഈ മാസം agents-ന് എത്ര owe ചെയ്യുന്നു?" sub="Sliders move ചെയ്‌ത് നോക്കൂ — ഇത് ആണ് ഇപ്പോൾ notebook-ലോ memory-യിലോ track ചെയ്യുന്നത്" />
         <div style={{ background: "#292524", border: "1px solid #44403c", borderRadius: "1.5rem", padding: "2.25rem", maxWidth: 680, margin: "0 auto" }}>
           {[
-            { id:"b", label:"ഒരു മാസം bookings", min:5,   max:80,    step:1,   val:bookings, display:String(bookings),                 set:setBookings },
-            { id:"r", label:"Average room rate",  min:500, max:10000, step:100, val:rate,     display:`₹${rate.toLocaleString("en-IN")}`, set:setRate },
+            { id:"a", label:"Agents you work with",          min:1,   max:12,    step:1,   val:agents,   display:String(agents),                    set:setAgents },
+            { id:"b", label:"Agent bookings this month",      min:5,   max:60,    step:1,   val:bookings, display:String(bookings),                  set:setBookings },
+            { id:"r", label:"Average room rate",              min:500, max:10000, step:100, val:rate,     display:`₹${rate.toLocaleString("en-IN")}`, set:setRate },
           ].map(({ id, label, min, max, step, val, display, set }) => (
             <div key={id} style={{ marginBottom: "2rem" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
@@ -665,11 +664,10 @@ function SavingsCalculator() {
               <input id={id} type="range" min={min} max={max} step={step} value={val} onChange={e => set(Number(e.target.value))} style={{ width: "100%", accentColor: C.amber, cursor: "pointer" }} />
             </div>
           ))}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { label:"Platform commission (20%)", val:`₹${commission.toLocaleString("en-IN")}`, bg:"#3f2828", border:"#7f1d1d", color:"#fca5a5" },
-              { label:"stayidom cost",              val:`₹${stayidomFee.toLocaleString("en-IN")}`, bg:"#1c2e22", border:C.green,   color:"#86efac" },
-              { label:"നിങ്ങൾ save ചെയ്യും",        val:`₹${saved.toLocaleString("en-IN")}`,       bg:"#2d2208", border:C.amber,   color:"#fbbf24" },
+              { label:`Total commission owed (at ${commissionPct}%)`, val:`₹${totalOwed.toLocaleString("en-IN")}`, bg:"#2d2208", border:C.amber,   color:"#fbbf24" },
+              { label:"Average owed per agent",                        val:`₹${perAgent.toLocaleString("en-IN")}`,  bg:"#1c2e22", border:C.green,   color:"#86efac" },
             ].map(({ label, val, bg, border, color }) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "0.875rem", padding: "1.125rem", textAlign: "center" }}>
                 <p style={{ fontSize: "0.875rem", color: "#a8a29e", marginBottom: "0.5rem" }}>{label}</p>
@@ -677,6 +675,7 @@ function SavingsCalculator() {
               </div>
             ))}
           </div>
+          <p style={{ fontSize: "0.8125rem", color: "#78716c", marginTop: "1.25rem", textAlign: "center" }}>Illustrative at a 10% commission rate — stayidom.in logs your actual rate per agent, automatically.</p>
         </div>
       </div>
     </section>
@@ -686,19 +685,14 @@ function SavingsCalculator() {
 function Testimonials() {
   return (
     <section id="testimonials" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
-      <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader title="Vattavada Owners പറയുന്നത്" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {TESTIMONIALS.map(({ name, property, quote, saving }) => (
-            <div key={name} style={{ background: "#fff", border: "1px solid #e7e5e4", borderRadius: "1.25rem", padding: "1.875rem", display: "flex", flexDirection: "column", gap: "1rem" }}>
-              <p style={{ fontSize: "1rem", color: "#44403c", lineHeight: 1.8, flex: 1, fontStyle: "italic" }}>"{quote}"</p>
-              <div>
-                <span style={{ display: "inline-block", fontSize: "0.875rem", fontWeight: 600, background: C.greenLight, color: C.green, padding: "0.3125rem 0.875rem", borderRadius: 99, marginBottom: "0.625rem" }}>{saving}</span>
-                <p style={{ fontSize: "0.9375rem", fontWeight: 700, color: C.text }}>{name}</p>
-                <p style={{ fontSize: "0.875rem", color: C.muted }}>{property}</p>
-              </div>
-            </div>
-          ))}
+      <div style={{ maxWidth: 680, margin: "0 auto", textAlign: "center" }}>
+        <SectionHeader title="Vattavada-ൽ ഇപ്പോൾ pilot ചെയ്യുന്നു" />
+        <div style={{ background: "#fff", border: `1px solid ${C.greenMid}`, borderRadius: "1.25rem", padding: "2.25rem" }}>
+          <div style={{ fontSize: "2rem", marginBottom: "0.875rem" }}>🌿</div>
+          <p style={{ fontSize: "1.0625rem", color: "#44403c", lineHeight: 1.8, marginBottom: "1.25rem" }}>
+            Agent-driven homestays-ന് വേണ്ടി ഞങ്ങൾ ഇപ്പോൾ build ചെയ്യുന്നത് — real owner conversations-ൽ നിന്ന്. Setup call-ൽ നിങ്ങളുടെ real bookings ഉപയോഗിച്ച് കാണിക്കാം, generic demo അല്ല.
+          </p>
+          <span style={{ fontSize: "0.875rem", fontWeight: 600, background: C.greenLight, color: C.green, padding: "0.375rem 1rem", borderRadius: 99 }}>Early pilot · Vattavada &amp; Cardamom Hills</span>
         </div>
       </div>
     </section>
@@ -784,7 +778,7 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
   return (
     <section id="pricing" style={{ background: C.bg, padding: "5rem 1.25rem" }}>
       <div style={{ maxWidth: 940, margin: "0 auto" }}>
-        <SectionHeader title="Simple, Transparent Pricing" sub="Commission ഇല്ല · Contract ഇല്ല · 14 days free trial" />
+        <SectionHeader title="Simple, Transparent Pricing" sub="Commission ഇല്ല (agent bookings-ന് ഉൾപ്പെടെ) · Contract ഇല്ല · 14 days free trial" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end" style={{ marginBottom: "3rem" }}>
           {[
             { tier: "starter", label: "Starter", rooms: "1–5 മുറികൾ", setup: "₹5,000",  monthly: "₹1,000 / മാസം", highlight: false, tagline: "ചെറിയ homestay-ന് perfect starting point" },
@@ -874,8 +868,8 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   return (
     <section id="signup" style={{ background: "linear-gradient(155deg,#166534,#14532d)", padding: "5rem 1.25rem", textAlign: "center" }}>
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
-        <h2 style={{ ...serif, fontSize: "clamp(1.875rem,4vw,2.75rem)", fontWeight: 700, color: "#fff", marginBottom: "0.75rem" }}>ഇന്ന് Free Demo ബുക്ക് ചെയ്യൂ</h2>
-        <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "2.25rem" }}>24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.</p>
+        <h2 style={{ ...serif, fontSize: "clamp(1.875rem,4vw,2.75rem)", fontWeight: 700, color: "#fff", marginBottom: "0.75rem" }}>നിങ്ങളുടെ real bookings ഉപയോഗിച്ച് ഒരു 15-minute call-ൽ set up ചെയ്യാം</h2>
+        <p style={{ color: C.greenLight, fontSize: "1rem", marginBottom: "2.25rem" }}>Blank forms fill ചെയ്യേണ്ട. 24 hours-ൽ ഞങ്ങൾ WhatsApp-ൽ contact ചെയ്യും. Zero obligation.</p>
         {submitted ? (
           <div style={{ background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", borderRadius: "1.25rem", padding: "2.5rem", color: "#fff" }}>
             <div style={{ fontSize: "3rem", marginBottom: "0.875rem" }}>🌿</div>
@@ -894,7 +888,7 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
               <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
             </select>
             <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
-              {loading ? "Submitting..." : "Free Demo ബുക്ക് ചെയ്യൂ →"}
+              {loading ? "Submitting..." : "Setup Call ബുക്ക് ചെയ്യൂ →"}
             </button>
           </form>
         )}
@@ -947,7 +941,7 @@ export default function LandingPage() {
         <FeaturesGrid />
         <AccountsPanel />
         <TwoGSimulator />
-        <SavingsCalculator />
+        <CommissionLedgerPreview />
         <Testimonials />
         <FAQ />
         <Pricing onSelectTier={handleSelectTier} />
