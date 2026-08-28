@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
-import { Loader2, X, Check, ChevronDown } from "lucide-react";
+import { Loader2, X, Check, ChevronDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
+import { getUnavailableDates } from "@/lib/bookingAvailability";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -29,6 +30,7 @@ interface Room {
   name: string;
   base_price: number;
   extra_guest_price: number;
+  max_guests: number;
 }
 
 interface AddBookingModalProps {
@@ -53,6 +55,7 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [conflicts, setConflicts] = useState<Record<string, string[]>>({});
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -78,14 +81,16 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
         ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev
         : [...prev, roomId]
     );
+    setConflicts((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
   };
 
   const guestCount = Number(form.guest_count) || 1;
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
+  const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
   const roomTotals = useMemo(() => selectedRooms.map((r) => {
     const base = r.base_price * nights;
-    const extra = Math.max(0, guestCount - 2) * (r.extra_guest_price ?? 0) * nights;
+    const extra = Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights;
     return { room: r, roomPrice: base, extraCharge: extra, total: base + extra };
   }), [selectedRooms, nights, guestCount]);
 
@@ -132,7 +137,24 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
     if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
     setSaving(true);
     setError("");
+    setConflicts({});
     try {
+      const conflictResults = await Promise.all(
+        selectedRoomIds.map(async (roomId) => {
+          const blockedDates = await getUnavailableDates(roomId, form.check_in, form.check_out);
+          return { roomId, blockedDates };
+        })
+      );
+      const newConflicts: Record<string, string[]> = {};
+      for (const { roomId, blockedDates } of conflictResults) {
+        if (blockedDates.length > 0) newConflicts[roomId] = blockedDates;
+      }
+      if (Object.keys(newConflicts).length > 0) {
+        setConflicts(newConflicts);
+        setSaving(false);
+        return;
+      }
+
       const isAgentBooking = form.source === "agent" && !!form.agent_id;
       const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
 
@@ -303,8 +325,8 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => { set("check_in", e.target.value); setConflicts({}); }} className={inputCls} /></div>
+              <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => { set("check_out", e.target.value); setConflicts({}); }} className={inputCls} /></div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
@@ -318,17 +340,38 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             <div className="space-y-2">
               {rooms.map((r) => {
                 const selected = selectedRoomIds.includes(r.id);
-                const roomTotal = nights > 0 ? (r.base_price + Math.max(0, guestCount - 2) * (r.extra_guest_price ?? 0)) * nights : 0;
+                const extraCharge = nights > 0 ? Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights : 0;
+                const roomTotal = nights > 0 ? r.base_price * nights + extraCharge : 0;
+                const roomConflicts = conflicts[r.id] ?? [];
                 return (
-                  <button key={r.id} type="button" onClick={() => toggleRoom(r.id)} className={["w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all", selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"].join(" ")}>
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => toggleRoom(r.id)}
+                    className={[
+                      "w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
+                      roomConflicts.length > 0
+                        ? "border-destructive/50 bg-destructive/5"
+                        : selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+                    ].join(" ")}
+                  >
                     <div className={["h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors", selected ? "border-primary bg-primary" : "border-border"].join(" ")}>
                       {selected && <Check className="h-3 w-3 text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">₹{r.base_price.toLocaleString("en-IN")}/night{r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}</div>
+                      <div className="text-xs text-muted-foreground">
+                        ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
+                        {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
+                      </div>
+                      {roomConflicts.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 text-xs text-destructive font-medium">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Not available: {roomConflicts.slice(0, 3).join(", ")}{roomConflicts.length > 3 ? ` +${roomConflicts.length - 3} more` : ""}
+                        </div>
+                      )}
                     </div>
-                    {selected && nights > 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
+                    {selected && nights > 0 && roomConflicts.length === 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
                   </button>
                 );
               })}
@@ -336,7 +379,7 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           </div>
 
           {/* Summary */}
-          {nights > 0 && selectedRooms.length > 0 && (
+          {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
               {roomTotals.map((rt) => (
@@ -357,11 +400,21 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
 
         <div className="px-5 py-4 border-t border-border space-y-2">
           {error && <p className="text-xs text-destructive">{error}</p>}
+          {hasConflicts && (
+            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || hasConflicts}
+              className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
+              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
             </button>
           </div>
         </div>
