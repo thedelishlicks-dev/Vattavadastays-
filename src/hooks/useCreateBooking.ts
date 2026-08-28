@@ -102,11 +102,14 @@ export function useCreateBooking() {
       // dates. Treating "no row" as "unavailable" breaks booking for every
       // property except the one that happens to be seeded.
       //
-      // This must match the admin-side logic in admin.bookings.tsx's
-      // getUnavailableDates(), which only flags a date when a row exists
-      // AND explicitly has is_available === false:
-      //
-      //   return (data ?? []).filter((row) => row.is_available === false)...
+      // This only needs to check `availability` (not `bookings` directly)
+      // because every path that creates a booking — this one, and the
+      // owner-side AddBookingModal — immediately upserts this table via
+      // markDatesUnavailable()/the Step 5 upsert below, rather than relying
+      // on the trg_booking_status_change trigger (which only fires on
+      // UPDATE of status and would miss a freshly-inserted 'confirmed' or
+      // 'pending' row). See src/lib/bookingAvailability.ts for the
+      // owner-side equivalent and more detail on why.
       //
       // Previously this code did `if (!row || !row.is_available) throw`,
       // which blocked bookings on properties with no seeded rows even

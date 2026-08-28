@@ -87,10 +87,28 @@ export interface Booking {
   checked_in_at?: string;
   checked_out_at?: string;
   invoice_notes?: string;
+  source: BookingSource;
+  agent_id?: string | null;
+  commission_amount?: number | null;
+  commission_paid: boolean;
+  commission_paid_date?: string | null;
   created_at: string;
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
+export type BookingSource = "direct" | "agent" | "walk_in";
+export type CommissionType = "percentage" | "flat";
+
+export interface Agent {
+  id: string;
+  property_id: string;
+  name: string;
+  phone?: string;
+  default_commission_type: CommissionType;
+  default_commission_value: number;
+  notes?: string;
+  created_at: string;
+}
 
 export interface BookingCharge {
   id: string;
@@ -120,6 +138,11 @@ export interface BookingGroup {
   payment_method?: string;
   payment_reference?: string;
   is_paid: boolean;
+  source: BookingSource;
+  agent_id?: string | null;
+  commission_amount?: number | null;
+  commission_paid: boolean;
+  commission_paid_date?: string | null;
   created_at: string;
   bookings?: Booking[];
 }

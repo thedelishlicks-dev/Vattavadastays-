@@ -1,17 +1,37 @@
-import { useState, useMemo } from "react";
-import { Plus, Loader2, X, Check } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Loader2, X, Check, ChevronDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import type { BookingStatus } from "@/types/database";
+import { useAgents } from "@/hooks/useAgents";
+import { AgentFormModal } from "@/components/AgentFormModal";
+import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { getUnavailableDates, markDatesUnavailable } from "@/lib/bookingAvailability";
+import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
+
+const SOURCE_OPTIONS: { value: BookingSource; label: string }[] = [
+  { value: "direct", label: "Direct" },
+  { value: "agent", label: "Agent" },
+  { value: "walk_in", label: "Walk-in" },
+];
+
+/** Commission for a room-rate base, using an agent's default rate. */
+function calcCommission(agent: Agent, roomRateBase: number): number {
+  const raw =
+    agent.default_commission_type === "percentage"
+      ? roomRateBase * (agent.default_commission_value / 100)
+      : agent.default_commission_value;
+  return Math.round(raw * 100) / 100;
+}
 
 interface Room {
   id: string;
   name: string;
   base_price: number;
   extra_guest_price: number;
+  max_guests: number;
 }
 
 interface AddBookingModalProps {
@@ -30,12 +50,26 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
     check_out: "",
     guest_count: 2 as number | string,
     status: "confirmed" as BookingStatus,
+    source: "direct" as BookingSource,
+    agent_id: "" as string,
   });
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [conflicts, setConflicts] = useState<Record<string, string[]>>({});
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
+  const { data: agents = [] } = useAgents(propertyId);
+  const [showNewAgentModal, setShowNewAgentModal] = useState(false);
+  // Commission is auto-filled whenever the agent (or the room-rate total it's
+  // based on) changes, but stays editable for one-off negotiated rates. Once
+  // the owner types into the field directly we stop overwriting it — until
+  // they pick a different agent, which resets to that agent's rate again.
+  const [commissionAmount, setCommissionAmount] = useState<number | "">("");
+  const [commissionEdited, setCommissionEdited] = useState(false);
+
+  const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
 
   const nights = useMemo(() => {
     if (!form.check_in || !form.check_out) return 0;
@@ -48,26 +82,83 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
         ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev
         : [...prev, roomId]
     );
+    setConflicts((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
   };
 
   const guestCount = Number(form.guest_count) || 1;
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
+  const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
   const roomTotals = useMemo(() => selectedRooms.map((r) => {
     const base = r.base_price * nights;
-    const extra = Math.max(0, guestCount - 2) * (r.extra_guest_price ?? 0) * nights;
+    const extra = Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights;
     return { room: r, roomPrice: base, extraCharge: extra, total: base + extra };
   }), [selectedRooms, nights, guestCount]);
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
+  // Commission base is room rate only (not extra-guest charges), matching
+  // the spec: "auto-fill using the agent's default rate, calculated from
+  // the booking's room rate". Summed across rooms for multi-room bookings.
+  const roomRateTotal = roomTotals.reduce((s, r) => s + r.roomPrice, 0);
+
+  // Auto-fill commission from the selected agent's default rate whenever the
+  // agent or the underlying room-rate total changes — unless the owner has
+  // already typed a one-off value into the field for this agent selection.
+  useEffect(() => {
+    if (form.source !== "agent" || !selectedAgent) {
+      setCommissionAmount("");
+      return;
+    }
+    if (commissionEdited) return;
+    setCommissionAmount(calcCommission(selectedAgent, roomRateTotal));
+  }, [form.source, selectedAgent, roomRateTotal, commissionEdited]);
+
+  const handleSelectAgent = (agentId: string) => {
+    set("agent_id", agentId);
+    setCommissionEdited(false); // fresh agent → re-derive suggested commission
+  };
+
+  const handleAgentCreated = (agent: Agent) => {
+    handleSelectAgent(agent.id);
+    setShowNewAgentModal(false);
+  };
+
+  const handleSourceChange = (source: BookingSource) => {
+    set("source", source);
+    if (source !== "agent") {
+      set("agent_id", "");
+      setCommissionEdited(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
+    if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
     setSaving(true);
     setError("");
+    setConflicts({});
     try {
+      const conflictResults = await Promise.all(
+        selectedRoomIds.map(async (roomId) => {
+          const blockedDates = await getUnavailableDates(roomId, form.check_in, form.check_out);
+          return { roomId, blockedDates };
+        })
+      );
+      const newConflicts: Record<string, string[]> = {};
+      for (const { roomId, blockedDates } of conflictResults) {
+        if (blockedDates.length > 0) newConflicts[roomId] = blockedDates;
+      }
+      if (Object.keys(newConflicts).length > 0) {
+        setConflicts(newConflicts);
+        setSaving(false);
+        return;
+      }
+
+      const isAgentBooking = form.source === "agent" && !!form.agent_id;
+      const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
+
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
         const { error: err } = await supabase.from("bookings").insert({
@@ -78,9 +169,19 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
           status: form.status, is_paid: false,
+          source: form.source,
+          agent_id: isAgentBooking ? form.agent_id : null,
+          commission_amount: finalCommission,
+          commission_paid: false,
         });
         if (err) throw err;
       } else {
+        // Multi-room: commission is calculated once for the whole booking
+        // (on the summed room rate across all rooms) and stored on the
+        // group, not split across individual room rows — same pattern
+        // total_amount already uses. Member booking rows still carry
+        // source/agent_id for traceability, but leave commission_amount
+        // null so ledger sums never double-count a group's commission.
         const { data: groupData, error: groupErr } = await supabase
           .from("booking_groups")
           .insert({
@@ -91,6 +192,10 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             check_in: form.check_in, check_out: form.check_out,
             total_amount: grandTotal, advance_amount: 0, discount_amount: 0,
             status: form.status, is_paid: false,
+            source: form.source,
+            agent_id: isAgentBooking ? form.agent_id : null,
+            commission_amount: finalCommission,
+            commission_paid: false,
           })
           .select()
           .single();
@@ -103,10 +208,22 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
           status: form.status, is_paid: false, group_id: groupData.id,
+          source: form.source,
+          agent_id: isAgentBooking ? form.agent_id : null,
+          commission_amount: null,
+          commission_paid: false,
         }));
         const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
         if (bookErr) throw bookErr;
       }
+
+      // Keep the `availability` table in sync immediately, the same way the
+      // guest-facing booking flow does — don't rely on the status-UPDATE
+      // trigger, since this is an INSERT and the trigger won't fire for it.
+      await Promise.all(
+        selectedRoomIds.map((roomId) => markDatesUnavailable(roomId, form.check_in, form.check_out))
+      );
+
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
       onSaved?.();
@@ -138,17 +255,79 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
           </div>
 
-          {/* Stay dates */}
+          {/* Booking source */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div>
-              <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div>
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">How did this booking come in?</p>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {SOURCE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSourceChange(opt.value)}
+                  className={[
+                    "flex-1 px-3 py-2 text-sm font-medium transition-colors",
+                    form.source === opt.value ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
-            </div>
+
+            {form.source === "agent" && (
+              <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+                <div>
+                  <label className={labelCls}>Agent</label>
+                  <div className="relative">
+                    <select
+                      value={form.agent_id}
+                      onChange={(e) => {
+                        if (e.target.value === "__new__") {
+                          setShowNewAgentModal(true);
+                        } else {
+                          handleSelectAgent(e.target.value);
+                        }
+                      }}
+                      className={`${inputCls} appearance-none pr-8`}
+                    >
+                      <option value="" disabled>Select an agent</option>
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({a.default_commission_type === "percentage" ? `${a.default_commission_value}%` : `₹${a.default_commission_value} flat`})
+                        </option>
+                      ))}
+                      <option value="__new__">+ Add new agent</option>
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                {form.agent_id && (
+                  <div>
+                    <label className={labelCls}>
+                      Commission {roomRateTotal > 0 ? `(from ₹${roomRateTotal.toLocaleString("en-IN")} room rate)` : ""}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={commissionAmount}
+                        onChange={(e) => {
+                          setCommissionEdited(true);
+                          setCommissionAmount(e.target.value === "" ? "" : parseFloat(e.target.value));
+                        }}
+                        className={`${inputCls} pl-7`}
+                        placeholder="0"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-filled from {selectedAgent?.name}'s default rate — editable for a one-off negotiated rate.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Room selection */}
@@ -157,25 +336,75 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             <div className="space-y-2">
               {rooms.map((r) => {
                 const selected = selectedRoomIds.includes(r.id);
-                const roomTotal = nights > 0 ? (r.base_price + Math.max(0, guestCount - 2) * (r.extra_guest_price ?? 0)) * nights : 0;
+                const extraCharge = nights > 0 ? Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights : 0;
+                const roomTotal = nights > 0 ? r.base_price * nights + extraCharge : 0;
+                const roomConflicts = conflicts[r.id] ?? [];
                 return (
-                  <button key={r.id} type="button" onClick={() => toggleRoom(r.id)} className={["w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all", selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50"].join(" ")}>
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => toggleRoom(r.id)}
+                    className={[
+                      "w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
+                      roomConflicts.length > 0
+                        ? "border-destructive/50 bg-destructive/5"
+                        : selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
+                    ].join(" ")}
+                  >
                     <div className={["h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors", selected ? "border-primary bg-primary" : "border-border"].join(" ")}>
                       {selected && <Check className="h-3 w-3 text-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium truncate">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">₹{r.base_price.toLocaleString("en-IN")}/night{r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}</div>
+                      <div className="text-xs text-muted-foreground">
+                        ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
+                        {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
+                      </div>
+                      {roomConflicts.length > 0 && (
+                        <div className="flex items-center gap-1 mt-1 text-xs text-destructive font-medium">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Not available: {roomConflicts.slice(0, 3).join(", ")}{roomConflicts.length > 3 ? ` +${roomConflicts.length - 3} more` : ""}
+                        </div>
+                      )}
                     </div>
-                    {selected && nights > 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
+                    {selected && nights > 0 && roomConflicts.length === 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
                   </button>
                 );
               })}
             </div>
           </div>
 
+          {/* Stay dates */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
+            <RoomAvailabilityCalendar
+              roomIds={selectedRoomIds}
+              checkIn={form.check_in}
+              checkOut={form.check_out}
+              onChange={(checkIn, checkOut) => {
+                set("check_in", checkIn);
+                set("check_out", checkOut);
+                setConflicts({});
+              }}
+            />
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-border px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
+                <div className="mt-0.5 font-medium">{form.check_in || "Select date"}</div>
+              </div>
+              <div className="rounded-lg border border-border px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
+                <div className="mt-0.5 font-medium">{form.check_out || "Select date"}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
+            </div>
+          </div>
+
           {/* Summary */}
-          {nights > 0 && selectedRooms.length > 0 && (
+          {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
               {roomTotals.map((rt) => (
@@ -184,21 +413,46 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
               {selectedRooms.length > 1 && (
                 <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
               )}
+              {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
+                <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
+                  <span>Commission to {selectedAgent?.name}</span>
+                  <span>₹{Number(commissionAmount).toLocaleString("en-IN")}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
 
         <div className="px-5 py-4 border-t border-border space-y-2">
           {error && <p className="text-xs text-destructive">{error}</p>}
+          {hasConflicts && (
+            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
+            </div>
+          )}
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+            <button
+              onClick={handleSave}
+              disabled={saving || hasConflicts}
+              className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+            >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
+              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
             </button>
           </div>
         </div>
       </div>
+
+      {showNewAgentModal && (
+        <AgentFormModal
+          propertyId={propertyId}
+          agent={null}
+          onClose={() => setShowNewAgentModal(false)}
+          onSaved={handleAgentCreated}
+        />
+      )}
     </div>
   );
 }
