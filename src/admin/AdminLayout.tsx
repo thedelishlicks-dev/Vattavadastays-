@@ -10,6 +10,8 @@ import {
   Sparkles,
   ScrollText,
   Wallet,
+  Handshake,
+  Receipt,
   Settings,
   LogOut,
   Menu,
@@ -37,6 +39,8 @@ const NAV: NavItemDef[] = [
   { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
   { to: "/admin/policies", label: "Policies", icon: ScrollText },
   { to: "/admin/payments", label: "Payments", icon: Wallet },
+  { to: "/admin/agents", label: "Agents", icon: Handshake },
+  { to: "/admin/commissions", label: "Commissions", icon: Receipt },
   { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
