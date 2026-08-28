@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import {
   Search, Plus, Loader2, X, IndianRupee, Utensils, MessageCircle, Check, LogOut,
   Trash2, ChevronRight, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
-  Tag, Pencil, Hotel, ChevronDown, ChevronUp, AlertTriangle,
+  Tag, Pencil, Hotel, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { BookingInvoice } from "@/components/BookingInvoice";
+import { AddBookingModal } from "@/components/AddBookingModal";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 
 export const Route = createFileRoute("/admin/bookings")({
@@ -44,23 +45,6 @@ const CHARGE_PRESETS = [
   { description: "Laundry", unit_price: 150 },
   { description: "Extra blanket", unit_price: 100 },
 ];
-
-async function getUnavailableDates(roomId: string, checkIn: string, checkOut: string): Promise<string[]> {
-  const dates: string[] = [];
-  const start = new Date(checkIn);
-  const end = new Date(checkOut);
-  for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-    dates.push(d.toISOString().slice(0, 10));
-  }
-  if (dates.length === 0) return [];
-  const { data, error } = await supabase
-    .from("availability")
-    .select("date, is_available")
-    .eq("room_id", roomId)
-    .in("date", dates);
-  if (error) throw error;
-  return (data ?? []).filter((row) => row.is_available === false).map((row) => row.date);
-}
 
 function StatusPill({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" };
@@ -152,273 +136,6 @@ function ChargesList({
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Add Multi-Room Booking Modal
-// FIX: extra guest charge now calculated above room.max_guests, not hardcoded 2
-// ---------------------------------------------------------------------------
-
-function AddGroupBookingModal({ propertyId, rooms, onClose, onSaved }: {
-  propertyId: string;
-  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; max_guests: number }[];
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [form, setForm] = useState({
-    guest_name: "",
-    guest_phone: "+91 ",
-    guest_email: "",
-    check_in: "",
-    check_out: "",
-    guest_count: 2 as number | string,
-    status: "confirmed" as BookingStatus,
-  });
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [conflicts, setConflicts] = useState<Record<string, string[]>>({});
-  const queryClient = useQueryClient();
-  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
-
-  const nights = useMemo(() => {
-    if (!form.check_in || !form.check_out) return 0;
-    return Math.max(0, (new Date(form.check_out).getTime() - new Date(form.check_in).getTime()) / 86400000);
-  }, [form.check_in, form.check_out]);
-
-  const toggleRoom = (roomId: string) => {
-    setSelectedRoomIds((prev) =>
-      prev.includes(roomId)
-        ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev
-        : [...prev, roomId]
-    );
-    setConflicts((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
-  };
-
-  const guestCount = Number(form.guest_count) || 1;
-  const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
-
-  const roomTotals = useMemo(() => selectedRooms.map((r) => {
-    const base = r.base_price * nights;
-    // FIX: extra charge above room.max_guests, not hardcoded 2
-    const extra = Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights;
-    return { room: r, roomPrice: base, extraCharge: extra, total: base + extra };
-  }), [selectedRooms, nights, guestCount]);
-
-  const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
-  const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
-
-  const handleSave = async () => {
-    if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
-    if (nights <= 0) { setError("Check-out must be after check-in"); return; }
-    if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
-
-    setSaving(true); setError(""); setConflicts({});
-
-    try {
-      const conflictResults = await Promise.all(
-        selectedRoomIds.map(async (roomId) => {
-          const blockedDates = await getUnavailableDates(roomId, form.check_in, form.check_out);
-          return { roomId, blockedDates };
-        })
-      );
-
-      const newConflicts: Record<string, string[]> = {};
-      for (const { roomId, blockedDates } of conflictResults) {
-        if (blockedDates.length > 0) newConflicts[roomId] = blockedDates;
-      }
-
-      if (Object.keys(newConflicts).length > 0) {
-        setConflicts(newConflicts); setSaving(false); return;
-      }
-
-      if (selectedRoomIds.length === 1) {
-        const rt = roomTotals[0];
-        const { error: err } = await supabase.from("bookings").insert({
-          property_id: propertyId,
-          room_id: rt.room.id,
-          guest_name: form.guest_name,
-          guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null,
-          guest_count: guestCount,
-          check_in: form.check_in,
-          check_out: form.check_out,
-          room_price: rt.roomPrice,
-          extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total,
-          advance_amount: 0,
-          discount_amount: 0,
-          status: form.status,
-          is_paid: false,
-        });
-        if (err) throw err;
-      } else {
-        const { data: groupData, error: groupErr } = await supabase
-          .from("booking_groups")
-          .insert({
-            property_id: propertyId,
-            group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
-            guest_name: form.guest_name,
-            guest_phone: form.guest_phone,
-            guest_email: form.guest_email || null,
-            guest_count: guestCount,
-            check_in: form.check_in,
-            check_out: form.check_out,
-            total_amount: grandTotal,
-            advance_amount: 0,
-            discount_amount: 0,
-            status: form.status,
-            is_paid: false,
-          })
-          .select()
-          .single();
-        if (groupErr) throw groupErr;
-
-        const bookingInserts = roomTotals.map((rt) => ({
-          property_id: propertyId,
-          room_id: rt.room.id,
-          guest_name: form.guest_name,
-          guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null,
-          guest_count: guestCount,
-          check_in: form.check_in,
-          check_out: form.check_out,
-          room_price: rt.roomPrice,
-          extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total,
-          advance_amount: 0,
-          discount_amount: 0,
-          status: form.status,
-          is_paid: false,
-          group_id: groupData.id,
-        }));
-        const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
-        if (bookErr) throw bookErr;
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
-      queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
-      onSaved();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">Add Booking</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" /></div>
-              <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} /></div>
-            </div>
-            <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
-          </div>
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => { set("check_in", e.target.value); setConflicts({}); }} className={inputCls} /></div>
-              <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => { set("check_out", e.target.value); setConflicts({}); }} className={inputCls} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
-            <div className="space-y-2">
-              {rooms.map((r) => {
-                const selected = selectedRoomIds.includes(r.id);
-                // FIX: extra charge above r.max_guests
-                const extraCharge = nights > 0 ? Math.max(0, guestCount - r.max_guests) * r.extra_guest_price * nights : 0;
-                const roomTotal = nights > 0 ? r.base_price * nights + extraCharge : 0;
-                const roomConflicts = conflicts[r.id] ?? [];
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => toggleRoom(r.id)}
-                    className={[
-                      "w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
-                      roomConflicts.length > 0
-                        ? "border-destructive/50 bg-destructive/5"
-                        : selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
-                    ].join(" ")}
-                  >
-                    <div className={["h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors", selected ? "border-primary bg-primary" : "border-border"].join(" ")}>
-                      {selected && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
-                        {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
-                      </div>
-                      {roomConflicts.length > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-destructive font-medium">
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          Not available: {roomConflicts.slice(0, 3).join(", ")}{roomConflicts.length > 3 ? ` +${roomConflicts.length - 3} more` : ""}
-                        </div>
-                      )}
-                    </div>
-                    {selected && nights > 0 && roomConflicts.length === 0 && (
-                      <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
-            <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
-              {roomTotals.map((rt) => (
-                <div key={rt.room.id} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground truncate mr-2">{rt.room.name}</span>
-                  <span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span>
-                </div>
-              ))}
-              {selectedRooms.length > 1 && (
-                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1">
-                  <span>Total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="px-5 py-4 border-t border-border space-y-2">
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          {hasConflicts && (
-            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button
-              onClick={handleSave}
-              disabled={saving || hasConflicts}
-              className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
@@ -1160,7 +877,7 @@ function BookingsAdmin() {
         </div>
       )}
 
-      {showAdd && property && <AddGroupBookingModal propertyId={property.id} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
+      {showAdd && property && <AddBookingModal propertyId={property.id} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
       {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleCancelAndClose} />}
       {activeGroup && <GroupBookingDetailModal group={activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} />}
     </div>
