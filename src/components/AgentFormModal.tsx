@@ -23,7 +23,7 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
     name: agent?.name ?? "",
     phone: agent?.phone ?? "",
     default_commission_type: (agent?.default_commission_type ?? "percentage") as CommissionType,
-    default_commission_value: agent?.default_commission_value ?? 10,
+    default_commission_value: (agent?.default_commission_value ?? 10) as number | "",
     notes: agent?.notes ?? "",
   });
   const [error, setError] = useState("");
@@ -36,19 +36,25 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
       setError("Agent name is required");
       return;
     }
-    if (form.default_commission_value < 0) {
-      setError("Commission value can't be negative");
+    // Coerce here, not on every keystroke — the field holds "" while the
+    // person is mid-edit (e.g. clearing the value to type a new one) and
+    // that must never be allowed to reach the DB as NaN/null, since
+    // default_commission_value is a NOT NULL column.
+    const commissionValue = form.default_commission_value === "" ? 0 : form.default_commission_value;
+    if (Number.isNaN(commissionValue) || commissionValue < 0) {
+      setError("Enter a valid commission value");
       return;
     }
-    if (form.default_commission_type === "percentage" && form.default_commission_value > 100) {
+    if (form.default_commission_type === "percentage" && commissionValue > 100) {
       setError("Percentage commission can't exceed 100%");
       return;
     }
     setError("");
     try {
+      const payload = { ...form, default_commission_value: commissionValue };
       const saved = isEdit
-        ? await updateAgent.mutateAsync({ id: agent.id, propertyId, ...form })
-        : await createAgent.mutateAsync({ propertyId, ...form });
+        ? await updateAgent.mutateAsync({ id: agent.id, propertyId, ...payload })
+        : await createAgent.mutateAsync({ propertyId, ...payload });
       onSaved?.(saved);
       onClose();
     } catch (e: unknown) {
@@ -101,7 +107,14 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
                 max={form.default_commission_type === "percentage" ? 100 : undefined}
                 step={form.default_commission_type === "percentage" ? 0.5 : 1}
                 value={form.default_commission_value}
-                onChange={(e) => set("default_commission_value", e.target.value === "" ? 0 : parseFloat(e.target.value))}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    set("default_commission_value", "");
+                    return;
+                  }
+                  const parsed = parseFloat(e.target.value);
+                  set("default_commission_value", Number.isNaN(parsed) ? "" : parsed);
+                }}
                 className={`${inputCls} flex-1`}
               />
             </div>
