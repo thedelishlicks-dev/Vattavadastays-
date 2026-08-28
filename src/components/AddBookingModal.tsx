@@ -4,7 +4,8 @@ import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
-import { getUnavailableDates } from "@/lib/bookingAvailability";
+import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { getUnavailableDates, markDatesUnavailable } from "@/lib/bookingAvailability";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -215,6 +216,14 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
         const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
         if (bookErr) throw bookErr;
       }
+
+      // Keep the `availability` table in sync immediately, the same way the
+      // guest-facing booking flow does — don't rely on the status-UPDATE
+      // trigger, since this is an INSERT and the trigger won't fire for it.
+      await Promise.all(
+        selectedRoomIds.map((roomId) => markDatesUnavailable(roomId, form.check_in, form.check_out))
+      );
+
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
       onSaved?.();
@@ -321,19 +330,6 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             )}
           </div>
 
-          {/* Stay dates */}
-          <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in} onChange={(e) => { set("check_in", e.target.value); setConflicts({}); }} className={inputCls} /></div>
-              <div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out} onChange={(e) => { set("check_out", e.target.value); setConflicts({}); }} className={inputCls} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
-            </div>
-          </div>
-
           {/* Room selection */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
@@ -375,6 +371,35 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* Stay dates */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
+            <RoomAvailabilityCalendar
+              roomIds={selectedRoomIds}
+              checkIn={form.check_in}
+              checkOut={form.check_out}
+              onChange={(checkIn, checkOut) => {
+                set("check_in", checkIn);
+                set("check_out", checkOut);
+                setConflicts({});
+              }}
+            />
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg border border-border px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
+                <div className="mt-0.5 font-medium">{form.check_in || "Select date"}</div>
+              </div>
+              <div className="rounded-lg border border-border px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
+                <div className="mt-0.5 font-medium">{form.check_out || "Select date"}</div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
             </div>
           </div>
 
