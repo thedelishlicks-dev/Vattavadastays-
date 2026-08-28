@@ -1,11 +1,28 @@
-import { useState, useMemo } from "react";
-import { Plus, Loader2, X, Check } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Loader2, X, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
-import type { BookingStatus } from "@/types/database";
+import { useAgents } from "@/hooks/useAgents";
+import { AgentFormModal } from "@/components/AgentFormModal";
+import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
+
+const SOURCE_OPTIONS: { value: BookingSource; label: string }[] = [
+  { value: "direct", label: "Direct" },
+  { value: "agent", label: "Agent" },
+  { value: "walk_in", label: "Walk-in" },
+];
+
+/** Commission for a room-rate base, using an agent's default rate. */
+function calcCommission(agent: Agent, roomRateBase: number): number {
+  const raw =
+    agent.default_commission_type === "percentage"
+      ? roomRateBase * (agent.default_commission_value / 100)
+      : agent.default_commission_value;
+  return Math.round(raw * 100) / 100;
+}
 
 interface Room {
   id: string;
@@ -30,12 +47,25 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
     check_out: "",
     guest_count: 2 as number | string,
     status: "confirmed" as BookingStatus,
+    source: "direct" as BookingSource,
+    agent_id: "" as string,
   });
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
+  const { data: agents = [] } = useAgents(propertyId);
+  const [showNewAgentModal, setShowNewAgentModal] = useState(false);
+  // Commission is auto-filled whenever the agent (or the room-rate total it's
+  // based on) changes, but stays editable for one-off negotiated rates. Once
+  // the owner types into the field directly we stop overwriting it — until
+  // they pick a different agent, which resets to that agent's rate again.
+  const [commissionAmount, setCommissionAmount] = useState<number | "">("");
+  const [commissionEdited, setCommissionEdited] = useState(false);
+
+  const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
 
   const nights = useMemo(() => {
     if (!form.check_in || !form.check_out) return 0;
@@ -60,14 +90,52 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
   }), [selectedRooms, nights, guestCount]);
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
+  // Commission base is room rate only (not extra-guest charges), matching
+  // the spec: "auto-fill using the agent's default rate, calculated from
+  // the booking's room rate". Summed across rooms for multi-room bookings.
+  const roomRateTotal = roomTotals.reduce((s, r) => s + r.roomPrice, 0);
+
+  // Auto-fill commission from the selected agent's default rate whenever the
+  // agent or the underlying room-rate total changes — unless the owner has
+  // already typed a one-off value into the field for this agent selection.
+  useEffect(() => {
+    if (form.source !== "agent" || !selectedAgent) {
+      setCommissionAmount("");
+      return;
+    }
+    if (commissionEdited) return;
+    setCommissionAmount(calcCommission(selectedAgent, roomRateTotal));
+  }, [form.source, selectedAgent, roomRateTotal, commissionEdited]);
+
+  const handleSelectAgent = (agentId: string) => {
+    set("agent_id", agentId);
+    setCommissionEdited(false); // fresh agent → re-derive suggested commission
+  };
+
+  const handleAgentCreated = (agent: Agent) => {
+    handleSelectAgent(agent.id);
+    setShowNewAgentModal(false);
+  };
+
+  const handleSourceChange = (source: BookingSource) => {
+    set("source", source);
+    if (source !== "agent") {
+      set("agent_id", "");
+      setCommissionEdited(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
+    if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
     setSaving(true);
     setError("");
     try {
+      const isAgentBooking = form.source === "agent" && !!form.agent_id;
+      const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
+
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
         const { error: err } = await supabase.from("bookings").insert({
@@ -78,9 +146,19 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
           status: form.status, is_paid: false,
+          source: form.source,
+          agent_id: isAgentBooking ? form.agent_id : null,
+          commission_amount: finalCommission,
+          commission_paid: false,
         });
         if (err) throw err;
       } else {
+        // Multi-room: commission is calculated once for the whole booking
+        // (on the summed room rate across all rooms) and stored on the
+        // group, not split across individual room rows — same pattern
+        // total_amount already uses. Member booking rows still carry
+        // source/agent_id for traceability, but leave commission_amount
+        // null so ledger sums never double-count a group's commission.
         const { data: groupData, error: groupErr } = await supabase
           .from("booking_groups")
           .insert({
@@ -91,6 +169,10 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
             check_in: form.check_in, check_out: form.check_out,
             total_amount: grandTotal, advance_amount: 0, discount_amount: 0,
             status: form.status, is_paid: false,
+            source: form.source,
+            agent_id: isAgentBooking ? form.agent_id : null,
+            commission_amount: finalCommission,
+            commission_paid: false,
           })
           .select()
           .single();
@@ -103,6 +185,10 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
           status: form.status, is_paid: false, group_id: groupData.id,
+          source: form.source,
+          agent_id: isAgentBooking ? form.agent_id : null,
+          commission_amount: null,
+          commission_paid: false,
         }));
         const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
         if (bookErr) throw bookErr;
@@ -136,6 +222,81 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
               <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} /></div>
             </div>
             <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
+          </div>
+
+          {/* Booking source */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">How did this booking come in?</p>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {SOURCE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSourceChange(opt.value)}
+                  className={[
+                    "flex-1 px-3 py-2 text-sm font-medium transition-colors",
+                    form.source === opt.value ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+                  ].join(" ")}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {form.source === "agent" && (
+              <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+                <div>
+                  <label className={labelCls}>Agent</label>
+                  <div className="relative">
+                    <select
+                      value={form.agent_id}
+                      onChange={(e) => {
+                        if (e.target.value === "__new__") {
+                          setShowNewAgentModal(true);
+                        } else {
+                          handleSelectAgent(e.target.value);
+                        }
+                      }}
+                      className={`${inputCls} appearance-none pr-8`}
+                    >
+                      <option value="" disabled>Select an agent</option>
+                      {agents.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name} ({a.default_commission_type === "percentage" ? `${a.default_commission_value}%` : `₹${a.default_commission_value} flat`})
+                        </option>
+                      ))}
+                      <option value="__new__">+ Add new agent</option>
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  </div>
+                </div>
+
+                {form.agent_id && (
+                  <div>
+                    <label className={labelCls}>
+                      Commission {roomRateTotal > 0 ? `(from ₹${roomRateTotal.toLocaleString("en-IN")} room rate)` : ""}
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={commissionAmount}
+                        onChange={(e) => {
+                          setCommissionEdited(true);
+                          setCommissionAmount(e.target.value === "" ? "" : parseFloat(e.target.value));
+                        }}
+                        className={`${inputCls} pl-7`}
+                        placeholder="0"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Auto-filled from {selectedAgent?.name}'s default rate — editable for a one-off negotiated rate.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Stay dates */}
@@ -184,6 +345,12 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
               {selectedRooms.length > 1 && (
                 <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
               )}
+              {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
+                <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
+                  <span>Commission to {selectedAgent?.name}</span>
+                  <span>₹{Number(commissionAmount).toLocaleString("en-IN")}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -199,6 +366,15 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
           </div>
         </div>
       </div>
+
+      {showNewAgentModal && (
+        <AgentFormModal
+          propertyId={propertyId}
+          agent={null}
+          onClose={() => setShowNewAgentModal(false)}
+          onSaved={handleAgentCreated}
+        />
+      )}
     </div>
   );
 }
