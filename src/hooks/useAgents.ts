@@ -3,6 +3,14 @@ import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
 import type { Agent, CommissionType } from "@/types/database";
 
+// Supabase's PostgrestError is a plain object, not a native Error — so
+// `catch (e) { e instanceof Error ? e.message : "fallback" }` in the UI
+// silently swallows the real message (RLS violation, constraint failure,
+// etc.) and shows a generic string instead. Wrap it so that check works.
+function asError(err: { message?: string } | null): Error {
+  return new Error(err?.message || "Unknown error");
+}
+
 export const useAgents = (propertyId: string) => {
   const { isAuthenticated } = useAuth();
   return useQuery({
@@ -13,7 +21,7 @@ export const useAgents = (propertyId: string) => {
         .select("*")
         .eq("property_id", propertyId)
         .order("name", { ascending: true });
-      if (error) throw error;
+      if (error) throw asError(error);
       return (data ?? []) as Agent[];
     },
     enabled: !!propertyId && isAuthenticated,
@@ -45,7 +53,7 @@ export function useCreateAgent() {
         })
         .select()
         .single();
-      if (error) throw error;
+      if (error) throw asError(error);
       return data as Agent;
     },
     onSuccess: (_data, variables) => {
@@ -70,7 +78,7 @@ export function useUpdateAgent() {
         .eq("id", input.id)
         .select()
         .single();
-      if (error) throw error;
+      if (error) throw asError(error);
       return data as Agent;
     },
     onSuccess: (_data, variables) => {
@@ -87,7 +95,7 @@ export function useDeleteAgent() {
       // ON DELETE SET NULL, so past commission records aren't destroyed,
       // they just lose the live agent link (source/commission_amount stay).
       const { error } = await supabase.from("agents").delete().eq("id", id);
-      if (error) throw error;
+      if (error) throw asError(error);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ["agents", variables.propertyId] });
