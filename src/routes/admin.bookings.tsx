@@ -398,7 +398,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                 {group.guest_phone && (
                   <Section title="Send to guest">
                     <div className="space-y-2">
-                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.guest_phone) })} label="💰 Payment reminder" />
+                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), chargesTotal, discount, advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.guest_phone) })} label="💰 Payment reminder" />
                       <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
                     </div>
                   </Section>
@@ -703,7 +703,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
       {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />}
       <Section title="Send to guest">
         <div className="space-y-2">
-          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone) })} label="💰 Payment reminder" />
+          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), chargesTotal, discount, advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone) })} label="💰 Payment reminder" />
           <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
         </div>
       </Section>
