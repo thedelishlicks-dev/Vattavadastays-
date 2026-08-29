@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
+import { extractUPIId } from "@/utils/upi";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
@@ -268,6 +269,10 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const [showEditGroupGuest, setShowEditGroupGuest] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const queryClient = useQueryClient();
+  // Same helper as the single-booking modal — was previously hardcoded to
+  // `undefined` here, which silently dropped the UPI fallback only for
+  // group bookings. Kept in sync via the shared extractUPIId util.
+  const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
   const { data: charges = [] } = useGroupCharges(group.id);
   const { mutateAsync: deleteGroupCharge } = useDeleteGroupCharge();
   const bookings = group.bookings ?? [];
@@ -393,7 +398,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                 {group.guest_phone && (
                   <Section title="Send to guest">
                     <div className="space-y-2">
-                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId: undefined, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.guest_phone) })} label="💰 Payment reminder" />
+                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.guest_phone) })} label="💰 Payment reminder" />
                       <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
                     </div>
                   </Section>
@@ -515,7 +520,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
   const { data: charges = [] } = useBookingCharges(booking.id); const { mutateAsync: deleteCharge } = useDeleteCharge();
   const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0); const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
   const ownerPhone = property?.owner_phone ?? ""; const lat = property?.location_lat; const lng = property?.location_lng; const canEditStay = !["completed", "cancelled"].includes(booking.status);
-  const upiId = (() => { const entry = (property?.shared_amenities ?? []).find((a) => a.startsWith("__upi:")); return entry ? decodeURIComponent(entry.slice("__upi:".length)) : undefined; })();
+  const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
   const handleStatus = async (status: string) => { setUpdating(true); await onStatusChange(booking.id, status); setUpdating(false); };
   return (
     <>
