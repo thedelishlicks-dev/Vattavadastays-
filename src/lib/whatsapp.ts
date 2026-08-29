@@ -114,20 +114,51 @@ export function directionsLink({
 }
 
 /**
- * Owner sends payment reminder to guest.
- *
- * Logic:
- * - If no advance recorded yet (advancePaid = 0), ask for 25% advance.
- * - If advance already recorded, ask for the remaining balance.
- * - If fully paid, the caller should not show this link at all,
- *   but we handle it gracefully just in case.
- *
- * NOTE: UPI ID is sent as plain text — never as a upi:// link.
- * WhatsApp intercepts upi:// links and forces WhatsApp Pay.
- * Plain text lets the guest copy the ID into GPay / PhonePe / Paytm.
+ * Shape shared by every payment-reminder call site. Keeping this as one
+ * type (instead of each caller inlining its own fields) is what stops the
+ * message text, amount math, and links from drifting apart again.
  */
-export function paymentReminderLink({
-  guestPhone,
+export interface PaymentReminderInput {
+  guestName: string;
+  totalAmount: number;
+  advancePaid: number;
+  checkIn: string;
+  propertyName: string;
+  /** UPI VPA only — e.g. "name@bank". NEVER pass a phone number here. */
+  upiId?: string;
+  ownerPhone?: string;
+  /** Link to the guest's booking-status page (status, invoice, payment). */
+  trackingUrl: string;
+}
+
+/**
+ * Single source of truth for the payment-reminder amount logic:
+ * - If no advance recorded yet (advancePaid = 0), suggest a 25% advance.
+ * - If an advance is already recorded, ask for the remaining balance.
+ * - If fully paid, callers should not show this reminder at all — this
+ *   function still degrades gracefully if it's called anyway.
+ */
+export function paymentDueAmount(totalAmount: number, advancePaid: number): number {
+  if (advancePaid === 0) return Math.round(totalAmount * 0.25);
+  return Math.max(0, totalAmount - advancePaid);
+}
+
+/**
+ * Builds the payment-reminder message text. Every screen that sends a
+ * payment reminder (bookings list, booking detail, dashboard modal) must
+ * call this — never hand-roll the copy or the amount math again.
+ *
+ * The tracking link is the ONE thing we ask the guest to tap: it hosts a
+ * "Pay via UPI" button that deep-links straight into GPay/PhonePe/Paytm
+ * with the amount pre-filled. The raw UPI ID is offered only as a labelled
+ * fallback for guests who'd rather paste it manually — never presented as
+ * a second, separate action, to avoid the "which one do I use?" confusion.
+ *
+ * NOTE: the fallback UPI ID must be a real UPI VPA. Never substitute the
+ * owner's phone number — a bare phone number is not guaranteed to be a
+ * valid payment handle and can silently misroute the payment.
+ */
+export function buildPaymentReminderText({
   guestName,
   totalAmount,
   advancePaid,
@@ -136,46 +167,30 @@ export function paymentReminderLink({
   upiId,
   ownerPhone,
   trackingUrl,
-}: {
-  guestPhone: string;
-  guestName: string;
-  totalAmount: number;
-  advancePaid: number;
-  checkIn: string;
-  propertyName: string;
-  upiId?: string;
-  ownerPhone?: string;
-  /** Optional link to the guest's booking-status page (status, invoice, payment) */
-  trackingUrl?: string;
-}): string {
-  const suggested25 = Math.round(totalAmount * 0.25);
-  const balance     = Math.max(0, totalAmount - advancePaid);
+}: PaymentReminderInput): string {
+  const due     = paymentDueAmount(totalAmount, advancePaid);
+  const balance = Math.max(0, totalAmount - advancePaid);
 
   let amountLine: string;
   let contextLine: string;
 
   if (advancePaid === 0) {
-    amountLine  = `₹${suggested25.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
+    amountLine  = `₹${due.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
     contextLine = `Total booking amount: ₹${totalAmount.toLocaleString("en-IN")}`;
   } else if (balance > 0) {
-    amountLine  = `₹${balance.toLocaleString("en-IN")} (remaining balance)`;
+    amountLine  = `₹${due.toLocaleString("en-IN")} (remaining balance)`;
     contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${totalAmount.toLocaleString("en-IN")}`;
   } else {
     amountLine  = "fully paid ✓";
     contextLine = `Total: ₹${totalAmount.toLocaleString("en-IN")}`;
   }
 
-  const trackingBlock = trackingUrl
-    ? `📋 Check your invoice & payment status anytime:\n${trackingUrl}\n\n`
-    : "";
+  const payBlock = `👉 Pay ₹${due.toLocaleString("en-IN")} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
 
-  const upiBlock = upiId
+  const upiFallback = upiId
     ? (
-        `To pay, open GPay / PhonePe / Paytm → Send money → paste this UPI ID:\n` +
-        `UPI ID: ${upiId}\n` +
-        `Amount: ${advancePaid === 0
-          ? `₹${suggested25.toLocaleString("en-IN")}`
-          : `₹${balance.toLocaleString("en-IN")}`}\n\n`
+        `Prefer to pay directly in your UPI app instead of the link above? Use this UPI ID:\n` +
+        `${upiId}\n\n`
       )
     : "";
 
@@ -183,15 +198,22 @@ export function paymentReminderLink({
     ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
     : "Call us if you need help.";
 
-  const text =
+  return (
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
     `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
     `${contextLine}\n\n` +
-    trackingBlock +
-    upiBlock +
-    helpLine;
+    payBlock +
+    upiFallback +
+    helpLine
+  );
+}
 
-  return link(guestPhone, text);
+/** Owner sends payment reminder to guest — returns a ready-to-open wa.me link. */
+export function paymentReminderLink(
+  input: PaymentReminderInput & { guestPhone: string }
+): string {
+  const { guestPhone, ...rest } = input;
+  return link(guestPhone, buildPaymentReminderText(rest));
 }
 
 /** Owner sends day-before reminder to guest */

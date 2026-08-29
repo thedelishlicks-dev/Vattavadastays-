@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, Send } from "lucide-react";
+import { buildPaymentReminderText, guestTrackingUrl } from "@/lib/whatsapp";
 
 interface Booking {
   id: string;
@@ -37,7 +38,8 @@ function buildMessage(
   template: Template,
   booking: Booking,
   roomName: string,
-  property: Props["property"]
+  property: Props["property"],
+  origin: string
 ): string {
   const name = booking.guest_name;
   const prop = property.name;
@@ -45,11 +47,6 @@ function buildMessage(
   const checkIn = booking.check_in;
   const checkOut = booking.check_out;
   const phone = property.owner_phone ?? property.owner_whatsapp ?? "";
-  const totalAmount = Number(booking.total_amount);
-  const advancePaid = Number(booking.advance_amount ?? 0);
-  const balance = Math.max(0, totalAmount - advancePaid);
-  const amountDue = balance > 0 ? balance : totalAmount;
-  const amountStr = `₹${amountDue.toLocaleString("en-IN")}`;
 
   switch (template) {
     case "confirmed":
@@ -70,14 +67,21 @@ function buildMessage(
       );
 
     case "payment":
-      return (
-        `Hi ${name}, friendly reminder — ${amountStr} is pending for your stay at ${prop} (Check-in: ${checkIn}).\n\n` +
-        `Please pay via UPI:\n` +
-        `UPI ID: ${property.upiId ?? phone}\n` +
-        `Amount: ${amountStr}\n\n` +
-        `Open GPay / PhonePe / Paytm → Send money → paste the UPI ID above.\n\n` +
-        `Call us at ${phone} if you need help.`
-      );
+      // Delegates to the shared builder so this button always matches the
+      // "Payment reminder" buttons on the bookings pages: same amount
+      // logic (25% advance vs. remaining balance), same tracking link as
+      // the one primary action, and never falls back to the owner's phone
+      // number in place of a real UPI ID.
+      return buildPaymentReminderText({
+        guestName: name,
+        totalAmount: Number(booking.total_amount),
+        advancePaid: Number(booking.advance_amount ?? 0),
+        checkIn,
+        propertyName: prop,
+        upiId: property.upiId ?? undefined,
+        ownerPhone: phone,
+        trackingUrl: guestTrackingUrl(origin, booking.guest_phone),
+      });
 
     case "directions":
       return (
@@ -94,7 +98,9 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
 
   const booking = bookings.find(b => b.id === bookingId);
   const roomName = booking ? (roomNameMap[booking.room_id] ?? "your room") : "";
-  const message = booking ? buildMessage(template, booking, roomName, property) : "";
+  const message = booking
+    ? buildMessage(template, booking, roomName, property, window.location.origin)
+    : "";
   const phone = booking?.guest_phone?.replace(/\D/g, "") ?? "";
   const waUrl = `https://wa.me/${phone.startsWith("91") ? phone : `91${phone}`}?text=${encodeURIComponent(message)}`;
 
