@@ -12,11 +12,13 @@ stayidom.in provides homestay owners in Vattavada (Kerala) with their own brande
 - **Booking Reference**: Guest receives a short reference ID (`#XXXXXXXX`) on confirmation, included in WhatsApp notification to owner.
 - **Multi-Tenant Architecture**: Secure data isolation using Supabase Row Level Security (RLS).
 - **Owner Dashboard**: Manage rooms, availability, and bookings from a mobile-responsive interface.
+- **Agent Booking Tracking**: Owners can log which bookings came through an agent, track commission (percentage or flat rate, auto-calculated but editable per booking), and see a per-agent commission ledger with mark-as-paid and CSV export. Agent self-service (agents logging in themselves) is not built yet — owner-entered only.
+- **Owner-side Availability Calendar**: The owner's Add Booking form shows a visual month calendar of booked/blocked dates for the selected room(s), same interaction as the guest-facing calendar, instead of blind date inputs.
 - **Superadmin Panel**: Platform management, property onboarding, and subscription tracking. Superadmin can manage any property dashboard directly.
 - **WhatsApp Integration**: Deep links for guest inquiries, booking notifications, and payment screenshot sharing. No heavy API required.
 - **UPI Payments**: Direct UPI deep links to owner's UPI ID. Guest pays owner directly — zero commission, instant settlement.
 - **Offline-Ready Maps**: Native map deep links instead of heavy JavaScript SDKs.
-- **Auto-availability Blocking**: Confirming a booking automatically blocks those dates. Cancelling re-opens them.
+- **Auto-availability Blocking**: Confirming a booking blocks those dates for future bookings — both guest-created and owner-created bookings sync the availability table immediately at creation (owner-side bookings previously didn't; fixed Round 7, see HANDOVER.md). Cancelling re-opens them.
 
 ## Tech Stack
 
@@ -90,7 +92,7 @@ This project follows strict performance and architectural guidelines for Vattava
 ## Documentation
 
 - [Agent Instructions](AGENTS.md)
-- [Handover Notes v5](HANDOVER_v5.md)
+- [Handover Notes (latest — v7)](HANDOVER.md)
 
 ## License
 
