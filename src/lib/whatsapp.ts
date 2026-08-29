@@ -120,7 +120,12 @@ export function directionsLink({
  */
 export interface PaymentReminderInput {
   guestName: string;
+  /** Room/stay charge only. Extra charges go in chargesTotal below. */
   totalAmount: number;
+  /** Sum of all "extra charges" tab entries (qty × unit_price). Defaults to 0. */
+  chargesTotal?: number;
+  /** Discount applied to the booking. Defaults to 0. */
+  discount?: number;
   advancePaid: number;
   checkIn: string;
   propertyName: string;
@@ -132,15 +137,18 @@ export interface PaymentReminderInput {
 }
 
 /**
- * Single source of truth for the payment-reminder amount logic:
- * - If no advance recorded yet (advancePaid = 0), suggest a 25% advance.
+ * Single source of truth for the payment-reminder amount logic. This MUST
+ * be computed the same way as the tracking page / admin balance:
+ *   grandTotal = totalAmount + chargesTotal - discount
+ * - If no advance recorded yet (advancePaid = 0), suggest a 25% advance
+ *   on the grand total (so extra charges aren't quietly excluded).
  * - If an advance is already recorded, ask for the remaining balance.
  * - If fully paid, callers should not show this reminder at all — this
  *   function still degrades gracefully if it's called anyway.
  */
-export function paymentDueAmount(totalAmount: number, advancePaid: number): number {
-  if (advancePaid === 0) return Math.round(totalAmount * 0.25);
-  return Math.max(0, totalAmount - advancePaid);
+export function paymentDueAmount(grandTotal: number, advancePaid: number): number {
+  if (advancePaid === 0) return Math.round(grandTotal * 0.25);
+  return Math.max(0, grandTotal - advancePaid);
 }
 
 /**
@@ -157,10 +165,18 @@ export function paymentDueAmount(totalAmount: number, advancePaid: number): numb
  * NOTE: the fallback UPI ID must be a real UPI VPA. Never substitute the
  * owner's phone number — a bare phone number is not guaranteed to be a
  * valid payment handle and can silently misroute the payment.
+ *
+ * NOTE: totalAmount is the room charge ONLY. Extra charges (food, late
+ * checkout, damages, etc. entered in the "Extra charges" tab) must be
+ * passed in chargesTotal, and any discount in discount — otherwise the
+ * balance shown here will silently under-count what's actually owed,
+ * same as the balance shown on the tracking page and admin dashboard.
  */
 export function buildPaymentReminderText({
   guestName,
   totalAmount,
+  chargesTotal = 0,
+  discount = 0,
   advancePaid,
   checkIn,
   propertyName,
@@ -168,21 +184,29 @@ export function buildPaymentReminderText({
   ownerPhone,
   trackingUrl,
 }: PaymentReminderInput): string {
-  const due     = paymentDueAmount(totalAmount, advancePaid);
-  const balance = Math.max(0, totalAmount - advancePaid);
+  const grandTotal = totalAmount + chargesTotal - discount;
+  const due     = paymentDueAmount(grandTotal, advancePaid);
+  const balance = Math.max(0, grandTotal - advancePaid);
+
+  const breakdownLine = chargesTotal > 0 || discount > 0
+    ? `(Room: ₹${totalAmount.toLocaleString("en-IN")}` +
+      (chargesTotal > 0 ? ` + Extra charges: ₹${chargesTotal.toLocaleString("en-IN")}` : "") +
+      (discount > 0 ? ` − Discount: ₹${discount.toLocaleString("en-IN")}` : "") +
+      `)\n`
+    : "";
 
   let amountLine: string;
   let contextLine: string;
 
   if (advancePaid === 0) {
     amountLine  = `₹${due.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
-    contextLine = `Total booking amount: ₹${totalAmount.toLocaleString("en-IN")}`;
+    contextLine = `Total booking amount: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
   } else if (balance > 0) {
     amountLine  = `₹${due.toLocaleString("en-IN")} (remaining balance)`;
-    contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${totalAmount.toLocaleString("en-IN")}`;
+    contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
   } else {
     amountLine  = "fully paid ✓";
-    contextLine = `Total: ₹${totalAmount.toLocaleString("en-IN")}`;
+    contextLine = `Total: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
   }
 
   const payBlock = `👉 Pay ₹${due.toLocaleString("en-IN")} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
@@ -201,7 +225,7 @@ export function buildPaymentReminderText({
   return (
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
     `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
-    `${contextLine}\n\n` +
+    `${contextLine}\n` +
     payBlock +
     upiFallback +
     helpLine
