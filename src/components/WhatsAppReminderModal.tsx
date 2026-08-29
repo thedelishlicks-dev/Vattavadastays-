@@ -10,7 +10,10 @@ interface Booking {
   check_out: string;
   total_amount: number;
   advance_amount: number;
+  discount_amount?: number | null;
   room_id: string;
+  /** Extra charges tab entries, joined in via useBookings(). */
+  booking_charges?: { qty: number; unit_price: number }[] | null;
 }
 
 interface Props {
@@ -66,15 +69,19 @@ function buildMessage(
         `Call us at ${phone} if you need anything.`
       );
 
-    case "payment":
+    case "payment": {
       // Delegates to the shared builder so this button always matches the
       // "Payment reminder" buttons on the bookings pages: same amount
-      // logic (25% advance vs. remaining balance), same tracking link as
-      // the one primary action, and never falls back to the owner's phone
-      // number in place of a real UPI ID.
+      // logic (25% advance vs. remaining balance, extra charges + discount
+      // included), same tracking link as the one primary action, and never
+      // falls back to the owner's phone number in place of a real UPI ID.
+      const chargesTotal = (booking.booking_charges ?? [])
+        .reduce((sum, c) => sum + c.qty * c.unit_price, 0);
       return buildPaymentReminderText({
         guestName: name,
         totalAmount: Number(booking.total_amount),
+        chargesTotal,
+        discount: Number(booking.discount_amount ?? 0),
         advancePaid: Number(booking.advance_amount ?? 0),
         checkIn,
         propertyName: prop,
@@ -82,6 +89,7 @@ function buildMessage(
         ownerPhone: phone,
         trackingUrl: guestTrackingUrl(origin, booking.guest_phone),
       });
+    }
 
     case "directions":
       return (

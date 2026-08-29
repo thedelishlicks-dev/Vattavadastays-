@@ -15,7 +15,7 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
     queryFn: async () => {
       let query = supabase
         .from("bookings")
-        .select("*")
+        .select("*, booking_charges(*)")
         .eq("property_id", propertyId)
         .order("check_in", { ascending: false });
       if (filters?.status) query = query.eq("status", filters.status);
