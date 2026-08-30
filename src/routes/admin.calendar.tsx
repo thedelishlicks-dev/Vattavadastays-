@@ -4,6 +4,7 @@ import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
 import { useBookings } from '@/hooks/useBookings'
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { eachDate } from '@/lib/bookingAvailability'
 
 export const Route = createFileRoute('/admin/calendar')({
   component: AdminCalendar,
@@ -35,32 +36,13 @@ function AdminCalendar() {
     property?.id ?? ''
   )
 
-  // FIX: parse date strings as local dates to avoid UTC midnight timezone shift
-  const parseLocalDate = (dateStr: string) => {
-    const [y, m, d] = dateStr.split('-').map(Number)
-    return new Date(y, m - 1, d)
-  }
-
-  const toLocalDateStr = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-
   // Build a set of booked dates for the selected room
   const bookedDates = useMemo(() => {
     const dates = new Set<string>()
     bookings
-      .filter(
-        (b) =>
-          b.room_id === activeRoomId &&
-          b.status !== 'cancelled'
-      )
+      .filter((b) => b.room_id === activeRoomId && b.status !== 'cancelled')
       .forEach((b) => {
-        const start = parseLocalDate(b.check_in)
-        const end = parseLocalDate(b.check_out)
-        const cur = new Date(start)
-        while (cur < end) {
-          dates.add(toLocalDateStr(cur))
-          cur.setDate(cur.getDate() + 1)
-        }
+        eachDate(b.check_in, b.check_out).forEach((d) => dates.add(d))
       })
     return dates
   }, [bookings, activeRoomId])
@@ -69,20 +51,11 @@ function AdminCalendar() {
   const bookedGuestMap = useMemo(() => {
     const map: Record<string, string> = {}
     bookings
-      .filter(
-        (b) =>
-          b.room_id === activeRoomId &&
-          b.status !== 'cancelled'
-      )
+      .filter((b) => b.room_id === activeRoomId && b.status !== 'cancelled')
       .forEach((b) => {
-        const start = parseLocalDate(b.check_in)
-        const end = parseLocalDate(b.check_out)
-        const cur = new Date(start)
-        while (cur < end) {
-          const d = toLocalDateStr(cur)
+        eachDate(b.check_in, b.check_out).forEach((d) => {
           map[d] = b.guest_name
-          cur.setDate(cur.getDate() + 1)
-        }
+        })
       })
     return map
   }, [bookings, activeRoomId])
