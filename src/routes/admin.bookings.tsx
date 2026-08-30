@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
   Search, Plus, Loader2, X, IndianRupee, Utensils, MessageCircle, Check, LogOut,
-  Trash2, ChevronRight, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
+  Trash2, ChevronRight, ChevronLeft, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
   Tag, Pencil, Hotel, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -46,6 +46,56 @@ const CHARGE_PRESETS = [
   { description: "Laundry", unit_price: 150 },
   { description: "Extra blanket", unit_price: 100 },
 ];
+
+// ---------------------------------------------------------------------------
+// Date / amount helpers for the unified bookings list (sort, filter, headers)
+// ---------------------------------------------------------------------------
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Today's date as YYYY-MM-DD in the browser's local timezone (not UTC). */
+function todayLocalStr(): string {
+  return new Date().toLocaleDateString("en-CA");
+}
+
+/** Adds `days` (can be negative) to a YYYY-MM-DD string, returning YYYY-MM-DD. */
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("en-CA");
+}
+
+function chargesSum(charges?: { qty: number; unit_price: number }[] | null): number {
+  return (charges ?? []).reduce((s, c) => s + c.qty * c.unit_price, 0);
+}
+
+/** Matches the balance math used on the tracking page / booking detail modal. */
+function amountDueFor(totalAmount: number, chargesTotal: number, discount: number, advance: number): number {
+  return Math.max(0, totalAmount + chargesTotal - discount - advance);
+}
+
+type DateScope = "upcoming" | "month";
+type SortKey = "checkin" | "created" | "due";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "checkin", label: "Check-in date" },
+  { key: "created", label: "Recently added" },
+  { key: "due", label: "Amount due" },
+];
+
+/**
+ * Groups the checked-in-date-sorted list into scannable buckets. Only
+ * meaningful when sortBy === "checkin" and dateScope === "upcoming" (every
+ * item's stay is guaranteed not to have ended yet in that scope).
+ */
+function dateBucket(checkIn: string, todayStr: string): string {
+  const tomorrow = addDaysStr(todayStr, 1);
+  const weekEnd = addDaysStr(todayStr, 7);
+  if (checkIn < todayStr) return "Staying now";
+  if (checkIn === todayStr) return "Today";
+  if (checkIn === tomorrow) return "Tomorrow";
+  if (checkIn <= weekEnd) return "This week";
+  return "Later";
+}
 
 function StatusPill({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" };
@@ -769,6 +819,10 @@ function Row({ label, value, highlight, bold, small }: { label: string; value: s
 // Page root
 // ---------------------------------------------------------------------------
 
+type BookingListItem =
+  | { kind: "single"; id: string; checkIn: string; checkOut: string; createdAt: string; status: string; guestName: string; guestPhone: string; amountDue: number; booking: Booking }
+  | { kind: "group"; id: string; checkIn: string; checkOut: string; createdAt: string; status: string; guestName: string; guestPhone: string; amountDue: number; group: BookingGroup };
+
 function BookingsAdmin() {
   const { data: property } = useOwnerProperty();
   const { data: bookings = [], isLoading: bookingsLoading } = useBookings(property?.id ?? "");
@@ -780,6 +834,9 @@ function BookingsAdmin() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [q, setQ] = useState("");
   const [hideCancelled, setHideCancelled] = useState(true);
+  const [dateScope, setDateScope] = useState<DateScope>("upcoming");
+  const [sortBy, setSortBy] = useState<SortKey>("checkin");
+  const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
 
   const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
   const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; (property?.rooms ?? []).forEach((r) => { map[r.id] = r.name; }); return map; }, [property]);
@@ -787,37 +844,84 @@ function BookingsAdmin() {
   const groupBookingIds = useMemo(() => { const ids = new Set<string>(); groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id))); return ids; }, [groups]);
   const standaloneBookings = useMemo(() => bookings.filter((b) => !groupBookingIds.has(b.id)), [bookings, groupBookingIds]);
 
-  const filteredStandalone = useMemo(() => standaloneBookings.filter((b) => {
-    const viewingCancelled = filterStatus === "cancelled";
-    if (!viewingCancelled && hideCancelled && b.status === "cancelled") return false;
-    if (filterStatus !== "all" && b.status !== filterStatus) return false;
-    if (q && !`${b.guest_name} ${b.guest_phone}`.toLowerCase().includes(q.toLowerCase())) return false;
-    return true;
-  }), [standaloneBookings, filterStatus, q, hideCancelled]);
+  const todayStr = useMemo(() => todayLocalStr(), []);
+  const monthStart = `${monthCursor.year}-${pad2(monthCursor.month + 1)}-01`;
+  const monthEnd = `${monthCursor.year}-${pad2(monthCursor.month + 1)}-${pad2(new Date(monthCursor.year, monthCursor.month + 1, 0).getDate())}`;
+  const monthLabel = new Date(monthCursor.year, monthCursor.month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  const filteredGroups = useMemo(() => groups.filter((g) => {
+  // Single merged, correctly-costed list — this replaces the old pattern of
+  // rendering groups and standalone bookings as two separately-sorted
+  // blocks, which is what made the page feel unordered.
+  const allItems = useMemo<BookingListItem[]>(() => {
+    const groupItems: BookingListItem[] = groups.map((g) => {
+      const gg = g as BookingGroup;
+      const chargesTotal = chargesSum(gg.booking_charges);
+      const advance = Number(gg.advance_amount ?? 0);
+      const discount = Number(gg.discount_amount ?? 0);
+      return {
+        kind: "group", id: gg.id, checkIn: gg.check_in, checkOut: gg.check_out,
+        createdAt: gg.created_at, status: gg.status, guestName: gg.guest_name, guestPhone: gg.guest_phone,
+        amountDue: amountDueFor(Number(gg.total_amount), chargesTotal, discount, advance),
+        group: gg,
+      };
+    });
+    const singleItems: BookingListItem[] = standaloneBookings.map((b) => {
+      const bb = b as Booking;
+      const chargesTotal = chargesSum(bb.booking_charges);
+      const advance = Number(bb.advance_amount ?? 0);
+      const discount = Number(bb.discount_amount ?? 0);
+      return {
+        kind: "single", id: bb.id, checkIn: bb.check_in, checkOut: bb.check_out,
+        createdAt: bb.created_at, status: bb.status, guestName: bb.guest_name, guestPhone: bb.guest_phone,
+        amountDue: amountDueFor(Number(bb.total_amount), chargesTotal, discount, advance),
+        booking: bb,
+      };
+    });
+    return [...groupItems, ...singleItems];
+  }, [groups, standaloneBookings]);
+
+  const filteredItems = useMemo(() => allItems.filter((it) => {
     const viewingCancelled = filterStatus === "cancelled";
-    if (!viewingCancelled && hideCancelled && g.status === "cancelled") return false;
-    if (filterStatus !== "all" && g.status !== filterStatus) return false;
-    if (q && !`${g.guest_name} ${g.guest_phone}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (!viewingCancelled && hideCancelled && it.status === "cancelled") return false;
+    if (filterStatus !== "all" && it.status !== filterStatus) return false;
+    if (q && !`${it.guestName} ${it.guestPhone}`.toLowerCase().includes(q.toLowerCase())) return false;
+    if (dateScope === "upcoming") {
+      // Stay hasn't fully ended yet — covers ongoing stays and future ones.
+      if (it.checkOut < todayStr) return false;
+    } else {
+      // Month scrubber: keep anything whose stay overlaps the selected month at all.
+      if (it.checkOut < monthStart || it.checkIn > monthEnd) return false;
+    }
     return true;
-  }), [groups, filterStatus, q, hideCancelled]);
+  }), [allItems, filterStatus, hideCancelled, q, dateScope, todayStr, monthStart, monthEnd]);
+
+  const sortedItems = useMemo(() => {
+    const items = [...filteredItems];
+    if (sortBy === "checkin") items.sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+    else if (sortBy === "created") items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    else items.sort((a, b) => b.amountDue - a.amountDue);
+    return items;
+  }, [filteredItems, sortBy]);
+
+  // Date-relative section headers only make sense when the list is actually
+  // sorted by check-in date and scoped to what's ahead — otherwise a
+  // "Today" header above a March booking (By month view) would be wrong.
+  const showDateHeaders = dateScope === "upcoming" && sortBy === "checkin";
 
   const stats = useMemo(() => {
     // "Active" = currently in-progress stays (pending/confirmed) — a count
     // of what needs attention right now. Deliberately excludes completed.
-    const activeStandalone = standaloneBookings.filter((b) => !["cancelled", "completed"].includes(b.status));
-    const activeGroups = groups.filter((g) => !["cancelled", "completed"].includes(g.status));
+    const active = allItems.filter((it) => !["cancelled", "completed"].includes(it.status)).length;
 
-    // "Outstanding" = money still owed. A completed stay with an unpaid
-    // balance is still money owed, so this only excludes cancelled bookings
-    // — NOT completed ones. Kept in sync with admin.payments.tsx's stats.
-    const unpaidStandalone = standaloneBookings.filter((b) => b.status !== "cancelled");
-    const unpaidGroups = groups.filter((g) => g.status !== "cancelled");
-    const outstandingStandalone = unpaidStandalone.reduce((s, b) => s + Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0) - Number(b.advance_amount ?? 0)), 0);
-    const outstandingGroups = unpaidGroups.reduce((s, g) => s + Math.max(0, Number(g.total_amount) - Number(g.discount_amount ?? 0) - Number(g.advance_amount ?? 0)), 0);
-    return { active: activeStandalone.length + activeGroups.length, outstanding: outstandingStandalone + outstandingGroups };
-  }, [standaloneBookings, groups]);
+    // "Outstanding" = money still owed, including extra charges and net of
+    // any discount — same math as the tracking page / booking detail modal.
+    // Only cancelled bookings are excluded (a completed stay can still owe).
+    const outstanding = allItems
+      .filter((it) => it.status !== "cancelled")
+      .reduce((s, it) => s + it.amountDue, 0);
+
+    return { active, outstanding };
+  }, [allItems]);
 
   const updateStatus = async (id: string, newStatus: string) => {
     const updates: Record<string, unknown> = { status: newStatus };
@@ -841,7 +945,7 @@ function BookingsAdmin() {
   };
 
   const isLoading = bookingsLoading || groupsLoading;
-  const totalItems = filteredGroups.length + filteredStandalone.length;
+  const totalItems = sortedItems.length;
 
   if (isLoading) return <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;
 
@@ -859,6 +963,7 @@ function BookingsAdmin() {
 
       <div className="space-y-2">
         <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm" /></div>
+
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((s) => (
             <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
@@ -866,6 +971,29 @@ function BookingsAdmin() {
             </button>
           ))}
         </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-full border border-border overflow-hidden shrink-0">
+            <button onClick={() => setDateScope("upcoming")} className={["px-3 py-1.5 text-xs font-medium transition-colors", dateScope === "upcoming" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"].join(" ")}>Upcoming</button>
+            <button onClick={() => setDateScope("month")} className={["px-3 py-1.5 text-xs font-medium transition-colors border-l border-border", dateScope === "month" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"].join(" ")}>By month</button>
+          </div>
+          {dateScope === "month" && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-muted"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <span className="text-xs font-medium min-w-[96px] text-center">{monthLabel}</span>
+              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-muted"><ChevronRight className="h-3.5 w-3.5" /></button>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 text-xs ml-auto">
+            <span className="text-muted-foreground hidden sm:inline">Sort:</span>
+            {SORT_OPTIONS.map((s) => (
+              <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-2.5 py-1 rounded-full border font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {filterStatus !== "cancelled" && (
           <button onClick={() => setHideCancelled((v) => !v)} className={["self-start text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", hideCancelled ? "bg-muted border-border text-muted-foreground" : "bg-red-50 border-red-200 text-red-600"].join(" ")}>
             {hideCancelled ? "Show cancelled" : "Hide cancelled"}
@@ -874,11 +1002,31 @@ function BookingsAdmin() {
       </div>
 
       {totalItems === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">No bookings match these filters.</div>
+        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
+          {dateScope === "upcoming" && filterStatus === "all" && !q
+            ? "No upcoming bookings — you're all caught up! Switch to \"By month\" to see past bookings."
+            : "No bookings match these filters."}
+        </div>
       ) : (
         <div className="space-y-3">
-          {filteredGroups.map((g) => <GroupBookingCard key={g.id} group={g as BookingGroup} roomNameMap={roomNameMap} onClick={() => setActiveGroup(g as BookingGroup)} />)}
-          {filteredStandalone.map((b) => <BookingCard key={b.id} booking={b as Booking} roomName={roomNameMap[b.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(b as Booking)} />)}
+          {(() => {
+            let lastBucket: string | null = null;
+            return sortedItems.map((it) => {
+              let header: React.ReactNode = null;
+              if (showDateHeaders) {
+                const bucket = dateBucket(it.checkIn, todayStr);
+                if (bucket !== lastBucket) { header = <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground pt-2 first:pt-0">{bucket}</div>; lastBucket = bucket; }
+              }
+              return (
+                <div key={`${it.kind}-${it.id}`}>
+                  {header}
+                  {it.kind === "group"
+                    ? <GroupBookingCard group={it.group} roomNameMap={roomNameMap} onClick={() => setActiveGroup(it.group)} />
+                    : <BookingCard booking={it.booking} roomName={roomNameMap[it.booking.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(it.booking)} />}
+                </div>
+              );
+            });
+          })()}
         </div>
       )}
 
