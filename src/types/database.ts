@@ -93,6 +93,8 @@ export interface Booking {
   commission_paid: boolean;
   commission_paid_date?: string | null;
   created_at: string;
+  /** Joined via useBookings() for list-level amount-due calculations. */
+  booking_charges?: BookingCharge[];
 }
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
@@ -145,4 +147,6 @@ export interface BookingGroup {
   commission_paid_date?: string | null;
   created_at: string;
   bookings?: Booking[];
+  /** Joined via useBookingGroups() for list-level amount-due calculations. */
+  booking_charges?: BookingCharge[];
 }
