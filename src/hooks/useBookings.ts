@@ -36,7 +36,7 @@ export const useBookingGroups = (propertyId: string) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("booking_groups")
-        .select("*, bookings(*)")
+        .select("*, bookings(*), booking_charges(*)")
         .eq("property_id", propertyId)
         .order("created_at", { ascending: false });
       if (error) throw error;
