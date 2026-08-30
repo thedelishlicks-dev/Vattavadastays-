@@ -28,9 +28,17 @@ interface RoomAvailabilityCalendarProps {
   checkIn: string; // "" | "yyyy-MM-dd"
   checkOut: string; // "" | "yyyy-MM-dd"
   onChange: (checkIn: string, checkOut: string) => void;
+  /**
+   * Whether this property's actual check-in/check-out times leave enough
+   * of a cleaning gap for same-day turnover (see isSameDayTurnoverSafe in
+   * bookingAvailability.ts). When false, a day that's blocked because
+   * another booking checks in that day can NOT be picked as this booking's
+   * checkout date either — a full clear day is required between stays.
+   */
+  turnoverSafe: boolean;
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe }: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -46,13 +54,13 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
     let cancelled = false;
     if (roomIds.length === 0) { setBlockedByRoom({}); return; }
     setLoading(true);
-    getBlockedDatesForRooms(roomIds, gridStart, gridEnd)
+    getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe)
       .then((res) => { if (!cancelled) setBlockedByRoom(res); })
       .catch(() => { if (!cancelled) setBlockedByRoom({}); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomKey, gridStart, gridEnd]);
+  }, [roomKey, gridStart, gridEnd, turnoverSafe]);
 
   const isDateBlocked = (dateStr: string) => roomIds.some((id) => blockedByRoom[id]?.has(dateStr));
 
@@ -75,10 +83,23 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
   const handlePick = (d: Date) => {
     const state = getDateState(d);
     if (state === "past" || state === "out-of-month") return;
+
+    // A day can be "blocked" simply because ANOTHER booking's stay starts
+    // that day — that's not automatically a reason to refuse it as OUR
+    // checkout date. Same-day turnover (previous guest out at 11am, next
+    // guest in at noon) is normal PROVIDED the property's actual
+    // check-in/check-out times leave enough of a cleaning gap
+    // (turnoverSafe, computed from isSameDayTurnoverSafe). When the
+    // property doesn't have that gap, this exception must not apply — a
+    // full clear day is required between stays, so the day stays blocked
+    // for every purpose, exactly like it did before same-day-turnover
+    // support existed.
+    const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+
     // Starting a fresh range, or re-picking after a complete range: begin a
-    // new check-in. Same for landing on a blocked day — never let it become
-    // an endpoint, but still allow resetting the start elsewhere.
-    if (!checkInDate || (checkInDate && checkOutDate) || state === "blocked") {
+    // new check-in. A blocked day can never become a check-in date — but it
+    // CAN become a checkout date (see above).
+    if (!checkInDate || (checkInDate && checkOutDate) || (state === "blocked" && !isCandidateCheckout)) {
       if (state === "blocked") return;
       onChange(format(d, "yyyy-MM-dd"), "");
       return;
@@ -87,11 +108,16 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
       onChange(format(d, "yyyy-MM-dd"), "");
       return;
     }
-    // Picking an end date: if any blocked date falls inside the proposed
-    // range, refuse it rather than silently booking over a gap.
-    const proposedRange: Date[] = [];
-    for (let cur = new Date(checkInDate); !isAfter(cur, d); cur = addDays(cur, 1)) proposedRange.push(new Date(cur));
-    const rangeHasBlocked = proposedRange.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
+    // Picking an end date: validate every NIGHT of the proposed stay —
+    // check-in inclusive, checkout EXCLUSIVE, matching eachDate() and
+    // getConflictingDates() in bookingAvailability.ts. When turnover isn't
+    // safe for this property, widen validation through the checkout day
+    // itself too (addDays(d,1)) — without a cleaning gap, our checkout day
+    // must also be free of any other booking's check-in.
+    const validateThrough = turnoverSafe ? d : addDays(d, 1);
+    const proposedNights: Date[] = [];
+    for (let cur = new Date(checkInDate); isBefore(cur, validateThrough); cur = addDays(cur, 1)) proposedNights.push(new Date(cur));
+    const rangeHasBlocked = proposedNights.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
     if (rangeHasBlocked) return;
     onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
   };
@@ -117,10 +143,17 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
 
       <div className="grid grid-cols-7 gap-0.5">
         {days.map((d, i) => {
-          const state = getDateState(d);
-          const selected = inRange(d);
+          const rawState = getDateState(d);
           const isStart = checkInDate && isSameDay(d, checkInDate);
           const isEnd = checkOutDate && isSameDay(d, checkOutDate);
+          const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+          // A day blocked only because another booking's stay STARTS there
+          // is still a valid checkout date for a different booking
+          // (same-day turnover). Don't show it as unavailable while it's
+          // being considered as an end date — handlePick's night-by-night
+          // check (excluding this day) decides if the range is actually free.
+          const state: DateState = rawState === "blocked" && isCandidateCheckout ? "available" : rawState;
+          const selected = inRange(d);
 
           let cellCls = "aspect-square rounded-md text-xs font-medium transition-colors ";
           if (state === "out-of-month") cellCls += "text-muted-foreground/20 cursor-default";

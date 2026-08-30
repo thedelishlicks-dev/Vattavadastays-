@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
+import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
@@ -453,7 +454,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                     </div>
                   </Section>
                 )}
-                {canAct && <GroupCancelButton groupId={group.id} onCancelled={() => { onRefresh(); onClose(); }} />}
+                {canAct && <GroupCancelButton groupId={group.id} rooms={bookings.map((b) => ({ roomId: b.room_id, checkIn: b.check_in, checkOut: b.check_out }))} onCancelled={() => { onRefresh(); onClose(); }} />}
               </div>
             )}
             {tab === "charges" && (
@@ -520,9 +521,18 @@ function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onC
   );
 }
 
-function GroupCancelButton({ groupId, onCancelled }: { groupId: string; onCancelled: () => void }) {
+function GroupCancelButton({ groupId, rooms, onCancelled }: { groupId: string; rooms: { roomId: string; checkIn: string; checkOut: string }[]; onCancelled: () => void }) {
   const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const queryClient = useQueryClient();
-  const handleCancel = async () => { setLoading(true); await supabase.from("booking_groups").update({ status: "cancelled" }).eq("id", groupId); await supabase.from("bookings").update({ status: "cancelled" }).eq("group_id", groupId); queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false }); queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onCancelled(); };
+  const handleCancel = async () => {
+    setLoading(true);
+    await supabase.from("booking_groups").update({ status: "cancelled" }).eq("id", groupId);
+    await supabase.from("bookings").update({ status: "cancelled" }).eq("group_id", groupId);
+    // Free up every room's dates — same fix as the single-booking cancel button.
+    await Promise.all(rooms.map((r) => releaseDatesIfUnblocked(r.roomId, r.checkIn, r.checkOut).catch(() => {})));
+    queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
+    queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    onCancelled();
+  };
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel all rooms</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
@@ -757,7 +767,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
           <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
         </div>
       </Section>
-      {!["cancelled", "completed"].includes(booking.status) && <CancelButton bookingId={booking.id} onCancelled={onPaymentSaved} />}
+      {!["cancelled", "completed"].includes(booking.status) && <CancelButton bookingId={booking.id} roomId={booking.room_id} checkIn={booking.check_in} checkOut={booking.check_out} onCancelled={onPaymentSaved} />}
     </div>
   );
 }
@@ -766,9 +776,19 @@ function WALink({ href, label }: { href: string; label: string }) {
   return <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted transition-colors"><MessageCircle className="h-4 w-4 text-[#25D366]" />{label}</a>;
 }
 
-function CancelButton({ bookingId, onCancelled }: { bookingId: string; onCancelled: () => void }) {
+function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { bookingId: string; roomId: string; checkIn: string; checkOut: string; onCancelled: () => void }) {
   const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const queryClient = useQueryClient();
-  const handleCancel = async () => { setLoading(true); const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId); if (!error) { queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); } setLoading(false); onCancelled(); };
+  const handleCancel = async () => {
+    setLoading(true);
+    const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
+    if (!error) {
+      // Free up these dates — without this, a cancelled booking's dates
+      // stayed blocked forever (nothing else in the app ever released them).
+      try { await releaseDatesIfUnblocked(roomId, checkIn, checkOut); } catch { /* non-fatal: booking is still cancelled either way */ }
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    }
+    setLoading(false); onCancelled();
+  };
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel booking</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
@@ -1030,7 +1050,7 @@ function BookingsAdmin() {
         </div>
       )}
 
-      {showAdd && property && <AddBookingModal propertyId={property.id} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
+      {showAdd && property && <AddBookingModal propertyId={property.id} property={property} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
       {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleCancelAndClose} />}
       {activeGroup && <GroupBookingDetailModal group={activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} />}
     </div>

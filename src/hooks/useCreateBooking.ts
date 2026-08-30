@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { getConflictingDates } from "@/lib/bookingAvailability";
 
 export interface RoomBookingInput {
   roomId: string;
@@ -18,6 +19,11 @@ export interface CreateBookingInput {
   checkIn: string;  // "YYYY-MM-DD"
   checkOut: string; // "YYYY-MM-DD"
   paymentMethod?: "UPI" | "Bank Transfer" | "Cash on Arrival";
+  /** Property's check-in/check-out times, used to determine whether
+   * same-day turnover is safe (see isSameDayTurnoverSafe). Pass these
+   * through from useProperty() rather than re-fetching here. */
+  propertyCheckInTime?: string | null;
+  propertyCheckOutTime?: string | null;
 }
 
 export interface RoomBookingResult {
@@ -84,45 +90,49 @@ export function useCreateBooking() {
         }
       }
 
-      // ── Step 2: Check availability for ALL rooms in ONE query ──
-      const { data: avail, error: availErr } = await supabase
-        .from("availability")
-        .select("room_id, date, is_available, price_override")
-        .in("room_id", roomIds)
-        .in("date", dates);
-
-      if (availErr) throw new Error("Could not check availability.");
-
-      // Verify every room is available on every date.
+      // ── Step 2: Verify every room is genuinely free for every requested
+      // night — checking the `bookings` table directly via
+      // getConflictingDates(), not just the `availability` mirror table.
       //
-      // IMPORTANT: a MISSING row means no one has ever touched that date —
-      // it does NOT mean the room is blocked. Properties that haven't been
-      // pre-seeded with a full year of availability rows (anything other
-      // than the `demo` property) will have no row at all for most future
-      // dates. Treating "no row" as "unavailable" breaks booking for every
-      // property except the one that happens to be seeded.
+      // This used to only check `availability`, which is a CACHE kept in
+      // sync by markDatesUnavailable()/the upsert in Step 5 below and by
+      // releaseDatesIfUnblocked() on cancellation. A cache can drift: a
+      // race between two near-simultaneous bookings, a bug in whatever
+      // keeps it in sync, or manual data changes could all leave it stale
+      // without this check ever noticing. Reading `bookings` directly here
+      // means this check can never be wrong about what's actually booked,
+      // regardless of the mirror's state.
       //
-      // This only needs to check `availability` (not `bookings` directly)
-      // because every path that creates a booking — this one, and the
-      // owner-side AddBookingModal — immediately upserts this table via
-      // markDatesUnavailable()/the Step 5 upsert below, rather than relying
-      // on the trg_booking_status_change trigger (which only fires on
-      // UPDATE of status and would miss a freshly-inserted 'confirmed' or
-      // 'pending' row). See src/lib/bookingAvailability.ts for the
-      // owner-side equivalent and more detail on why.
-      //
-      // Previously this code did `if (!row || !row.is_available) throw`,
-      // which blocked bookings on properties with no seeded rows even
-      // though the owner-side flow allowed the exact same booking through.
-      for (const ri of input.rooms) {
-        const room = roomDetails.find((r) => r.id === ri.roomId)!;
-        for (const date of dates) {
-          const row = avail?.find((a) => a.room_id === ri.roomId && a.date === date);
-          if (row && row.is_available === false) {
-            throw new Error(`"${room.name}" is not available on ${date}.`);
-          }
+      // Also applies the SAME turnover-buffer policy as the owner
+      // dashboard (isSameDayTurnoverSafe, inside getConflictingDates) —
+      // previously this guest-facing path had no turnover awareness at
+      // all, so it could reject a valid same-day-turnover booking a
+      // property's cleaning schedule actually supports, or (worse) accept
+      // one a property's schedule does NOT support. Reusing the exact same
+      // function the owner-side save check uses means guest and owner
+      // bookings can never disagree about what counts as a conflict.
+      const turnoverProperty = {
+        check_in_time: input.propertyCheckInTime ?? null,
+        check_out_time: input.propertyCheckOutTime ?? null,
+      };
+      const conflictsByRoom = await Promise.all(
+        input.rooms.map((ri) => getConflictingDates(ri.roomId, input.checkIn, input.checkOut, turnoverProperty))
+      );
+      for (let i = 0; i < input.rooms.length; i++) {
+        const room = roomDetails.find((r) => r.id === input.rooms[i].roomId)!;
+        if (conflictsByRoom[i].length > 0) {
+          throw new Error(`"${room.name}" is no longer available for the selected dates. Please choose different dates.`);
         }
       }
+
+      // Separate, minimal fetch of the availability mirror — used ONLY for
+      // per-date price overrides now (see Step 3), not for validation.
+      const { data: avail, error: availErr } = await supabase
+        .from("availability")
+        .select("room_id, date, price_override")
+        .in("room_id", roomIds)
+        .in("date", dates);
+      if (availErr) throw new Error("Could not load pricing.");
 
       // ── Step 3: Calculate price per room ──
       const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
