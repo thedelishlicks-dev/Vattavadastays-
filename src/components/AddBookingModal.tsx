@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
-import { getUnavailableDates, markDatesUnavailable } from "@/lib/bookingAvailability";
+import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -36,12 +36,17 @@ interface Room {
 
 interface AddBookingModalProps {
   propertyId: string;
+  /** Needs at least check_in_time/check_out_time — used to determine
+   * whether same-day turnover is safe for this property (see
+   * isSameDayTurnoverSafe in bookingAvailability.ts). */
+  property: TurnoverPolicyInput;
   rooms: Room[];
   onClose: () => void;
   onSaved?: () => void;
 }
 
-export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBookingModalProps) {
+export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved }: AddBookingModalProps) {
+  const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
   const [form, setForm] = useState({
     guest_name: "",
     guest_phone: "+91 ",
@@ -142,7 +147,7 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
     try {
       const conflictResults = await Promise.all(
         selectedRoomIds.map(async (roomId) => {
-          const blockedDates = await getUnavailableDates(roomId, form.check_in, form.check_out);
+          const blockedDates = await getConflictingDates(roomId, form.check_in, form.check_out, property);
           return { roomId, blockedDates };
         })
       );
@@ -381,6 +386,7 @@ export function AddBookingModal({ propertyId, rooms, onClose, onSaved }: AddBook
               roomIds={selectedRoomIds}
               checkIn={form.check_in}
               checkOut={form.check_out}
+              turnoverSafe={turnoverSafe}
               onChange={(checkIn, checkOut) => {
                 set("check_in", checkIn);
                 set("check_out", checkOut);
