@@ -222,7 +222,7 @@ function DashboardPage() {
         <BlockDatesModal propertyId={property.id} rooms={activeRooms} onClose={() => setModal(null)} />
       )}
       {modal === "add" && property && (
-        <AddBookingModal propertyId={property.id} rooms={activeRooms} onClose={() => setModal(null)} onSaved={() => setModal(null)} />
+        <AddBookingModal propertyId={property.id} property={property} rooms={activeRooms} onClose={() => setModal(null)} onSaved={() => setModal(null)} />
       )}
       {modal === "whatsapp" && property && (
         <WhatsAppReminderModal
