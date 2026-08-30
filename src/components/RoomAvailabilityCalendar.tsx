@@ -28,9 +28,17 @@ interface RoomAvailabilityCalendarProps {
   checkIn: string; // "" | "yyyy-MM-dd"
   checkOut: string; // "" | "yyyy-MM-dd"
   onChange: (checkIn: string, checkOut: string) => void;
+  /**
+   * Whether this property's actual check-in/check-out times leave enough
+   * of a cleaning gap for same-day turnover (see isSameDayTurnoverSafe in
+   * bookingAvailability.ts). When false, a day that's blocked because
+   * another booking checks in that day can NOT be picked as this booking's
+   * checkout date either — a full clear day is required between stays.
+   */
+  turnoverSafe: boolean;
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe }: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -46,13 +54,13 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
     let cancelled = false;
     if (roomIds.length === 0) { setBlockedByRoom({}); return; }
     setLoading(true);
-    getBlockedDatesForRooms(roomIds, gridStart, gridEnd)
+    getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe)
       .then((res) => { if (!cancelled) setBlockedByRoom(res); })
       .catch(() => { if (!cancelled) setBlockedByRoom({}); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomKey, gridStart, gridEnd]);
+  }, [roomKey, gridStart, gridEnd, turnoverSafe]);
 
   const isDateBlocked = (dateStr: string) => roomIds.some((id) => blockedByRoom[id]?.has(dateStr));
 
@@ -77,12 +85,16 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
     if (state === "past" || state === "out-of-month") return;
 
     // A day can be "blocked" simply because ANOTHER booking's stay starts
-    // that day — that's not a reason to refuse it as OUR checkout date.
-    // Same-day turnover (previous guest out at 11am, next guest in at
-    // noon) is normal; the day only needs to be free as a NIGHT, not as
-    // someone else's check-in. The proposedNights check below (which
-    // excludes the checkout day itself) is what actually validates this.
-    const isCandidateCheckout = !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+    // that day — that's not automatically a reason to refuse it as OUR
+    // checkout date. Same-day turnover (previous guest out at 11am, next
+    // guest in at noon) is normal PROVIDED the property's actual
+    // check-in/check-out times leave enough of a cleaning gap
+    // (turnoverSafe, computed from isSameDayTurnoverSafe). When the
+    // property doesn't have that gap, this exception must not apply — a
+    // full clear day is required between stays, so the day stays blocked
+    // for every purpose, exactly like it did before same-day-turnover
+    // support existed.
+    const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
 
     // Starting a fresh range, or re-picking after a complete range: begin a
     // new check-in. A blocked day can never become a check-in date — but it
@@ -97,12 +109,14 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
       return;
     }
     // Picking an end date: validate every NIGHT of the proposed stay —
-    // check-in inclusive, checkout EXCLUSIVE. The checkout day itself is
-    // never a night of this stay, so it's fine even if another booking's
-    // stay begins then. Matches eachDate()/getBlockedDatesForRooms() and
-    // the nights array built in useCreateBooking.ts.
+    // check-in inclusive, checkout EXCLUSIVE, matching eachDate() and
+    // getConflictingDates() in bookingAvailability.ts. When turnover isn't
+    // safe for this property, widen validation through the checkout day
+    // itself too (addDays(d,1)) — without a cleaning gap, our checkout day
+    // must also be free of any other booking's check-in.
+    const validateThrough = turnoverSafe ? d : addDays(d, 1);
     const proposedNights: Date[] = [];
-    for (let cur = new Date(checkInDate); isBefore(cur, d); cur = addDays(cur, 1)) proposedNights.push(new Date(cur));
+    for (let cur = new Date(checkInDate); isBefore(cur, validateThrough); cur = addDays(cur, 1)) proposedNights.push(new Date(cur));
     const rangeHasBlocked = proposedNights.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
     if (rangeHasBlocked) return;
     onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
@@ -132,7 +146,7 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
           const rawState = getDateState(d);
           const isStart = checkInDate && isSameDay(d, checkInDate);
           const isEnd = checkOutDate && isSameDay(d, checkOutDate);
-          const isCandidateCheckout = !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+          const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
           // A day blocked only because another booking's stay STARTS there
           // is still a valid checkout date for a different booking
           // (same-day turnover). Don't show it as unavailable while it's
