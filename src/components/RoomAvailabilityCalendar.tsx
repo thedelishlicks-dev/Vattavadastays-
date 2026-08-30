@@ -75,10 +75,19 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
   const handlePick = (d: Date) => {
     const state = getDateState(d);
     if (state === "past" || state === "out-of-month") return;
+
+    // A day can be "blocked" simply because ANOTHER booking's stay starts
+    // that day — that's not a reason to refuse it as OUR checkout date.
+    // Same-day turnover (previous guest out at 11am, next guest in at
+    // noon) is normal; the day only needs to be free as a NIGHT, not as
+    // someone else's check-in. The proposedNights check below (which
+    // excludes the checkout day itself) is what actually validates this.
+    const isCandidateCheckout = !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+
     // Starting a fresh range, or re-picking after a complete range: begin a
-    // new check-in. Same for landing on a blocked day — never let it become
-    // an endpoint, but still allow resetting the start elsewhere.
-    if (!checkInDate || (checkInDate && checkOutDate) || state === "blocked") {
+    // new check-in. A blocked day can never become a check-in date — but it
+    // CAN become a checkout date (see above).
+    if (!checkInDate || (checkInDate && checkOutDate) || (state === "blocked" && !isCandidateCheckout)) {
       if (state === "blocked") return;
       onChange(format(d, "yyyy-MM-dd"), "");
       return;
@@ -87,11 +96,14 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
       onChange(format(d, "yyyy-MM-dd"), "");
       return;
     }
-    // Picking an end date: if any blocked date falls inside the proposed
-    // range, refuse it rather than silently booking over a gap.
-    const proposedRange: Date[] = [];
-    for (let cur = new Date(checkInDate); !isAfter(cur, d); cur = addDays(cur, 1)) proposedRange.push(new Date(cur));
-    const rangeHasBlocked = proposedRange.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
+    // Picking an end date: validate every NIGHT of the proposed stay —
+    // check-in inclusive, checkout EXCLUSIVE. The checkout day itself is
+    // never a night of this stay, so it's fine even if another booking's
+    // stay begins then. Matches eachDate()/getBlockedDatesForRooms() and
+    // the nights array built in useCreateBooking.ts.
+    const proposedNights: Date[] = [];
+    for (let cur = new Date(checkInDate); isBefore(cur, d); cur = addDays(cur, 1)) proposedNights.push(new Date(cur));
+    const rangeHasBlocked = proposedNights.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
     if (rangeHasBlocked) return;
     onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
   };
@@ -117,10 +129,17 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange 
 
       <div className="grid grid-cols-7 gap-0.5">
         {days.map((d, i) => {
-          const state = getDateState(d);
-          const selected = inRange(d);
+          const rawState = getDateState(d);
           const isStart = checkInDate && isSameDay(d, checkInDate);
           const isEnd = checkOutDate && isSameDay(d, checkOutDate);
+          const isCandidateCheckout = !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+          // A day blocked only because another booking's stay STARTS there
+          // is still a valid checkout date for a different booking
+          // (same-day turnover). Don't show it as unavailable while it's
+          // being considered as an end date — handlePick's night-by-night
+          // check (excluding this day) decides if the range is actually free.
+          const state: DateState = rawState === "blocked" && isCandidateCheckout ? "available" : rawState;
+          const selected = inRange(d);
 
           let cellCls = "aspect-square rounded-md text-xs font-medium transition-colors ";
           if (state === "out-of-month") cellCls += "text-muted-foreground/20 cursor-default";
