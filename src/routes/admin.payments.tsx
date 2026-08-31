@@ -106,6 +106,34 @@ function paymentStatus(item: LedgerItem): { label: string; cls: string } {
   return { label: "Unpaid", cls: "bg-red-100 text-red-700" };
 }
 
+// ---------------------------------------------------------------------------
+// Monthly summary — bucketed by check-in date (the same date the Dashboard's
+// "Monthly revenue" KPI uses), not by the date money actually arrived.
+//
+// Why check-in date and not payment date: a booking's advance_amount is a
+// running total on the row itself, not a dated log of each individual
+// payment, so there's no reliable way yet to say "₹X came in during June"
+// for a guest who paid a deposit in May and the balance in June. What this
+// CAN answer honestly is "how is June's business doing" — which of June's
+// bookings are billed, collected, and still outstanding. If real cash-flow
+// timing ever matters (bank reconciliation, GST filing against actual
+// receipts), that needs a proper dated payments table — this is the
+// same-day version of that.
+// ---------------------------------------------------------------------------
+
+type MonthSummary = {
+  monthKey: string; // "2026-06"
+  count: number;
+  billed: number;
+  collected: number;
+  outstanding: number;
+};
+
+function monthLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
   const { user } = useAuth();
@@ -124,6 +152,7 @@ function AdminPayments() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("checkin");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [monthFilter, setMonthFilter] = useState<string | null>(null);
 
   useEffect(() => {
     if (property) {
@@ -242,10 +271,33 @@ function AdminPayments() {
     return { totalCollected, totalOutstanding, totalBilled, fullyPaid, partPaid, unpaid };
   }, [items]);
 
+  // One row per check-in month, most recent first — the "which months are
+  // healthy vs falling behind" view.
+  const monthlyStats = useMemo(() => {
+    const map = new Map<string, MonthSummary>();
+    items.forEach((i) => {
+      const key = i.check_in.slice(0, 7);
+      const entry = map.get(key) ?? {
+        monthKey: key,
+        count: 0,
+        billed: 0,
+        collected: 0,
+        outstanding: 0,
+      };
+      entry.count += 1;
+      entry.billed += grossTotal(i);
+      entry.collected += i.advance_amount;
+      entry.outstanding += balanceOf(i);
+      map.set(key, entry);
+    });
+    return [...map.values()].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
+  }, [items]);
+
   const filteredItems = useMemo(() => {
     let list = items;
     if (filterTab === "outstanding") list = list.filter((i) => !i.is_paid);
     else if (filterTab === "paid") list = list.filter((i) => i.is_paid);
+    if (monthFilter) list = list.filter((i) => i.check_in.slice(0, 7) === monthFilter);
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter(
@@ -253,7 +305,7 @@ function AdminPayments() {
       );
     }
     return list;
-  }, [items, filterTab, search]);
+  }, [items, filterTab, monthFilter, search]);
 
   const sortedItems = useMemo(() => {
     const arr = [...filteredItems];
@@ -355,7 +407,8 @@ function AdminPayments() {
     const a = document.createElement("a");
     a.href = url;
     const dateStr = new Date().toLocaleDateString("en-CA");
-    a.download = `payments-ledger-${filterTab}-${dateStr}.csv`;
+    const scope = monthFilter ?? dateStr;
+    a.download = `payments-ledger-${filterTab}-${scope}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -412,10 +465,99 @@ function AdminPayments() {
         </div>
       </div>
 
+      {/* Monthly summary */}
+      {monthlyStats.length > 0 && (
+        <div className="space-y-3">
+          <div>
+            <h2 className="font-semibold text-sm">Monthly Summary</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              By check-in date. Tap a month to filter the ledger below to it.
+            </p>
+          </div>
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+                  <tr>
+                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Month</th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Bookings
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Billed</th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Collected
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Outstanding
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Collected %
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyStats.map((m) => {
+                    const pct = m.billed > 0 ? Math.round((m.collected / m.billed) * 100) : 100;
+                    const selected = monthFilter === m.monthKey;
+                    return (
+                      <tr
+                        key={m.monthKey}
+                        onClick={() => setMonthFilter(selected ? null : m.monthKey)}
+                        className={[
+                          "border-t border-border cursor-pointer transition-colors",
+                          selected ? "bg-primary/10" : "hover:bg-muted/40",
+                        ].join(" ")}
+                      >
+                        <td className="px-4 py-2.5 font-medium whitespace-nowrap">
+                          {monthLabel(m.monthKey)}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-muted-foreground whitespace-nowrap">
+                          {m.count}
+                        </td>
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          ₹{m.billed.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-primary whitespace-nowrap">
+                          ₹{m.collected.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-2.5 text-right text-destructive whitespace-nowrap">
+                          {m.outstanding > 0 ? `₹${m.outstanding.toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          <span
+                            className={[
+                              "font-medium",
+                              pct >= 90
+                                ? "text-green-700"
+                                : pct >= 60
+                                  ? "text-amber-700"
+                                  : "text-destructive",
+                            ].join(" ")}
+                          >
+                            {pct}%
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ledger */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-sm">Payment Ledger</h2>
+          <h2 className="font-semibold text-sm">
+            Payment Ledger
+            {monthFilter && (
+              <span className="ml-2 font-normal text-xs text-muted-foreground">
+                · {monthLabel(monthFilter)}
+              </span>
+            )}
+          </h2>
           <button
             onClick={exportCsv}
             disabled={sortedItems.length === 0}
@@ -457,6 +599,14 @@ function AdminPayments() {
               className="w-full rounded-full border border-border bg-background pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
+          {monthFilter && (
+            <button
+              onClick={() => setMonthFilter(null)}
+              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+            >
+              {monthLabel(monthFilter)} <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         {sortedItems.length === 0 ? (
