@@ -10,8 +10,11 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Receipt,
 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
@@ -132,6 +135,22 @@ type MonthSummary = {
 function monthLabel(monthKey: string): string {
   const [y, m] = monthKey.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+/** Compact axis label, e.g. "Jun '26" — used only in the trend chart. */
+function monthShortLabel(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+}
+
+function collectedPct(m: Pick<MonthSummary, "billed" | "collected">): number {
+  return m.billed > 0 ? Math.round((m.collected / m.billed) * 100) : 100;
+}
+
+function pctColorCls(pct: number): string {
+  if (pct >= 90) return "text-green-700";
+  if (pct >= 60) return "text-amber-700";
+  return "text-destructive";
 }
 
 function AdminPayments() {
@@ -271,8 +290,9 @@ function AdminPayments() {
     return { totalCollected, totalOutstanding, totalBilled, fullyPaid, partPaid, unpaid };
   }, [items]);
 
-  // One row per check-in month, most recent first — the "which months are
-  // healthy vs falling behind" view.
+  // One entry per check-in month, most recent first — feeds the trend chart
+  // and the month-scrubber below. This is never rendered as a one-row-per-
+  // month table, so it doesn't grow the page as history piles up.
   const monthlyStats = useMemo(() => {
     const map = new Map<string, MonthSummary>();
     items.forEach((i) => {
@@ -292,6 +312,32 @@ function AdminPayments() {
     });
     return [...map.values()].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
   }, [items]);
+
+  // Fixed-size trend: always just the most recent 6 months that have data,
+  // oldest to newest left-to-right, no matter how much history exists
+  // overall — this is what keeps the summary from growing forever.
+  const trendData = useMemo(
+    () =>
+      monthlyStats
+        .slice(0, 6)
+        .slice()
+        .reverse()
+        .map((m) => ({
+          month: monthShortLabel(m.monthKey),
+          Collected: m.collected,
+          Outstanding: m.outstanding,
+        })),
+    [monthlyStats],
+  );
+
+  // Scrubber steps through monthlyStats one month at a time — index 0 is the
+  // most recent month. Clamped whenever the month list's size changes (e.g. a
+  // new booking lands in a month that didn't exist before).
+  const [scrubIndex, setScrubIndex] = useState(0);
+  useEffect(() => {
+    setScrubIndex((i) => Math.min(i, Math.max(0, monthlyStats.length - 1)));
+  }, [monthlyStats.length]);
+  const scrubMonth = monthlyStats[scrubIndex] ?? null;
 
   const filteredItems = useMemo(() => {
     let list = items;
@@ -465,83 +511,138 @@ function AdminPayments() {
         </div>
       </div>
 
-      {/* Monthly summary */}
-      {monthlyStats.length > 0 && (
+      {/* Monthly summary — fixed-size trend chart + one-month-at-a-time
+          scrubber, instead of a table that adds a row every month forever. */}
+      {monthlyStats.length > 0 && scrubMonth && (
         <div className="space-y-3">
           <div>
             <h2 className="font-semibold text-sm">Monthly Summary</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              By check-in date. Tap a month to filter the ledger below to it.
-            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">By check-in date.</p>
           </div>
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[640px]">
-                <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-                  <tr>
-                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Month</th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
-                      Bookings
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Billed</th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+
+          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+            {trendData.length > 1 && (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs text-muted-foreground">
+                    Last {trendData.length} months
+                  </span>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: "var(--primary)" }}
+                      />
                       Collected
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: "var(--destructive)", opacity: 0.7 }}
+                      />
                       Outstanding
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
-                      Collected %
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyStats.map((m) => {
-                    const pct = m.billed > 0 ? Math.round((m.collected / m.billed) * 100) : 100;
-                    const selected = monthFilter === m.monthKey;
-                    return (
-                      <tr
-                        key={m.monthKey}
-                        onClick={() => setMonthFilter(selected ? null : m.monthKey)}
-                        className={[
-                          "border-t border-border cursor-pointer transition-colors",
-                          selected ? "bg-primary/10" : "hover:bg-muted/40",
-                        ].join(" ")}
-                      >
-                        <td className="px-4 py-2.5 font-medium whitespace-nowrap">
-                          {monthLabel(m.monthKey)}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-muted-foreground whitespace-nowrap">
-                          {m.count}
-                        </td>
-                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          ₹{m.billed.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-primary whitespace-nowrap">
-                          ₹{m.collected.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-2.5 text-right text-destructive whitespace-nowrap">
-                          {m.outstanding > 0 ? `₹${m.outstanding.toLocaleString("en-IN")}` : "—"}
-                        </td>
-                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          <span
-                            className={[
-                              "font-medium",
-                              pct >= 90
-                                ? "text-green-700"
-                                : pct >= 60
-                                  ? "text-amber-700"
-                                  : "text-destructive",
-                            ].join(" ")}
-                          >
-                            {pct}%
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    </span>
+                  </div>
+                </div>
+                <div className="h-36">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={trendData} barGap={4}>
+                      <CartesianGrid
+                        vertical={false}
+                        stroke="var(--border)"
+                        strokeDasharray="3 3"
+                      />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        width={44}
+                        tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v: number) =>
+                          v >= 1000 ? `₹${Math.round(v / 1000)}k` : `₹${v}`
+                        }
+                      />
+                      <Tooltip
+                        cursor={{ fill: "var(--muted)" }}
+                        formatter={(value: number) => `₹${Number(value).toLocaleString("en-IN")}`}
+                        contentStyle={{
+                          background: "var(--card)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 8,
+                          fontSize: 12,
+                        }}
+                      />
+                      <Bar dataKey="Collected" fill="var(--primary)" radius={[3, 3, 0, 0]} />
+                      <Bar
+                        dataKey="Outstanding"
+                        fill="var(--destructive)"
+                        fillOpacity={0.7}
+                        radius={[3, 3, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            {/* Single-month detail with prev/next — browse any month without
+                the page growing a permanent row for it. */}
+            <div className={trendData.length > 1 ? "border-t border-border pt-3" : ""}>
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  onClick={() => setScrubIndex((i) => Math.min(i + 1, monthlyStats.length - 1))}
+                  disabled={scrubIndex >= monthlyStats.length - 1}
+                  className="h-7 w-7 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
+                  aria-label="Older month"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+
+                <div className="flex-1 text-center min-w-0">
+                  <div className="text-sm font-semibold">{monthLabel(scrubMonth.monthKey)}</div>
+                  <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-1 text-xs">
+                    <span className="text-muted-foreground">{scrubMonth.count} bookings</span>
+                    <span className="text-muted-foreground">
+                      Billed ₹{scrubMonth.billed.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-primary font-medium">
+                      Collected ₹{scrubMonth.collected.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-destructive font-medium">
+                      Outstanding{" "}
+                      {scrubMonth.outstanding > 0
+                        ? `₹${scrubMonth.outstanding.toLocaleString("en-IN")}`
+                        : "₹0"}
+                    </span>
+                    <span className={`font-semibold ${pctColorCls(collectedPct(scrubMonth))}`}>
+                      {collectedPct(scrubMonth)}% collected
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setScrubIndex((i) => Math.max(i - 1, 0))}
+                  disabled={scrubIndex <= 0}
+                  className="h-7 w-7 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
+                  aria-label="Newer month"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="text-center mt-2">
+                <button
+                  onClick={() => setMonthFilter(scrubMonth.monthKey)}
+                  className="text-xs text-primary hover:underline font-medium"
+                >
+                  View {monthLabel(scrubMonth.monthKey)} in ledger →
+                </button>
+              </div>
             </div>
           </div>
         </div>
