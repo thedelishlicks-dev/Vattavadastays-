@@ -1,12 +1,25 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  CalendarDays, IndianRupee, Percent, MessageSquare,
-  Ban, Plus, Send, CheckCircle2, Circle, ChevronRight,
-  Image, BedDouble, CalendarCheck, CreditCard, ScrollText, Sparkles,
+  CalendarDays,
+  IndianRupee,
+  Percent,
+  MessageSquare,
+  Ban,
+  Plus,
+  Send,
+  CheckCircle2,
+  Circle,
+  ChevronRight,
+  Image,
+  BedDouble,
+  CalendarCheck,
+  CreditCard,
+  ScrollText,
+  Sparkles,
 } from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
@@ -42,13 +55,62 @@ function buildChecklist(property: Property | undefined): ChecklistItem[] {
   const hasCancelPolicy = amenities.some((a) => a.startsWith("__cancel:"));
 
   return [
-    { id: "logo", label: "Upload your logo", description: "Shown in the header and as your app icon", icon: Sparkles, done: !!property?.logo_url, href: "/admin/settings" },
-    { id: "hero", label: "Add a hero image", description: "Full-width photo guests see first on your booking page", icon: Image, done: !!property?.hero_image, href: "/admin/settings" },
-    { id: "rooms", label: "Add at least one room", description: "Guests can't book without rooms", icon: BedDouble, done: rooms.length > 0, href: "/admin/rooms" },
-    { id: "room_photo", label: "Upload a room photo", description: "Photos increase bookings significantly", icon: Image, done: hasRoomPhoto, href: "/admin/rooms" },
-    { id: "availability", label: "Set room availability", description: "Open dates so guests can book", icon: CalendarCheck, done: hasAvailability, href: "/admin/calendar" },
-    { id: "upi", label: "Add your UPI ID", description: "Required for guests to pay advance online", icon: CreditCard, done: hasUpi, href: "/admin/payments" },
-    { id: "policy", label: "Set cancellation policy", description: "Guests see this before booking", icon: ScrollText, done: hasCancelPolicy, href: "/admin/policies" },
+    {
+      id: "logo",
+      label: "Upload your logo",
+      description: "Shown in the header and as your app icon",
+      icon: Sparkles,
+      done: !!property?.logo_url,
+      href: "/admin/settings",
+    },
+    {
+      id: "hero",
+      label: "Add a hero image",
+      description: "Full-width photo guests see first on your booking page",
+      icon: Image,
+      done: !!property?.hero_image,
+      href: "/admin/settings",
+    },
+    {
+      id: "rooms",
+      label: "Add at least one room",
+      description: "Guests can't book without rooms",
+      icon: BedDouble,
+      done: rooms.length > 0,
+      href: "/admin/rooms",
+    },
+    {
+      id: "room_photo",
+      label: "Upload a room photo",
+      description: "Photos increase bookings significantly",
+      icon: Image,
+      done: hasRoomPhoto,
+      href: "/admin/rooms",
+    },
+    {
+      id: "availability",
+      label: "Set room availability",
+      description: "Open dates so guests can book",
+      icon: CalendarCheck,
+      done: hasAvailability,
+      href: "/admin/calendar",
+    },
+    {
+      id: "upi",
+      label: "Add your UPI ID",
+      description: "Required for guests to pay advance online",
+      icon: CreditCard,
+      done: hasUpi,
+      href: "/admin/payments",
+    },
+    {
+      id: "policy",
+      label: "Set cancellation policy",
+      description: "Guests see this before booking",
+      icon: ScrollText,
+      done: hasCancelPolicy,
+      href: "/admin/policies",
+    },
   ];
 }
 
@@ -67,23 +129,45 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h2 className="font-semibold text-sm">Get your property ready</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{doneCount} of {items.length} steps complete</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {doneCount} of {items.length} steps complete
+            </p>
           </div>
           <span className="text-sm font-semibold text-primary">{pct}%</span>
         </div>
         <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${pct}%` }} />
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-500"
+            style={{ width: `${pct}%` }}
+          />
         </div>
       </div>
       <div className="divide-y divide-border">
         {items.map((item) => {
           const Icon = item.icon;
           return (
-            <Link key={item.id} to={item.href} className={["flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors", item.done ? "opacity-50" : ""].join(" ")}>
-              <div className="shrink-0">{item.done ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <Circle className="h-5 w-5 text-muted-foreground" />}</div>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0"><Icon className="h-4 w-4 text-primary" /></div>
+            <Link
+              key={item.id}
+              to={item.href}
+              className={[
+                "flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors",
+                item.done ? "opacity-50" : "",
+              ].join(" ")}
+            >
+              <div className="shrink-0">
+                {item.done ? (
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                ) : (
+                  <Circle className="h-5 w-5 text-muted-foreground" />
+                )}
+              </div>
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
               <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>{item.label}</div>
+                <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>
+                  {item.label}
+                </div>
                 <div className="text-xs text-muted-foreground truncate">{item.description}</div>
               </div>
               {!item.done && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
@@ -92,7 +176,9 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
         })}
       </div>
       <div className="px-4 py-3 bg-primary-light/30 border-t border-border">
-        <p className="text-xs text-muted-foreground">Complete all steps to start accepting bookings from guests.</p>
+        <p className="text-xs text-muted-foreground">
+          Complete all steps to start accepting bookings from guests.
+        </p>
       </div>
     </div>
   );
@@ -105,6 +191,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   const { data: bookings = [], isLoading: bookLoading } = useBookings(property?.id ?? "");
+  const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "");
   const [modal, setModal] = useState<Modal>(null);
 
   const today = (() => {
@@ -112,49 +199,84 @@ function DashboardPage() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   })();
 
-  const stats = useMemo(() => {
-    const upcoming = bookings.filter((b) => b.check_in >= today && b.status !== "cancelled").length;
-    const monthlyRevenue = bookings.filter((b) => {
-      const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-      return b.check_in?.slice(0, 7) === thisMonth && (b.status === "confirmed" || b.status === "completed");
-    }).reduce(
-      // FIX: subtract discount_amount — was previously summing raw
-      // total_amount, which overstates revenue for any discounted booking.
-      // Kept in sync with the discount-subtraction fix applied to
-      // admin.bookings.tsx and admin.payments.tsx.
-      (sum, b) => sum + Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0)),
-      0,
-    );
-    return { upcoming, monthlyRevenue };
-  }, [bookings, today]);
+  // A booking that belongs to a group is represented by the group row, not
+  // its own row, so it isn't double-counted below (same rule as
+  // admin.bookings.tsx / admin.payments.tsx).
+  const groupBookingIds = useMemo(() => {
+    const ids = new Set<string>();
+    groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id)));
+    return ids;
+  }, [groups]);
+  const standaloneBookings = useMemo(
+    () => bookings.filter((b) => !groupBookingIds.has(b.id)),
+    [bookings, groupBookingIds],
+  );
 
-  const recent = [...bookings].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 6);
-  const isLoading = propLoading || bookLoading;
+  const stats = useMemo(() => {
+    // FIX: previously only counted standalone `bookings`, so guests booked
+    // as part of a multi-room booking_group never showed up here — both the
+    // "upcoming" count and monthly revenue understated the real numbers
+    // whenever a group booking fell in scope. Now folds in booking_groups,
+    // same as the Bookings and Payments pages.
+    const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+    const revenueOf = (b: {
+      check_in?: string;
+      status: string;
+      total_amount: number;
+      discount_amount?: number;
+    }) => {
+      if (b.check_in?.slice(0, 7) !== thisMonth) return 0;
+      if (b.status !== "confirmed" && b.status !== "completed") return 0;
+      // Subtract discount_amount — summing raw total_amount overstates
+      // revenue for any discounted booking.
+      return Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0));
+    };
+
+    const upcoming =
+      standaloneBookings.filter((b) => b.check_in >= today && b.status !== "cancelled").length +
+      groups.filter((g) => g.check_in >= today && g.status !== "cancelled").length;
+
+    const monthlyRevenue =
+      standaloneBookings.reduce((sum, b) => sum + revenueOf(b), 0) +
+      groups.reduce((sum, g) => sum + revenueOf(g), 0);
+
+    return { upcoming, monthlyRevenue };
+  }, [standaloneBookings, groups, today]);
+
+  const recent = [...bookings]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 6);
+  const isLoading = propLoading || bookLoading || groupsLoading;
 
   const roomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
-    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => { map[r.id] = r.name; });
+    (property?.rooms ?? []).forEach((r: { id: string; name: string }) => {
+      map[r.id] = r.name;
+    });
     return map;
   }, [property]);
 
   // Pass all room fields needed by AddBookingModal including extra_guest_price
-  const activeRooms = useMemo(() =>
-    (property?.rooms ?? [])
-      .filter((r) => r.is_active)
-      .map((r) => ({
-        id: r.id,
-        name: r.name,
-        base_price: r.base_price ?? 0,
-        extra_guest_price: r.extra_guest_price ?? 0,
-        max_guests: r.max_guests ?? 2,
-      })),
-    [property]
+  const activeRooms = useMemo(
+    () =>
+      (property?.rooms ?? [])
+        .filter((r) => r.is_active)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          base_price: r.base_price ?? 0,
+          extra_guest_price: r.extra_guest_price ?? 0,
+          max_guests: r.max_guests ?? 2,
+        })),
+    [property],
   );
 
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(4)].map((_, i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
+        ))}
       </div>
     );
   }
@@ -163,31 +285,45 @@ function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Snapshot of bookings, revenue, and inquiries.</p>
+        <p className="text-sm text-muted-foreground">
+          Snapshot of bookings, revenue, and inquiries.
+        </p>
       </div>
 
       <OnboardingChecklist property={property as Property | undefined} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatCard icon={CalendarDays} label="Upcoming bookings" value={stats.upcoming} />
-        <StatCard icon={IndianRupee} label="Monthly revenue" value={`₹${stats.monthlyRevenue.toLocaleString("en-IN")}`} />
+        <StatCard
+          icon={IndianRupee}
+          label="Monthly revenue"
+          value={`₹${stats.monthlyRevenue.toLocaleString("en-IN")}`}
+        />
         <StatCard icon={Percent} label="Occupancy rate" value="—" />
         <StatCard icon={MessageSquare} label="Total bookings" value={bookings.length} />
       </div>
 
       <div className="bg-card border border-border rounded-xl p-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">Quick actions</div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+          Quick actions
+        </div>
         <div className="flex flex-wrap gap-2">
           <ActionBtn icon={Ban} label="Block dates" onClick={() => setModal("block")} />
           <ActionBtn icon={Plus} label="Add booking" onClick={() => setModal("add")} />
-          <ActionBtn icon={Send} label="Send WhatsApp reminder" onClick={() => setModal("whatsapp")} />
+          <ActionBtn
+            icon={Send}
+            label="Send WhatsApp reminder"
+            onClick={() => setModal("whatsapp")}
+          />
         </div>
       </div>
 
       <div className="bg-card border border-border rounded-xl">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h2 className="font-medium">Recent bookings</h2>
-          <Link to="/admin/bookings" className="text-xs text-primary hover:underline">View all →</Link>
+          <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
+            View all →
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -202,15 +338,30 @@ function DashboardPage() {
             </thead>
             <tbody>
               {recent.length === 0 && (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">No bookings yet.</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
+                    No bookings yet.
+                  </td>
+                </tr>
               )}
               {recent.map((b) => (
                 <tr key={b.id} className="border-t border-border">
-                  <td className="px-4 py-3"><div className="font-medium">{b.guest_name}</div><div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div></td>
-                  <td className="px-4 py-3 text-muted-foreground">{roomNameMap[b.room_id] ?? b.room_id?.slice(0, 8) ?? "—"}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">{b.check_in} → {b.check_out}</td>
-                  <td className="px-4 py-3"><StatusPill status={b.status} /></td>
-                  <td className="px-4 py-3 text-right font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</td>
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{b.guest_name}</div>
+                    <div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {roomNameMap[b.room_id] ?? b.room_id?.slice(0, 8) ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                    {b.check_in} → {b.check_out}
+                  </td>
+                  <td className="px-4 py-3">
+                    <StatusPill status={b.status} />
+                  </td>
+                  <td className="px-4 py-3 text-right font-medium">
+                    ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -219,16 +370,31 @@ function DashboardPage() {
       </div>
 
       {modal === "block" && property && (
-        <BlockDatesModal propertyId={property.id} rooms={activeRooms} onClose={() => setModal(null)} />
+        <BlockDatesModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+        />
       )}
       {modal === "add" && property && (
-        <AddBookingModal propertyId={property.id} property={property} rooms={activeRooms} onClose={() => setModal(null)} onSaved={() => setModal(null)} />
+        <AddBookingModal
+          propertyId={property.id}
+          property={property}
+          rooms={activeRooms}
+          onClose={() => setModal(null)}
+          onSaved={() => setModal(null)}
+        />
       )}
       {modal === "whatsapp" && property && (
         <WhatsAppReminderModal
           bookings={bookings}
           roomNameMap={roomNameMap}
-          property={{ name: property.name, owner_phone: property.owner_phone ?? null, owner_whatsapp: property.owner_whatsapp ?? null, upiId: extractUPIId(property.shared_amenities ?? []) }}
+          property={{
+            name: property.name,
+            owner_phone: property.owner_phone ?? null,
+            owner_whatsapp: property.owner_whatsapp ?? null,
+            upiId: extractUPIId(property.shared_amenities ?? []),
+          }}
           onClose={() => setModal(null)}
         />
       )}
@@ -236,18 +402,41 @@ function DashboardPage() {
   );
 }
 
-function StatCard({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string | number }) {
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string | number;
+}) {
   return (
     <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground"><Icon className="h-3.5 w-3.5" /> {label}</div>
-      <div className="mt-2 font-display text-2xl md:text-3xl font-semibold text-foreground">{value}</div>
+      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {label}
+      </div>
+      <div className="mt-2 font-display text-2xl md:text-3xl font-semibold text-foreground">
+        {value}
+      </div>
     </div>
   );
 }
 
-function ActionBtn({ icon: Icon, label, onClick }: { icon: React.ComponentType<{ className?: string }>; label: string; onClick: () => void }) {
+function ActionBtn({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <button onClick={onClick} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted transition-colors">
+    <button
+      onClick={onClick}
+      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted transition-colors"
+    >
       <Icon className="h-4 w-4 text-primary" /> {label}
     </button>
   );
