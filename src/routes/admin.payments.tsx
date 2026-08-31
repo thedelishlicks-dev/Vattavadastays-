@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
-import { Wallet, Loader2, Check, IndianRupee } from "lucide-react";
+import {
+  Wallet,
+  Loader2,
+  Check,
+  X,
+  IndianRupee,
+  Download,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  Receipt,
+} from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
@@ -30,29 +41,69 @@ function encodeUpiId(upiId: string, existing: string[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
-// Unified "outstanding item" shape so standalone bookings and booking_groups
-// can be rendered/toggled/summed identically. This is the core fix: the old
-// version only looked at useBookings() and silently ignored booking_groups
-// entirely, plus it forgot to subtract discount_amount.
+// Unified ledger row so standalone bookings and booking_groups can be
+// rendered/toggled/summed identically. This mirrors the BookingListItem
+// pattern in admin.bookings.tsx on purpose: this page's numbers must match
+// that page's numbers, or an owner ends up doing accounting against two
+// different "outstanding" figures for the same business.
 // ---------------------------------------------------------------------------
 
-type OutstandingItem = {
+type LedgerItem = {
   id: string;
   kind: "booking" | "group";
   guest_name: string;
   guest_phone: string | null;
   check_in: string;
+  status: string;
   total_amount: number;
   discount_amount: number;
+  charges_total: number;
   advance_amount: number;
   payment_method: string | null;
+  payment_reference: string | null;
   is_paid: boolean;
-  status: string;
   roomLabel: string; // "2 rooms" for groups, blank for single bookings
 };
 
-function balanceOf(item: Pick<OutstandingItem, "total_amount" | "discount_amount" | "advance_amount">) {
-  return Math.max(0, Number(item.total_amount) - Number(item.discount_amount) - Number(item.advance_amount));
+function chargesSum(charges?: { qty: number; unit_price: number }[] | null): number {
+  return (charges ?? []).reduce((s, c) => s + c.qty * c.unit_price, 0);
+}
+
+/**
+ * Gross amount owed for the stay: room total + extra charges (food, laundry,
+ * bonfire, etc.) minus discount. This MUST match amountDueFor() in
+ * admin.bookings.tsx.
+ *
+ * BUG FIXED: the old version of this page computed the balance as just
+ * total_amount - discount - advance, completely ignoring booking_charges.
+ * That's why "Outstanding" here (₹1,18,513) never matched "Outstanding" on
+ * the Bookings page (₹1,26,038) — the ₹7,525 gap is exactly the sum of
+ * unbilled extra charges that this page was silently dropping.
+ */
+function grossTotal(
+  item: Pick<LedgerItem, "total_amount" | "discount_amount" | "charges_total">,
+): number {
+  return Math.max(0, Number(item.total_amount) + item.charges_total - Number(item.discount_amount));
+}
+
+function balanceOf(
+  item: Pick<LedgerItem, "total_amount" | "discount_amount" | "charges_total" | "advance_amount">,
+): number {
+  return Math.max(0, grossTotal(item) - Number(item.advance_amount));
+}
+
+function csvEscape(value: string | number): string {
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+type FilterTab = "outstanding" | "paid" | "all";
+type SortKey = "checkin" | "guest" | "total" | "collected" | "balance";
+
+function paymentStatus(item: LedgerItem): { label: string; cls: string } {
+  if (item.is_paid) return { label: "Paid", cls: "bg-green-100 text-green-800" };
+  if (item.advance_amount > 0) return { label: "Partial", cls: "bg-amber-100 text-amber-800" };
+  return { label: "Unpaid", cls: "bg-red-100 text-red-700" };
 }
 
 function AdminPayments() {
@@ -68,6 +119,11 @@ function AdminPayments() {
   const [savedConfig, setSavedConfig] = useState(false);
   const [configError, setConfigError] = useState("");
   const [togglingId, setTogglingId] = useState<string | null>(null);
+
+  const [filterTab, setFilterTab] = useState<FilterTab>("outstanding");
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("checkin");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   useEffect(() => {
     if (property) {
@@ -128,12 +184,11 @@ function AdminPayments() {
     [bookings, groupBookingIds],
   );
 
-  // FIX: outstanding/collected now combine standalone bookings AND booking
-  // groups, subtract discount_amount, and use a consistent status filter
-  // (exclude cancelled only — matches the idea that a completed-but-unpaid
-  // stay is still money owed, not money written off).
-  const items: OutstandingItem[] = useMemo(() => {
-    const fromBookings: OutstandingItem[] = standaloneBookings
+  // Combines standalone bookings AND booking groups, includes extra charges,
+  // subtracts discount_amount, and excludes only cancelled bookings — same
+  // rules as the Bookings page so the two "Outstanding" figures agree.
+  const items: LedgerItem[] = useMemo(() => {
+    const fromBookings: LedgerItem[] = standaloneBookings
       .filter((b) => b.status !== "cancelled")
       .map((b) => ({
         id: b.id,
@@ -141,16 +196,18 @@ function AdminPayments() {
         guest_name: b.guest_name,
         guest_phone: b.guest_phone,
         check_in: b.check_in,
+        status: b.status,
         total_amount: Number(b.total_amount),
         discount_amount: Number(b.discount_amount ?? 0),
+        charges_total: chargesSum(b.booking_charges),
         advance_amount: Number(b.advance_amount ?? 0),
-        payment_method: b.payment_method,
+        payment_method: b.payment_method ?? null,
+        payment_reference: b.payment_reference ?? null,
         is_paid: b.is_paid,
-        status: b.status,
         roomLabel: "",
       }));
 
-    const fromGroups: OutstandingItem[] = (groups as BookingGroup[])
+    const fromGroups: LedgerItem[] = (groups as BookingGroup[])
       .filter((g) => g.status !== "cancelled")
       .map((g) => ({
         id: g.id,
@@ -158,37 +215,81 @@ function AdminPayments() {
         guest_name: g.guest_name,
         guest_phone: g.guest_phone,
         check_in: g.check_in,
+        status: g.status,
         total_amount: Number(g.total_amount),
         discount_amount: Number(g.discount_amount ?? 0),
+        charges_total: chargesSum(g.booking_charges),
         advance_amount: Number(g.advance_amount ?? 0),
-        payment_method: g.payment_method,
+        payment_method: g.payment_method ?? null,
+        payment_reference: g.payment_reference ?? null,
         is_paid: g.is_paid,
-        status: g.status,
         roomLabel: `${(g.bookings ?? []).length} rooms`,
       }));
 
     return [...fromBookings, ...fromGroups];
   }, [standaloneBookings, groups]);
 
-  const unpaidItems = useMemo(
-    () =>
-      items
-        .filter((i) => !i.is_paid)
-        .sort((a, b) => new Date(a.check_in).getTime() - new Date(b.check_in).getTime()),
-    [items],
-  );
-
+  // Stats are computed over the FULL ledger (not the filtered/searched view)
+  // so the two headline numbers always reflect the whole business, no matter
+  // what the table below is currently scoped to.
   const stats = useMemo(() => {
     const totalCollected = items.reduce((s, i) => s + i.advance_amount, 0);
     const totalOutstanding = items.reduce((s, i) => s + balanceOf(i), 0);
+    const totalBilled = items.reduce((s, i) => s + grossTotal(i), 0);
     const fullyPaid = items.filter((i) => i.is_paid).length;
     const partPaid = items.filter((i) => !i.is_paid && i.advance_amount > 0).length;
-    return { totalCollected, totalOutstanding, fullyPaid, partPaid };
+    const unpaid = items.filter((i) => !i.is_paid && i.advance_amount === 0).length;
+    return { totalCollected, totalOutstanding, totalBilled, fullyPaid, partPaid, unpaid };
   }, [items]);
 
-  const togglePaid = async (item: OutstandingItem) => {
+  const filteredItems = useMemo(() => {
+    let list = items;
+    if (filterTab === "outstanding") list = list.filter((i) => !i.is_paid);
+    else if (filterTab === "paid") list = list.filter((i) => i.is_paid);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (i) => i.guest_name.toLowerCase().includes(q) || (i.guest_phone ?? "").includes(q),
+      );
+    }
+    return list;
+  }, [items, filterTab, search]);
+
+  const sortedItems = useMemo(() => {
+    const arr = [...filteredItems];
+    const dirMul = sortDir === "asc" ? 1 : -1;
+    arr.sort((a, b) => {
+      switch (sortKey) {
+        case "guest":
+          return a.guest_name.localeCompare(b.guest_name) * dirMul;
+        case "total":
+          return (grossTotal(a) - grossTotal(b)) * dirMul;
+        case "collected":
+          return (a.advance_amount - b.advance_amount) * dirMul;
+        case "balance":
+          return (balanceOf(a) - balanceOf(b)) * dirMul;
+        case "checkin":
+        default:
+          return a.check_in.localeCompare(b.check_in) * dirMul;
+      }
+    });
+    return arr;
+  }, [filteredItems, sortKey, sortDir]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortKey(key);
+      // Money columns read best biggest-first; text/date columns read best
+      // smallest/earliest-first.
+      setSortDir(key === "balance" || key === "collected" || key === "total" ? "desc" : "asc");
+    }
+  };
+
+  const togglePaid = async (item: LedgerItem) => {
     setTogglingId(item.id);
-    // FIX: never overwrite advance_amount — it holds the cumulative partial
+    // Never overwrite advance_amount — it holds the cumulative partial
     // payments recorded in admin.bookings.tsx. Only flip the is_paid flag.
     const table = item.kind === "group" ? "booking_groups" : "bookings";
     await supabase.from(table).update({ is_paid: !item.is_paid }).eq("id", item.id);
@@ -201,21 +302,91 @@ function AdminPayments() {
     setTogglingId(null);
   };
 
+  const exportCsv = () => {
+    const header = [
+      "Guest",
+      "Phone",
+      "Check-in",
+      "Rooms",
+      "Total Amount",
+      "Discount",
+      "Extra Charges",
+      "Gross Total",
+      "Collected",
+      "Balance Due",
+      "Payment Method",
+      "Reference",
+      "Status",
+    ];
+    const rows = sortedItems.map((i) => [
+      i.guest_name,
+      i.guest_phone ?? "",
+      i.check_in,
+      i.roomLabel || "1 room",
+      i.total_amount.toFixed(2),
+      i.discount_amount.toFixed(2),
+      i.charges_total.toFixed(2),
+      grossTotal(i).toFixed(2),
+      i.advance_amount.toFixed(2),
+      balanceOf(i).toFixed(2),
+      i.payment_method ?? "",
+      i.payment_reference ?? "",
+      paymentStatus(i).label,
+    ]);
+    const sum = (f: (i: LedgerItem) => number) => sortedItems.reduce((s, i) => s + f(i), 0);
+    const totalsRow = [
+      "",
+      "",
+      "",
+      "TOTAL",
+      sum((i) => i.total_amount).toFixed(2),
+      sum((i) => i.discount_amount).toFixed(2),
+      sum((i) => i.charges_total).toFixed(2),
+      sum((i) => grossTotal(i)).toFixed(2),
+      sum((i) => i.advance_amount).toFixed(2),
+      sum((i) => balanceOf(i)).toFixed(2),
+      "",
+      "",
+      "",
+    ];
+    const csv = [header, ...rows, totalsRow].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const dateStr = new Date().toLocaleDateString("en-CA");
+    a.download = `payments-ledger-${filterTab}-${dateStr}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
   }
 
+  const sortIcon = (key: SortKey) =>
+    sortKey === key ? (
+      sortDir === "asc" ? (
+        <ChevronUp className="h-3 w-3" />
+      ) : (
+        <ChevronDown className="h-3 w-3" />
+      )
+    ) : null;
+
+  const thCls = "px-4 py-2.5 font-medium whitespace-nowrap select-none";
+  const thSortCls = `${thCls} cursor-pointer hover:text-foreground`;
+
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Payments</h1>
         <p className="text-sm text-muted-foreground">
-          Configure payment methods and track outstanding balances.
+          Track collections and outstanding balances across all bookings.
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
         <div className="bg-card border border-border rounded-xl p-4">
           <p className="text-xs text-muted-foreground mb-1">Collected</p>
           <p className="font-display text-2xl font-semibold text-primary">
@@ -230,12 +401,222 @@ function AdminPayments() {
           <p className="font-display text-2xl font-semibold text-destructive">
             ₹{stats.totalOutstanding.toLocaleString("en-IN")}
           </p>
+          <p className="text-xs text-muted-foreground mt-0.5">{stats.unpaid} not started</p>
         </div>
+        <div className="bg-card border border-border rounded-xl p-4 col-span-2 md:col-span-1">
+          <p className="text-xs text-muted-foreground mb-1">Total billed</p>
+          <p className="font-display text-2xl font-semibold">
+            ₹{stats.totalBilled.toLocaleString("en-IN")}
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">Room total + charges − discounts</p>
+        </div>
+      </div>
+
+      {/* Ledger */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-semibold text-sm">Payment Ledger</h2>
+          <button
+            onClick={exportCsv}
+            disabled={sortedItems.length === 0}
+            className="shrink-0 flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            <Download className="h-4 w-4" /> Export CSV
+          </button>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex rounded-full border border-border overflow-hidden shrink-0">
+            {(
+              [
+                { key: "outstanding", label: "Outstanding" },
+                { key: "paid", label: "Paid" },
+                { key: "all", label: "All" },
+              ] as { key: FilterTab; label: string }[]
+            ).map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setFilterTab(t.key)}
+                className={[
+                  "px-3 py-1.5 text-xs font-medium transition-colors",
+                  filterTab === t.key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground hover:bg-muted",
+                ].join(" ")}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search guest or phone…"
+              className="w-full rounded-full border border-border bg-background pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </div>
+        </div>
+
+        {sortedItems.length === 0 ? (
+          <div className="bg-card border border-border rounded-xl p-8 text-center">
+            {filterTab === "outstanding" ? (
+              <>
+                <IndianRupee className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
+                <p className="text-xs text-muted-foreground mt-0.5">No outstanding payments.</p>
+              </>
+            ) : (
+              <>
+                <Receipt className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground font-medium">Nothing here yet.</p>
+              </>
+            )}
+          </div>
+        ) : (
+          // Horizontal-scroll fix: the old markup put overflow-hidden directly
+          // on the div wrapping <table>, which just clips overflow instead of
+          // scrolling it. The scrollable element now needs its own
+          // overflow-x-auto wrapper, separate from the outer rounded-corner
+          // clipping container.
+          <div className="bg-card border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[1220px]">
+                <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+                  <tr>
+                    <th
+                      className={`${thSortCls} sticky left-0 z-10 bg-muted/50`}
+                      onClick={() => toggleSort("guest")}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        Guest {sortIcon("guest")}
+                      </span>
+                    </th>
+                    <th className={thSortCls} onClick={() => toggleSort("checkin")}>
+                      <span className="inline-flex items-center gap-1">
+                        Check-in {sortIcon("checkin")}
+                      </span>
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Room total
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Discount
+                    </th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
+                      Charges
+                    </th>
+                    <th className={`${thSortCls} text-right`} onClick={() => toggleSort("total")}>
+                      <span className="inline-flex items-center gap-1 justify-end w-full">
+                        Gross total {sortIcon("total")}
+                      </span>
+                    </th>
+                    <th
+                      className={`${thSortCls} text-right`}
+                      onClick={() => toggleSort("collected")}
+                    >
+                      <span className="inline-flex items-center gap-1 justify-end w-full">
+                        Collected {sortIcon("collected")}
+                      </span>
+                    </th>
+                    <th className={`${thSortCls} text-right`} onClick={() => toggleSort("balance")}>
+                      <span className="inline-flex items-center gap-1 justify-end w-full">
+                        Balance due {sortIcon("balance")}
+                      </span>
+                    </th>
+                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Method</th>
+                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Reference</th>
+                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Status</th>
+                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedItems.map((item) => {
+                    const balance = balanceOf(item);
+                    const status = paymentStatus(item);
+                    return (
+                      <tr key={`${item.kind}-${item.id}`} className="border-t border-border">
+                        <td className="px-4 py-3 sticky left-0 z-10 bg-card">
+                          <div className="font-medium flex items-center gap-1.5">
+                            {item.guest_name}
+                            {item.roomLabel && (
+                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                                {item.roomLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{item.guest_phone}</div>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                          {item.check_in}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          ₹{item.total_amount.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap text-green-600">
+                          {item.discount_amount > 0
+                            ? `-₹${item.discount_amount.toLocaleString("en-IN")}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap text-amber-700">
+                          {item.charges_total > 0
+                            ? `+₹${item.charges_total.toLocaleString("en-IN")}`
+                            : "—"}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap font-medium">
+                          ₹{grossTotal(item).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap text-primary">
+                          ₹{item.advance_amount.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap font-semibold">
+                          ₹{balance.toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                          {item.payment_method ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
+                          {item.payment_reference ?? "—"}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.cls}`}
+                          >
+                            {status.label}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => togglePaid(item)}
+                            disabled={togglingId === item.id}
+                            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
+                          >
+                            {togglingId === item.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : item.is_paid ? (
+                              <X className="h-3 w-3" />
+                            ) : (
+                              <Check className="h-3 w-3" />
+                            )}
+                            {item.is_paid ? "Mark unpaid" : "Mark paid"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Payment config */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        <h2 className="font-semibold text-sm">Payment Settings</h2>
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Wallet className="h-4 w-4 text-primary" /> Payment Settings
+        </h2>
 
         <div>
           <label className={labelCls}>UPI ID</label>
@@ -286,83 +667,6 @@ function AdminPayments() {
           {savedConfig && <span className="text-sm text-primary font-medium">Saved ✓</span>}
           {configError && <span className="text-sm text-destructive">{configError}</span>}
         </div>
-      </div>
-
-      {/* Outstanding bookings */}
-      <div className="space-y-3">
-        <h2 className="font-semibold text-sm">Outstanding Payments</h2>
-
-        {unpaidItems.length === 0 ? (
-          <div className="bg-card border border-border rounded-xl p-8 text-center">
-            <IndianRupee className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
-            <p className="text-xs text-muted-foreground mt-0.5">No outstanding payments.</p>
-          </div>
-        ) : (
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">Guest</th>
-                  <th className="px-4 py-2.5 font-medium">Check-in</th>
-                  <th className="px-4 py-2.5 font-medium">Balance due</th>
-                  <th className="px-4 py-2.5 font-medium">Method</th>
-                  <th className="px-4 py-2.5 font-medium text-right">Mark paid</th>
-                </tr>
-              </thead>
-              <tbody>
-                {unpaidItems.map((item) => (
-                  <tr key={`${item.kind}-${item.id}`} className="border-t border-border">
-                    <td className="px-4 py-3">
-                      <div className="font-medium flex items-center gap-1.5">
-                        {item.guest_name}
-                        {item.roomLabel && (
-                          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                            {item.roomLabel}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{item.guest_phone}</div>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{item.check_in}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold">
-                        ₹{balanceOf(item).toLocaleString("en-IN")}
-                      </div>
-                      {item.advance_amount > 0 && (
-                        <div className="text-xs text-primary mt-0.5">
-                          Adv ₹{item.advance_amount.toLocaleString("en-IN")}
-                        </div>
-                      )}
-                      {item.discount_amount > 0 && (
-                        <div className="text-xs text-green-600 mt-0.5">
-                          -₹{item.discount_amount.toLocaleString("en-IN")} disc
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">
-                      {item.payment_method ?? "—"}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => togglePaid(item)}
-                        disabled={togglingId === item.id}
-                        className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                      >
-                        {togglingId === item.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <Check className="h-3 w-3" />
-                        )}
-                        Paid
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
     </div>
   );
