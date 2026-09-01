@@ -8,7 +8,7 @@
 
 ## Project Summary
 
-stayidom.in is a white-label, commission-free booking SaaS for Vattavada (Kerala) homestays.
+stayidom.in is a white-label, commission-free booking and property management SaaS for vacation rentals and homestays across Kerala's tourism belt — mountains, backwaters, and beaches. Currently piloting in Vattavada (Idukki), a remote mountain village with weak 2G-grade BSNL/Jio signal, used as the platform's connectivity stress-test market before wider rollout.
 
 - Guest side: `{subdomain}.stayidom.in` — public booking page
 - Owner side: `/admin` — protected dashboard
