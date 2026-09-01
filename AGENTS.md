@@ -8,8 +8,11 @@ Read this file fully before writing a single line of code.
 
 ## What this project is
 
-stayidom.in is a SaaS platform giving Vattavada (Kerala) homestay owners
-their own standalone booking website.
+stayidom.in is a SaaS platform giving vacation rental and homestay owners
+across Kerala's tourism belt (mountains, backwaters, beaches) their own
+standalone booking website. It is currently being piloted in Vattavada, a
+remote mountain village with weak 2G-grade signal — the platform's toughest
+connectivity test case, not its only market.
 
 - Guest side: Public booking website at {subdomain}.stayidom.in
 - Owner side: Protected dashboard at /admin
