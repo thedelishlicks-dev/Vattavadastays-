@@ -1,10 +1,12 @@
 # stayidom.in
 
-A white-label, commission-free booking engine for Vattavada homestays, designed for rural connectivity.
+A white-label, commission-free booking and property management platform for vacation rentals and homestays across Kerala's tourism belt — mountains, backwaters, and beaches — engineered from day one for patchy rural connectivity rather than assuming city-grade signal everywhere.
 
 ## Project Overview
 
-stayidom.in provides homestay owners in Vattavada (Kerala) with their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
+stayidom.in gives vacation rental and homestay owners across Kerala their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
+
+We're currently piloting the platform in **Vattavada**, a remote mountain village in Idukki with only weak 2G-grade BSNL/Jio signal — deliberately one of the toughest connectivity environments in the state. The idea: if the guest booking flow and owner dashboard hold up here, they'll hold up just as well in the backwaters (Alleppey, Kumarakom) or on the coast (Varkala, Kovalam) later. Vattavada is the pilot market, not the ceiling.
 
 ### Key Features
 
@@ -71,7 +73,7 @@ stayidom.in provides homestay owners in Vattavada (Kerala) with their own brande
 
 ## Architecture & Constraints
 
-This project follows strict performance and architectural guidelines for Vattavada's low-signal environment:
+This project follows strict performance and architectural guidelines developed against Vattavada's low-signal pilot environment — the toughest network conditions we design for, and the baseline every feature is held to before it ships anywhere else:
 
 - **No SSR**: Pure Vite SPA. Never use `@tanstack/react-start` or `@supabase/ssr`.
 - **No Heavy SDKs**: Google Maps JS SDK and other heavy libraries are prohibited on the guest page.
