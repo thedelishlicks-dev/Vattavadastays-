@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
@@ -6,6 +6,8 @@ import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
+import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
+import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
@@ -38,8 +40,17 @@ interface AddBookingModalProps {
   propertyId: string;
   /** Needs at least check_in_time/check_out_time — used to determine
    * whether same-day turnover is safe for this property (see
-   * isSameDayTurnoverSafe in bookingAvailability.ts). */
-  property: TurnoverPolicyInput;
+   * isSameDayTurnoverSafe in bookingAvailability.ts). Also used, when
+   * present, to auto-send the guest a WhatsApp tracking/confirmation
+   * message right after the booking is saved — name/owner_phone/
+   * owner_whatsapp/shared_amenities (for the UPI id) are all optional so
+   * this still works for callers that only pass the turnover-policy shape. */
+  property: TurnoverPolicyInput & {
+    name?: string;
+    owner_phone?: string | null;
+    owner_whatsapp?: string | null;
+    shared_amenities?: string[] | null;
+  };
   rooms: Room[];
   onClose: () => void;
   onSaved?: () => void;
@@ -63,6 +74,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
   const [error, setError] = useState("");
   const [conflicts, setConflicts] = useState<Record<string, string[]>>({});
   const queryClient = useQueryClient();
+  // Hidden anchor, clicked programmatically right after a successful save —
+  // same trick BookingForm.tsx uses for the guest→owner notify link. Opening
+  // WhatsApp via window.open() after the async supabase calls above would
+  // get blocked as a popup by most browsers; a real anchor click doesn't.
+  const waRef = useRef<HTMLAnchorElement>(null);
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   const { data: agents = [] } = useAgents(propertyId);
@@ -231,6 +247,45 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
 
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
+
+      // Auto-send the guest their tracking link on WhatsApp — same message
+      // the owner used to send by hand. Skipped if there's no usable guest
+      // phone number, or the property has no owner contact number to send
+      // the message "from" (needed for the confirmed-booking template).
+      const guestPhoneDigits = form.guest_phone.replace(/\D/g, "");
+      const ownerPhone = property.owner_phone ?? property.owner_whatsapp ?? "";
+      if (guestPhoneDigits.length >= 10 && property.name) {
+        const trackingUrl = guestTrackingUrl(window.location.origin, form.guest_phone);
+        const roomName = selectedRooms.map((r) => r.name).join(", ");
+        const waLink =
+          form.status === "confirmed"
+            ? confirmationLink({
+                guestPhone: form.guest_phone,
+                guestName: form.guest_name,
+                propertyName: property.name,
+                roomName,
+                checkIn: form.check_in,
+                checkOut: form.check_out,
+                ownerPhone,
+                trackingUrl,
+              })
+            : paymentReminderLink({
+                guestPhone: form.guest_phone,
+                guestName: form.guest_name,
+                totalAmount: grandTotal,
+                advancePaid: 0,
+                checkIn: form.check_in,
+                propertyName: property.name,
+                ownerPhone,
+                upiId: extractUPIId(property.shared_amenities ?? null) ?? undefined,
+                trackingUrl,
+              });
+        if (waRef.current) {
+          waRef.current.href = waLink;
+          waRef.current.click();
+        }
+      }
+
       onSaved?.();
       onClose();
     } catch (e: unknown) {
@@ -242,6 +297,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+      {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
+      <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
