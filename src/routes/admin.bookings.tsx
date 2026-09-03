@@ -336,8 +336,13 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
 
   const handleStatus = async (status: string) => {
     setUpdatingStatus(true);
-    await supabase.from("booking_groups").update({ status }).eq("id", group.id);
-    await supabase.from("bookings").update({ status }).eq("group_id", group.id);
+    // Clear the hold timer once a booking leaves "pending" — it's no
+    // longer a temporary hold, and this stops the expiry job from ever
+    // needing to consider it (belt-and-braces; it already only touches
+    // status === "pending" rows).
+    const holdUpdate = status !== "pending" ? { hold_expires_at: null } : {};
+    await supabase.from("booking_groups").update({ status, ...holdUpdate }).eq("id", group.id);
+    await supabase.from("bookings").update({ status, ...holdUpdate }).eq("group_id", group.id);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     onRefresh(); setUpdatingStatus(false);
@@ -347,8 +352,9 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     const newAdvance = advance + amount;
     const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
     const newStatus = group.status === "pending" ? "confirmed" : group.status;
-    await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus }).eq("id", group.id);
-    if (newStatus !== group.status) await supabase.from("bookings").update({ status: newStatus }).eq("group_id", group.id);
+    const holdUpdate = newStatus !== "pending" ? { hold_expires_at: null } : {};
+    await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus, ...holdUpdate }).eq("id", group.id);
+    if (newStatus !== group.status) await supabase.from("bookings").update({ status: newStatus, ...holdUpdate }).eq("group_id", group.id);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     onRefresh(); setShowPaymentForm(false);
@@ -806,7 +812,8 @@ function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, 
     if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     if (newPayment > maxAllowed) { setError(maxAllowed <= 0 ? "Already fully paid" : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
     setSaving(true); setError("");
-    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: booking.status === "pending" ? "confirmed" : booking.status }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
+    const newStatus = booking.status === "pending" ? "confirmed" : booking.status;
+    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: newStatus, ...(newStatus !== "pending" ? { hold_expires_at: null } : {}) }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
     catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
   };
   return (
@@ -946,6 +953,7 @@ function BookingsAdmin() {
   const updateStatus = async (id: string, newStatus: string) => {
     const updates: Record<string, unknown> = { status: newStatus };
     if (newStatus === "completed") updates.checked_out_at = new Date().toISOString();
+    if (newStatus !== "pending") updates.hold_expires_at = null;
     await supabase.from("bookings").update(updates).eq("id", id);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
