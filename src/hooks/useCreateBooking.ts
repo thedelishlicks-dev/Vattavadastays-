@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { getConflictingDates } from "@/lib/bookingAvailability";
+import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 
 export interface RoomBookingInput {
   roomId: string;
@@ -173,6 +173,11 @@ export function useCreateBooking() {
       // of N separate cards.
       const grandTotal = roomPrices.reduce((sum, r) => sum + r.totalAmount, 0);
       let groupId: string | null = null;
+      // Guest self-service bookings always start "pending" (awaiting
+      // advance payment/owner confirmation) — same hold-expiry rule as the
+      // owner-side AddBookingModal, so an abandoned guest booking doesn't
+      // block these dates forever either. See pendingHoldExpiry() docs.
+      const holdExpiresAt = pendingHoldExpiry();
 
       if (input.rooms.length > 1) {
         const { data: groupData, error: groupErr } = await supabase
@@ -192,6 +197,7 @@ export function useCreateBooking() {
             status: "pending",
             payment_method: input.paymentMethod ?? "Cash on Arrival",
             is_paid: false,
+            hold_expires_at: holdExpiresAt,
           })
           .select("id")
           .single();
@@ -219,6 +225,7 @@ export function useCreateBooking() {
           status: "pending",
           payment_method: input.paymentMethod ?? "Cash on Arrival",
           is_paid: false,
+          hold_expires_at: holdExpiresAt,
           ...(groupId ? { group_id: groupId } : {}),
         };
       });
