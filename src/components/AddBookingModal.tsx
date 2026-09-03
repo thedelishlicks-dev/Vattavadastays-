@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
-import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
+import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
@@ -179,6 +179,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
 
       const isAgentBooking = form.source === "agent" && !!form.agent_id;
       const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
+      // A "pending" booking already blocks its dates the moment it's saved
+      // (see markDatesUnavailable below) — hold_expires_at is what lets a
+      // scheduled DB job release them again if the guest never confirms.
+      // "confirmed" bookings never expire.
+      const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry() : null;
 
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
@@ -194,6 +199,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           agent_id: isAgentBooking ? form.agent_id : null,
           commission_amount: finalCommission,
           commission_paid: false,
+          hold_expires_at: holdExpiresAt,
         });
         if (err) throw err;
       } else {
@@ -217,6 +223,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             agent_id: isAgentBooking ? form.agent_id : null,
             commission_amount: finalCommission,
             commission_paid: false,
+            hold_expires_at: holdExpiresAt,
           })
           .select()
           .single();
@@ -233,6 +240,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           agent_id: isAgentBooking ? form.agent_id : null,
           commission_amount: null,
           commission_paid: false,
+          hold_expires_at: holdExpiresAt,
         }));
         const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
         if (bookErr) throw bookErr;
