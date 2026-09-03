@@ -39,6 +39,29 @@ export function addOneDay(dateStr: string): string {
  */
 export const CLEANING_BUFFER_MINUTES = 60;
 
+/**
+ * How long a "pending" booking (owner-created enquiry hold, or a guest's
+ * self-service booking awaiting advance payment) keeps its dates blocked
+ * before it's treated as abandoned and auto-released. A `pending` booking
+ * already blocks its dates the instant it's created (see
+ * markDatesUnavailable below) — this is what stops that block from lasting
+ * forever if the guest never follows through.
+ *
+ * Matched by a scheduled `expire_stale_pending_bookings()` Postgres
+ * function (see supabase/migrations) that cancels any booking/group still
+ * `pending` past its `hold_expires_at` and frees its `availability` rows —
+ * so changing this constant alone does NOT change the server-side expiry;
+ * update the interval in that migration too if this changes.
+ */
+export const PENDING_HOLD_HOURS = 24;
+
+/** ISO timestamp `PENDING_HOLD_HOURS` from now — set as `hold_expires_at`
+ * on every booking/booking_group inserted with status "pending". Bookings
+ * inserted as "confirmed" should pass `null` instead (no expiry). */
+export function pendingHoldExpiry(): string {
+  return new Date(Date.now() + PENDING_HOLD_HOURS * 60 * 60 * 1000).toISOString();
+}
+
 export interface TurnoverPolicyInput {
   check_in_time?: string | null;
   check_out_time?: string | null;
