@@ -1,4 +1,4 @@
-export type SubscriptionStatus = "trial" | "active" | "suspended";
+ export type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
 
 export interface Property {
@@ -92,6 +92,10 @@ export interface Booking {
   commission_amount?: number | null;
   commission_paid: boolean;
   commission_paid_date?: string | null;
+  /** When set, this row is a temporary "pending" hold that a scheduled DB
+   * job (see supabase/migrations) will cancel and release past this time
+   * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
+  hold_expires_at?: string | null;
   created_at: string;
   /** Joined via useBookings() for list-level amount-due calculations. */
   booking_charges?: BookingCharge[];
@@ -145,6 +149,10 @@ export interface BookingGroup {
   commission_amount?: number | null;
   commission_paid: boolean;
   commission_paid_date?: string | null;
+  /** When set, this row is a temporary "pending" hold that a scheduled DB
+   * job (see supabase/migrations) will cancel and release past this time
+   * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
+  hold_expires_at?: string | null;
   created_at: string;
   bookings?: Booking[];
   /** Joined via useBookingGroups() for list-level amount-due calculations. */
