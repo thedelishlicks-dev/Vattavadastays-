@@ -18,9 +18,18 @@ function link(phone: string, text: string): string {
 /**
  * Builds the guest-facing booking tracking URL — status, invoice, and
  * payment in one place. Pass window.location.origin as `origin`.
+ *
+ * Pass `propertyId` whenever it's available (i.e. every current call
+ * site) so the tracking page can scope its lookup to just this property
+ * and show its name in the header — otherwise a guest who has ever booked
+ * at more than one property under the same phone number sees every
+ * property's bookings mixed together with no way to tell them apart. Omit
+ * only for backward compatibility with old links already sent before this
+ * param existed; those still work, just without the scoping/branding.
  */
-export function guestTrackingUrl(origin: string, guestPhone: string): string {
-  return `${origin}/booking-status?phone=${encodeURIComponent(guestPhone)}`;
+export function guestTrackingUrl(origin: string, guestPhone: string, propertyId?: string): string {
+  const propertyParam = propertyId ? `&property=${encodeURIComponent(propertyId)}` : "";
+  return `${origin}/booking-status?phone=${encodeURIComponent(guestPhone)}${propertyParam}`;
 }
 
 /** Guest taps "Book via WhatsApp" on the guest page */
