@@ -1,4 +1,4 @@
- export type SubscriptionStatus = "trial" | "active" | "suspended";
+export type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
 
 export interface Property {
@@ -24,6 +24,11 @@ export interface Property {
   owner_whatsapp?: string;
   check_in_time: string;
   check_out_time: string;
+  /** Hours a "pending" booking's dates stay held before an unattended hold
+   * auto-cancels and releases them (see expire_stale_pending_bookings() /
+   * pg_cron). Defaults to 24 at the DB level for properties that haven't
+   * set their own. */
+  pending_hold_hours: number;
   is_active: boolean;
   theme?: string;
   heading_font?: string;
