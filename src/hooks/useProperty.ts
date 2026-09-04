@@ -21,6 +21,11 @@ export type Property = {
   owner_whatsapp: string | null
   check_in_time: string | null
   check_out_time: string | null
+  /** Owner-configurable hold window (hours) for pending bookings — see
+   * Settings page and pendingHoldExpiry() in lib/bookingAvailability.ts.
+   * Already returned by the `select('*, ...')` below; just wasn't
+   * declared on this type. */
+  pending_hold_hours: number | null
   is_active: boolean
   subscription_status: string
   landmark_description: string | null

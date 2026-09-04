@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { Check, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
-import { bookingInquiryLink } from "@/lib/whatsapp";
+import { bookingInquiryLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
@@ -144,9 +144,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
         })
       : null;
 
-  const trackingUrl = submittedPhone
-    ? `${window.location.origin}/booking-status?phone=${encodeURIComponent(submittedPhone)}`
-    : null;
+  const trackingUrl = submittedPhone ? guestTrackingUrl(window.location.origin, submittedPhone, property?.id) : null;
 
   const upiId = property ? extractUPIId(property.shared_amenities) : null;
 
