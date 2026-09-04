@@ -47,19 +47,28 @@ export const CLEANING_BUFFER_MINUTES = 60;
  * markDatesUnavailable below) — this is what stops that block from lasting
  * forever if the guest never follows through.
  *
+ * This is now owner-configurable per property (see
+ * `properties.pending_hold_hours`, editable in Settings) — this constant
+ * is only the fallback used when a property record isn't available.
+ *
  * Matched by a scheduled `expire_stale_pending_bookings()` Postgres
  * function (see supabase/migrations) that cancels any booking/group still
- * `pending` past its `hold_expires_at` and frees its `availability` rows —
- * so changing this constant alone does NOT change the server-side expiry;
- * update the interval in that migration too if this changes.
+ * `pending` past its `hold_expires_at` and frees its `availability` rows.
+ * That function does NOT need to know this value — it only ever compares
+ * `hold_expires_at < now()`, and `hold_expires_at` is computed here at
+ * creation time using whichever hours value applies.
  */
 export const PENDING_HOLD_HOURS = 24;
 
-/** ISO timestamp `PENDING_HOLD_HOURS` from now — set as `hold_expires_at`
- * on every booking/booking_group inserted with status "pending". Bookings
- * inserted as "confirmed" should pass `null` instead (no expiry). */
-export function pendingHoldExpiry(): string {
-  return new Date(Date.now() + PENDING_HOLD_HOURS * 60 * 60 * 1000).toISOString();
+/** ISO timestamp `hours` from now — set as `hold_expires_at` on every
+ * booking/booking_group inserted with status "pending". Bookings inserted
+ * as "confirmed" should pass `null` instead (no expiry).
+ *
+ * Pass the property's own `pending_hold_hours` when available; falls back
+ * to `PENDING_HOLD_HOURS` (24h) if omitted or not a positive number. */
+export function pendingHoldExpiry(hours: number = PENDING_HOLD_HOURS): string {
+  const safeHours = hours > 0 ? hours : PENDING_HOLD_HOURS;
+  return new Date(Date.now() + safeHours * 60 * 60 * 1000).toISOString();
 }
 
 export interface TurnoverPolicyInput {

@@ -276,6 +276,7 @@ function AdminSettings() {
     owner_whatsapp: '',
     check_in_time: '',
     check_out_time: '',
+    pending_hold_hours: '24',
     location_lat: '',
     location_lng: '',
     landmark_description: '',
@@ -298,6 +299,7 @@ function AdminSettings() {
         owner_whatsapp: property.owner_whatsapp ?? '',
         check_in_time: property.check_in_time ?? '',
         check_out_time: property.check_out_time ?? '',
+        pending_hold_hours: property.pending_hold_hours != null ? property.pending_hold_hours.toString() : '24',
         location_lat: property.location_lat != null ? property.location_lat.toString() : '',
         location_lng: property.location_lng != null ? property.location_lng.toString() : '',
         landmark_description: property.landmark_description ?? '',
@@ -325,6 +327,7 @@ function AdminSettings() {
       const payload: Record<string, unknown> = { ...updates }
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
+      payload.pending_hold_hours = updates.pending_hold_hours ? Math.round(Number(updates.pending_hold_hours)) : 24
       payload.theme = theme
       payload.heading_font = font
       payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
@@ -477,6 +480,21 @@ function AdminSettings() {
               <label className={labelCls}>Check-out Time</label>
               <input type="time" name="check_out_time" value={form.check_out_time} onChange={handleChange} className={inputCls} />
             </div>
+          </div>
+          <div>
+            <label className={labelCls}>Pending booking hold (hours)</label>
+            <input
+              type="number"
+              name="pending_hold_hours"
+              min={1}
+              max={168}
+              value={form.pending_hold_hours}
+              onChange={handleChange}
+              className={inputCls}
+            />
+            <p className="text-xs text-stone-500 mt-1">
+              When you add a booking and leave it "Pending" (e.g. a guest enquiry awaiting advance payment), the room stays blocked for this many hours. If the booking isn't confirmed by then, it's automatically cancelled and the dates are freed up again. Default is 24 hours.
+            </p>
           </div>
         </div>
 

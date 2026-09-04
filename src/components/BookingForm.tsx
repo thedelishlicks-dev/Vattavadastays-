@@ -93,6 +93,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
         paymentMethod: payment,
         propertyCheckInTime: property?.check_in_time ?? null,
         propertyCheckOutTime: property?.check_out_time ?? null,
+        propertyPendingHoldHours: property?.pending_hold_hours ?? null,
       });
 
       setSubmittedName(name);

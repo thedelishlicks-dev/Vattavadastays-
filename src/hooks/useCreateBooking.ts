@@ -24,6 +24,10 @@ export interface CreateBookingInput {
    * through from useProperty() rather than re-fetching here. */
   propertyCheckInTime?: string | null;
   propertyCheckOutTime?: string | null;
+  /** Property's owner-configurable pending-hold window (Settings page).
+   * Pass through from useProperty(); falls back to the 24h default inside
+   * pendingHoldExpiry() if omitted. */
+  propertyPendingHoldHours?: number | null;
 }
 
 export interface RoomBookingResult {
@@ -177,7 +181,7 @@ export function useCreateBooking() {
       // advance payment/owner confirmation) — same hold-expiry rule as the
       // owner-side AddBookingModal, so an abandoned guest booking doesn't
       // block these dates forever either. See pendingHoldExpiry() docs.
-      const holdExpiresAt = pendingHoldExpiry();
+      const holdExpiresAt = pendingHoldExpiry(input.propertyPendingHoldHours ?? undefined);
 
       if (input.rooms.length > 1) {
         const { data: groupData, error: groupErr } = await supabase

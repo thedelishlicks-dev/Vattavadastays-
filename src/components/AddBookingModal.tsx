@@ -50,6 +50,9 @@ interface AddBookingModalProps {
     owner_phone?: string | null;
     owner_whatsapp?: string | null;
     shared_amenities?: string[] | null;
+    /** Owner-configurable hold window for pending bookings (Settings page).
+     * Falls back to the 24h default inside pendingHoldExpiry() if omitted. */
+    pending_hold_hours?: number | null;
   };
   rooms: Room[];
   onClose: () => void;
@@ -183,7 +186,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
       // (see markDatesUnavailable below) — hold_expires_at is what lets a
       // scheduled DB job release them again if the guest never confirms.
       // "confirmed" bookings never expire.
-      const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry() : null;
+      const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry(property.pending_hold_hours ?? undefined) : null;
 
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
