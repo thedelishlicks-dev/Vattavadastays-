@@ -266,7 +266,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
       const guestPhoneDigits = form.guest_phone.replace(/\D/g, "");
       const ownerPhone = property.owner_phone ?? property.owner_whatsapp ?? "";
       if (guestPhoneDigits.length >= 10 && property.name) {
-        const trackingUrl = guestTrackingUrl(window.location.origin, form.guest_phone);
+        const trackingUrl = guestTrackingUrl(window.location.origin, form.guest_phone, propertyId);
         const roomName = selectedRooms.map((r) => r.name).join(", ");
         const waLink =
           form.status === "confirmed"
