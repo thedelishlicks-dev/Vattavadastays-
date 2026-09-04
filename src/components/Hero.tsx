@@ -92,7 +92,7 @@ export function Hero() {
 
           {/* Track booking — always visible */}
           <a
-            href="/booking-status"
+            href={property?.id ? `/booking-status?property=${encodeURIComponent(property.id)}` : "/booking-status"}
             className="inline-flex items-center justify-center gap-2 rounded-full border border-white/30 bg-white/10 backdrop-blur-sm px-6 py-2.5 text-sm font-medium text-white hover:bg-white/20 transition-all duration-300"
           >
             <ClipboardList className="h-4 w-4" />
