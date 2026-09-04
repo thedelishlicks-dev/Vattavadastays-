@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
-    TanStackRouterVite(),
+    TanStackRouterVite({ autoCodeSplitting: true }),
     tsconfigPaths(),
     tailwindcss(),
     react(),
