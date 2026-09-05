@@ -360,7 +360,16 @@ function DashboardPage() {
                     <StatusPill status={b.status} />
                   </td>
                   <td className="px-4 py-3 text-right font-medium">
-                    ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                    {/* Net of discount — matches the amount shown on the
+                        bookings page. Showing the raw total_amount here
+                        would silently disagree with that page whenever a
+                        booking has a discount applied. */}
+                    ₹{Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0)).toLocaleString("en-IN")}
+                    {Number(b.discount_amount ?? 0) > 0 && (
+                      <div className="text-[10px] font-normal text-green-600">
+                        -₹{Number(b.discount_amount).toLocaleString("en-IN")} disc
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -394,6 +403,10 @@ function DashboardPage() {
             owner_phone: property.owner_phone ?? null,
             owner_whatsapp: property.owner_whatsapp ?? null,
             upiId: extractUPIId(property.shared_amenities ?? []),
+            check_in_time: property.check_in_time ?? null,
+            location_lat: property.location_lat ?? null,
+            location_lng: property.location_lng ?? null,
+            landmark_description: property.landmark_description ?? null,
           }}
           onClose={() => setModal(null)}
         />
