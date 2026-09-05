@@ -394,6 +394,10 @@ function DashboardPage() {
             owner_phone: property.owner_phone ?? null,
             owner_whatsapp: property.owner_whatsapp ?? null,
             upiId: extractUPIId(property.shared_amenities ?? []),
+            check_in_time: property.check_in_time ?? null,
+            location_lat: property.location_lat ?? null,
+            location_lng: property.location_lng ?? null,
+            landmark_description: property.landmark_description ?? null,
           }}
           onClose={() => setModal(null)}
         />
