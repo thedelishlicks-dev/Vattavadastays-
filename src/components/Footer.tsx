@@ -105,7 +105,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
 
               {/* Track booking — always visible */}
               <a
-                href="/booking-status"
+                href={property?.id ? `/booking-status?property=${encodeURIComponent(property.id)}` : "/booking-status"}
                 className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
               >
                 <ClipboardList className="h-4 w-4" />
