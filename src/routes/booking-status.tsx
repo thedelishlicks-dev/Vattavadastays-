@@ -102,17 +102,17 @@ function BookingStatusPage() {
         `guest_phone.eq.+91${last10},` +
         `guest_phone.eq.+91 ${last10}`;
 
-      // Fetch all individual room bookings matching this phone — this
-      // includes rooms that belong to a group booking (they each have their
-      // own row with group_id set). Scoped to one property when the link
-      // we were opened from specifies one (propertyIdFilter) — otherwise
-      // (old links, or a guest who typed their number in directly) this
-      // intentionally spans every property, same as before.
+      // Every current entry point (WhatsApp tracking links, the property's
+      // own "Track Booking" nav link) always includes this. If it's
+      // missing, `enabled: !!propertyIdFilter` below means this query never
+      // even runs — see the dedicated "missing property" screen instead of
+      // a lookup, so no phone number is ever searched across every
+      // property on the platform.
       let bookingsQuery = supabase
         .from("bookings")
         .select("*, booking_charges(*), rooms(name)")
-        .or(phoneFilter);
-      if (propertyIdFilter) bookingsQuery = bookingsQuery.eq("property_id", propertyIdFilter);
+        .or(phoneFilter)
+        .eq("property_id", propertyIdFilter);
       const { data: bookingsRaw, error: bookingsErr } = await bookingsQuery.order("created_at", {
         ascending: false,
       });
@@ -122,18 +122,16 @@ function BookingStatusPage() {
       // Also fetch any group booking rows matching this phone — these hold
       // the pooled total/discount/advance for multi-room bookings, which
       // individual `bookings` rows do NOT carry.
-      let groupsQuery = supabase.from("booking_groups").select("*").or(phoneFilter);
-      if (propertyIdFilter) groupsQuery = groupsQuery.eq("property_id", propertyIdFilter);
-      const { data: groupsRaw, error: groupsErr } = await groupsQuery;
+      const { data: groupsRaw, error: groupsErr } = await supabase
+        .from("booking_groups")
+        .select("*")
+        .or(phoneFilter)
+        .eq("property_id", propertyIdFilter);
 
       if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
 
       if ((!bookingsRaw || bookingsRaw.length === 0) && (!groupsRaw || groupsRaw.length === 0)) {
-        throw new Error(
-          propertyIdFilter
-            ? "No bookings found for this phone number at this property."
-            : "No bookings found for this phone number.",
-        );
+        throw new Error("No bookings found for this phone number at this property.");
       }
 
       const groupsById = new Map((groupsRaw ?? []).map((g) => [g.id, g]));
@@ -227,27 +225,6 @@ function BookingStatusPage() {
     retry: false,
   });
 
-  // Only needed for the unscoped/global lookup (no propertyIdFilter) when
-  // results span more than one property — labels each entry in the picker
-  // below so a guest with bookings at multiple properties can tell them
-  // apart. Skipped entirely when propertyIdFilter is set, since every
-  // result is guaranteed to be the same property already.
-  const distinctPropertyIds = propertyIdFilter
-    ? []
-    : Array.from(new Set((data ?? []).map((d) => d.booking.property_id).filter(Boolean)));
-  const { data: propertyNames } = useQuery({
-    queryKey: ["booking-status-property-names", distinctPropertyIds],
-    queryFn: async () => {
-      const { data: rows, error: err } = await supabase
-        .from("properties")
-        .select("id, name")
-        .in("id", distinctPropertyIds);
-      if (err) throw err;
-      return new Map((rows ?? []).map((r) => [r.id, r.name]));
-    },
-    enabled: distinctPropertyIds.length > 1,
-  });
-
   useEffect(() => {
     if (prefillPhone) {
       setHasSearched(true);
@@ -272,19 +249,39 @@ function BookingStatusPage() {
   const isCancelled = selected?.booking.status === "cancelled";
   const currentStep = selected ? getStepIndex(selected.booking.status) : -1;
 
+  // Every current entry point (WhatsApp tracking links, a property's own
+  // "Track Booking" nav link) always includes ?property=. If it's missing
+  // — an old pre-fix link, a bookmark, or a manually-typed URL — we
+  // deliberately do NOT fall back to searching by phone number alone
+  // across every property on the platform: that would let anyone who
+  // knows a phone number see a guest's full booking history everywhere
+  // they've ever stayed. Show a clear explanation instead.
+  if (!propertyIdFilter) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center px-4">
+        <div className="max-w-md text-center space-y-3">
+          <h1 className="font-display text-xl font-semibold">Booking link needed</h1>
+          <p className="text-sm text-muted-foreground">
+            This page needs to be opened from the tracking link sent to you on WhatsApp, or from
+            the "Track your booking" link on the property's own page — please use that link
+            rather than this one directly.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       {/* Header */}
-      <header className="bg-card border-b border-border px-4 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-10 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
         <a href="/" className="flex items-center gap-2">
           <span className="h-8 w-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
             S
           </span>
           <span className="font-display font-semibold text-primary">stayidom.in</span>
         </a>
-        <span className="text-muted-foreground text-sm">
-          / {linkProperty?.name ?? "Track Booking"}
-        </span>
+        <span className="text-muted-foreground text-sm">/ {linkProperty?.name ?? "…"}</span>
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-8 space-y-6">
@@ -375,11 +372,6 @@ function BookingStatusPage() {
                       </span>
                     )}
                   </div>
-                  {propertyNames?.get(d.booking.property_id) && (
-                    <div className="text-xs font-medium text-primary mt-0.5">
-                      {propertyNames.get(d.booking.property_id)}
-                    </div>
-                  )}
                   <div className="text-xs text-muted-foreground mt-0.5">
                     ₹{Number(d.booking.total_amount).toLocaleString("en-IN")} · {d.booking.status}
                     {d.isGroup && d.groupReference ? ` · ${d.groupReference}` : ""}
