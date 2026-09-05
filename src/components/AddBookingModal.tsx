@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Loader2, X, Check, ChevronDown, AlertTriangle } from "lucide-react";
+import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
@@ -93,6 +93,15 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
   const [commissionAmount, setCommissionAmount] = useState<number | "">("");
   const [commissionEdited, setCommissionEdited] = useState(false);
 
+  // Discount — for guests who negotiated a rate before the owner creates
+  // the booking. Same shape (amount + optional reason) and same validation
+  // as the "Add discount" form on the booking detail page, so a booking
+  // created here looks identical to one discounted after the fact.
+  const [showDiscount, setShowDiscount] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState<string>("");
+  const [discountReason, setDiscountReason] = useState("");
+  const [discountError, setDiscountError] = useState("");
+
   const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
 
   const nights = useMemo(() => {
@@ -124,6 +133,18 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
   // the spec: "auto-fill using the agent's default rate, calculated from
   // the booking's room rate". Summed across rooms for multi-room bookings.
   const roomRateTotal = roomTotals.reduce((s, r) => s + r.roomPrice, 0);
+
+  const discountValue = Math.min(Number(discountAmount) || 0, grandTotal);
+  const netTotal = Math.max(0, grandTotal - discountValue);
+
+  // Discount can't exceed what's actually being booked — reset it if the
+  // owner shrinks the total (fewer/cheaper rooms, shorter stay) below a
+  // discount they'd already typed in.
+  useEffect(() => {
+    if (Number(discountAmount) > grandTotal) {
+      setDiscountAmount(grandTotal > 0 ? String(grandTotal) : "");
+    }
+  }, [grandTotal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-fill commission from the selected agent's default rate whenever the
   // agent or the underlying room-rate total changes — unless the owner has
@@ -160,8 +181,12 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
     if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
+    const discountAmt = Number(discountAmount) || 0;
+    if (discountAmt < 0) { setDiscountError("Cannot be negative"); return; }
+    if (discountAmt > grandTotal) { setDiscountError("Cannot exceed total"); return; }
     setSaving(true);
     setError("");
+    setDiscountError("");
     setConflicts({});
     try {
       const conflictResults = await Promise.all(
@@ -182,6 +207,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
 
       const isAgentBooking = form.source === "agent" && !!form.agent_id;
       const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
+      const finalDiscountReason = discountAmt > 0 ? (discountReason.trim() || null) : null;
       // A "pending" booking already blocks its dates the moment it's saved
       // (see markDatesUnavailable below) — hold_expires_at is what lets a
       // scheduled DB job release them again if the guest never confirms.
@@ -196,7 +222,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           guest_email: form.guest_email || null, guest_count: guestCount,
           check_in: form.check_in, check_out: form.check_out,
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total, advance_amount: 0, discount_amount: 0,
+          total_amount: rt.total, advance_amount: 0, discount_amount: discountAmt,
+          discount_reason: finalDiscountReason,
           status: form.status, is_paid: false,
           source: form.source,
           agent_id: isAgentBooking ? form.agent_id : null,
@@ -209,9 +236,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
         // Multi-room: commission is calculated once for the whole booking
         // (on the summed room rate across all rooms) and stored on the
         // group, not split across individual room rows — same pattern
-        // total_amount already uses. Member booking rows still carry
-        // source/agent_id for traceability, but leave commission_amount
-        // null so ledger sums never double-count a group's commission.
+        // total_amount already uses. A negotiated discount is likewise a
+        // whole-booking amount, stored once on the group. Member booking
+        // rows still carry source/agent_id for traceability, but leave
+        // commission_amount and discount_amount at their neutral defaults
+        // so ledger sums never double-count a group's commission/discount.
         const { data: groupData, error: groupErr } = await supabase
           .from("booking_groups")
           .insert({
@@ -220,7 +249,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             guest_name: form.guest_name, guest_phone: form.guest_phone,
             guest_email: form.guest_email || null, guest_count: guestCount,
             check_in: form.check_in, check_out: form.check_out,
-            total_amount: grandTotal, advance_amount: 0, discount_amount: 0,
+            total_amount: grandTotal, advance_amount: 0, discount_amount: discountAmt,
+            discount_reason: finalDiscountReason,
             status: form.status, is_paid: false,
             source: form.source,
             agent_id: isAgentBooking ? form.agent_id : null,
@@ -284,6 +314,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
                 guestPhone: form.guest_phone,
                 guestName: form.guest_name,
                 totalAmount: grandTotal,
+                discount: discountAmt,
                 advancePaid: 0,
                 checkIn: form.check_in,
                 propertyName: property.name,
@@ -477,6 +508,60 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             </div>
           </div>
 
+          {/* Discount — for a rate the guest negotiated before this booking
+              exists. Kept optional and collapsed by default so it stays out
+              of the way for the common no-discount case. */}
+          {nights > 0 && selectedRooms.length > 0 && (
+            <div className="space-y-2">
+              {!showDiscount ? (
+                <button
+                  type="button"
+                  onClick={() => setShowDiscount(true)}
+                  className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Tag className="h-4 w-4" />
+                  Add discount
+                </button>
+              ) : (
+                <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium text-green-900">Discount</div>
+                    <button
+                      type="button"
+                      onClick={() => { setShowDiscount(false); setDiscountAmount(""); setDiscountReason(""); setDiscountError(""); }}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Discount amount (₹)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={grandTotal}
+                      value={discountAmount}
+                      onChange={(e) => { setDiscountAmount(e.target.value); setDiscountError(""); }}
+                      className={inputCls}
+                      placeholder="e.g. 500"
+                      autoFocus
+                    />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Reason (optional)</label>
+                    <input
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      className={inputCls}
+                      placeholder="e.g. Negotiated rate"
+                    />
+                  </div>
+                  {discountError && <p className="text-xs text-destructive">{discountError}</p>}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Summary */}
           {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
@@ -485,7 +570,13 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
                 <div key={rt.room.id} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{rt.room.name}</span><span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span></div>
               ))}
               {selectedRooms.length > 1 && (
-                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
+                <div className="flex justify-between text-sm font-semibold border-t border-border pt-2 mt-1"><span>Room total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
+              )}
+              {discountValue > 0 && (
+                <div className="flex justify-between text-sm text-green-700 font-medium"><span>Discount{discountReason.trim() ? ` (${discountReason.trim()})` : ""}</span><span>-₹{discountValue.toLocaleString("en-IN")}</span></div>
+              )}
+              {discountValue > 0 && (
+                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{netTotal.toLocaleString("en-IN")}</span></div>
               )}
               {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
                 <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
