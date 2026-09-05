@@ -1,6 +1,13 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { X, Send } from "lucide-react";
-import { buildPaymentReminderText, guestTrackingUrl } from "@/lib/whatsapp";
+import {
+  buildConfirmationText,
+  buildDayBeforeReminderText,
+  buildDirectionsText,
+  buildPaymentReminderText,
+  guestTrackingUrl,
+  clean,
+} from "@/lib/whatsapp";
 
 interface Booking {
   id: string;
@@ -24,18 +31,17 @@ interface Props {
     owner_phone: string | null;
     owner_whatsapp: string | null;
     upiId?: string | null;
+    check_in_time?: string | null;
+    /** Needed for the "Directions" template — that template is hidden
+     * entirely when either is missing, same rule the bookings page uses. */
+    location_lat?: number | null;
+    location_lng?: number | null;
+    landmark_description?: string | null;
   };
   onClose: () => void;
 }
 
 type Template = "confirmed" | "reminder" | "payment" | "directions";
-
-const TEMPLATES: { key: Template; label: string }[] = [
-  { key: "confirmed",  label: "Booking confirmed" },
-  { key: "reminder",  label: "Day-before reminder" },
-  { key: "payment",   label: "Payment reminder" },
-  { key: "directions", label: "Directions" },
-];
 
 function buildMessage(
   template: Template,
@@ -46,35 +52,36 @@ function buildMessage(
 ): string {
   const name = booking.guest_name;
   const prop = property.name;
-  const room = roomName;
   const checkIn = booking.check_in;
   const checkOut = booking.check_out;
   const phone = property.owner_phone ?? property.owner_whatsapp ?? "";
 
   switch (template) {
+    // Delegates to the shared text builders so every button in this modal
+    // always matches what the bookings pages actually send: same copy,
+    // same tracking link, same amount math. Never hand-roll message text
+    // here again — see the comments on each builder in lib/whatsapp.ts for
+    // why (this modal used to drift out of sync with the real messages).
     case "confirmed":
-      return (
-        `Dear ${name}, your booking at ${prop} is confirmed.\n\n` +
-        `Check-in: ${checkIn}\n` +
-        `Check-out: ${checkOut}\n` +
-        `Room: ${room}\n\n` +
-        `Any questions, call us at ${phone}.`
-      );
+      return buildConfirmationText({
+        guestName: name,
+        propertyName: prop,
+        roomName,
+        checkIn,
+        checkOut,
+        ownerPhone: phone,
+        trackingUrl: guestTrackingUrl(origin, booking.guest_phone),
+      });
 
     case "reminder":
-      return (
-        `Hi ${name}, looking forward to your arrival tomorrow at ${prop}!\n\n` +
-        `Check-in from 12:00 PM.\n` +
-        `Room: ${room}\n\n` +
-        `Call us at ${phone} if you need anything.`
-      );
+      return buildDayBeforeReminderText({
+        guestName: name,
+        propertyName: prop,
+        checkInTime: property.check_in_time ?? "12:00 PM",
+        ownerPhone: phone,
+      });
 
     case "payment": {
-      // Delegates to the shared builder so this button always matches the
-      // "Payment reminder" buttons on the bookings pages: same amount
-      // logic (25% advance vs. remaining balance, extra charges + discount
-      // included), same tracking link as the one primary action, and never
-      // falls back to the owner's phone number in place of a real UPI ID.
       const chargesTotal = (booking.booking_charges ?? [])
         .reduce((sum, c) => sum + c.qty * c.unit_price, 0);
       return buildPaymentReminderText({
@@ -92,14 +99,39 @@ function buildMessage(
     }
 
     case "directions":
-      return (
-        `Hi ${name}, here's how to reach ${prop}.\n\n` +
-        `Call us at ${phone} when you reach Munnar — we'll guide you from there.`
-      );
+      // Only reachable when location_lat/lng are present — see the
+      // TEMPLATES filter below — but guard anyway in case a caller ever
+      // pre-selects "directions" for a property without coordinates.
+      if (property.location_lat == null || property.location_lng == null) {
+        return `Hi ${name}, here's how to reach ${prop}.\n\nCall us at ${phone} when you reach — we'll guide you from there.`;
+      }
+      return buildDirectionsText({
+        guestName: name,
+        propertyName: prop,
+        lat: property.location_lat,
+        lng: property.location_lng,
+        ownerPhone: phone,
+        landmark: property.landmark_description ?? undefined,
+      });
   }
 }
 
 export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose }: Props) {
+  const hasCoordinates = property.location_lat != null && property.location_lng != null;
+
+  const templates = useMemo(() => {
+    const all: { key: Template; label: string }[] = [
+      { key: "confirmed",  label: "Booking confirmed" },
+      { key: "reminder",  label: "Day-before reminder" },
+      { key: "payment",   label: "Payment reminder" },
+      { key: "directions", label: "Directions" },
+    ];
+    // Directions needs real coordinates to build a maps link — don't offer
+    // a template that can only ever fall back to "call us", same rule the
+    // bookings page uses for its own Directions button.
+    return hasCoordinates ? all : all.filter(t => t.key !== "directions");
+  }, [hasCoordinates]);
+
   const upcoming = bookings.filter(b => b.check_in >= new Date().toISOString().split("T")[0]);
   const [bookingId, setBookingId] = useState(upcoming[0]?.id ?? bookings[0]?.id ?? "");
   const [template, setTemplate] = useState<Template>("confirmed");
@@ -109,12 +141,12 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
   const message = booking
     ? buildMessage(template, booking, roomName, property, window.location.origin)
     : "";
-  const phone = booking?.guest_phone?.replace(/\D/g, "") ?? "";
-  const waUrl = `https://wa.me/${phone.startsWith("91") ? phone : `91${phone}`}?text=${encodeURIComponent(message)}`;
+  const phone = booking ? clean(booking.guest_phone) : "";
+  const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl">
+      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-2">
@@ -126,7 +158,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {bookings.length === 0 ? (
             <p className="text-sm text-muted-foreground">No bookings found.</p>
           ) : (
@@ -151,7 +183,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
               <div>
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message type</label>
                 <div className="mt-1.5 flex flex-wrap gap-2">
-                  {TEMPLATES.map(t => (
+                  {templates.map(t => (
                     <button
                       key={t.key}
                       onClick={() => setTemplate(t.key)}
@@ -185,7 +217,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 pb-5">
+        <div className="flex items-center justify-end gap-3 px-5 pb-5 pt-2 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-full border border-border hover:bg-muted">
             Cancel
           </button>
