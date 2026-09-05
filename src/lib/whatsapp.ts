@@ -4,7 +4,7 @@
  * Indian numbers only — always prefixes 91.
  */
 
-function clean(phone: string): string {
+export function clean(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("91") && digits.length === 12) return digits;
   if (digits.length === 10) return `91${digits}`;
@@ -62,18 +62,7 @@ export function bookingInquiryLink({
   return link(ownerWhatsapp, text);
 }
 
-/** Owner sends booking confirmation to guest */
-export function confirmationLink({
-  guestPhone,
-  guestName,
-  propertyName,
-  roomName,
-  checkIn,
-  checkOut,
-  ownerPhone,
-  trackingUrl,
-}: {
-  guestPhone: string;
+export interface ConfirmationTextInput {
   guestName: string;
   propertyName: string;
   roomName: string;
@@ -82,8 +71,25 @@ export function confirmationLink({
   ownerPhone: string;
   /** Optional link to the guest's booking-status page (status, invoice, payment) */
   trackingUrl?: string;
-}): string {
-  const text =
+}
+
+/**
+ * Builds the booking-confirmation message text. Every screen that sends a
+ * confirmation (bookings list, booking detail, dashboard quick-action
+ * modal) must call this — never hand-roll the copy again, or the preview
+ * silently drifts from what guests actually receive (e.g. missing the
+ * tracking link).
+ */
+export function buildConfirmationText({
+  guestName,
+  propertyName,
+  roomName,
+  checkIn,
+  checkOut,
+  ownerPhone,
+  trackingUrl,
+}: ConfirmationTextInput): string {
+  return (
     `Dear ${guestName}, your booking at ${propertyName} is confirmed! ✅\n\n` +
     `Room: ${roomName}\n` +
     `Check-in: ${checkIn}\n` +
@@ -91,35 +97,55 @@ export function confirmationLink({
     (trackingUrl
       ? `📋 View your booking status, invoice & make payments anytime here:\n${trackingUrl}\n\n`
       : "") +
-    `Any questions, call us: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`;
-  return link(guestPhone, text);
+    `Any questions, call us: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
 }
 
-/** Owner sends directions to guest */
-export function directionsLink({
+/** Owner sends booking confirmation to guest */
+export function confirmationLink({
   guestPhone,
-  guestName,
-  propertyName,
-  lat,
-  lng,
-  ownerPhone,
-  landmark,
-}: {
-  guestPhone: string;
+  ...rest
+}: ConfirmationTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildConfirmationText(rest));
+}
+
+export interface DirectionsTextInput {
   guestName: string;
   propertyName: string;
   lat: number;
   lng: number;
   ownerPhone: string;
   landmark?: string;
-}): string {
+}
+
+/**
+ * Builds the directions message text. Shared by every "Directions" send
+ * button — needs a real lat/lng, so callers should only offer this
+ * template when the property actually has coordinates set.
+ */
+export function buildDirectionsText({
+  guestName,
+  propertyName,
+  lat,
+  lng,
+  ownerPhone,
+  landmark,
+}: DirectionsTextInput): string {
   const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
-  const text =
+  return (
     `Hi ${guestName}, here's how to reach ${propertyName}:\n\n` +
     `📍 Google Maps: ${mapsUrl}\n` +
     (landmark ? `Landmark: ${landmark}\n` : "") +
-    `\nCall us when you reach Munnar: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`;
-  return link(guestPhone, text);
+    `\nCall us when you reach Munnar: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
+}
+
+/** Owner sends directions to guest */
+export function directionsLink({
+  guestPhone,
+  ...rest
+}: DirectionsTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildDirectionsText(rest));
 }
 
 /**
@@ -249,25 +275,33 @@ export function paymentReminderLink(
   return link(guestPhone, buildPaymentReminderText(rest));
 }
 
-/** Owner sends day-before reminder to guest */
-export function dayBeforeReminderLink({
-  guestPhone,
-  guestName,
-  propertyName,
-  checkInTime,
-  ownerPhone,
-}: {
-  guestPhone: string;
+export interface DayBeforeReminderTextInput {
   guestName: string;
   propertyName: string;
   checkInTime: string;
   ownerPhone: string;
-}): string {
-  const text =
+}
+
+/** Builds the day-before reminder message text. */
+export function buildDayBeforeReminderText({
+  guestName,
+  propertyName,
+  checkInTime,
+  ownerPhone,
+}: DayBeforeReminderTextInput): string {
+  return (
     `Hi ${guestName}, looking forward to your arrival tomorrow at ${propertyName}! 🌿\n\n` +
     `Check-in from ${checkInTime}.\n` +
-    `Call us when you're on the way: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`;
-  return link(guestPhone, text);
+    `Call us when you're on the way: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
+}
+
+/** Owner sends day-before reminder to guest */
+export function dayBeforeReminderLink({
+  guestPhone,
+  ...rest
+}: DayBeforeReminderTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildDayBeforeReminderText(rest));
 }
 
 /** Returns a clean tel: href for Indian numbers — always +91 */
