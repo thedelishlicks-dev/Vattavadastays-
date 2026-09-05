@@ -68,7 +68,15 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     check_in: "",
     check_out: "",
     guest_count: 2 as number | string,
-    status: "confirmed" as BookingStatus,
+    // Defaults to "pending", not "confirmed" — every booking created here
+    // starts with advance_amount: 0 (no payment captured in this modal), so
+    // defaulting to "confirmed" meant an owner who forgot to toggle it back
+    // got: no hold_expires_at (dates locked forever with no auto-release if
+    // the guest never pays), a WhatsApp "confirmed ✅" message with no
+    // mention of payment, and the booking counted as full revenue on the
+    // dashboard despite ₹0 collected. "Confirmed" is now a deliberate
+    // one-tap choice for the genuine walk-in/cash-on-arrival case.
+    status: "pending" as BookingStatus,
     source: "direct" as BookingSource,
     agent_id: "" as string,
   });
