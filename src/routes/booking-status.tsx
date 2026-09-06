@@ -96,37 +96,34 @@ function BookingStatusPage() {
       const last10 = digits.slice(-10);
       if (last10.length < 10) throw new Error("Enter a valid 10-digit phone number.");
 
-      const phoneFilter =
-        `guest_phone.eq.${last10},` +
-        `guest_phone.eq.91${last10},` +
-        `guest_phone.eq.+91${last10},` +
-        `guest_phone.eq.+91 ${last10}`;
-
+      // Both lookups go through SECURITY DEFINER functions, not direct
+      // table reads — this table used to have a wide-open anon-read
+      // policy (`using (true)`) so this page could work without a login,
+      // which meant anyone could read every booking, not just their own.
+      // The functions filter by phone + property internally and only ever
+      // return matching rows; see the migration named
+      // fix_public_booking_lookup for the full context.
+      //
       // Every current entry point (WhatsApp tracking links, the property's
-      // own "Track Booking" nav link) always includes this. If it's
-      // missing, `enabled: !!propertyIdFilter` below means this query never
-      // even runs — see the dedicated "missing property" screen instead of
-      // a lookup, so no phone number is ever searched across every
-      // property on the platform.
-      let bookingsQuery = supabase
-        .from("bookings")
-        .select("*, booking_charges(*), rooms(name)")
-        .or(phoneFilter)
-        .eq("property_id", propertyIdFilter);
-      const { data: bookingsRaw, error: bookingsErr } = await bookingsQuery.order("created_at", {
-        ascending: false,
-      });
+      // own "Track Booking" nav link) always includes propertyIdFilter. If
+      // it's missing, `enabled: !!propertyIdFilter` below means this query
+      // never even runs — see the dedicated "missing property" screen
+      // instead of a lookup, so no phone number is ever searched across
+      // every property on the platform.
+      const { data: bookingsRaw, error: bookingsErr } = (await supabase.rpc(
+        "lookup_bookings_by_phone",
+        { p_phone: last10, p_property_id: propertyIdFilter },
+      )) as { data: any[] | null; error: { message: string } | null };
 
       if (bookingsErr) throw new Error("Could not fetch bookings. Please try again.");
 
       // Also fetch any group booking rows matching this phone — these hold
       // the pooled total/discount/advance for multi-room bookings, which
       // individual `bookings` rows do NOT carry.
-      const { data: groupsRaw, error: groupsErr } = await supabase
-        .from("booking_groups")
-        .select("*")
-        .or(phoneFilter)
-        .eq("property_id", propertyIdFilter);
+      const { data: groupsRaw, error: groupsErr } = (await supabase.rpc(
+        "lookup_booking_groups_by_phone",
+        { p_phone: last10, p_property_id: propertyIdFilter },
+      )) as { data: any[] | null; error: { message: string } | null };
 
       if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
 
