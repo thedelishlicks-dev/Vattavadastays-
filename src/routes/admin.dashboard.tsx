@@ -210,9 +210,15 @@ function useAttentionRows(
   today: string,
 ) {
   return useMemo(() => {
+    // Only pending requests whose check-in hasn't already passed count as
+    // "needs your attention today" — a pending booking with a check-in
+    // weeks in the past isn't a decision waiting on the owner, it's a
+    // stale/abandoned request. Those still show up on the Bookings page
+    // (via the Pending filter with "By month"), just not here, so this
+    // list doesn't grow without bound.
     const pending: AttentionRow[] = [
       ...bookings
-        .filter((b) => b.status === "pending")
+        .filter((b) => b.status === "pending" && b.check_in >= today)
         .map((b) => ({
           id: b.id,
           kind: "pending" as const,
@@ -222,7 +228,7 @@ function useAttentionRows(
           isGroup: false,
         })),
       ...groups
-        .filter((g) => g.status === "pending")
+        .filter((g) => g.status === "pending" && g.check_in >= today)
         .map((g) => ({
           id: g.id,
           kind: "pending" as const,
@@ -273,10 +279,15 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
       <div className="divide-y divide-border">
         {rows.map((row) => {
           const isPending = row.kind === "pending";
+          // Plain <a>, not <Link>: the Bookings page reads bookingId/groupId
+          // from window.location.search (see admin.bookings.tsx) to open
+          // the exact booking's detail modal on load, rather than landing
+          // on the default Upcoming view where an unrelated guest happens
+          // to be on top.
           return (
-            <Link
+            <a
               key={`${row.kind}-${row.id}`}
-              to="/admin/bookings"
+              href={`/admin/bookings?${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
               className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
             >
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -300,7 +311,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </Link>
+            </a>
           );
         })}
       </div>
