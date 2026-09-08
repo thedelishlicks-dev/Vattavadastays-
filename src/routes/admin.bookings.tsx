@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Search, Plus, Loader2, X, IndianRupee, Utensils, MessageCircle, Check, LogOut,
   Trash2, ChevronRight, ChevronLeft, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
@@ -320,9 +320,6 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const [showEditGroupGuest, setShowEditGroupGuest] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const queryClient = useQueryClient();
-  // Same helper as the single-booking modal — was previously hardcoded to
-  // `undefined` here, which silently dropped the UPI fallback only for
-  // group bookings. Kept in sync via the shared extractUPIId util.
   const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
   const { data: charges = [] } = useGroupCharges(group.id);
   const { mutateAsync: deleteGroupCharge } = useDeleteGroupCharge();
@@ -336,10 +333,6 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
 
   const handleStatus = async (status: string) => {
     setUpdatingStatus(true);
-    // Clear the hold timer once a booking leaves "pending" — it's no
-    // longer a temporary hold, and this stops the expiry job from ever
-    // needing to consider it (belt-and-braces; it already only touches
-    // status === "pending" rows).
     const holdUpdate = status !== "pending" ? { hold_expires_at: null } : {};
     await supabase.from("booking_groups").update({ status, ...holdUpdate }).eq("id", group.id);
     await supabase.from("bookings").update({ status, ...holdUpdate }).eq("group_id", group.id);
@@ -366,13 +359,9 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     onRefresh(); setShowDiscountForm(false);
   };
 
-  // Sum room_price / extra_guest_charge across ALL rooms in the group —
-  // using only bookings[0] here would show one room's charges paired with
-  // the group's pooled guest_count/total_amount, which is misleading
-  // (e.g. "7 guests" next to a single room's ₹500 extra charge).
   const groupRoomPriceTotal = bookings.reduce((sum, b) => sum + Number(b.room_price ?? 0), 0);
   const groupExtraGuestTotal = bookings.reduce((sum, b) => sum + Number(b.extra_guest_charge ?? 0), 0);
-  const groupNights = bookings[0]?.nights ?? 0; // same stay dates across all rooms in a group
+  const groupNights = bookings[0]?.nights ?? 0;
 
   const invoiceBooking = {
     ...bookings[0],
@@ -533,7 +522,6 @@ function GroupCancelButton({ groupId, rooms, onCancelled }: { groupId: string; r
     setLoading(true);
     await supabase.from("booking_groups").update({ status: "cancelled" }).eq("id", groupId);
     await supabase.from("bookings").update({ status: "cancelled" }).eq("group_id", groupId);
-    // Free up every room's dates — same fix as the single-booking cancel button.
     await Promise.all(rooms.map((r) => releaseDatesIfUnblocked(r.roomId, r.checkIn, r.checkOut).catch(() => {})));
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
@@ -682,7 +670,6 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const newTotal = useMemo(() => {
     if (!selectedRoom || nights === 0) return 0;
     const roomCost = selectedRoom.base_price * nights;
-    // FIX: extra charge above room.max_guests, not hardcoded 2
     const extraCharge = Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights;
     return roomCost + extraCharge;
   }, [selectedRoom, nights, guestCount]);
@@ -692,7 +679,6 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
     setSaving(true); setError("");
     try {
       const roomCost = (selectedRoom?.base_price ?? 0) * nights;
-      // FIX: extra charge above room.max_guests
       const extraCharge = Math.max(0, guestCount - (selectedRoom?.max_guests ?? 2)) * (selectedRoom?.extra_guest_price ?? 0) * nights;
       const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal }).eq("id", booking.id);
       if (err) throw err;
@@ -788,8 +774,6 @@ function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { b
     setLoading(true);
     const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
     if (!error) {
-      // Free up these dates — without this, a cancelled booking's dates
-      // stayed blocked forever (nothing else in the app ever released them).
       try { await releaseDatesIfUnblocked(roomId, checkIn, checkOut); } catch { /* non-fatal: booking is still cancelled either way */ }
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     }
@@ -865,6 +849,39 @@ function BookingsAdmin() {
   const [sortBy, setSortBy] = useState<SortKey>("checkin");
   const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
 
+  // Deep-link support: the dashboard's "Needs your attention" rows link
+  // here with ?bookingId=<id> or ?groupId=<id> so tapping a specific
+  // pending request opens that exact booking directly, instead of landing
+  // on the default Upcoming view where an unrelated guest may be on top.
+  // Reads window.location.search directly rather than TanStack's
+  // useSearch, matching the ?property= pattern used elsewhere in admin
+  // (per the CRITICAL Architecture Rules — useSearch doesn't propagate to
+  // child routes reliably here). Runs off the raw bookings/groups data, not
+  // the filtered/sorted list, so it opens correctly even if the item
+  // wouldn't currently show under the active filters (e.g. its stay has
+  // already ended, or a status filter is applied).
+  useEffect(() => {
+    if (bookingsLoading || groupsLoading) return;
+    const params = new URLSearchParams(window.location.search);
+    const bookingId = params.get("bookingId");
+    const groupId = params.get("groupId");
+    if (!bookingId && !groupId) return;
+
+    if (groupId) {
+      const g = groups.find((g) => g.id === groupId);
+      if (g) setActiveGroup(g);
+    } else if (bookingId) {
+      const b = bookings.find((b) => b.id === bookingId);
+      if (b) setActiveBooking(b);
+    }
+
+    // Clear the param so refreshing or navigating back doesn't reopen it.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("bookingId");
+    url.searchParams.delete("groupId");
+    window.history.replaceState({}, "", url.toString());
+  }, [bookingsLoading, groupsLoading, bookings, groups]);
+
   const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
   const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; (property?.rooms ?? []).forEach((r) => { map[r.id] = r.name; }); return map; }, [property]);
 
@@ -876,9 +893,6 @@ function BookingsAdmin() {
   const monthEnd = `${monthCursor.year}-${pad2(monthCursor.month + 1)}-${pad2(new Date(monthCursor.year, monthCursor.month + 1, 0).getDate())}`;
   const monthLabel = new Date(monthCursor.year, monthCursor.month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
-  // Single merged, correctly-costed list — this replaces the old pattern of
-  // rendering groups and standalone bookings as two separately-sorted
-  // blocks, which is what made the page feel unordered.
   const allItems = useMemo<BookingListItem[]>(() => {
     const groupItems: BookingListItem[] = groups.map((g) => {
       const gg = g as BookingGroup;
@@ -913,10 +927,8 @@ function BookingsAdmin() {
     if (filterStatus !== "all" && it.status !== filterStatus) return false;
     if (q && !`${it.guestName} ${it.guestPhone}`.toLowerCase().includes(q.toLowerCase())) return false;
     if (dateScope === "upcoming") {
-      // Stay hasn't fully ended yet — covers ongoing stays and future ones.
       if (it.checkOut < todayStr) return false;
     } else {
-      // Month scrubber: keep anything whose stay overlaps the selected month at all.
       if (it.checkOut < monthStart || it.checkIn > monthEnd) return false;
     }
     return true;
@@ -930,23 +942,13 @@ function BookingsAdmin() {
     return items;
   }, [filteredItems, sortBy]);
 
-  // Date-relative section headers only make sense when the list is actually
-  // sorted by check-in date and scoped to what's ahead — otherwise a
-  // "Today" header above a March booking (By month view) would be wrong.
   const showDateHeaders = dateScope === "upcoming" && sortBy === "checkin";
 
   const stats = useMemo(() => {
-    // "Active" = currently in-progress stays (pending/confirmed) — a count
-    // of what needs attention right now. Deliberately excludes completed.
     const active = allItems.filter((it) => !["cancelled", "completed"].includes(it.status)).length;
-
-    // "Outstanding" = money still owed, including extra charges and net of
-    // any discount — same math as the tracking page / booking detail modal.
-    // Only cancelled bookings are excluded (a completed stay can still owe).
     const outstanding = allItems
       .filter((it) => it.status !== "cancelled")
       .reduce((s, it) => s + it.amountDue, 0);
-
     return { active, outstanding };
   }, [allItems]);
 

@@ -2,7 +2,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CalendarDays,
   IndianRupee,
-  Percent,
   MessageSquare,
   Ban,
   Plus,
@@ -16,6 +15,8 @@ import {
   CreditCard,
   ScrollText,
   Sparkles,
+  Clock,
+  DoorOpen,
 } from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -34,7 +35,8 @@ export const Route = createFileRoute("/admin/dashboard")({
 type Modal = "block" | "add" | "whatsapp" | null;
 
 // ---------------------------------------------------------------------------
-// Onboarding checklist
+// Onboarding checklist (unchanged — already handles the empty/first-time
+// state well, so it's left as-is)
 // ---------------------------------------------------------------------------
 
 type ChecklistItem = {
@@ -185,6 +187,213 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
 }
 
 // ---------------------------------------------------------------------------
+// Needs your attention — replaces the old 4-card KPI grid as the first thing
+// an owner sees. Surfaces pending bookings (awaiting owner confirmation) and
+// today's check-ins (needs the room ready), since those are the two things
+// an owner actually needs to act on today. Unlike a stats grid, this section
+// is silent (renders nothing) when there's nothing to act on, rather than
+// showing "0" / "—" placeholders that read as broken.
+// ---------------------------------------------------------------------------
+
+type AttentionRow = {
+  id: string;
+  kind: "pending" | "checkin";
+  guestName: string;
+  checkIn: string;
+  checkOut: string;
+  isGroup: boolean;
+};
+
+function useAttentionRows(
+  bookings: ReturnType<typeof useBookings>["data"] = [],
+  groups: ReturnType<typeof useBookingGroups>["data"] = [],
+  today: string,
+) {
+  return useMemo(() => {
+    // Only pending requests whose check-in hasn't already passed count as
+    // "needs your attention today" — a pending booking with a check-in
+    // weeks in the past isn't a decision waiting on the owner, it's a
+    // stale/abandoned request. Those still show up on the Bookings page
+    // (via the Pending filter with "By month"), just not here, so this
+    // list doesn't grow without bound.
+    const pending: AttentionRow[] = [
+      ...bookings
+        .filter((b) => b.status === "pending" && b.check_in >= today)
+        .map((b) => ({
+          id: b.id,
+          kind: "pending" as const,
+          guestName: b.guest_name,
+          checkIn: b.check_in,
+          checkOut: b.check_out,
+          isGroup: false,
+        })),
+      ...groups
+        .filter((g) => g.status === "pending" && g.check_in >= today)
+        .map((g) => ({
+          id: g.id,
+          kind: "pending" as const,
+          guestName: g.guest_name,
+          checkIn: g.check_in,
+          checkOut: g.check_out,
+          isGroup: true,
+        })),
+    ];
+
+    const checkinsToday: AttentionRow[] = [
+      ...bookings
+        .filter((b) => b.status === "confirmed" && b.check_in === today)
+        .map((b) => ({
+          id: b.id,
+          kind: "checkin" as const,
+          guestName: b.guest_name,
+          checkIn: b.check_in,
+          checkOut: b.check_out,
+          isGroup: false,
+        })),
+      ...groups
+        .filter((g) => g.status === "confirmed" && g.check_in === today)
+        .map((g) => ({
+          id: g.id,
+          kind: "checkin" as const,
+          guestName: g.guest_name,
+          checkIn: g.check_in,
+          checkOut: g.check_out,
+          isGroup: true,
+        })),
+    ];
+
+    // Pending requests are the most time-sensitive (a guest is waiting on a
+    // decision), so they lead; today's check-ins follow.
+    return [...pending, ...checkinsToday];
+  }, [bookings, groups, today]);
+}
+
+function AttentionSection({ rows }: { rows: AttentionRow[] }) {
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="border border-primary/30 rounded-xl overflow-hidden">
+      <div className="px-4 py-2.5 text-xs uppercase tracking-wider text-muted-foreground bg-primary-light/20">
+        Needs your attention
+      </div>
+      <div className="divide-y divide-border">
+        {rows.map((row) => {
+          const isPending = row.kind === "pending";
+          // Plain <a>, not <Link>: the Bookings page reads bookingId/groupId
+          // from window.location.search (see admin.bookings.tsx) to open
+          // the exact booking's detail modal on load, rather than landing
+          // on the default Upcoming view where an unrelated guest happens
+          // to be on top.
+          return (
+            <a
+              key={`${row.kind}-${row.id}`}
+              href={`/admin/bookings?${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
+              className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+            >
+              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                {isPending ? (
+                  <Clock className="h-4 w-4 text-primary" />
+                ) : (
+                  <DoorOpen className="h-4 w-4 text-primary" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate">
+                  {isPending ? "Booking request" : "Checking in today"} — {row.guestName}
+                  {row.isGroup && (
+                    <span className="ml-1.5 text-[10px] font-normal text-muted-foreground align-middle">
+                      multi-room
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {row.checkIn} → {row.checkOut}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Recent bookings — stacked rows instead of a wide table. A 5-column table
+// on a narrow phone either needs horizontal scroll (easy to miss — the
+// status pill was getting cut off at the screen edge) or shrinks illegibly.
+// Stacking guest/dates on one line and status/amount on the next needs no
+// scroll and no minimum width.
+// ---------------------------------------------------------------------------
+
+function RecentBookings({
+  recent,
+  roomNameMap,
+}: {
+  recent: Array<{
+    id: string;
+    guest_name: string;
+    room_id: string | null;
+    check_in: string;
+    check_out: string;
+    status: string;
+    total_amount: number;
+    discount_amount?: number;
+  }>;
+  roomNameMap: Record<string, string>;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl">
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <h2 className="font-medium">Recent bookings</h2>
+        <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
+          View all →
+        </Link>
+      </div>
+
+      {recent.length === 0 ? (
+        <div className="px-4 py-10 text-center text-muted-foreground text-sm">
+          No bookings yet.
+        </div>
+      ) : (
+        <div className="divide-y divide-border">
+          {recent.map((b) => {
+            const netAmount = Math.max(
+              0,
+              Number(b.total_amount) - Number(b.discount_amount ?? 0),
+            );
+            return (
+              <div key={b.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{b.guest_name}</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {roomNameMap[b.room_id ?? ""] ?? "—"} · {b.check_in} → {b.check_out}
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-medium text-sm">₹{netAmount.toLocaleString("en-IN")}</div>
+                    {Number(b.discount_amount ?? 0) > 0 && (
+                      <div className="text-[10px] text-green-600">
+                        -₹{Number(b.discount_amount).toLocaleString("en-IN")} disc
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <StatusPill status={b.status} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard page
 // ---------------------------------------------------------------------------
 
@@ -213,11 +422,6 @@ function DashboardPage() {
   );
 
   const stats = useMemo(() => {
-    // FIX: previously only counted standalone `bookings`, so guests booked
-    // as part of a multi-room booking_group never showed up here — both the
-    // "upcoming" count and monthly revenue understated the real numbers
-    // whenever a group booking fell in scope. Now folds in booking_groups,
-    // same as the Bookings and Payments pages.
     const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
     const revenueOf = (b: {
       check_in?: string;
@@ -227,8 +431,6 @@ function DashboardPage() {
     }) => {
       if (b.check_in?.slice(0, 7) !== thisMonth) return 0;
       if (b.status !== "confirmed" && b.status !== "completed") return 0;
-      // Subtract discount_amount — summing raw total_amount overstates
-      // revenue for any discounted booking.
       return Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0));
     };
 
@@ -243,6 +445,8 @@ function DashboardPage() {
     return { upcoming, monthlyRevenue };
   }, [standaloneBookings, groups, today]);
 
+  const attentionRows = useAttentionRows(bookings, groups, today);
+
   const recent = [...bookings]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 6);
@@ -256,7 +460,6 @@ function DashboardPage() {
     return map;
   }, [property]);
 
-  // Pass all room fields needed by AddBookingModal including extra_guest_price
   const activeRooms = useMemo(
     () =>
       (property?.rooms ?? [])
@@ -274,12 +477,17 @@ function DashboardPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
         ))}
       </div>
     );
   }
+
+  // Only show the stats strip once there's real booking history — an empty
+  // "0" / "—" row on a brand-new property reads as broken, not as "no data
+  // yet". The onboarding checklist already covers guidance for that state.
+  const hasBookingHistory = bookings.length > 0 || groups.length > 0;
 
   return (
     <div className="space-y-6">
@@ -292,16 +500,7 @@ function DashboardPage() {
 
       <OnboardingChecklist property={property as Property | undefined} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <StatCard icon={CalendarDays} label="Upcoming bookings" value={stats.upcoming} />
-        <StatCard
-          icon={IndianRupee}
-          label="Monthly revenue"
-          value={`₹${stats.monthlyRevenue.toLocaleString("en-IN")}`}
-        />
-        <StatCard icon={Percent} label="Occupancy rate" value="—" />
-        <StatCard icon={MessageSquare} label="Total bookings" value={bookings.length} />
-      </div>
+      <AttentionSection rows={attentionRows} />
 
       <div className="bg-card border border-border rounded-xl p-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
@@ -318,65 +517,34 @@ function DashboardPage() {
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl">
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h2 className="font-medium">Recent bookings</h2>
-          <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
-            View all →
-          </Link>
+      {hasBookingHistory && (
+        <div className="bg-card border border-border rounded-xl p-4">
+          <div className="flex divide-x divide-border">
+            <div className="flex-1 pr-4">
+              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                <CalendarDays className="h-3.5 w-3.5" /> Upcoming
+              </div>
+              <div className="mt-1.5 font-display text-xl font-semibold">{stats.upcoming}</div>
+            </div>
+            <div className="flex-1 px-4">
+              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                <IndianRupee className="h-3.5 w-3.5" /> This month
+              </div>
+              <div className="mt-1.5 font-display text-xl font-semibold">
+                ₹{stats.monthlyRevenue.toLocaleString("en-IN")}
+              </div>
+            </div>
+            <div className="flex-1 pl-4">
+              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                <MessageSquare className="h-3.5 w-3.5" /> Total bookings
+              </div>
+              <div className="mt-1.5 font-display text-xl font-semibold">{bookings.length}</div>
+            </div>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
-              <tr>
-                <th className="px-4 py-2.5 font-medium">Guest</th>
-                <th className="px-4 py-2.5 font-medium">Room</th>
-                <th className="px-4 py-2.5 font-medium">Dates</th>
-                <th className="px-4 py-2.5 font-medium">Status</th>
-                <th className="px-4 py-2.5 font-medium text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recent.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-muted-foreground">
-                    No bookings yet.
-                  </td>
-                </tr>
-              )}
-              {recent.map((b) => (
-                <tr key={b.id} className="border-t border-border">
-                  <td className="px-4 py-3">
-                    <div className="font-medium">{b.guest_name}</div>
-                    <div className="text-xs text-muted-foreground">{b.id.slice(0, 8)}</div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {roomNameMap[b.room_id] ?? b.room_id?.slice(0, 8) ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {b.check_in} → {b.check_out}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusPill status={b.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium">
-                    {/* Net of discount — matches the amount shown on the
-                        bookings page. Showing the raw total_amount here
-                        would silently disagree with that page whenever a
-                        booking has a discount applied. */}
-                    ₹{Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0)).toLocaleString("en-IN")}
-                    {Number(b.discount_amount ?? 0) > 0 && (
-                      <div className="text-[10px] font-normal text-green-600">
-                        -₹{Number(b.discount_amount).toLocaleString("en-IN")} disc
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
+
+      <RecentBookings recent={recent} roomNameMap={roomNameMap} />
 
       {modal === "block" && property && (
         <BlockDatesModal
@@ -411,27 +579,6 @@ function DashboardPage() {
           onClose={() => setModal(null)}
         />
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="bg-card border border-border rounded-xl p-4">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" /> {label}
-      </div>
-      <div className="mt-2 font-display text-2xl md:text-3xl font-semibold text-foreground">
-        {value}
-      </div>
     </div>
   );
 }
