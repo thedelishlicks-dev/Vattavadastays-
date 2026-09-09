@@ -82,10 +82,12 @@ function getPropertyParam(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Property identity block — sits at the top of the sidebar/drawer so the
-// admin reads as "this owner's book", not generic software chrome. Falls
-// back to an initial-letter circle when there's no logo yet (common during
-// the pilot, before onboarding is complete).
+// Property identity block — desktop sidebar only. The persistent rail has
+// no other header nearby showing which property this is, so it earns the
+// space here; the mobile drawer skips it since the top app bar it opens
+// from already shows the property name (see the drawer header below).
+// Falls back to an initial-letter circle when there's no logo yet (common
+// during the pilot, before onboarding is complete).
 // ---------------------------------------------------------------------------
 
 function PropertyIdentity({
@@ -255,11 +257,13 @@ export function AdminLayout() {
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col">
-            <div className="flex items-center justify-between border-b border-border">
-              <div className="flex-1 min-w-0">
-                <PropertyIdentity name={propertyName} logoUrl={property?.logo_url} subdomain={property?.subdomain} />
-              </div>
-              <button onClick={() => setMobileOpen(false)} className="p-2 mr-3 rounded-md hover:bg-muted shrink-0" aria-label="Close menu">
+            {/* No PropertyIdentity here: the top app bar (visible on the
+                screen this drawer opens from) already shows the property
+                name, so repeating name/logo/subdomain here would just cost
+                vertical space without telling the owner anything new. */}
+            <div className="h-14 px-5 flex items-center border-b border-border justify-between">
+              <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
+              <button onClick={() => setMobileOpen(false)} className="p-2 -mr-2 rounded-md hover:bg-muted" aria-label="Close menu">
                 <X className="h-5 w-5" />
               </button>
             </div>
