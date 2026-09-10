@@ -126,7 +126,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
   const pct = Math.round((doneCount / items.length) * 100);
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[var(--shadow-neu-flat)]">
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -137,9 +137,9 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
           </div>
           <span className="text-sm font-semibold text-primary">{pct}%</span>
         </div>
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden shadow-[var(--shadow-neu-inset-sm)]">
           <div
-            className="h-full rounded-full bg-primary transition-all duration-500"
+            className="h-full rounded-full bg-primary transition-all duration-500 ease-[var(--ease-smooth)]"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -152,13 +152,13 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
               key={item.id}
               to={item.href}
               className={[
-                "flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors",
+                "flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5",
                 item.done ? "opacity-50" : "",
               ].join(" ")}
             >
               <div className="shrink-0">
                 {item.done ? (
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  <CheckCircle2 className="h-5 w-5 text-primary animate-in zoom-in-75 duration-200" />
                 ) : (
                   <Circle className="h-5 w-5 text-muted-foreground" />
                 )}
@@ -272,7 +272,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="border border-primary/30 rounded-xl overflow-hidden">
+    <div className="animate-in fade-in slide-in-from-top-2 duration-300 [--tw-ease:var(--ease-smooth)] border border-primary/30 rounded-xl overflow-hidden shadow-[var(--shadow-neu-flat)]">
       <div className="px-4 py-2.5 text-xs uppercase tracking-wider text-muted-foreground bg-primary-light/20">
         Needs your attention
       </div>
@@ -288,7 +288,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
             <a
               key={`${row.kind}-${row.id}`}
               href={`/admin/bookings?${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
+              className="flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5"
             >
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 {isPending ? (
@@ -344,7 +344,7 @@ function RecentBookings({
   roomNameMap: Record<string, string>;
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl">
+    <div className="bg-card border border-border rounded-xl shadow-[var(--shadow-neu-flat)]">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="font-medium">Recent bookings</h2>
         <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
@@ -364,7 +364,7 @@ function RecentBookings({
               Number(b.total_amount) - Number(b.discount_amount ?? 0),
             );
             return (
-              <div key={b.id} className="px-4 py-3">
+              <div key={b.id} className="px-4 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-muted/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-medium text-sm truncate">{b.guest_name}</div>
@@ -502,7 +502,7 @@ function DashboardPage() {
 
       <AttentionSection rows={attentionRows} />
 
-      <div className="bg-card border border-border rounded-xl p-4">
+      <div className="bg-card border border-border rounded-xl p-4 shadow-[var(--shadow-neu-flat)]">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Quick actions
         </div>
@@ -518,7 +518,7 @@ function DashboardPage() {
       </div>
 
       {hasBookingHistory && (
-        <div className="bg-card border border-border rounded-xl p-4">
+        <div className="bg-card border border-border rounded-xl p-4 shadow-[var(--shadow-neu-flat)]">
           <div className="flex divide-x divide-border">
             <div className="flex-1 pr-4">
               <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
@@ -595,7 +595,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium hover:bg-muted transition-colors"
+      className="neu-interactive press-scale inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium transition-colors hover:bg-muted"
     >
       <Icon className="h-4 w-4 text-primary" /> {label}
     </button>

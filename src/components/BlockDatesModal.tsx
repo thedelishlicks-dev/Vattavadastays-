@@ -89,8 +89,8 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl">
+    <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="animate-in fade-in zoom-in-95 duration-250 [--tw-ease:var(--ease-smooth)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)]">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
+            className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -117,7 +117,7 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
                 setRoomId(e.target.value);
                 setSelected(new Set());
               }}
-              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
             >
               {rooms.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -132,14 +132,14 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
             <div className="flex items-center justify-between mb-3">
               <button
                 onClick={() => setMonth(addMonths(month, -1))}
-                className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
+                className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
               <span className="text-sm font-medium">{format(month, "MMMM yyyy")}</span>
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
-                className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted"
+                className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
@@ -163,13 +163,13 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
                     disabled={isPast || outOfMonth}
                     onClick={() => toggleDay(d)}
                     className={[
-                      "aspect-square rounded-md text-xs font-medium transition-colors",
+                      "aspect-square rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
                       outOfMonth ? "opacity-0 pointer-events-none" : "",
                       isPast ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
                       isSelected
-                        ? "bg-red-500 text-white"
+                        ? "press-scale bg-red-500 text-white animate-in zoom-in-95 fade-in duration-200 [--tw-ease:var(--ease-smooth)]"
                         : !isPast && !outOfMonth
-                          ? "hover:bg-muted"
+                          ? "press-scale hover:bg-muted"
                           : "",
                     ].join(" ")}
                   >
@@ -197,7 +197,7 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Maintenance, personal use…"
-              className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
             />
           </div>
 
@@ -208,14 +208,14 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
         <div className="flex items-center justify-end gap-3 px-5 pb-5">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm rounded-full border border-border hover:bg-muted"
+            className="press-scale px-4 py-2 text-sm rounded-full border border-border hover:bg-muted transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={saving || selected.size === 0 || done}
-            className="px-5 py-2 text-sm rounded-full bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
+            className="press-scale px-5 py-2 text-sm rounded-full bg-red-500 text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:bg-red-600 active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {done
