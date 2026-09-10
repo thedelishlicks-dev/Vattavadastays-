@@ -97,9 +97,9 @@ export function Amenities({ property }: Props) {
             return (
               <div
                 key={key}
-                className="group flex flex-col items-center gap-3 rounded-2xl bg-card border border-border p-6 hover:shadow-[var(--shadow-soft)] hover:-translate-y-1 transition-all"
+                className="group flex flex-col items-center gap-3 rounded-2xl bg-card border border-border p-6 shadow-[var(--shadow-neu-flat)] hover:shadow-[var(--shadow-neu-raised)] hover:-translate-y-1 transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)]"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-light text-primary transition-all duration-[var(--duration-base)] ease-[var(--ease-snappy)] group-hover:bg-primary group-hover:text-primary-foreground group-hover:scale-110">
                   <Icon className="h-6 w-6" />
                 </div>
                 <span className="text-sm font-medium text-foreground text-center capitalize">
