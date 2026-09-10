@@ -69,7 +69,7 @@ function AdminGuard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="animate-in fade-in duration-300 h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     )
   }
@@ -77,5 +77,12 @@ function AdminGuard() {
   if (!isAuthenticated) return null
   if (isSuperAdmin && !superAdminManaging) return null
 
-  return <AdminLayout />
+  return (
+    <div
+      key="admin-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)]"
+    >
+      <AdminLayout />
+    </div>
+  )
 }

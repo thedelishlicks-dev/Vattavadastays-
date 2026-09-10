@@ -23,7 +23,7 @@ function SuperAdminLayout() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        <div className="animate-in fade-in duration-300 h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
       </div>
     );
   }
@@ -32,7 +32,7 @@ function SuperAdminLayout() {
 
   if (!isSuperAdminEmail(user?.email)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="animate-in fade-in duration-300 min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
           <Shield className="h-12 w-12 text-destructive mx-auto" />
           <h1 className="text-xl font-semibold">Access Denied</h1>
@@ -45,7 +45,10 @@ function SuperAdminLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      key="superadmin-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] min-h-screen bg-background"
+    >
       <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">

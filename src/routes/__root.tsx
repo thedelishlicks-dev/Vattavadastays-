@@ -1,4 +1,4 @@
-import { Outlet, Link, createRootRoute } from "@tanstack/react-router";
+import { Outlet, Link, createRootRoute, useRouterState } from "@tanstack/react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "../styles.css";
@@ -33,10 +33,20 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  // Keying on pathname remounts this wrapper on every navigation, which
+  // replays the CSS entrance animation below — a gentle fade + rise instead
+  // of the page just snapping into view.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <Outlet />
+        <div
+          key={pathname}
+          className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)]"
+        >
+          <Outlet />
+        </div>
       </ThemeProvider>
     </QueryClientProvider>
   );
