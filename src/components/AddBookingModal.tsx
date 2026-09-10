@@ -10,7 +10,7 @@ import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/w
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
-const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const inputCls = "focus-glow w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const SOURCE_OPTIONS: { value: BookingSource; label: string }[] = [
@@ -349,11 +349,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
       {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
       <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+      <div className="animate-in fade-in duration-200 absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 [--tw-ease:var(--ease-smooth)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-display text-lg font-semibold">Add Booking</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} className="press-scale h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
@@ -605,11 +605,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             </div>
           )}
           <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
+            <button onClick={onClose} className="press-scale flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors">Cancel</button>
             <button
               onClick={handleSave}
               disabled={saving || hasConflicts}
-              className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+              className="press-scale flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
             >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
