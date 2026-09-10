@@ -104,24 +104,24 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
             <div
               key={room.id}
               className={[
-                'rounded-2xl border bg-white overflow-hidden shadow-sm transition-shadow',
+                'group rounded-2xl border bg-white overflow-hidden transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)]',
                 isBooked
-                  ? 'opacity-60 cursor-not-allowed border-stone-200'
+                  ? 'opacity-60 cursor-not-allowed border-stone-200 shadow-[var(--shadow-neu-flat)]'
                   : isSelected
-                  ? 'hover:shadow-md cursor-pointer border-primary ring-2 ring-primary/20'
-                  : 'hover:shadow-md cursor-pointer border-stone-200',
+                  ? 'cursor-pointer border-primary ring-2 ring-primary/20 shadow-[var(--shadow-neu-raised)] hover:-translate-y-1'
+                  : 'cursor-pointer border-stone-200 shadow-[var(--shadow-neu-flat)] hover:-translate-y-1 hover:shadow-[var(--shadow-neu-raised)] active:translate-y-0 active:shadow-[var(--shadow-neu-pressed)]',
               ].join(' ')}
               onClick={() => !isBooked && onSelect(room)}
             >
               {room.images?.[0] && (
-                <div className="relative">
+                <div className="relative overflow-hidden">
                   <img
                     src={room.images[0]}
                     alt={room.name}
-                    className="aspect-[4/5] w-full object-cover"
+                    className="aspect-[4/5] w-full object-cover transition-transform duration-500 ease-[var(--ease-smooth)] group-hover:scale-105"
                   />
                   {isBooked && (
-                    <div className="absolute inset-0 bg-stone-900/40 flex items-center justify-center">
+                    <div className="animate-in fade-in duration-300 absolute inset-0 bg-stone-900/40 flex items-center justify-center">
                       <span className="bg-white text-stone-800 text-xs font-semibold px-3 py-1.5 rounded-full">
                         Not available
                       </span>
@@ -129,7 +129,7 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
                   )}
                   {isSelected && !isBooked && (
                     <div className="absolute top-2 right-2">
-                      <span className="bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                      <span className="animate-in zoom-in-75 fade-in duration-200 ease-[var(--ease-snappy)] bg-primary text-primary-foreground text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" />
                         Added
                       </span>
@@ -186,14 +186,14 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
                   ) : isSelected ? (
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelect(room) }}
-                      className="text-sm bg-primary-light text-primary border border-primary/30 px-4 py-1.5 rounded-full hover:bg-primary/10 transition-colors font-medium"
+                      className="press-scale text-sm bg-primary-light text-primary border border-primary/30 px-4 py-1.5 rounded-full hover:bg-primary/10 transition-colors font-medium"
                     >
                       Edit
                     </button>
                   ) : (
                     <button
                       onClick={(e) => { e.stopPropagation(); onSelect(room) }}
-                      className="text-sm bg-primary text-primary-foreground px-4 py-1.5 rounded-full hover:opacity-90 transition-colors"
+                      className="press-scale text-sm bg-primary text-primary-foreground px-4 py-1.5 rounded-full hover:opacity-90 transition-colors"
                     >
                       Select
                     </button>
