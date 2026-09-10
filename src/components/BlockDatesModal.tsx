@@ -90,7 +90,7 @@ export function BlockDatesModal({ propertyId, rooms, onClose }: Props) {
 
   return (
     <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="animate-in fade-in zoom-in-95 duration-250 [--tw-ease:var(--ease-smooth)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)]">
+      <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)]">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-2">
