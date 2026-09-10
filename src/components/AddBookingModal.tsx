@@ -350,7 +350,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
       {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
       <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
       <div className="animate-in fade-in duration-200 absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-300 [--tw-ease:var(--ease-smooth)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
+      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-display text-lg font-semibold">Add Booking</h2>
           <button onClick={onClose} className="press-scale h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
