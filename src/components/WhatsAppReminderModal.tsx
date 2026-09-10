@@ -145,15 +145,15 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-card border border-border rounded-2xl w-full max-w-md shadow-xl max-h-[92vh] flex flex-col">
+    <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="animate-in fade-in zoom-in-95 duration-250 [--tw-ease:var(--ease-smooth)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-2">
             <Send className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-sm">Send WhatsApp reminder</h2>
           </div>
-          <button onClick={onClose} className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted">
+          <button onClick={onClose} className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -169,7 +169,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
                 <select
                   value={bookingId}
                   onChange={e => setBookingId(e.target.value)}
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
                 >
                   {bookings.map(b => (
                     <option key={b.id} value={b.id}>
@@ -188,9 +188,9 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
                       key={t.key}
                       onClick={() => setTemplate(t.key)}
                       className={[
-                        "text-xs px-3 py-1.5 rounded-full border transition-colors",
+                        "press-scale text-xs px-3 py-1.5 rounded-full border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
                         template === t.key
-                          ? "bg-primary text-primary-foreground border-primary"
+                          ? "bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]"
                           : "bg-background border-border hover:bg-muted",
                       ].join(" ")}
                     >
@@ -202,7 +202,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
 
               {/* Message preview */}
               {booking && (
-                <div>
+                <div key={bookingId + template} className="animate-in fade-in duration-200">
                   <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preview</label>
                   <div className="mt-1.5 rounded-xl bg-[#dcfce7] border border-[#bbf7d0] p-4 text-sm text-[#14532d] leading-relaxed whitespace-pre-wrap">
                     {message}
@@ -218,7 +218,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
 
         {/* Footer */}
         <div className="flex items-center justify-end gap-3 px-5 pb-5 pt-2 border-t border-border">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-full border border-border hover:bg-muted">
+          <button onClick={onClose} className="press-scale px-4 py-2 text-sm rounded-full border border-border hover:bg-muted transition-colors">
             Cancel
           </button>
           {booking && (
@@ -227,7 +227,7 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
               target="_blank"
               rel="noopener noreferrer"
               onClick={onClose}
-              className="inline-flex items-center gap-2 px-5 py-2 text-sm rounded-full bg-[#25D366] text-white hover:bg-[#1ebe5d] transition-colors"
+              className="press-scale inline-flex items-center gap-2 px-5 py-2 text-sm rounded-full bg-[#25D366] text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:bg-[#1ebe5d] active:shadow-[var(--shadow-neu-pressed)]"
             >
               <Send className="h-3.5 w-3.5" />
               Open in WhatsApp
