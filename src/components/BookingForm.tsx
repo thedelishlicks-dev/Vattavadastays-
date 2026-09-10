@@ -16,7 +16,7 @@ type Props = {
 };
 
 const inputCls =
-  "w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+  "focus-glow w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none";
 
 export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   const [name, setName] = useState("");
@@ -463,7 +463,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                  className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100"
                 >
                   {isPending
                     ? "Submitting..."

@@ -43,6 +43,21 @@
   --font-malayalam: "Noto Malayalam", system-ui, sans-serif;
   --shadow-soft: 0 8px 30px -12px color-mix(in oklab, var(--primary) 25%, transparent);
   --shadow-elevated: 0 20px 50px -20px color-mix(in oklab, var(--primary) 35%, transparent);
+
+  /* Neomorphic shadow pairs — dual light/dark shadows cast from the background itself,
+     so they stay on-brand (stone/green) instead of generic grey. Pure CSS, no runtime cost. */
+  --shadow-neu-raised: 5px 5px 12px var(--neu-shadow-dark), -5px -5px 12px var(--neu-shadow-light);
+  --shadow-neu-flat: 2px 2px 6px var(--neu-shadow-dark), -2px -2px 6px var(--neu-shadow-light);
+  --shadow-neu-pressed: inset 3px 3px 7px var(--neu-shadow-dark), inset -3px -3px 7px
+      var(--neu-shadow-light);
+  --shadow-neu-inset-sm: inset 2px 2px 4px var(--neu-shadow-dark), inset -2px -2px 4px
+      var(--neu-shadow-light);
+
+  /* Motion tokens — shared easing/duration so every micro-transition in the app feels consistent */
+  --ease-snappy: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --duration-fast: 150ms;
+  --duration-base: 220ms;
 }
 
 :root {
@@ -71,6 +86,9 @@
   --input: oklch(0.9 0.01 140);
   --ring: oklch(0.45 0.13 148);
   --whatsapp: oklch(0.65 0.16 150);
+  /* Neomorphic light-source pair, tuned to the stone background rather than generic grey */
+  --neu-shadow-light: oklch(1 0 0 / 0.85);
+  --neu-shadow-dark: oklch(0.75 0.015 60 / 0.55);
   --chart-1: oklch(0.45 0.13 148);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -108,6 +126,9 @@
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.7 0.15 145);
   --whatsapp: oklch(0.7 0.16 150);
+  /* Neomorphic dark-theme pair: subtle lighter highlight, deep shadow */
+  --neu-shadow-light: oklch(0.3 0.03 150 / 0.6);
+  --neu-shadow-dark: oklch(0.05 0.02 150 / 0.75);
   --sidebar: oklch(0.22 0.03 150);
   --sidebar-foreground: oklch(0.95 0.01 140);
   --sidebar-primary: oklch(0.7 0.15 145);
@@ -116,6 +137,64 @@
   --sidebar-accent-foreground: oklch(0.95 0.01 140);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.7 0.15 145);
+}
+
+/* Micro-interaction utilities — compose these onto any element.
+   All pure CSS transforms/shadows: zero network cost, GPU-cheap, safe for low-end devices. */
+
+@utility press-scale {
+  transition: transform var(--duration-fast) var(--ease-snappy);
+  &:active {
+    transform: scale(0.96);
+  }
+}
+
+@utility hover-lift {
+  transition:
+    transform var(--duration-base) var(--ease-smooth),
+    box-shadow var(--duration-base) var(--ease-smooth);
+  &:hover {
+    transform: translateY(-3px);
+  }
+}
+
+@utility neu-raised {
+  box-shadow: var(--shadow-neu-raised);
+  transition: box-shadow var(--duration-base) var(--ease-smooth);
+}
+
+@utility neu-pressed {
+  box-shadow: var(--shadow-neu-pressed);
+}
+
+@utility neu-interactive {
+  box-shadow: var(--shadow-neu-raised);
+  transition:
+    box-shadow var(--duration-fast) var(--ease-snappy),
+    transform var(--duration-fast) var(--ease-snappy);
+  &:active {
+    box-shadow: var(--shadow-neu-pressed);
+    transform: scale(0.98);
+  }
+}
+
+@utility focus-glow {
+  transition: box-shadow var(--duration-base) var(--ease-smooth);
+  &:focus-visible {
+    box-shadow: 0 0 0 4px color-mix(in oklab, var(--ring) 25%, transparent);
+    outline: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer base {
