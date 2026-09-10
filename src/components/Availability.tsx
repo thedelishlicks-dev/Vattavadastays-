@@ -175,7 +175,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
             <div className="flex items-center justify-between mb-5">
               <button
                 onClick={() => setMonth(addMonths(month, -1))}
-                className="h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center"
+                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)]"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -185,7 +185,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </div>
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
-                className="h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center"
+                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)]"
                 aria-label="Next month"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -214,7 +214,8 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                 const selected = inRange(d);
                 const isSelectable = state === "available" || state === "partial";
 
-                let cellCls = "aspect-square rounded-lg text-sm font-medium transition-colors relative ";
+                let cellCls =
+                  "aspect-square rounded-lg text-sm font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] relative ";
 
                 if (state === "out-of-month") {
                   cellCls += "text-muted-foreground/20 cursor-default";
@@ -225,16 +226,16 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                   cellCls += "bg-red-50 text-red-300 cursor-not-allowed";
                 } else if (isStart || isEnd) {
                   // Selected start/end — primary green
-                  cellCls += "bg-primary text-primary-foreground hover:bg-primary cursor-pointer";
+                  cellCls += "press-scale bg-primary text-primary-foreground hover:bg-primary cursor-pointer shadow-[var(--shadow-neu-flat)] animate-in zoom-in-90 duration-200";
                 } else if (selected) {
                   // In-range highlight
-                  cellCls += "bg-primary-light text-primary cursor-pointer";
+                  cellCls += "press-scale bg-primary-light text-primary cursor-pointer";
                 } else if (state === "partial") {
                   // Amber — some rooms available
-                  cellCls += "bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer";
+                  cellCls += "press-scale bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer";
                 } else {
                   // Green — fully available
-                  cellCls += "text-foreground hover:bg-primary-light cursor-pointer";
+                  cellCls += "press-scale text-foreground hover:bg-primary-light cursor-pointer";
                 }
 
                 return (
@@ -331,3 +332,4 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
     </section>
   );
 }
+  
