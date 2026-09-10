@@ -215,7 +215,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                 const isSelectable = state === "available" || state === "partial";
 
                 let cellCls =
-                  "aspect-square rounded-lg text-sm font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] relative ";
+                  "aspect-square rounded-lg text-sm font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] relative ";
 
                 if (state === "out-of-month") {
                   cellCls += "text-muted-foreground/20 cursor-default";
@@ -225,8 +225,9 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                   // Red — fully booked
                   cellCls += "bg-red-50 text-red-300 cursor-not-allowed";
                 } else if (isStart || isEnd) {
-                  // Selected start/end — primary green
-                  cellCls += "press-scale bg-primary text-primary-foreground hover:bg-primary cursor-pointer shadow-[var(--shadow-neu-flat)] animate-in zoom-in-90 duration-200";
+                  // Selected start/end — primary green. Ease-out (decelerate, no overshoot)
+                  // reads calmer here than the snappy/bouncy curve used for button presses.
+                  cellCls += "press-scale bg-primary text-primary-foreground hover:bg-primary cursor-pointer shadow-[var(--shadow-neu-flat)] animate-in zoom-in-95 fade-in duration-250 [--tw-ease:var(--ease-smooth)]";
                 } else if (selected) {
                   // In-range highlight
                   cellCls += "press-scale bg-primary-light text-primary cursor-pointer";
@@ -332,4 +333,3 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
     </section>
   );
 }
-  
