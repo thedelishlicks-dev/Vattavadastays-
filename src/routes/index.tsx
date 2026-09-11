@@ -94,9 +94,46 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   if (isLoading) {
     return (
-      <div className="animate-in fade-in duration-300 min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-in fade-in duration-300 min-h-screen bg-background">
         <SeoTags subdomain={subdomain} />
-        <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
+
+        {/* Header skeleton */}
+        <div className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-md">
+          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
+              <div className="h-4 w-28 rounded-md bg-muted animate-pulse" />
+            </div>
+            <div className="hidden md:flex gap-6">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-4 w-16 rounded-md bg-muted animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Hero skeleton */}
+        <div className="relative flex h-[88vh] min-h-[560px] w-full flex-col items-center justify-center gap-4 bg-muted/60 overflow-hidden">
+          <div className="h-24 w-24 rounded-full bg-muted animate-pulse md:h-32 md:w-32" />
+          <div className="h-7 w-56 rounded-md bg-muted animate-pulse" />
+          <div className="h-4 w-40 rounded-md bg-muted animate-pulse" />
+        </div>
+
+        {/* Content section skeletons */}
+        <div className="mx-auto max-w-6xl space-y-16 px-4 py-16">
+          <div className="space-y-4">
+            <div className="mx-auto h-6 w-48 rounded-md bg-muted animate-pulse" />
+            <div className="h-64 rounded-2xl bg-muted animate-pulse" />
+          </div>
+          <div className="space-y-4">
+            <div className="mx-auto h-6 w-32 rounded-md bg-muted animate-pulse" />
+            <div className="grid gap-4 md:grid-cols-3">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-72 rounded-2xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
