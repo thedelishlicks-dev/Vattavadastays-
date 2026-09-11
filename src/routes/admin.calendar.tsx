@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
 import { useBookings } from '@/hooks/useBookings'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { eachDate } from '@/lib/bookingAvailability'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -62,8 +62,33 @@ function AdminCalendar() {
 
   if (propLoading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="animate-in fade-in duration-300 max-w-4xl mx-auto py-8 px-4">
+        <div className="h-8 w-64 rounded-md bg-muted animate-pulse mb-6" />
+        <div className="h-4 w-72 rounded-md bg-muted animate-pulse mb-3" />
+        <div className="flex gap-2 mb-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-8 w-20 rounded-full bg-muted animate-pulse" />
+          ))}
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+          <div className="h-5 w-32 rounded-md bg-muted animate-pulse" />
+          <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+        </div>
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="h-8" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {[...Array(35)].map((_, i) => (
+              <div key={i} className="h-16 border-b border-r border-border/50 p-1.5">
+                <div className="h-3 w-4 rounded bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -100,7 +125,10 @@ function AdminCalendar() {
   const isLoading = availLoading || bookingsLoading
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div
+      key="calendar-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
+    >
       <h1 className="font-display text-2xl md:text-3xl font-semibold mb-6">Availability Calendar</h1>
 
       <p className="text-xs text-muted-foreground mb-3">
@@ -111,9 +139,9 @@ function AdminCalendar() {
           <button
             key={room.id}
             onClick={() => setSelectedRoomId(room.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+            className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
               activeRoomId === room.id
-                ? 'bg-primary text-primary-foreground border-primary'
+                ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
                 : 'bg-background text-foreground border-border hover:border-primary'
             }`}
           >
@@ -123,21 +151,35 @@ function AdminCalendar() {
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-stone-100">
+        <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors">
           <ChevronLeft className="h-5 w-5" />
         </button>
         <span className="font-semibold text-foreground">{monthLabel}</span>
-        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-stone-100">
+        <button onClick={nextMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors">
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="animate-in fade-in duration-300 rounded-xl border border-border overflow-hidden">
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="h-8" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {[...Array(35)].map((_, i) => (
+              <div key={i} className="h-16 border-b border-r border-border/50 p-1.5">
+                <div className="h-3 w-4 rounded bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
+        <div
+          key={activeRoomId}
+          className="animate-in fade-in duration-[var(--duration-base)] ease-[var(--ease-smooth)] rounded-xl border border-border overflow-hidden bg-card shadow-[var(--shadow-neu-flat)]"
+        >
           <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
               <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">

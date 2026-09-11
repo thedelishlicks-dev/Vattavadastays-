@@ -366,8 +366,26 @@ function AdminRooms() {
 
   if (isLoading)
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="animate-in fade-in duration-300 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-24 rounded-md bg-muted animate-pulse" />
+            <div className="h-4 w-32 rounded-md bg-muted animate-pulse" />
+          </div>
+          <div className="h-9 w-28 rounded-full bg-muted animate-pulse" />
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="w-full h-40 bg-muted animate-pulse" />
+              <div className="p-5 space-y-3">
+                <div className="h-5 w-2/3 rounded-md bg-muted animate-pulse" />
+                <div className="h-4 w-1/2 rounded-md bg-muted animate-pulse" />
+                <div className="h-4 w-3/4 rounded-md bg-muted animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     )
 
@@ -379,7 +397,10 @@ function AdminRooms() {
   const rooms = property.rooms ?? []
 
   return (
-    <div className="space-y-6">
+    <div
+      key="rooms-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] space-y-6"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms</h1>
