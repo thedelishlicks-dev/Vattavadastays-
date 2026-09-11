@@ -835,7 +835,7 @@ type BookingListItem =
   | { kind: "group"; id: string; checkIn: string; checkOut: string; createdAt: string; status: string; guestName: string; guestPhone: string; amountDue: number; group: BookingGroup };
 
 function BookingsAdmin() {
-  const { data: property } = useOwnerProperty();
+  const { data: property, isLoading: propLoading } = useOwnerProperty();
   const { data: bookings = [], isLoading: bookingsLoading } = useBookings(property?.id ?? "");
   const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
@@ -974,13 +974,16 @@ function BookingsAdmin() {
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
   };
 
-  const isLoading = bookingsLoading || groupsLoading;
+  const isLoading = propLoading || bookingsLoading || groupsLoading;
   const totalItems = sortedItems.length;
 
-  if (isLoading) return <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;
+  if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;
 
   return (
-    <div className="space-y-5">
+    <div
+      key="bookings-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] space-y-5"
+    >
       <div className="flex items-center justify-between">
         <div><h1 className="font-display text-2xl md:text-3xl font-semibold">Bookings</h1><p className="text-sm text-muted-foreground">Tap any booking to view details.</p></div>
         <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"><Plus className="h-4 w-4" /> Add</button>
