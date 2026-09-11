@@ -94,7 +94,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="animate-in fade-in duration-300 min-h-screen bg-background flex items-center justify-center">
         <SeoTags subdomain={subdomain} />
         <div className="text-sm text-muted-foreground animate-pulse">Loading…</div>
       </div>
@@ -118,7 +118,10 @@ function GuestPage({ subdomain }: { subdomain: string }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      key="site-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] min-h-screen bg-background"
+    >
       {subdomain === "demo" && (
         <div style={{ background: "#fef3c7", borderBottom: "1px solid #fcd34d", color: "#92400e", textAlign: "center", fontSize: "13px", padding: "8px 16px" }}>
           You're viewing a demo — no real booking will be made.
