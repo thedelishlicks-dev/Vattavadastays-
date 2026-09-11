@@ -62,7 +62,7 @@ function AdminCalendar() {
 
   if (propLoading) {
     return (
-      <div className="flex justify-center py-16">
+      <div className="animate-in fade-in duration-300 flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -100,7 +100,10 @@ function AdminCalendar() {
   const isLoading = availLoading || bookingsLoading
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
+    <div
+      key="calendar-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
+    >
       <h1 className="font-display text-2xl md:text-3xl font-semibold mb-6">Availability Calendar</h1>
 
       <p className="text-xs text-muted-foreground mb-3">
@@ -111,9 +114,9 @@ function AdminCalendar() {
           <button
             key={room.id}
             onClick={() => setSelectedRoomId(room.id)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-colors ${
+            className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
               activeRoomId === room.id
-                ? 'bg-primary text-primary-foreground border-primary'
+                ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
                 : 'bg-background text-foreground border-border hover:border-primary'
             }`}
           >
@@ -123,21 +126,24 @@ function AdminCalendar() {
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-stone-100">
+        <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors">
           <ChevronLeft className="h-5 w-5" />
         </button>
         <span className="font-semibold text-foreground">{monthLabel}</span>
-        <button onClick={nextMonth} className="p-2 rounded-lg hover:bg-stone-100">
+        <button onClick={nextMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors">
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-8">
+        <div className="animate-in fade-in duration-300 flex justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-card">
+        <div
+          key={activeRoomId}
+          className="animate-in fade-in duration-[var(--duration-base)] ease-[var(--ease-smooth)] rounded-xl border border-border overflow-hidden bg-card shadow-[var(--shadow-neu-flat)]"
+        >
           <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
               <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">
