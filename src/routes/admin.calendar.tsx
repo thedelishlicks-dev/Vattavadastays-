@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
 import { useBookings } from '@/hooks/useBookings'
-import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { eachDate } from '@/lib/bookingAvailability'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -62,8 +62,33 @@ function AdminCalendar() {
 
   if (propLoading) {
     return (
-      <div className="animate-in fade-in duration-300 flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="animate-in fade-in duration-300 max-w-4xl mx-auto py-8 px-4">
+        <div className="h-8 w-64 rounded-md bg-muted animate-pulse mb-6" />
+        <div className="h-4 w-72 rounded-md bg-muted animate-pulse mb-3" />
+        <div className="flex gap-2 mb-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-8 w-20 rounded-full bg-muted animate-pulse" />
+          ))}
+        </div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+          <div className="h-5 w-32 rounded-md bg-muted animate-pulse" />
+          <div className="h-8 w-8 rounded-lg bg-muted animate-pulse" />
+        </div>
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="h-8" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {[...Array(35)].map((_, i) => (
+              <div key={i} className="h-16 border-b border-r border-border/50 p-1.5">
+                <div className="h-3 w-4 rounded bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -136,8 +161,19 @@ function AdminCalendar() {
       </div>
 
       {isLoading ? (
-        <div className="animate-in fade-in duration-300 flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <div className="animate-in fade-in duration-300 rounded-xl border border-border overflow-hidden">
+          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
+            {[...Array(7)].map((_, i) => (
+              <div key={i} className="h-8" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {[...Array(35)].map((_, i) => (
+              <div key={i} className="h-16 border-b border-r border-border/50 p-1.5">
+                <div className="h-3 w-4 rounded bg-muted animate-pulse" />
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <div
