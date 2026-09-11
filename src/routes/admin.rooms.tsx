@@ -366,7 +366,7 @@ function AdminRooms() {
 
   if (isLoading)
     return (
-      <div className="flex justify-center py-16">
+      <div className="animate-in fade-in duration-300 flex justify-center py-16">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
@@ -379,7 +379,10 @@ function AdminRooms() {
   const rooms = property.rooms ?? []
 
   return (
-    <div className="space-y-6">
+    <div
+      key="rooms-content"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] space-y-6"
+    >
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms</h1>
