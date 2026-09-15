@@ -196,6 +196,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
           room={openRoom}
           checkIn={checkIn}
           checkOut={checkOut}
+          propertyAmenities={property?.shared_amenities}
           onClose={() => setOpenRoom(null)}
           onConfirm={handleRoomConfirm}
         />
