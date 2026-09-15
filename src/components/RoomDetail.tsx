@@ -1,20 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { differenceInCalendarDays, format } from "date-fns";
-import { X, Minus, Plus } from "lucide-react";
+import { X, Minus, Plus, Coffee, UtensilsCrossed, Truck } from "lucide-react";
 import type { Room } from "@/types/database";
-
-type MealPlan = "None" | "Breakfast" | "Half Board" | "Full Board";
-const MEAL_PRICES: Record<MealPlan, number> = {
-  None: 0,
-  Breakfast: 200,
-  "Half Board": 450,
-  "Full Board": 700,
-};
+import { parseMealsConfig, hasMealInfo } from "@/lib/meals";
 
 type Props = {
   room: Room;
   checkIn: Date | null;
   checkOut: Date | null;
+  /** Property's shared_amenities — used to surface meal info (see lib/meals.ts). Optional so this still renders fine if the caller hasn't loaded the property yet. */
+  propertyAmenities?: string[] | null;
   onClose: () => void;
   onConfirm: (details: BookingDetails) => void;
 };
@@ -24,7 +19,6 @@ export type BookingDetails = {
   adults: number;
   children: number;
   extraBeds: number;
-  meal: MealPlan;
   nights: number;
   total: number;
   checkIn: string;
@@ -32,21 +26,21 @@ export type BookingDetails = {
   extraGuestCharge: number;
 };
 
-export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Props) {
+export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose, onConfirm }: Props) {
   const [adults, setAdults] = useState(room.max_guests);
   const [children, setChildren] = useState(0);
   const [extraBeds, setExtraBeds] = useState(0);
-  const [meal, setMeal] = useState<MealPlan>("None");
+
+  const meals = useMemo(() => parseMealsConfig(propertyAmenities), [propertyAmenities]);
 
   // Defensive resync: if this component instance is ever reused for a
   // different room (e.g. no `key` prop upstream, or a future refactor),
-  // reset the guest/meal selections to that room's own defaults instead
-  // of carrying over stale values from whichever room was open before.
+  // reset the guest selections to that room's own defaults instead of
+  // carrying over stale values from whichever room was open before.
   useEffect(() => {
     setAdults(room.max_guests);
     setChildren(0);
     setExtraBeds(0);
-    setMeal("None");
   }, [room.id, room.max_guests]);
 
   const nights =
@@ -60,10 +54,9 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
     const extraGuestCharge =
       Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
     const extraBedCost = extraBeds * (room.extra_guest_price ?? 0) * nights;
-    const mealCost = MEAL_PRICES[meal] * (adults + children) * nights;
-    const total = roomCost + extraGuestCharge + extraBedCost + mealCost;
-    return { roomCost, extraGuestCharge, extraBedCost, mealCost, total };
-  }, [room, nights, extraBeds, meal, adults, children]);
+    const total = roomCost + extraGuestCharge + extraBedCost;
+    return { roomCost, extraGuestCharge, extraBedCost, total };
+  }, [room, nights, extraBeds, adults]);
 
   const Stepper = ({
     value,
@@ -140,8 +133,45 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
             </div>
           </div>
 
+          {/* Meal info — purely informational, not part of the price below.
+              Real charges for anything ordered are added by the owner on
+              the booking's Extras tab once the stay is underway. */}
+          {hasMealInfo(meals) && (
+            <div className="rounded-xl border border-border p-4 space-y-2.5">
+              <h4 className="font-medium text-sm">Meals</h4>
+              {meals.breakfast === "included" && (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Coffee className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Breakfast is included in the room rate.</span>
+                </div>
+              )}
+              {meals.breakfast === "paid" && (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Coffee className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Breakfast available{meals.breakfast_note ? ` — ${meals.breakfast_note}` : ""}.</span>
+                </div>
+              )}
+              {meals.kitchen_available && (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <UtensilsCrossed className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Lunch/dinner from the in-house kitchen{meals.kitchen_note ? ` — ${meals.kitchen_note}` : ""}.</span>
+                </div>
+              )}
+              {meals.delivery_available && (
+                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                  <Truck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                  <span>Food delivery can be arranged{meals.delivery_note ? ` — ${meals.delivery_note}` : ""}.</span>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground/80 pt-0.5">
+                Prices aren't fixed at booking — order what you like during your stay and
+                it'll be added to your bill.
+              </p>
+            </div>
+          )}
+
           <div className="rounded-xl border border-border p-4 space-y-3">
-            <h4 className="font-medium text-sm">Guests & meals</h4>
+            <h4 className="font-medium text-sm">Guests</h4>
 
             {/* Adults stepper — max is room.max_guests (included) + reasonable overflow */}
             <Stepper
@@ -165,21 +195,6 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
                 {adults - room.max_guests} extra guest{adults - room.max_guests > 1 ? "s" : ""} above included capacity · ₹{((adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")} charge
               </div>
             )}
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-sm">Meal plan</span>
-              <select
-                value={meal}
-                onChange={(e) => setMeal(e.target.value as MealPlan)}
-                className="rounded-lg border border-border bg-background px-3 py-1.5 text-sm"
-              >
-                {(Object.keys(MEAL_PRICES) as MealPlan[]).map((m) => (
-                  <option key={m} value={m}>
-                    {m} {MEAL_PRICES[m] ? `(+₹${MEAL_PRICES[m]}/pp/day)` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
           </div>
 
           <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2 text-sm">
@@ -197,12 +212,6 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
               <div className="flex justify-between text-muted-foreground">
                 <span>Extra beds</span>
                 <span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span>
-              </div>
-            )}
-            {totals.mealCost > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Meals</span>
-                <span>₹{totals.mealCost.toLocaleString("en-IN")}</span>
               </div>
             )}
             <div className="border-t border-border pt-2 flex justify-between font-display text-lg font-semibold">
@@ -223,7 +232,6 @@ export function RoomDetail({ room, checkIn, checkOut, onClose, onConfirm }: Prop
                   adults,
                   children,
                   extraBeds,
-                  meal,
                   nights,
                   total: totals.total,
                   checkIn: format(checkIn, "yyyy-MM-dd"),

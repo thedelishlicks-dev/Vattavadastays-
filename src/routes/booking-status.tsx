@@ -45,6 +45,32 @@ function getStepIndex(status: string) {
   return i === -1 ? 0 : i;
 }
 
+/** First token of the guest's name, for a friendly "Hi X" greeting. */
+function getFirstName(guestName?: string | null): string {
+  if (!guestName) return "";
+  return guestName.trim().split(/\s+/)[0] ?? "";
+}
+
+/** A short, status-aware hospitable message for the guest — warmer than a
+ * bare status timeline, and gives the property name so it's clear whose
+ * booking this is (useful when a guest has stayed at more than one
+ * property that uses this link format). */
+function getHospitableMessage(entry: BookingStatusEntry, propertyName?: string): string {
+  const place = propertyName ? ` at ${propertyName}` : "";
+  switch (entry.booking.status) {
+    case "pending":
+      return `Thanks for booking${place}! We've received your request and will confirm it shortly.`;
+    case "confirmed":
+      return `You're all set${place}. We're looking forward to hosting you on ${entry.booking.check_in}.`;
+    case "completed":
+      return `Thanks for staying with us${place} — we hope you had a wonderful time!`;
+    case "cancelled":
+      return `This booking${place} was cancelled. Reach out to the property if you have any questions.`;
+    default:
+      return `Here's the latest on your booking${place}.`;
+  }
+}
+
 // One entry per "thing the guest booked" — either a standalone booking row,
 // or a synthesized entry representing a whole group booking (multiple rooms
 // under one booking_groups row). The page only ever deals with this shape,
@@ -382,6 +408,16 @@ function BookingStatusPage() {
         {/* Results */}
         {selected && !isLoading && (
           <div className="space-y-4">
+            {/* Personal greeting */}
+            <div className="px-1">
+              <h2 className="font-display text-lg font-semibold">
+                {getFirstName(selected.booking.guest_name) ? `Hi ${getFirstName(selected.booking.guest_name)} 👋` : "Hi there 👋"}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                {getHospitableMessage(selected, linkProperty?.name)}
+              </p>
+            </div>
+
             {/* Status */}
             {isCancelled ? (
               <div className="bg-destructive/10 border border-destructive/20 rounded-2xl p-5 flex gap-3 items-center">
