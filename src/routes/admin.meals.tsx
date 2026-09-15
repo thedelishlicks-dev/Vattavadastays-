@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { UtensilsCrossed, Loader2, Plus, X } from "lucide-react";
+import { UtensilsCrossed, Loader2, Coffee, Truck } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { type MealsConfig, type BreakfastPlan, parseMealsConfig, encodeMealsConfig, defaultMealsConfig } from "@/lib/meals";
 
 export const Route = createFileRoute("/admin/meals")({
   component: AdminMeals,
@@ -14,75 +15,18 @@ const inputCls =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
-type MealPackage = {
-  id: string;
-  name: string;
-  description: string;
-  price: string; // string so field can be cleared while typing
-  per: "person" | "room";
-};
-
-type MealsConfig = {
-  breakfast_included: boolean;
-  breakfast_price: string; // string so field can be cleared while typing
-  packages: MealPackage[];
-};
-
-// Persisted shape — prices stored as numbers in DB
-type MealsConfigPersisted = {
-  breakfast_included: boolean;
-  breakfast_price: number;
-  packages: Array<Omit<MealPackage, "price"> & { price: number }>;
-};
-
-const defaultConfig = (): MealsConfig => ({
-  breakfast_included: false,
-  breakfast_price: "0",
-  packages: [],
-});
-
-const emptyPackage = (): MealPackage => ({
-  id: crypto.randomUUID(),
-  name: "",
-  description: "",
-  price: "",
-  per: "person",
-});
-
-function parseMealsConfig(shared_amenities: string[] | null): MealsConfig {
-  if (!shared_amenities) return defaultConfig();
-  const sentinel = shared_amenities.find((a) => a.startsWith("__meals:"));
-  if (!sentinel) return defaultConfig();
-  try {
-    const persisted: MealsConfigPersisted = JSON.parse(
-      decodeURIComponent(sentinel.slice("__meals:".length))
-    );
-    return {
-      breakfast_included: persisted.breakfast_included,
-      breakfast_price: String(persisted.breakfast_price ?? 0),
-      packages: persisted.packages.map((p) => ({ ...p, price: String(p.price) })),
-    };
-  } catch {
-    return defaultConfig();
-  }
-}
-
-function encodeMealsConfig(config: MealsConfig, existing: string[]): string[] {
-  const filtered = existing.filter((a) => !a.startsWith("__meals:"));
-  const persisted: MealsConfigPersisted = {
-    breakfast_included: config.breakfast_included,
-    breakfast_price: parseFloat(config.breakfast_price) || 0,
-    packages: config.packages.map((p) => ({ ...p, price: parseFloat(p.price) || 0 })),
-  };
-  return [...filtered, `__meals:${encodeURIComponent(JSON.stringify(persisted))}`];
-}
+const BREAKFAST_OPTIONS: { value: BreakfastPlan; label: string }[] = [
+  { value: "included", label: "Included in room rate" },
+  { value: "paid", label: "Available, paid" },
+  { value: "unavailable", label: "Not offered" },
+];
 
 function AdminMeals() {
   const { data: property, isLoading } = useOwnerProperty();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [config, setConfig] = useState<MealsConfig>(defaultConfig());
+  const [config, setConfig] = useState<MealsConfig>(defaultMealsConfig());
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -96,33 +40,8 @@ function AdminMeals() {
   const set = <K extends keyof MealsConfig>(k: K, v: MealsConfig[K]) =>
     setConfig((c) => ({ ...c, [k]: v }));
 
-  const addPackage = () =>
-    setConfig((c) => ({ ...c, packages: [...c.packages, emptyPackage()] }));
-
-  const removePackage = (id: string) =>
-    setConfig((c) => ({ ...c, packages: c.packages.filter((p) => p.id !== id) }));
-
-  const updatePackage = (id: string, k: keyof MealPackage, v: unknown) =>
-    setConfig((c) => ({
-      ...c,
-      packages: c.packages.map((p) => (p.id === id ? { ...p, [k]: v } : p)),
-    }));
-
   const handleSave = async () => {
     if (!property) return;
-
-    // Validate prices before saving
-    const breakfastPrice = parseFloat(config.breakfast_price);
-    if (!config.breakfast_included && (isNaN(breakfastPrice) || breakfastPrice < 0)) {
-      setError("Breakfast price must be 0 or more");
-      return;
-    }
-    for (const pkg of config.packages) {
-      if (!pkg.name.trim()) { setError("All packages need a name"); return; }
-      const p = parseFloat(pkg.price);
-      if (isNaN(p) || p < 0) { setError(`Invalid price for "${pkg.name || "package"}"`); return; }
-    }
-
     setSaving(true);
     setError("");
     try {
@@ -151,133 +70,123 @@ function AdminMeals() {
       <div>
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Meals</h1>
         <p className="text-sm text-muted-foreground">
-          Configure meal offerings shown to guests on the booking page.
+          Let guests know what's on offer before they book. This is informational only —
+          when a guest actually orders food during their stay, add it as a charge on that
+          booking's <span className="font-medium text-foreground">Extras</span> tab, same as
+          any other add-on. Prices here are just what guests see up front; nothing is
+          auto-charged.
         </p>
       </div>
 
       {/* Breakfast */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        <h2 className="font-semibold text-sm">Breakfast</h2>
+        <div className="flex items-center gap-2">
+          <Coffee className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold text-sm">Breakfast</h2>
+        </div>
 
-        <label className="flex items-center gap-3 cursor-pointer select-none">
-          <div
-            onClick={() => set("breakfast_included", !config.breakfast_included)}
-            className={[
-              "w-10 h-6 rounded-full transition-colors relative cursor-pointer",
-              config.breakfast_included ? "bg-primary" : "bg-muted-foreground/30",
-            ].join(" ")}
-          >
-            <span className={[
-              "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
-              config.breakfast_included ? "translate-x-5" : "translate-x-1",
-            ].join(" ")} />
-          </div>
-          <span className="text-sm font-medium">
-            {config.breakfast_included
-              ? "Breakfast included in room rate"
-              : "Breakfast not included"}
-          </span>
-        </label>
+        <div className="flex flex-wrap gap-2">
+          {BREAKFAST_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => set("breakfast", opt.value)}
+              className={[
+                "px-3 py-1.5 rounded-full text-xs border transition-colors",
+                config.breakfast === opt.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:bg-muted",
+              ].join(" ")}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
 
-        {!config.breakfast_included && (
+        {config.breakfast === "paid" && (
           <div>
-            <label className={labelCls}>Breakfast add-on price per person (₹)</label>
+            <label className={labelCls}>Note for guests (e.g. price, timing)</label>
             <input
-              type="number"
-              min={0}
-              value={config.breakfast_price}
-              onChange={(e) => set("breakfast_price", e.target.value)}
-              className={`${inputCls} max-w-[200px]`}
+              value={config.breakfast_note}
+              onChange={(e) => set("breakfast_note", e.target.value)}
+              className={inputCls}
+              placeholder="e.g. ₹150/person/day — let us know at check-in"
             />
-            <p className="text-xs text-muted-foreground mt-1">
-              Set 0 to hide breakfast option from guests.
-            </p>
           </div>
         )}
       </div>
 
-      {/* Meal packages */}
+      {/* Lunch / dinner via in-house kitchen */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-sm">Meal Packages</h2>
-          <button
-            onClick={addPackage}
-            className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border px-3 py-1.5 hover:bg-muted"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add package
-          </button>
+        <div className="flex items-center gap-2">
+          <UtensilsCrossed className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold text-sm">Lunch &amp; dinner</h2>
         </div>
 
-        {config.packages.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <UtensilsCrossed className="h-8 w-8 mx-auto mb-2 opacity-40" />
-            <p>No meal packages yet.</p>
-            <p className="text-xs mt-0.5">Add packages like "Full Board" or "Dinner Add-on".</p>
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => set("kitchen_available", !config.kitchen_available)}
+            className={[
+              "w-10 h-6 rounded-full transition-colors relative cursor-pointer shrink-0",
+              config.kitchen_available ? "bg-primary" : "bg-muted-foreground/30",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                config.kitchen_available ? "translate-x-5" : "translate-x-1",
+              ].join(" ")}
+            />
           </div>
-        ) : (
-          <div className="space-y-4">
-            {config.packages.map((pkg) => (
-              <div key={pkg.id} className="rounded-lg border border-border p-4 space-y-3 relative">
-                <button
-                  onClick={() => removePackage(pkg.id)}
-                  className="absolute top-3 right-3 h-6 w-6 rounded-md hover:bg-muted flex items-center justify-center"
-                >
-                  <X className="h-3.5 w-3.5 text-muted-foreground" />
-                </button>
+          <span className="text-sm font-medium">In-house kitchen serves lunch/dinner on order</span>
+        </label>
 
-                <div className="grid grid-cols-2 gap-3 pr-8">
-                  <div>
-                    <label className={labelCls}>Package name *</label>
-                    <input
-                      value={pkg.name}
-                      onChange={(e) => updatePackage(pkg.id, "name", e.target.value)}
-                      className={inputCls}
-                      placeholder="e.g. Full Board"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>Price (₹) *</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={pkg.price}
-                      onChange={(e) => updatePackage(pkg.id, "price", e.target.value)}
-                      className={inputCls}
-                    />
-                  </div>
-                </div>
+        {config.kitchen_available && (
+          <div>
+            <label className={labelCls}>Note for guests (menu style, rough pricing)</label>
+            <input
+              value={config.kitchen_note}
+              onChange={(e) => set("kitchen_note", e.target.value)}
+              className={inputCls}
+              placeholder="e.g. Home-style Kerala meals on order, ₹200–350/person"
+            />
+          </div>
+        )}
+      </div>
 
-                <div>
-                  <label className={labelCls}>Description</label>
-                  <input
-                    value={pkg.description}
-                    onChange={(e) => updatePackage(pkg.id, "description", e.target.value)}
-                    className={inputCls}
-                    placeholder="e.g. Breakfast, lunch and dinner"
-                  />
-                </div>
+      {/* Delivery */}
+      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold text-sm">Food delivery</h2>
+        </div>
 
-                <div>
-                  <label className={labelCls}>Charged per</label>
-                  <div className="flex gap-2">
-                    {(["person", "room"] as const).map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => updatePackage(pkg.id, "per", opt)}
-                        className={[
-                          "px-3 py-1.5 rounded-full text-xs border transition-colors",
-                          pkg.per === opt
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "border-border hover:bg-muted",
-                        ].join(" ")}
-                      >
-                        Per {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
+        <label className="flex items-center gap-3 cursor-pointer select-none">
+          <div
+            onClick={() => set("delivery_available", !config.delivery_available)}
+            className={[
+              "w-10 h-6 rounded-full transition-colors relative cursor-pointer shrink-0",
+              config.delivery_available ? "bg-primary" : "bg-muted-foreground/30",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                config.delivery_available ? "translate-x-5" : "translate-x-1",
+              ].join(" ")}
+            />
+          </div>
+          <span className="text-sm font-medium">We arrange food delivery for guests</span>
+        </label>
+
+        {config.delivery_available && (
+          <div>
+            <label className={labelCls}>Note for guests</label>
+            <input
+              value={config.delivery_note}
+              onChange={(e) => set("delivery_note", e.target.value)}
+              className={inputCls}
+              placeholder="e.g. We can arrange delivery from nearby restaurants on request"
+            />
           </div>
         )}
       </div>
