@@ -1,5 +1,6 @@
 import { Users, BedDouble, Bath } from "lucide-react";
 import type { Property } from "@/hooks/useProperty";
+import { parseMealsConfig } from "@/lib/meals";
 
 interface AboutProps {
   property?: Property | null;
@@ -9,14 +10,18 @@ export function About({ property }: AboutProps) {
   if (!property) return null;
 
   const roomCount = property.rooms?.length ?? 0;
-  const hasMeals = property.shared_amenities?.some(
-    (a) => !a.startsWith("__") && (a.toLowerCase().includes("meal") || a.toLowerCase().includes("breakfast"))
-  );
+  const meals = parseMealsConfig(property.shared_amenities);
+  const mealsLabel =
+    meals.breakfast === "included"
+      ? "Included"
+      : meals.breakfast === "paid" || meals.kitchen_available || meals.delivery_available
+        ? "Available"
+        : "—";
 
   const stats = [
     { icon: BedDouble, label: "Rooms", value: roomCount > 0 ? String(roomCount) : "—" },
     { icon: Users, label: "Host", value: property.owner_name ?? "Your host" },
-    { icon: Bath, label: "Meals", value: hasMeals ? "Included" : "Available" },
+    { icon: Bath, label: "Meals", value: mealsLabel },
   ];
 
   const aboutImage = property.about_image ?? property.hero_image ?? "/assets/cottage.jpg";
