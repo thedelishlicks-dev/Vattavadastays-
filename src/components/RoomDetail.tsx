@@ -18,7 +18,6 @@ export type BookingDetails = {
   room: Room;
   adults: number;
   children: number;
-  extraBeds: number;
   nights: number;
   total: number;
   checkIn: string;
@@ -29,7 +28,6 @@ export type BookingDetails = {
 export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose, onConfirm }: Props) {
   const [adults, setAdults] = useState(room.max_guests);
   const [children, setChildren] = useState(0);
-  const [extraBeds, setExtraBeds] = useState(0);
 
   const meals = useMemo(() => parseMealsConfig(propertyAmenities), [propertyAmenities]);
 
@@ -40,7 +38,6 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
   useEffect(() => {
     setAdults(room.max_guests);
     setChildren(0);
-    setExtraBeds(0);
   }, [room.id, room.max_guests]);
 
   const nights =
@@ -50,13 +47,17 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
 
   const totals = useMemo(() => {
     const roomCost = room.base_price * nights;
-    // Extra charge applies only above max_guests (the included capacity the owner set)
+    // Extra charge applies only above max_guests (the included capacity the owner set).
+    // This already covers where an extra guest sleeps — most properties don't
+    // charge a separate "extra bed" fee on top of the per-head charge. If a
+    // guest wants a bed without adding a guest (e.g. splitting a bed for
+    // kids), that's a one-off request the owner handles directly and adds
+    // to the booking's Extras tab, same as any other add-on.
     const extraGuestCharge =
       Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
-    const extraBedCost = extraBeds * (room.extra_guest_price ?? 0) * nights;
-    const total = roomCost + extraGuestCharge + extraBedCost;
-    return { roomCost, extraGuestCharge, extraBedCost, total };
-  }, [room, nights, extraBeds, adults]);
+    const total = roomCost + extraGuestCharge;
+    return { roomCost, extraGuestCharge, total };
+  }, [room, nights, adults]);
 
   const Stepper = ({
     value,
@@ -182,12 +183,6 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
               label={`Adults (${room.max_guests} included in price)`}
             />
             <Stepper value={children} set={setChildren} max={4} label="Children" />
-            <Stepper
-              value={extraBeds}
-              set={setExtraBeds}
-              max={3}
-              label={`Extra beds (₹${room.extra_guest_price ?? 0}/night)`}
-            />
 
             {/* Show extra charge hint once adults exceed included capacity */}
             {adults > room.max_guests && (
@@ -208,12 +203,6 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
                 <span>₹{totals.extraGuestCharge.toLocaleString("en-IN")}</span>
               </div>
             )}
-            {totals.extraBedCost > 0 && (
-              <div className="flex justify-between text-muted-foreground">
-                <span>Extra beds</span>
-                <span>₹{totals.extraBedCost.toLocaleString("en-IN")}</span>
-              </div>
-            )}
             <div className="border-t border-border pt-2 flex justify-between font-display text-lg font-semibold">
               <span>Total</span>
               <span>₹{totals.total.toLocaleString("en-IN")}</span>
@@ -231,7 +220,6 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
                   room,
                   adults,
                   children,
-                  extraBeds,
                   nights,
                   total: totals.total,
                   checkIn: format(checkIn, "yyyy-MM-dd"),
