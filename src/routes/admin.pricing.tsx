@@ -100,7 +100,7 @@ function PricingDrawer({
               className={inputCls}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Applied per guest beyond 2. Set 0 to disable.
+              Applied per guest beyond {room.max_guests} (this room's max guests). Set 0 to disable.
             </p>
           </div>
 
@@ -223,7 +223,7 @@ function AdminPricing() {
                       </td>
                       <td className="px-4 py-3">
                         {room.extra_guest_price > 0
-                          ? <span>₹{room.extra_guest_price.toLocaleString("en-IN")}/person</span>
+                          ? <span>₹{room.extra_guest_price.toLocaleString("en-IN")}/person <span className="text-xs text-muted-foreground">beyond {room.max_guests}</span></span>
                           : <span className="text-muted-foreground text-xs">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -248,7 +248,7 @@ function AdminPricing() {
         <p className="font-medium text-foreground text-xs uppercase tracking-wider mb-2">How pricing works</p>
         <p>• <strong>Base price</strong> applies Sun–Thu nights.</p>
         <p>• <strong>Weekend multiplier</strong> auto-applies on Fri–Sat bookings.</p>
-        <p>• <strong>Extra guest</strong> charge kicks in for guests beyond 2.</p>
+        <p>• <strong>Extra guest</strong> charge kicks in per room once guests exceed that room's own max guest count (set in <strong>Rooms</strong>) — not a fixed number across all rooms.</p>
         <p>• Override specific dates from the <strong>Calendar</strong> tab.</p>
       </div>
 

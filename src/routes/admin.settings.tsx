@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState, useEffect, useRef } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
@@ -274,8 +274,6 @@ function AdminSettings() {
     owner_name: '',
     owner_phone: '',
     owner_whatsapp: '',
-    check_in_time: '',
-    check_out_time: '',
     pending_hold_hours: '24',
     location_lat: '',
     location_lng: '',
@@ -297,8 +295,6 @@ function AdminSettings() {
         owner_name: property.owner_name ?? '',
         owner_phone: property.owner_phone ?? '',
         owner_whatsapp: property.owner_whatsapp ?? '',
-        check_in_time: property.check_in_time ?? '',
-        check_out_time: property.check_out_time ?? '',
         pending_hold_hours: property.pending_hold_hours != null ? property.pending_hold_hours.toString() : '24',
         location_lat: property.location_lat != null ? property.location_lat.toString() : '',
         location_lng: property.location_lng != null ? property.location_lng.toString() : '',
@@ -471,16 +467,23 @@ function AdminSettings() {
         {/* ── Check-in / out ── */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-stone-900">Check-in / Check-out</h2>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Check-in Time</label>
-              <input type="time" name="check_in_time" value={form.check_in_time} onChange={handleChange} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Check-out Time</label>
-              <input type="time" name="check_out_time" value={form.check_out_time} onChange={handleChange} className={inputCls} />
-            </div>
-          </div>
+          {/* Check-in/out TIMES live on the Policies page, not here — this
+              page used to have its own separate time inputs for the same
+              two columns, saved on every Settings submit regardless of
+              whether they'd been touched. That meant editing something
+              unrelated here (e.g. the tagline) could silently overwrite a
+              time an owner had just set on Policies, and the two pages
+              used incompatible formats (a native 24-hour time picker here
+              vs. a free-text "2:00 PM" field there) — whichever was saved
+              last would display oddly on the other page. One home for
+              this avoids both problems. */}
+          <p className="text-xs text-stone-500">
+            Check-in and check-out times are set on the{" "}
+            <Link to="/admin/policies" className="text-primary underline underline-offset-2">
+              Policies
+            </Link>{" "}
+            page, along with your cancellation policy and house rules.
+          </p>
           <div>
             <label className={labelCls}>Pending booking hold (hours)</label>
             <input

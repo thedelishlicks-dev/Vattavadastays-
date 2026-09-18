@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
@@ -53,8 +53,42 @@ const emptyForm = (): RoomForm => ({
 function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: () => void; onDeleted: () => void }) {
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  // Bookings that reference this room survive a delete (room_id just goes
+  // null — see the "will not be deleted" note below), but the moment the
+  // room is gone, every screen that looks up its name (booking cards,
+  // invoices, WhatsApp confirmations) falls back to "Unknown room". For a
+  // booking that's already checked out that's a harmless cosmetic loss of
+  // history. For one that's upcoming or in progress, it means the owner
+  // can no longer tell which physical room a guest is actually staying in
+  // — so those get checked for and blocked here rather than only warned
+  // about after the fact.
+  const [upcomingCount, setUpcomingCount] = useState<number | null>(null)
+  const [checkingBookings, setCheckingBookings] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setCheckingBookings(true)
+    supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('room_id', room.id)
+      .neq('status', 'cancelled')
+      .gte('check_out', new Date().toISOString().slice(0, 10))
+      .then(({ count }) => {
+        if (!cancelled) {
+          setUpcomingCount(count ?? 0)
+          setCheckingBookings(false)
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [room.id])
+
+  const blocked = (upcomingCount ?? 0) > 0
 
   const handleDelete = async () => {
+    if (blocked) return
     setDeleting(true)
     setError('')
     try {
@@ -82,18 +116,35 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
             <p className="text-xs text-muted-foreground mt-0.5">{room.name}</p>
           </div>
         </div>
-        <div className="rounded-xl bg-destructive/5 border border-destructive/20 px-4 py-3 text-xs text-destructive space-y-1">
-          <p className="font-medium">This cannot be undone. This will permanently delete:</p>
-          <ul className="list-disc list-inside space-y-0.5 text-destructive/80">
-            <li>The room and all its details</li>
-            <li>All availability calendar entries for this room</li>
-          </ul>
-          <p className="mt-1 text-destructive/70">Existing bookings for this room will not be deleted but may show "Unknown room".</p>
-        </div>
+
+        {checkingBookings ? (
+          <div className="h-16 rounded-xl bg-muted animate-pulse" />
+        ) : blocked ? (
+          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 space-y-1.5">
+            <p className="font-medium">
+              Can't delete — {upcomingCount} upcoming or in-progress booking{upcomingCount === 1 ? "" : "s"} still reference this room.
+            </p>
+            <p>
+              Deleting it now would make those bookings show "Unknown room" everywhere — the
+              booking list, invoices, WhatsApp messages. Wait until those stays are complete, or
+              set this room to <strong>Inactive</strong> instead (hides it from new guests without
+              breaking existing bookings).
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-xl bg-destructive/5 border border-destructive/20 px-4 py-3 text-xs text-destructive space-y-1">
+            <p className="font-medium">This cannot be undone. This will permanently delete:</p>
+            <ul className="list-disc list-inside space-y-0.5 text-destructive/80">
+              <li>The room and all its details</li>
+              <li>All availability calendar entries for this room</li>
+            </ul>
+            <p className="mt-1 text-destructive/70">Past bookings for this room will not be deleted but will show "Unknown room".</p>
+          </div>
+        )}
         {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Keep room</button>
-          <button onClick={handleDelete} disabled={deleting} className="flex-1 rounded-full bg-destructive text-white py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
+          <button onClick={handleDelete} disabled={deleting || blocked || checkingBookings} className="flex-1 rounded-full bg-destructive text-white py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
             {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             Delete
           </button>
