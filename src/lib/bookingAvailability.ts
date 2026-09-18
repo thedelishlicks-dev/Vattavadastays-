@@ -244,6 +244,13 @@ export async function getConflictingDates(
   checkIn: string,
   checkOut: string,
   property?: TurnoverPolicyInput | null,
+  /** Pass the booking's own id when checking dates for a booking that
+   * ALREADY EXISTS on this room (i.e. editing it) — otherwise the
+   * booking's own current (pre-edit) row is fetched back and compared
+   * against the new dates, which almost always overlaps itself and would
+   * report a false-positive conflict against its own unedited row. Leave
+   * undefined when checking a brand-new booking that has no row yet. */
+  excludeBookingId?: string,
 ): Promise<string[]> {
   const turnoverSafe = isSameDayTurnoverSafe(property);
   const widen = (dateStr: string) => (turnoverSafe ? dateStr : addOneDay(dateStr));
@@ -265,13 +272,17 @@ export async function getConflictingDates(
   // wasn't fetched at all by a strict .gt() filter). Over-fetching a few
   // harmless extra rows costs nothing.
   const [{ data: bookings, error: bookingsErr }, { data: availRows, error: availErr }] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("check_in, check_out")
-      .eq("room_id", roomId)
-      .neq("status", "cancelled")
-      .lte("check_in", effectiveCheckOut)
-      .gte("check_out", checkIn),
+    (() => {
+      let q = supabase
+        .from("bookings")
+        .select("check_in, check_out")
+        .eq("room_id", roomId)
+        .neq("status", "cancelled")
+        .lte("check_in", effectiveCheckOut)
+        .gte("check_out", checkIn);
+      if (excludeBookingId) q = q.neq("id", excludeBookingId);
+      return q;
+    })(),
     // Manual/explicit blocks within the (possibly widened) window.
     supabase
       .from("availability")
