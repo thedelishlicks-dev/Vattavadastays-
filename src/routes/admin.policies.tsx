@@ -161,23 +161,23 @@ function AdminPolicies() {
       {/* Check-in / Check-out */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">Check-in & Check-out</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="min-w-0">
+        <div className="flex gap-4 overflow-hidden">
+          <div className="flex-1 min-w-0">
             <label className={labelCls}>Check-in time</label>
             <input
               type="time"
               value={parseTimeToHHMM(form.check_in_time)}
               onChange={(e) => set("check_in_time", formatTimeInput(e.target.value))}
-              className={`${inputCls} min-w-0`}
+              className={`${inputCls} min-w-0 max-w-full`}
             />
           </div>
-          <div className="min-w-0">
+          <div className="flex-1 min-w-0">
             <label className={labelCls}>Check-out time</label>
             <input
               type="time"
               value={parseTimeToHHMM(form.check_out_time)}
               onChange={(e) => set("check_out_time", formatTimeInput(e.target.value))}
-              className={`${inputCls} min-w-0`}
+              className={`${inputCls} min-w-0 max-w-full`}
             />
           </div>
         </div>
