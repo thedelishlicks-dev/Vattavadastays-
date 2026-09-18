@@ -15,10 +15,9 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
-import { supabase } from "@/lib/supabase";
 import { useQuery } from "@tanstack/react-query";
 import { getSubdomain } from "@/lib/subdomain";
-import { eachDate, addOneDay, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
+import { isSameDayTurnoverSafe, getBlockedDatesForRooms } from "@/lib/bookingAvailability";
 
 function buildMonthDays(month: Date) {
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
@@ -51,47 +50,48 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
   const { data: property } = useProperty(subdomain);
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
 
-  const { data: bookings = [] } = useQuery({
-    queryKey: ["guest-bookings", property?.id],
-    queryFn: async () => {
-      if (!property?.id) return [];
-      const from = format(new Date(), "yyyy-MM-dd");
-      const to = format(addMonths(new Date(), 6), "yyyy-MM-dd");
-      const { data, error } = await supabase
-        .from("bookings")
-        .select("check_in, check_out, room_id")
-        .eq("property_id", property.id)
-        .neq("status", "cancelled")
-        .gte("check_out", from)
-        .lte("check_in", to);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: !!property?.id,
-  });
-
-  const totalRooms = useMemo(
-    () => (property?.rooms ?? []).filter((r) => r.is_active).length,
+  const activeRoomIds = useMemo(
+    () => (property?.rooms ?? []).filter((r) => r.is_active).map((r) => r.id),
     [property]
   );
 
-  // Map each date → set of room_ids that are occupied on that date. When
-  // turnover isn't safe for this property, a booking's occupied nights are
-  // widened through its own checkout day too — without a cleaning gap, that
-  // day isn't free for a new stay to start either, so it must count as
-  // occupied here just like it does in getConflictingDates() (the
-  // authoritative per-room check run again at actual booking time).
+  // Dates the owner has manually blocked (maintenance, personal use, etc. —
+  // see BlockDatesModal on the dashboard) need to count as occupied here,
+  // exactly like a real booking would. Without this, this "pick your
+  // dates" calendar showed a blocked room's dates as fully available to
+  // guests — they'd only find out it was actually unavailable at the very
+  // end of the booking form, when useCreateBooking's own check (which DOES
+  // look at manual blocks) rejects it. getBlockedDatesForRooms already
+  // covers both real bookings AND manual blocks in one call (and already
+  // applies the same turnover widening this file used to duplicate by
+  // hand) — it's the same function the owner-side calendar paints from, so
+  // this view can never disagree with what the owner sees as blocked.
+  const { data: blockedByRoom = {} } = useQuery({
+    queryKey: ["blocked-dates", activeRoomIds.join(","), turnoverSafe],
+    queryFn: () => {
+      const from = format(new Date(), "yyyy-MM-dd");
+      const to = format(addMonths(new Date(), 6), "yyyy-MM-dd");
+      return getBlockedDatesForRooms(activeRoomIds, from, to, turnoverSafe);
+    },
+    enabled: activeRoomIds.length > 0,
+  });
+
+  const totalRooms = activeRoomIds.length;
+
+  // Map each date → set of room_ids that are occupied (booked OR manually
+  // blocked) on that date. Inverted from blockedByRoom (room → dates)
+  // since the rest of this component reasons per-date (how many of the
+  // property's rooms are free today), not per-room.
   const bookedDateCounts = useMemo(() => {
     const counts: Record<string, Set<string>> = {};
-    bookings.forEach((b) => {
-      const effectiveCheckOut = turnoverSafe ? b.check_out : addOneDay(b.check_out);
-      eachDate(b.check_in, effectiveCheckOut).forEach((d) => {
+    Object.entries(blockedByRoom).forEach(([roomId, dates]) => {
+      dates.forEach((d) => {
         if (!counts[d]) counts[d] = new Set();
-        counts[d].add(b.room_id);
+        counts[d].add(roomId);
       });
     });
     return counts;
-  }, [bookings, turnoverSafe]);
+  }, [blockedByRoom]);
 
   const getDateState = (date: Date): DateState => {
     if (!isSameMonth(date, month)) return "out-of-month";
