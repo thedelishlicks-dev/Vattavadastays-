@@ -5,6 +5,7 @@ import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { parseTimeToHHMM, formatTimeInput } from "@/lib/bookingAvailability";
 
 export const Route = createFileRoute("/admin/policies")({
   component: AdminPolicies,
@@ -164,24 +165,25 @@ function AdminPolicies() {
           <div>
             <label className={labelCls}>Check-in time</label>
             <input
-              value={form.check_in_time}
-              onChange={(e) => set("check_in_time", e.target.value)}
+              type="time"
+              value={parseTimeToHHMM(form.check_in_time)}
+              onChange={(e) => set("check_in_time", formatTimeInput(e.target.value))}
               className={inputCls}
-              placeholder="e.g. 2:00 PM"
             />
           </div>
           <div>
             <label className={labelCls}>Check-out time</label>
             <input
-              value={form.check_out_time}
-              onChange={(e) => set("check_out_time", e.target.value)}
+              type="time"
+              value={parseTimeToHHMM(form.check_out_time)}
+              onChange={(e) => set("check_out_time", formatTimeInput(e.target.value))}
               className={inputCls}
-              placeholder="e.g. 11:00 AM"
             />
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          These appear in WhatsApp booking confirmation messages and the guest page.
+          Used in the day-before WhatsApp reminder, and to figure out whether a room can be
+          turned over for a new guest the same day an old one checks out.
         </p>
       </div>
 
