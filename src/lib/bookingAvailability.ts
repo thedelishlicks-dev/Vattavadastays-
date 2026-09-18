@@ -107,6 +107,38 @@ export function parseTimeToMinutes(time: string | null | undefined): number | nu
 }
 
 /**
+ * "HH:MM" 24-hour string a native <input type="time"> needs as its value —
+ * built on parseTimeToMinutes so it accepts the same two formats (24-hour
+ * or "h:mm AM/PM"). Returns "" for anything empty/unparseable, which a
+ * time input just renders as blank rather than a broken value.
+ */
+export function parseTimeToHHMM(time: string | null | undefined): string {
+  const mins = parseTimeToMinutes(time);
+  if (mins == null) return "";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Friendly "h:mm AM/PM" string (e.g. "2:00 PM") from a native
+ * <input type="time">'s 24-hour "HH:MM" value. This is the format
+ * check_in_time/check_out_time are actually stored and shown in — guest
+ * WhatsApp messages, the guest page — so it reads naturally rather than as
+ * "14:00". parseTimeToMinutes still accepts either format regardless.
+ */
+export function formatTimeInput(hhmm: string): string {
+  const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return hhmm;
+  let h = Number(m[1]);
+  const min = m[2];
+  const period = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if (h === 0) h = 12;
+  return `${h}:${min} ${period}`;
+}
+
+/**
  * Whether a NEW guest can check into a room on the same calendar date
  * another guest checked out of — i.e. whether the exclusive-checkout-date
  * convention used throughout this app (a stay's check-out date is never

@@ -5,6 +5,7 @@ import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { parseTimeToHHMM, formatTimeInput } from "@/lib/bookingAvailability";
 
 export const Route = createFileRoute("/admin/policies")({
   component: AdminPolicies,
@@ -160,28 +161,29 @@ function AdminPolicies() {
       {/* Check-in / Check-out */}
       <div className="bg-card border border-border rounded-xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">Check-in & Check-out</h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
+        <div className="flex gap-4 overflow-hidden">
+          <div className="flex-1 min-w-0">
             <label className={labelCls}>Check-in time</label>
             <input
-              value={form.check_in_time}
-              onChange={(e) => set("check_in_time", e.target.value)}
-              className={inputCls}
-              placeholder="e.g. 2:00 PM"
+              type="time"
+              value={parseTimeToHHMM(form.check_in_time)}
+              onChange={(e) => set("check_in_time", formatTimeInput(e.target.value))}
+              className={`${inputCls} min-w-0 max-w-full`}
             />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <label className={labelCls}>Check-out time</label>
             <input
-              value={form.check_out_time}
-              onChange={(e) => set("check_out_time", e.target.value)}
-              className={inputCls}
-              placeholder="e.g. 11:00 AM"
+              type="time"
+              value={parseTimeToHHMM(form.check_out_time)}
+              onChange={(e) => set("check_out_time", formatTimeInput(e.target.value))}
+              className={`${inputCls} min-w-0 max-w-full`}
             />
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          These appear in WhatsApp booking confirmation messages and the guest page.
+          Used in the day-before WhatsApp reminder, and to figure out whether a room can be
+          turned over for a new guest the same day an old one checks out.
         </p>
       </div>
 
