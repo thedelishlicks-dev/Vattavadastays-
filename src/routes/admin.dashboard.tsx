@@ -327,6 +327,12 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
 // scroll and no minimum width.
 // ---------------------------------------------------------------------------
 
+type ChargeLine = { qty: number; unit_price: number };
+
+function chargesSum(charges?: ChargeLine[] | null): number {
+  return (charges ?? []).reduce((s, c) => s + c.qty * c.unit_price, 0);
+}
+
 function RecentBookings({
   recent,
   roomNameMap,
@@ -340,6 +346,7 @@ function RecentBookings({
     status: string;
     total_amount: number;
     discount_amount?: number;
+    booking_charges?: ChargeLine[] | null;
   }>;
   roomNameMap: Record<string, string>;
 }) {
@@ -361,7 +368,7 @@ function RecentBookings({
           {recent.map((b) => {
             const netAmount = Math.max(
               0,
-              Number(b.total_amount) - Number(b.discount_amount ?? 0),
+              Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0),
             );
             return (
               <div key={b.id} className="px-4 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-muted/30">
@@ -428,10 +435,11 @@ function DashboardPage() {
       status: string;
       total_amount: number;
       discount_amount?: number;
+      booking_charges?: ChargeLine[] | null;
     }) => {
       if (b.check_in?.slice(0, 7) !== thisMonth) return 0;
       if (b.status !== "confirmed" && b.status !== "completed") return 0;
-      return Math.max(0, Number(b.total_amount) - Number(b.discount_amount ?? 0));
+      return Math.max(0, Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0));
     };
 
     const upcoming =

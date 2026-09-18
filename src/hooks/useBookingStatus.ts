@@ -32,6 +32,7 @@ export function useBookingStatus(phone: string, bookingId: string) {
         (sum: number, c: BookingCharge) => sum + c.qty * c.unit_price,
         0
       );
+      const discount = Number(booking.discount_amount ?? 0);
 
       return {
         booking: booking as Booking,
@@ -41,6 +42,7 @@ export function useBookingStatus(phone: string, bookingId: string) {
           0,
           Number(booking.total_amount) +
             chargesTotal -
+            discount -
             Number(booking.advance_amount ?? 0)
         ),
       };
