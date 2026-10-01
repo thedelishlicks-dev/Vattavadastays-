@@ -3,6 +3,8 @@ import { differenceInCalendarDays, format } from "date-fns";
 import { X, Minus, Plus, Coffee, UtensilsCrossed, Truck } from "lucide-react";
 import type { Room } from "@/types/database";
 import { parseMealsConfig, hasMealInfo } from "@/lib/meals";
+import { useAvailabilityRange } from "@/hooks/useAvailabilityRange";
+import { priceRoomStay } from "@/lib/quoteBuilder";
 
 type Props = {
   room: Room;
@@ -45,8 +47,20 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
       ? Math.max(1, differenceInCalendarDays(checkOut, checkIn))
       : 1;
 
+  const checkInStr = checkIn ? format(checkIn, "yyyy-MM-dd") : "";
+  const checkOutStr = checkOut ? format(checkOut, "yyyy-MM-dd") : "";
+  // Same per-date overrides + weekend rule the booking flow charges
+  // (useCreateBooking), so the estimate shown here matches the final price.
+  const { data: priceRows } = useAvailabilityRange(room.id, checkInStr, checkOutStr);
+
   const totals = useMemo(() => {
-    const roomCost = room.base_price * nights;
+    let roomCost = room.base_price * nights;
+    if (checkInStr && checkOutStr) {
+      const overrides: Record<string, number> = {};
+      for (const row of priceRows ?? []) if (row.price_override) overrides[row.date] = Number(row.price_override);
+      const stay = priceRoomStay({ room, guests: 1, checkIn: checkInStr, checkOut: checkOutStr, overrides });
+      if (stay.nights > 0) roomCost = stay.room_price;
+    }
     // Extra charge applies only above max_guests (the included capacity the owner set).
     // This already covers where an extra guest sleeps — most properties don't
     // charge a separate "extra bed" fee on top of the per-head charge. If a
@@ -57,7 +71,7 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
       Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
     const total = roomCost + extraGuestCharge;
     return { roomCost, extraGuestCharge, total };
-  }, [room, nights, adults]);
+  }, [room, nights, adults, checkInStr, checkOutStr, priceRows]);
 
   const Stepper = ({
     value,
