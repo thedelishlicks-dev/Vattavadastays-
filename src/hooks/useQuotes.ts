@@ -103,6 +103,21 @@ export function useSetQuoteStatus() {
   });
 }
 
+/** Link a quote to the booking it became, and mark it accepted. */
+export function useMarkQuoteConverted() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { propertyId: string; id: string; bookingId: string | null }) => {
+      const { error } = await supabase
+        .from("quotes")
+        .update({ status: "accepted", converted_booking_id: input.bookingId || null, updated_at: new Date().toISOString() })
+        .eq("id", input.id);
+      if (error) throw asError(error);
+    },
+    onSuccess: (_d, v) => queryClient.invalidateQueries({ queryKey: ["quotes", v.propertyId] }),
+  });
+}
+
 export function useDeleteQuote() {
   const queryClient = useQueryClient();
   return useMutation({
