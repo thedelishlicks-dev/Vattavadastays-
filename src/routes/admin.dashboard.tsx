@@ -477,6 +477,7 @@ function DashboardPage() {
           name: r.name,
           base_price: r.base_price ?? 0,
           extra_guest_price: r.extra_guest_price ?? 0,
+          weekend_multiplier: r.weekend_multiplier ?? 1,
           max_guests: r.max_guests ?? 2,
         })),
     [property],
