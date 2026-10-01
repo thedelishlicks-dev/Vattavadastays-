@@ -1,8 +1,9 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
+import { CalendarCheck, MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useDeleteQuote, useQuotes, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
+import { useDeleteQuote, useMarkQuoteConverted, useQuotes, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
+import { AddBookingModal } from "@/components/AddBookingModal";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
 import { PageHeader } from "@/admin/formKit";
 import { formatINR, nightsBetween } from "@/lib/quotes";
@@ -51,10 +52,14 @@ function AdminQuotes() {
   return <QuoteList property={property as never} onEdit={setEditing} />;
 }
 
-function QuoteList({ property, onEdit }: { property: { id: string; name: string; owner_phone?: string }; onEdit: (q: Quote | "new") => void }) {
+type ListProperty = { id: string; name: string; owner_phone?: string; rooms?: { id: string; is_active?: boolean }[]; [k: string]: unknown };
+
+function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Quote | "new") => void }) {
   const { data: quotes = [], isLoading } = useQuotes(property.id);
   const setStatus = useSetQuoteStatus();
   const del = useDeleteQuote();
+  const markConverted = useMarkQuoteConverted();
+  const [converting, setConverting] = useState<Quote | null>(null);
   const [filter, setFilter] = useState<Filter>("open");
 
   const shown = quotes.filter((q) => {
@@ -123,7 +128,7 @@ function QuoteList({ property, onEdit }: { property: { id: string; name: string;
                 <div className="text-right shrink-0">
                   <div className="font-semibold">{formatINR(q.total_amount)}</div>
                   <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[11px] ${STATUS_STYLE[st]}`}>
-                    {STATUS_LABEL[st]}{st === "sent" && q.sent_at ? ` · ${ago(q.sent_at)}` : ""}
+                    {q.converted_booking_id ? "Booked ✓" : STATUS_LABEL[st]}{st === "sent" && q.sent_at ? ` · ${ago(q.sent_at)}` : ""}
                   </span>
                 </div>
               </div>
@@ -144,12 +149,22 @@ function QuoteList({ property, onEdit }: { property: { id: string; name: string;
                 <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 hover:bg-muted">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
-                {q.status !== "accepted" && (
+                {!q.converted_booking_id && q.status !== "lost" && (
+                  <button onClick={() => setConverting(q)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-primary-foreground hover:opacity-90">
+                    <CalendarCheck className="h-3.5 w-3.5" /> Convert to booking
+                  </button>
+                )}
+                {q.converted_booking_id && (
+                  <Link to="/admin/bookings" className="inline-flex items-center gap-1.5 rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50">
+                    <CalendarCheck className="h-3.5 w-3.5" /> View in Bookings
+                  </Link>
+                )}
+                {!q.converted_booking_id && q.status !== "accepted" && (
                   <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "accepted" })} className="rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50">
                     Accepted
                   </button>
                 )}
-                {q.status !== "lost" && (
+                {!q.converted_booking_id && q.status !== "lost" && (
                   <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "lost" })} className="rounded-full border border-border px-3 py-1.5 hover:bg-muted">
                     Lost
                   </button>
@@ -167,6 +182,29 @@ function QuoteList({ property, onEdit }: { property: { id: string; name: string;
           );
         })}
       </div>
+
+      {converting && (
+        <AddBookingModal
+          propertyId={property.id}
+          property={property as never}
+          rooms={((property.rooms ?? []).filter((r) => r.is_active !== false)) as never}
+          onClose={() => setConverting(null)}
+          onSaved={() => setConverting(null)}
+          fromQuote={{
+            quoteId: converting.id,
+            guestName: converting.guest_name === "Guest" ? "" : converting.guest_name,
+            guestPhone: converting.guest_phone,
+            checkIn: converting.check_in,
+            checkOut: converting.check_out,
+            guestCount: converting.guest_count,
+            rooms: converting.rooms,
+            lines: converting.lines,
+            discount: converting.discount_amount,
+            onConverted: (bookingId) =>
+              markConverted.mutateAsync({ propertyId: property.id, id: converting.id, bookingId }),
+          }}
+        />
+      )}
     </div>
   );
 }
