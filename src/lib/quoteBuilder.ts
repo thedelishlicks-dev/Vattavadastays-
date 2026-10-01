@@ -53,7 +53,9 @@ export function priceRoomStay(input: {
   overrides?: Record<string, number>;
 }): RoomQuoteLine {
   const { room, checkIn, checkOut } = input;
-  const nights = nightsBetween(checkIn, checkOut);
+  // Empty / partial dates → 0 nights (never NaN, which would show as ₹NaN).
+  const rawNights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
+  const nights = Number.isFinite(rawNights) ? rawNights : 0;
   const guests = Math.max(1, Math.floor(input.guests || 1));
   const dates = nights > 0 ? stayDates(checkIn, checkOut) : [];
 
