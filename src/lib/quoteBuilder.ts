@@ -5,7 +5,7 @@
 // helpers. No React / Supabase. Builds on lib/quotes.ts (add-on pricing).
 
 import { clean } from "./whatsapp";
-import { formatINR, nightsBetween, stayDates, UNIT_LABELS, type QuoteLine } from "./quotes";
+import { formatINR, lineToCharges, nightsBetween, stayDates, UNIT_LABELS, type QuoteLine } from "./quotes";
 
 // ── Rooms ───────────────────────────────────────────────────────────────────
 
@@ -178,6 +178,78 @@ export function buildQuoteText(i: QuoteMessageInput): string {
 /** wa.me deep link — no API. Same pattern as lib/whatsapp.ts. */
 export function quoteLink(guestPhone: string, text: string): string {
   return `https://wa.me/${clean(guestPhone)}?text=${encodeURIComponent(text)}`;
+}
+
+// ── Converting a quote into a booking ───────────────────────────────────────
+
+/** What the booking modal needs to turn an accepted quote into a booking. */
+export interface QuoteConversion {
+  quoteId: string;
+  guestName: string;
+  guestPhone: string;
+  checkIn: string;
+  checkOut: string;
+  guestCount: number;
+  rooms: RoomQuoteLine[];
+  lines: QuoteLine[];
+  /** Whole-quote discount, carried over as the booking's discount. */
+  discount: number;
+  /** Called with the new booking's id once it is saved (links the quote). */
+  onConverted?: (bookingId: string) => Promise<void> | void;
+}
+
+/** Add-on lines → booking_charges rows (one per price segment, exact prices). */
+export function chargesFromQuote(lines: QuoteLine[]): { description: string; qty: number; unit_price: number }[] {
+  return lines.flatMap(lineToCharges);
+}
+
+/** Quote phone (digits) → the "+91 98765 43210" shape the booking form uses. */
+export function formPhoneFromQuote(phone: string): string {
+  const d = phone.replace(/\D/g, "");
+  const ten = d.length >= 10 ? d.slice(-10) : d;
+  return ten.length === 10 ? `+91 ${ten}` : "+91 ";
+}
+
+interface RoomTotalLike {
+  room: { id: string; name?: string };
+  roomPrice: number;
+  extraCharge: number;
+  total: number;
+}
+
+/**
+ * While the booking's dates still match the quote, each quoted room keeps
+ * EXACTLY the quoted price and guest count (the guest agreed to that number,
+ * even if rates have moved since). Rooms not in the quote, or any room once
+ * the dates change, fall back to live pricing.
+ */
+export function lockToQuote<T extends RoomTotalLike>(
+  live: T[],
+  quoteRooms: RoomQuoteLine[] | undefined,
+  active: boolean,
+  fallbackGuests: number,
+): (T & { guests: number; locked: boolean })[] {
+  return live.map((rt) => {
+    const q = active ? quoteRooms?.find((r) => r.room_id === rt.room.id) : undefined;
+    return q
+      ? { ...rt, roomPrice: q.room_price, extraCharge: q.extra_guest_charge, total: q.total, guests: q.guests, locked: true }
+      : { ...rt, guests: fallbackGuests, locked: false };
+  });
+}
+
+/** Rooms whose live room rate (excluding extra guests) now differs from the quote. */
+export function quotePriceDrift(
+  live: RoomTotalLike[],
+  locked: (RoomTotalLike & { locked: boolean })[],
+): { name: string; quoted: number; now: number }[] {
+  return locked
+    .filter((rt) => rt.locked)
+    .map((rt) => ({
+      name: rt.room.name ?? "Room",
+      quoted: rt.roomPrice,
+      now: live.find((l) => l.room.id === rt.room.id)?.roomPrice ?? rt.roomPrice,
+    }))
+    .filter((d) => Math.abs(d.quoted - d.now) > 0.5);
 }
 
 export { UNIT_LABELS };
