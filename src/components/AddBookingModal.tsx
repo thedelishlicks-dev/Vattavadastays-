@@ -7,7 +7,7 @@ import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
-import { priceRoomStay } from "@/lib/quoteBuilder";
+import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
 import { stayDates } from "@/lib/quotes";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
@@ -61,17 +61,20 @@ interface AddBookingModalProps {
   rooms: Room[];
   onClose: () => void;
   onSaved?: () => void;
+  /** Converting an accepted quote: pre-fills the form, keeps the quoted room
+   * prices (while dates match), and saves the quote's add-ons as Extras. */
+  fromQuote?: QuoteConversion;
 }
 
-export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved }: AddBookingModalProps) {
+export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved, fromQuote }: AddBookingModalProps) {
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
   const [form, setForm] = useState({
-    guest_name: "",
-    guest_phone: "+91 ",
+    guest_name: fromQuote?.guestName ?? "",
+    guest_phone: fromQuote ? formPhoneFromQuote(fromQuote.guestPhone) : "+91 ",
     guest_email: "",
-    check_in: "",
-    check_out: "",
-    guest_count: 2 as number | string,
+    check_in: fromQuote?.checkIn ?? "",
+    check_out: fromQuote?.checkOut ?? "",
+    guest_count: (fromQuote?.guestCount ?? 2) as number | string,
     // Defaults to "pending", not "confirmed" — every booking created here
     // starts with advance_amount: 0 (no payment captured in this modal), so
     // defaulting to "confirmed" meant an owner who forgot to toggle it back
@@ -84,7 +87,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     source: "direct" as BookingSource,
     agent_id: "" as string,
   });
-  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>([rooms[0]?.id ?? ""]);
+  const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>(() => {
+    const ids = (fromQuote?.rooms ?? []).map((r) => r.room_id).filter((id) => rooms.some((r) => r.id === id));
+    return ids.length > 0 ? ids : [rooms[0]?.id ?? ""];
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [conflicts, setConflicts] = useState<Record<string, string[]>>({});
@@ -109,9 +115,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
   // the booking. Same shape (amount + optional reason) and same validation
   // as the "Add discount" form on the booking detail page, so a booking
   // created here looks identical to one discounted after the fact.
-  const [showDiscount, setShowDiscount] = useState(false);
-  const [discountAmount, setDiscountAmount] = useState<string>("");
-  const [discountReason, setDiscountReason] = useState("");
+  const [showDiscount, setShowDiscount] = useState((fromQuote?.discount ?? 0) > 0);
+  const [discountAmount, setDiscountAmount] = useState<string>(fromQuote && fromQuote.discount > 0 ? String(fromQuote.discount) : "");
+  const [discountReason, setDiscountReason] = useState(fromQuote && fromQuote.discount > 0 ? "As quoted" : "");
   const [discountError, setDiscountError] = useState("");
 
   const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
@@ -157,7 +163,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     },
   });
 
-  const roomTotals = useMemo(() => selectedRooms.map((r) => {
+  const liveRoomTotals = useMemo(() => selectedRooms.map((r) => {
     const overrides: Record<string, number> = {};
     for (const o of priceOverrides) {
       if (o.room_id === r.id && o.price_override) overrides[o.date] = Number(o.price_override);
@@ -168,6 +174,20 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
     });
     return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
   }), [selectedRooms, guestCount, form.check_in, form.check_out, priceOverrides]);
+
+  // Quote conversion: while the dates still match the quote, each quoted room
+  // keeps EXACTLY the quoted price and guest count — the guest agreed to that
+  // number, even if rates moved since. If the owner changes the dates the
+  // quote no longer applies and live pricing takes over. The quote's add-ons
+  // are saved as normal Extras charges (same mechanism as every other extra).
+  const quoteLocked = !!fromQuote && form.check_in === fromQuote.checkIn && form.check_out === fromQuote.checkOut;
+  const roomTotals = useMemo(
+    () => lockToQuote(liveRoomTotals, fromQuote?.rooms, quoteLocked, guestCount),
+    [liveRoomTotals, fromQuote, quoteLocked, guestCount],
+  );
+  const priceDrift = useMemo(() => quotePriceDrift(liveRoomTotals, roomTotals), [liveRoomTotals, roomTotals]);
+  const extraLines = fromQuote?.lines ?? [];
+  const extrasTotal = extraLines.reduce((s, l) => s + l.subtotal, 0);
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
   // Commission base is room rate only (not extra-guest charges), matching
@@ -254,13 +274,15 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
       // scheduled DB job release them again if the guest never confirms.
       // "confirmed" bookings never expire.
       const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry(property.pending_hold_hours ?? undefined) : null;
+      let createdBookingId = "";
+      let createdGroupId = "";
 
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
-        const { error: err } = await supabase.from("bookings").insert({
+        const { data: inserted, error: err } = await supabase.from("bookings").insert({
           property_id: propertyId, room_id: rt.room.id,
           guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: guestCount,
+          guest_email: form.guest_email || null, guest_count: rt.guests,
           check_in: form.check_in, check_out: form.check_out,
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: discountAmt,
@@ -271,8 +293,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           commission_amount: finalCommission,
           commission_paid: false,
           hold_expires_at: holdExpiresAt,
-        });
+        }).select("id").single();
         if (err) throw err;
+        createdBookingId = inserted.id;
       } else {
         // Multi-room: commission is calculated once for the whole booking
         // (on the summed room rate across all rooms) and stored on the
@@ -288,7 +311,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             property_id: propertyId,
             group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
             guest_name: form.guest_name, guest_phone: form.guest_phone,
-            guest_email: form.guest_email || null, guest_count: guestCount,
+            guest_email: form.guest_email || null, guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : guestCount,
             check_in: form.check_in, check_out: form.check_out,
             total_amount: grandTotal, advance_amount: 0, discount_amount: discountAmt,
             discount_reason: finalDiscountReason,
@@ -302,10 +325,11 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           .select()
           .single();
         if (groupErr) throw groupErr;
+        createdGroupId = groupData.id;
         const bookingInserts = roomTotals.map((rt) => ({
           property_id: propertyId, room_id: rt.room.id,
           guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: guestCount,
+          guest_email: form.guest_email || null, guest_count: rt.guests,
           check_in: form.check_in, check_out: form.check_out,
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
@@ -316,8 +340,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
           commission_paid: false,
           hold_expires_at: holdExpiresAt,
         }));
-        const { error: bookErr } = await supabase.from("bookings").insert(bookingInserts);
+        const { data: insertedBookings, error: bookErr } = await supabase.from("bookings").insert(bookingInserts).select("id");
         if (bookErr) throw bookErr;
+        createdBookingId = insertedBookings?.[0]?.id ?? "";
       }
 
       // Keep the `availability` table in sync immediately, the same way the
@@ -329,6 +354,26 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
 
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups", propertyId], exact: false });
+
+      // Quote conversion: add-ons → Extras (booking_charges), attached to the
+      // single booking or to the group for multi-room stays. The booking is
+      // already saved by now, so a failure here must NOT throw (the owner
+      // would retry and hit "dates unavailable") — warn instead.
+      let extrasWarning = "";
+      if (fromQuote) {
+        const charges = chargesFromQuote(fromQuote.lines);
+        if (charges.length > 0) {
+          const owner = createdGroupId ? { group_id: createdGroupId } : { booking_id: createdBookingId };
+          const { error: chargeErr } = await supabase.from("booking_charges").insert(charges.map((c) => ({ ...owner, ...c })));
+          if (chargeErr) {
+            extrasWarning = "The booking was created, but its add-ons could not be added automatically. Please add them in the booking's Extras tab:\n" +
+              fromQuote.lines.map((l) => `• ${l.name} — ₹${l.subtotal.toLocaleString("en-IN")}`).join("\n");
+          }
+          queryClient.invalidateQueries({ queryKey: ["bookingCharges"], exact: false });
+          queryClient.invalidateQueries({ queryKey: ["groupCharges"], exact: false });
+        }
+        try { await fromQuote.onConverted?.(createdBookingId); } catch { /* linking the quote is best-effort */ }
+      }
 
       // Auto-send the guest their tracking link on WhatsApp — same message
       // the owner used to send by hand. Skipped if there's no usable guest
@@ -354,7 +399,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             : paymentReminderLink({
                 guestPhone: form.guest_phone,
                 guestName: form.guest_name,
-                totalAmount: grandTotal,
+                totalAmount: grandTotal + extrasTotal,
                 discount: discountAmt,
                 advancePaid: 0,
                 checkIn: form.check_in,
@@ -369,6 +414,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
         }
       }
 
+      if (extrasWarning) window.alert(extrasWarning);
       onSaved?.();
       onClose();
     } catch (e: unknown) {
@@ -385,11 +431,27 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
       <div className="animate-in fade-in duration-200 absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">Add Booking</h2>
+          <h2 className="font-display text-lg font-semibold">{fromQuote ? "Convert quote to booking" : "Add Booking"}</h2>
           <button onClick={onClose} className="press-scale h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {fromQuote && (
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
+              <p className="font-medium text-foreground">Pre-filled from the quote you sent.</p>
+              {quoteLocked ? (
+                <p className="text-muted-foreground">Room prices are kept exactly as quoted. Add-ons are saved as Extras on the booking.</p>
+              ) : (
+                <p className="text-amber-700">Dates differ from the quote, so rooms are priced at today&apos;s rates. Add-ons keep their quoted prices — adjust them in Extras if needed.</p>
+              )}
+              {priceDrift.length > 0 && (
+                <p className="text-amber-700">
+                  Rates have changed since the quote ({priceDrift.map((d) => `${d.name}: quoted ₹${d.quoted.toLocaleString("en-IN")}, now ₹${d.now.toLocaleString("en-IN")}`).join("; ")}). The booking keeps the quoted price.
+                </p>
+              )}
+              <p className="text-muted-foreground">It starts as pending, and holds the dates until the advance arrives.</p>
+            </div>
+          )}
           {/* Guest details */}
           <div className="space-y-3">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest details</p>
@@ -613,11 +675,14 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
               {selectedRooms.length > 1 && (
                 <div className="flex justify-between text-sm font-semibold border-t border-border pt-2 mt-1"><span>Room total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
               )}
+              {extraLines.map((l, i) => (
+                <div key={i} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{l.name}{l.variant_label && l.variant_label.toLowerCase() !== "standard" ? ` (${l.variant_label})` : ""} <span className="text-[11px]">· extra</span></span><span className="font-medium shrink-0">₹{l.subtotal.toLocaleString("en-IN")}</span></div>
+              ))}
               {discountValue > 0 && (
                 <div className="flex justify-between text-sm text-green-700 font-medium"><span>Discount{discountReason.trim() ? ` (${discountReason.trim()})` : ""}</span><span>-₹{discountValue.toLocaleString("en-IN")}</span></div>
               )}
-              {discountValue > 0 && (
-                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{netTotal.toLocaleString("en-IN")}</span></div>
+              {(discountValue > 0 || extrasTotal > 0) && (
+                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{(netTotal + extrasTotal).toLocaleString("en-IN")}</span></div>
               )}
               {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
                 <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
@@ -645,7 +710,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
               className="press-scale flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
             >
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : "Add booking"}
+              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
             </button>
           </div>
         </div>
