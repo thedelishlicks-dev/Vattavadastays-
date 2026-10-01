@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Room } from "@/types/database";
+import { SeasonsEditor } from "@/components/SeasonsEditor";
 
 export const Route = createFileRoute("/admin/pricing")({
   component: AdminPricing,
@@ -251,6 +252,8 @@ function AdminPricing() {
         <p>• <strong>Extra guest</strong> charge kicks in per room once guests exceed that room's own max guest count (set in <strong>Rooms</strong>) — not a fixed number across all rooms.</p>
         <p>• Override specific dates from the <strong>Calendar</strong> tab.</p>
       </div>
+
+      {property && <SeasonsEditor propertyId={property.id} />}
 
       {editingRoom && (
         <PricingDrawer
