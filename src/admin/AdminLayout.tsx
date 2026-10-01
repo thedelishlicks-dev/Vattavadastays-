@@ -7,6 +7,8 @@ import {
   ClipboardList,
   Tag,
   UtensilsCrossed,
+  Gift,
+  MessageSquareText,
   Sparkles,
   ScrollText,
   Wallet,
@@ -39,6 +41,8 @@ const NAV: NavItemDef[] = [
   { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
   { to: "/admin/pricing", label: "Pricing", icon: Tag },
   { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
+  { to: "/admin/addons", label: "Add-ons", icon: Gift },
+  { to: "/admin/quotes", label: "Quotes", icon: MessageSquareText },
   { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
   { to: "/admin/policies", label: "Policies", icon: ScrollText },
   { to: "/admin/payments", label: "Payments", icon: Wallet },
@@ -60,11 +64,11 @@ function findNav(to: string): NavItemDef {
 const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
   {
     label: "Operations",
-    items: ["/admin/dashboard", "/admin/calendar", "/admin/bookings"].map(findNav),
+    items: ["/admin/dashboard", "/admin/calendar", "/admin/bookings", "/admin/quotes"].map(findNav),
   },
   {
     label: "Property",
-    items: ["/admin/rooms", "/admin/pricing", "/admin/amenities", "/admin/meals", "/admin/policies"].map(
+    items: ["/admin/rooms", "/admin/pricing", "/admin/amenities", "/admin/meals", "/admin/addons", "/admin/policies"].map(
       findNav,
     ),
   },

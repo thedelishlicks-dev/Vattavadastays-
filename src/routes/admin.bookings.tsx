@@ -12,7 +12,9 @@ import {
   useGroupCharges, useAddGroupCharge, useDeleteGroupCharge,
 } from "@/hooks/useBookingCharges";
 import { supabase } from "@/lib/supabase";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { priceRoomStay } from "@/lib/quoteBuilder";
+import { stayDates } from "@/lib/quotes";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
@@ -569,7 +571,7 @@ type ModalTab = "overview" | "charges" | "invoice";
 
 function BookingDetailModal({ booking, roomName, rooms, property, onClose, onStatusChange, onPaymentSaved }: {
   booking: Booking; roomName: string;
-  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; max_guests: number }[];
+  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
   property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onStatusChange: (id: string, status: string) => Promise<void>; onPaymentSaved: () => void;
 }) {
   const [tab, setTab] = useState<ModalTab>("overview"); const [updating, setUpdating] = useState(false); const [showEditGuest, setShowEditGuest] = useState(false); const [showEditStay, setShowEditStay] = useState(false);
@@ -661,7 +663,7 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
 
 function EditStayModal({ booking, rooms, onClose, onSaved }: {
   booking: Booking;
-  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; max_guests: number }[];
+  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
   onClose: () => void; onSaved: () => void;
 }) {
   const [form, setForm] = useState({ room_id: booking.room_id ?? rooms[0]?.id ?? "", check_in: booking.check_in ?? "", check_out: booking.check_out ?? "", guest_count: booking.guest_count as number | string });
@@ -669,19 +671,38 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const guestCount = Number(form.guest_count) || 1;
-  const newTotal = useMemo(() => {
-    if (!selectedRoom || nights === 0) return 0;
-    const roomCost = selectedRoom.base_price * nights;
-    const extraCharge = Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights;
-    return roomCost + extraCharge;
-  }, [selectedRoom, nights, guestCount]);
+  // Same pricing rule as guest bookings and quotes (weekend multiplier +
+  // per-date overrides + extra guests) — see priceRoomStay().
+  const nightDates = useMemo(
+    () => (nights > 0 && form.check_in && form.check_out ? stayDates(form.check_in as string, form.check_out as string) : []),
+    [nights, form.check_in, form.check_out],
+  );
+  const { data: priceOverrides = [] } = useQuery({
+    queryKey: ["edit-stay-overrides", form.room_id, form.check_in, form.check_out],
+    enabled: nightDates.length > 0 && !!form.room_id,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("availability").select("room_id, date, price_override").eq("room_id", form.room_id).in("date", nightDates);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const stay = useMemo(() => {
+    if (!selectedRoom || nights === 0) return null;
+    const overrides: Record<string, number> = {};
+    for (const o of priceOverrides) if (o.price_override) overrides[o.date] = Number(o.price_override);
+    return priceRoomStay({
+      room: { ...selectedRoom, weekend_multiplier: selectedRoom.weekend_multiplier ?? 1 },
+      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string, overrides,
+    });
+  }, [selectedRoom, nights, guestCount, form.check_in, form.check_out, priceOverrides]);
+  const newTotal = stay?.total ?? 0;
   const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
   const handleSave = async () => {
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     setSaving(true); setError("");
     try {
-      const roomCost = (selectedRoom?.base_price ?? 0) * nights;
-      const extraCharge = Math.max(0, guestCount - (selectedRoom?.max_guests ?? 2)) * (selectedRoom?.extra_guest_price ?? 0) * nights;
+      const roomCost = stay?.room_price ?? 0;
+      const extraCharge = stay?.extra_guest_charge ?? 0;
       const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved();
@@ -699,7 +720,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
           {nights > 0 && selectedRoom && (
             <div className="rounded-xl border border-border p-3 space-y-1">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · room</span><span>₹{(selectedRoom.base_price * nights).toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · room</span><span>₹{(stay?.room_price ?? 0).toLocaleString("en-IN")}</span></div>
               {guestCount > selectedRoom.max_guests && <div className="flex justify-between text-sm text-muted-foreground"><span>{guestCount - selectedRoom.max_guests} extra guest{guestCount - selectedRoom.max_guests > 1 ? "s" : ""}</span><span>₹{(Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")}</span></div>}
               <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1"><span>New total</span><span>₹{newTotal.toLocaleString("en-IN")}</span></div>
             </div>

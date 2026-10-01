@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
+import { priceRoomStay } from "@/lib/quoteBuilder";
+import { stayDates } from "@/lib/quotes";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
@@ -33,6 +35,8 @@ interface Room {
   name: string;
   base_price: number;
   extra_guest_price: number;
+  /** Fri/Sat nights are charged base_price × this (1 = no weekend uplift). */
+  weekend_multiplier?: number;
   max_guests: number;
 }
 
@@ -130,11 +134,40 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
   const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
+  // Room price = EXACTLY what the same stay costs a guest booking online
+  // (useCreateBooking): per-date price_override wins, otherwise base_price ×
+  // weekend_multiplier on Fri/Sat nights, plus extra-guest charges. Both flows
+  // share priceRoomStay() so they can never drift apart again.
+  const nightDates = useMemo(
+    () => (nights > 0 && form.check_in && form.check_out ? stayDates(form.check_in, form.check_out) : []),
+    [nights, form.check_in, form.check_out],
+  );
+  const selectedIdsKey = selectedRooms.map((r) => r.id).join(",");
+  const { data: priceOverrides = [] } = useQuery({
+    queryKey: ["booking-price-overrides", selectedIdsKey, form.check_in, form.check_out],
+    enabled: nightDates.length > 0 && selectedRooms.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("availability")
+        .select("room_id, date, price_override")
+        .in("room_id", selectedRooms.map((r) => r.id))
+        .in("date", nightDates);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const roomTotals = useMemo(() => selectedRooms.map((r) => {
-    const base = r.base_price * nights;
-    const extra = Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights;
-    return { room: r, roomPrice: base, extraCharge: extra, total: base + extra };
-  }), [selectedRooms, nights, guestCount]);
+    const overrides: Record<string, number> = {};
+    for (const o of priceOverrides) {
+      if (o.room_id === r.id && o.price_override) overrides[o.date] = Number(o.price_override);
+    }
+    const p = priceRoomStay({
+      room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
+      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out, overrides,
+    });
+    return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
+  }), [selectedRooms, guestCount, form.check_in, form.check_out, priceOverrides]);
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
   // Commission base is room rate only (not extra-guest charges), matching
@@ -448,8 +481,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
             <div className="space-y-2">
               {rooms.map((r) => {
                 const selected = selectedRoomIds.includes(r.id);
-                const extraCharge = nights > 0 ? Math.max(0, guestCount - r.max_guests) * (r.extra_guest_price ?? 0) * nights : 0;
-                const roomTotal = nights > 0 ? r.base_price * nights + extraCharge : 0;
+                const roomTotal = roomTotals.find((x) => x.room.id === r.id)?.total ?? 0;
                 const roomConflicts = conflicts[r.id] ?? [];
                 return (
                   <button
@@ -470,6 +502,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved 
                       <div className="text-sm font-medium truncate">{r.name}</div>
                       <div className="text-xs text-muted-foreground">
                         ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
+                        {(r.weekend_multiplier ?? 1) > 1 ? ` · Fri/Sat ₹${Math.round(r.base_price * (r.weekend_multiplier ?? 1)).toLocaleString("en-IN")}` : ""}
                         {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
                       </div>
                       {roomConflicts.length > 0 && (
