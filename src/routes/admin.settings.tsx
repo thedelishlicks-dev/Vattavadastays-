@@ -6,6 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
+import { PaymentSetupSection } from '@/components/PaymentSetupSection'
+import { fetchSharedAmenities } from '@/lib/propertyConfig'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
 
 export const Route = createFileRoute('/admin/settings')({
@@ -326,7 +328,8 @@ function AdminSettings() {
       payload.pending_hold_hours = updates.pending_hold_hours ? Math.round(Number(updates.pending_hold_hours)) : 24
       payload.theme = theme
       payload.heading_font = font
-      payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
+      // Re-read the latest column so we never overwrite sentinels saved elsewhere (UPI, policies, meals…)
+      payload.shared_amenities = encodeTheme(theme, await fetchSharedAmenities(property.id))
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)
       if (error) throw error
     },
@@ -374,6 +377,11 @@ function AdminSettings() {
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
       <h1 className="text-2xl font-bold text-stone-900 mb-6">Property Settings</h1>
+
+      {/* Payment setup has its own Save button (separate from the form below). */}
+      <div className="mb-6">
+        <PaymentSetupSection />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
