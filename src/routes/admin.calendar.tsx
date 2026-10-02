@@ -3,7 +3,8 @@ import { useState, useMemo } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
 import { useBookings } from '@/hooks/useBookings'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ban } from 'lucide-react'
+import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { eachDate } from '@/lib/bookingAvailability'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -14,8 +15,10 @@ function AdminCalendar() {
   const { data: property, isLoading: propLoading } = useOwnerProperty()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [viewDate, setViewDate] = useState(new Date())
+  const [showBlock, setShowBlock] = useState(false)
 
   const rooms = property?.rooms ?? []
+  const activeRooms = rooms.filter((r: { is_active: boolean }) => r.is_active)
   const activeRoomId = selectedRoomId ?? rooms[0]?.id ?? null
 
   const year = viewDate.getFullYear()
@@ -129,11 +132,17 @@ function AdminCalendar() {
       key="calendar-content"
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
     >
-      <h1 className="font-display text-2xl md:text-3xl font-semibold mb-6">Availability Calendar</h1>
-
-      <p className="text-xs text-muted-foreground mb-3">
-        To block dates, use the Block dates button on the Dashboard.
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Availability Calendar</h1>
+        <button
+          type="button"
+          onClick={() => setShowBlock(true)}
+          disabled={activeRooms.length === 0}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+        >
+          <Ban className="h-4 w-4" /> Block dates
+        </button>
+      </div>
       <div className="flex gap-2 mb-6 flex-wrap">
         {rooms.map((room) => (
           <button
@@ -264,6 +273,15 @@ function AdminCalendar() {
           Blocked
         </span>
       </div>
+
+      {showBlock && (
+        <BlockDatesModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          property={property}
+          onClose={() => setShowBlock(false)}
+        />
+      )}
     </div>
   )
 }
