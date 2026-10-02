@@ -31,16 +31,25 @@ function PricingDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [form, setForm] = useState<PricingForm>({
-    base_price: room.base_price,
-    extra_guest_price: room.extra_guest_price,
-    weekend_multiplier: room.weekend_multiplier ?? 1,
+  // Keep what the owner TYPES as text so a field can be cleared and retyped
+  // (a number-typed state snapped back to 0 / 1 the moment the field was
+  // emptied, leaving a stray leading 0). The numeric form is derived from it.
+  const [text, setText] = useState({
+    base_price: String(room.base_price ?? ""),
+    extra_guest_price: String(room.extra_guest_price ?? ""),
+    weekend_multiplier: String(room.weekend_multiplier ?? 1),
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const set = (k: keyof PricingForm, v: number) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const form: PricingForm = {
+    base_price: parseInt(text.base_price) || 0,
+    extra_guest_price: parseInt(text.extra_guest_price) || 0,
+    weekend_multiplier: parseFloat(text.weekend_multiplier) || 1,
+  };
+
+  const set = (k: keyof PricingForm, v: string) =>
+    setText((t) => ({ ...t, [k]: v }));
 
   const handleSave = async () => {
     if (form.base_price <= 0) { setError("Base price must be greater than 0"); return; }
@@ -84,8 +93,8 @@ function PricingDrawer({
           <div>
             <label className={labelCls}>Base price / night (₹) *</label>
             <input
-              type="number" min={0} value={form.base_price}
-              onChange={(e) => set("base_price", parseInt(e.target.value) || 0)}
+              type="number" inputMode="numeric" min={0} value={text.base_price} placeholder="e.g. 2500"
+              onChange={(e) => set("base_price", e.target.value)}
               className={inputCls}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -96,8 +105,8 @@ function PricingDrawer({
           <div>
             <label className={labelCls}>Extra guest charge / night (₹)</label>
             <input
-              type="number" min={0} value={form.extra_guest_price}
-              onChange={(e) => set("extra_guest_price", parseInt(e.target.value) || 0)}
+              type="number" inputMode="numeric" min={0} value={text.extra_guest_price} placeholder="0"
+              onChange={(e) => set("extra_guest_price", e.target.value)}
               className={inputCls}
             />
             <p className="text-xs text-muted-foreground mt-1">
@@ -108,8 +117,8 @@ function PricingDrawer({
           <div>
             <label className={labelCls}>Weekend multiplier (Fri – Sat)</label>
             <input
-              type="number" min={1} max={5} step={0.05} value={form.weekend_multiplier}
-              onChange={(e) => set("weekend_multiplier", parseFloat(e.target.value) || 1)}
+              type="number" inputMode="decimal" min={1} max={5} step={0.05} value={text.weekend_multiplier} placeholder="1"
+              onChange={(e) => set("weekend_multiplier", e.target.value)}
               className={`${inputCls} max-w-[160px]`}
             />
             <p className="text-xs text-muted-foreground mt-1">
