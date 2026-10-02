@@ -7,20 +7,11 @@ import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Room } from "@/types/database";
 import { SeasonsEditor } from "@/components/SeasonsEditor";
+import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from "@/components/RoomPricingFields";
 
 export const Route = createFileRoute("/admin/pricing")({
   component: AdminPricing,
 });
-
-const inputCls =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
-const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
-
-type PricingForm = {
-  base_price: number;
-  extra_guest_price: number;
-  weekend_multiplier: number;
-};
 
 function PricingDrawer({
   room,
@@ -31,38 +22,21 @@ function PricingDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  // Keep what the owner TYPES as text so a field can be cleared and retyped
-  // (a number-typed state snapped back to 0 / 1 the moment the field was
-  // emptied, leaving a stray leading 0). The numeric form is derived from it.
-  const [text, setText] = useState({
-    base_price: String(room.base_price ?? ""),
-    extra_guest_price: String(room.extra_guest_price ?? ""),
-    weekend_multiplier: String(room.weekend_multiplier ?? 1),
-  });
+  // Same fields, validation and preview as the Rooms editor — one shared
+  // component (RoomPricingFields) so the two can't drift apart.
+  const [pricing, setPricing] = useState<PricingText>(pricingTextFromRoom(room));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const form: PricingForm = {
-    base_price: parseInt(text.base_price) || 0,
-    extra_guest_price: parseInt(text.extra_guest_price) || 0,
-    weekend_multiplier: parseFloat(text.weekend_multiplier) || 1,
-  };
-
-  const set = (k: keyof PricingForm, v: string) =>
-    setText((t) => ({ ...t, [k]: v }));
-
   const handleSave = async () => {
-    if (form.base_price <= 0) { setError("Base price must be greater than 0"); return; }
+    const parsed = parsePricing(pricing);
+    if (!parsed.ok) { setError(parsed.error); return; }
     setSaving(true);
     setError("");
     try {
       const { error: err } = await supabase
         .from("rooms")
-        .update({
-          base_price: form.base_price,
-          extra_guest_price: form.extra_guest_price,
-          weekend_multiplier: form.weekend_multiplier,
-        })
+        .update(parsed.values)
         .eq("id", room.id);
       if (err) throw err;
       onSaved();
@@ -72,8 +46,6 @@ function PricingDrawer({
       setSaving(false);
     }
   };
-
-  const weekendPrice = Math.round(form.base_price * form.weekend_multiplier);
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -89,61 +61,12 @@ function PricingDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          <div>
-            <label className={labelCls}>Base price / night (₹) *</label>
-            <input
-              type="number" inputMode="numeric" min={0} value={text.base_price} placeholder="e.g. 2500"
-              onChange={(e) => set("base_price", e.target.value)}
-              className={inputCls}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Weekday rate — applies Sun to Thu
-            </p>
-          </div>
-
-          <div>
-            <label className={labelCls}>Extra guest charge / night (₹)</label>
-            <input
-              type="number" inputMode="numeric" min={0} value={text.extra_guest_price} placeholder="0"
-              onChange={(e) => set("extra_guest_price", e.target.value)}
-              className={inputCls}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Applied per guest beyond {room.max_guests} (this room's max guests). Set 0 to disable.
-            </p>
-          </div>
-
-          <div>
-            <label className={labelCls}>Weekend multiplier (Fri – Sat)</label>
-            <input
-              type="number" inputMode="decimal" min={1} max={5} step={0.05} value={text.weekend_multiplier} placeholder="1"
-              onChange={(e) => set("weekend_multiplier", e.target.value)}
-              className={`${inputCls} max-w-[160px]`}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              e.g. 1.25 = 25% higher on Fri–Sat
-            </p>
-          </div>
-
-          {/* Live preview */}
-          <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2 text-sm">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Price preview</p>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Weekday (Sun–Thu)</span>
-              <span className="font-semibold">₹{form.base_price.toLocaleString("en-IN")}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Weekend (Fri–Sat)</span>
-              <span className="font-semibold">₹{weekendPrice.toLocaleString("en-IN")}</span>
-            </div>
-            {form.extra_guest_price > 0 && (
-              <div className="flex justify-between border-t border-border pt-2 mt-2">
-                <span className="text-muted-foreground">Per extra guest / night</span>
-                <span className="font-semibold">+₹{form.extra_guest_price.toLocaleString("en-IN")}</span>
-              </div>
-            )}
-          </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          <RoomPricingFields
+            value={pricing}
+            onChange={(k, v) => setPricing((p) => ({ ...p, [k]: v }))}
+            maxGuests={room.max_guests}
+          />
         </div>
 
         <div className="px-5 py-4 border-t border-border space-y-2">
@@ -259,7 +182,6 @@ function AdminPricing() {
         <p>• <strong>Base price</strong> applies Sun–Thu nights.</p>
         <p>• <strong>Weekend multiplier</strong> auto-applies on Fri–Sat bookings.</p>
         <p>• <strong>Extra guest</strong> charge kicks in per room once guests exceed that room's own max guest count (set in <strong>Rooms</strong>) — not a fixed number across all rooms.</p>
-        <p>• Override specific dates from the <strong>Calendar</strong> tab.</p>
       </div>
 
       {property && <SeasonsEditor propertyId={property.id} />}
