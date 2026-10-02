@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
 import type { Room } from '@/types/database'
 import { validateAndCompress, compressionSummary } from '@/lib/imageUtils'
+import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
 
 export const Route = createFileRoute('/admin/rooms')({
   component: AdminRooms,
@@ -27,9 +28,6 @@ type RoomForm = {
   room_type: string
   bed_type: string
   max_guests: string
-  base_price: string
-  extra_guest_price: string
-  weekend_multiplier: number
   room_amenities: string[]
   is_active: boolean
 }
@@ -39,9 +37,6 @@ const emptyForm = (): RoomForm => ({
   room_type: 'deluxe',
   bed_type: 'king',
   max_guests: '2',
-  base_price: '2500',
-  extra_guest_price: '500',
-  weekend_multiplier: 1,
   room_amenities: [],
   is_active: true,
 })
@@ -241,9 +236,11 @@ function RoomImageUpload({ room, propertyId, onUploaded }: { room: Room; propert
 function RoomDrawer({ room, propertyId, onClose, onSaved }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState<RoomForm>(
     room
-      ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), base_price: String(room.base_price), extra_guest_price: String(room.extra_guest_price), weekend_multiplier: room.weekend_multiplier ?? 1, room_amenities: room.room_amenities ?? [], is_active: room.is_active }
+      ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), room_amenities: room.room_amenities ?? [], is_active: room.is_active }
       : emptyForm()
   )
+  // Price fields come from the shared RoomPricingFields component (same one the Pricing page uses).
+  const [pricing, setPricing] = useState<PricingText>(pricingTextFromRoom(room))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [customAmenity, setCustomAmenity] = useState('')
@@ -262,15 +259,13 @@ function RoomDrawer({ room, propertyId, onClose, onSaved }: { room: Room | null;
   const handleSave = async () => {
     if (!form.name.trim()) { setError('Room name is required'); return }
     const maxGuests = parseInt(form.max_guests)
-    const basePrice = parseFloat(form.base_price)
-    const extraGuestPrice = parseFloat(form.extra_guest_price)
     if (isNaN(maxGuests) || maxGuests < 1) { setError('Max guests must be at least 1'); return }
-    if (!basePrice || basePrice <= 0) { setError('Base price must be greater than 0'); return }
-    if (isNaN(extraGuestPrice) || extraGuestPrice < 0) { setError('Extra guest price must be 0 or more'); return }
+    const parsedPricing = parsePricing(pricing)
+    if (!parsedPricing.ok) { setError(parsedPricing.error); return }
     setSaving(true)
     setError('')
     try {
-      const payload = { ...form, max_guests: maxGuests, base_price: basePrice, extra_guest_price: extraGuestPrice }
+      const payload = { ...form, max_guests: maxGuests, ...parsedPricing.values }
       if (room) {
         const { error: err } = await supabase.from('rooms').update(payload).eq('id', room.id)
         if (err) throw err
@@ -325,22 +320,11 @@ function RoomDrawer({ room, propertyId, onClose, onSaved }: { room: Room | null;
             <input type="number" min={1} max={20} value={form.max_guests} onChange={(e) => set('max_guests', e.target.value)} className={inputCls} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Base price / night (₹) *</label>
-              <input type="number" min={0} value={form.base_price} onChange={(e) => set('base_price', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Extra guest / night (₹)</label>
-              <input type="number" min={0} value={form.extra_guest_price} onChange={(e) => set('extra_guest_price', e.target.value)} className={inputCls} />
-            </div>
-          </div>
-
-          <div>
-            <label className={labelCls}>Weekend multiplier</label>
-            <input type="number" min={1} max={5} step={0.1} value={form.weekend_multiplier} onChange={(e) => set('weekend_multiplier', parseFloat(e.target.value) || 1)} className={`${inputCls} max-w-[140px]`} />
-            <p className="text-xs text-muted-foreground mt-1">e.g. 1.25 = 25% higher on Fri–Sat</p>
-          </div>
+          <RoomPricingFields
+            value={pricing}
+            onChange={(k, v) => setPricing((p) => ({ ...p, [k]: v }))}
+            maxGuests={form.max_guests}
+          />
 
           <div>
             <label className={labelCls}>Amenities</label>
