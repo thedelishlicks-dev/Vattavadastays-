@@ -103,7 +103,7 @@ function buildChecklist(property: Property | undefined): ChecklistItem[] {
       description: "Required for guests to pay advance online",
       icon: CreditCard,
       done: hasUpi,
-      href: "/admin/payments",
+      href: "/admin/settings",
     },
     {
       id: "policy",
