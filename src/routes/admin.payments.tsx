@@ -987,7 +987,7 @@ function AdminPayments() {
         <div className="flex items-center gap-3 min-w-0">
           <Wallet className="h-4 w-4 text-primary shrink-0" />
           <p className="text-sm text-muted-foreground">
-            UPI ID and accepted payment methods are now in <strong className="text-foreground">Settings → Payment setup</strong>.
+            UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.
           </p>
         </div>
         <Link
