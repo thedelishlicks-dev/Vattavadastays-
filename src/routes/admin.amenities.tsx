@@ -190,7 +190,7 @@ function AdminAmenities() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm">Room Amenities</h2>
-            <span className="text-xs text-muted-foreground">Edit from Rooms tab</span>
+            <span className="text-xs text-muted-foreground">Edit in Rooms & Pricing → Rooms</span>
           </div>
           {rooms.map((room) => (
             <div key={room.id} className="bg-card border border-border rounded-xl p-4">
