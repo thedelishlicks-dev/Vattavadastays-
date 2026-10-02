@@ -272,7 +272,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
 
       <Section title="Add-ons & packages" description="Meals, campfire, kitchen, trekking… priced for the season of these dates.">
         {activePackages.length + activeAddons.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing in your catalog yet — add items on the Add-ons page.</p>
+          <p className="text-sm text-muted-foreground">Nothing in your catalog yet — add items in Property → Add-ons.</p>
         ) : (
           <select className={inputCls} value="" onChange={(e) => addCatalogItem(e.target.value)} disabled={!datesOk}>
             <option value="">{datesOk ? "＋ Add a package or add-on…" : "Pick dates first"}</option>
