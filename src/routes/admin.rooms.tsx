@@ -233,7 +233,12 @@ function RoomImageUpload({ room, propertyId, onUploaded }: { room: Room; propert
 // Room drawer (add / edit)
 // ---------------------------------------------------------------------------
 
-function RoomDrawer({ room, propertyId, onClose, onSaved }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void }) {
+function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void; focusPricing?: boolean }) {
+  // Tapping the price block on a room card opens this same editor already scrolled to pricing.
+  const pricingRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (focusPricing) pricingRef.current?.scrollIntoView({ block: 'start' })
+  }, [focusPricing])
   const [form, setForm] = useState<RoomForm>(
     room
       ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), room_amenities: room.room_amenities ?? [], is_active: room.is_active }
@@ -320,11 +325,14 @@ function RoomDrawer({ room, propertyId, onClose, onSaved }: { room: Room | null;
             <input type="number" min={1} max={20} value={form.max_guests} onChange={(e) => set('max_guests', e.target.value)} className={inputCls} />
           </div>
 
+          <div ref={pricingRef} className="scroll-mt-4">
+          <h3 className="text-sm font-semibold mb-3">Pricing</h3>
           <RoomPricingFields
             value={pricing}
             onChange={(k, v) => setPricing((p) => ({ ...p, [k]: v }))}
             maxGuests={form.max_guests}
           />
+          </div>
 
           <div>
             <label className={labelCls}>Amenities</label>
@@ -385,12 +393,14 @@ function AdminRooms() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [drawerRoom, setDrawerRoom] = useState<Room | null | undefined>(undefined)
+  const [focusPricing, setFocusPricing] = useState(false)
   const [deleteRoom, setDeleteRoom] = useState<Room | null>(null)
 
   const handleSaved = () => {
     queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
     queryClient.invalidateQueries({ queryKey: ['property'] })
     setDrawerRoom(undefined)
+    setFocusPricing(false)
   }
 
   const handleDeleted = () => {
@@ -438,7 +448,7 @@ function AdminRooms() {
     >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms</h1>
+          <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms & Pricing</h1>
           <p className="text-sm text-muted-foreground">
             {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {rooms.filter((r) => r.is_active).length} active
           </p>
@@ -496,12 +506,30 @@ function AdminRooms() {
                   </div>
                   <div className="flex gap-4">
                     <span>Max: <span className="text-foreground font-medium">{room.max_guests} guests</span></span>
-                    <span>Base: <span className="text-foreground font-medium">₹{room.base_price.toLocaleString('en-IN')}/night</span></span>
                   </div>
-                  {room.extra_guest_price > 0 && (
-                    <span>Extra guest: <span className="text-foreground font-medium">₹{room.extra_guest_price}/person</span></span>
-                  )}
                 </div>
+
+                {/* One tap from the price to the editor — pricing is edited here, in the room editor. */}
+                <button
+                  type="button"
+                  onClick={() => { setFocusPricing(true); setDrawerRoom(room) }}
+                  className="mt-3 w-full text-left rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors px-3 py-2.5 flex items-center justify-between gap-3"
+                  title="Edit pricing"
+                >
+                  <div className="text-sm space-y-0.5">
+                    <div>
+                      <span className="font-semibold text-foreground">₹{room.base_price.toLocaleString('en-IN')}</span>
+                      <span className="text-muted-foreground"> / night</span>
+                      {(room.weekend_multiplier ?? 1) > 1 && (
+                        <span className="text-muted-foreground"> · Fri–Sat <span className="text-foreground font-medium">₹{Math.round(room.base_price * (room.weekend_multiplier ?? 1)).toLocaleString('en-IN')}</span></span>
+                      )}
+                    </div>
+                    {room.extra_guest_price > 0 && (
+                      <div className="text-xs text-muted-foreground">+₹{room.extra_guest_price.toLocaleString('en-IN')} per guest beyond {room.max_guests}</div>
+                    )}
+                  </div>
+                  <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                </button>
 
                 {room.room_amenities && room.room_amenities.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -517,7 +545,7 @@ function AdminRooms() {
       )}
 
       {drawerRoom !== undefined && (
-        <RoomDrawer room={drawerRoom} propertyId={property.id} onClose={() => setDrawerRoom(undefined)} onSaved={handleSaved} />
+        <RoomDrawer room={drawerRoom} propertyId={property.id} focusPricing={focusPricing} onClose={() => { setDrawerRoom(undefined); setFocusPricing(false) }} onSaved={handleSaved} />
       )}
 
       {deleteRoom && (
