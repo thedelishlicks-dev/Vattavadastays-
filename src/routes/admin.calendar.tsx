@@ -107,13 +107,10 @@ function AdminCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstWeekday = new Date(year, month, 1).getDay()
 
-  const availMap: Record<string, { is_available: boolean; price_override: number | null }> = {}
+  const availMap: Record<string, { is_available: boolean }> = {}
   if (availability) {
     for (const slot of availability) {
-      availMap[slot.date] = {
-        is_available: slot.is_available,
-        price_override: slot.price_override,
-      }
+      availMap[slot.date] = { is_available: slot.is_available }
     }
   }
 
@@ -214,8 +211,6 @@ function AdminCalendar() {
               // check isBooked first before treating the slot as manually blocked.
               const isManuallyBlocked = !isBooked && slot?.is_available === false
 
-              const price = slot?.price_override
-
               const bgColor = isBooked
                 ? 'bg-blue-50'
                 : isManuallyBlocked
@@ -248,9 +243,6 @@ function AdminCalendar() {
                     <div className="text-blue-500 truncate text-[10px]">
                       {guestName.split(' ')[0]}
                     </div>
-                  )}
-                  {price && !isBooked && (
-                    <div className="text-amber-600">₹{price}</div>
                   )}
                 </div>
               )
