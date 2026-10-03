@@ -27,7 +27,6 @@ export interface RoomQuoteLine {
   extra_guest_charge: number;
   total: number;
   weekend_nights: number;
-  override_nights: number;
 }
 
 /** Friday and Saturday nights — the same rule as the guest booking flow. */
@@ -40,17 +39,15 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Prices one room for a stay with EXACTLY the rule guests are charged:
- *  - per night, a per-date price_override (availability table) wins;
- *  - otherwise base_price × weekend_multiplier on Fri/Sat nights;
+ *  - per night: base_price × weekend_multiplier on Fri/Sat nights, else base_price;
  *  - extra guests = max(0, guests − max_guests) × extra_guest_price × nights.
- * `overrides` maps "YYYY-MM-DD" → price_override for THIS room.
+ * (Per-date price overrides were removed — nothing in the admin could set them.)
  */
 export function priceRoomStay(input: {
   room: QuoteRoom;
   guests: number;
   checkIn: string;
   checkOut: string;
-  overrides?: Record<string, number>;
 }): RoomQuoteLine {
   const { room, checkIn, checkOut } = input;
   // Empty / partial dates → 0 nights (never NaN, which would show as ₹NaN).
@@ -61,17 +58,10 @@ export function priceRoomStay(input: {
 
   let roomPrice = 0;
   let weekendNights = 0;
-  let overrideNights = 0;
   for (const date of dates) {
-    const override = input.overrides?.[date];
-    if (override) {
-      roomPrice += Number(override);
-      overrideNights += 1;
-    } else {
-      const weekend = isWeekendNight(date);
-      if (weekend && (room.weekend_multiplier ?? 1) !== 1) weekendNights += 1;
-      roomPrice += room.base_price * (weekend ? (room.weekend_multiplier ?? 1) : 1);
-    }
+    const weekend = isWeekendNight(date);
+    if (weekend && (room.weekend_multiplier ?? 1) !== 1) weekendNights += 1;
+    roomPrice += room.base_price * (weekend ? (room.weekend_multiplier ?? 1) : 1);
   }
   const extra = Math.max(0, guests - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
   const rp = round2(roomPrice);
@@ -84,7 +74,6 @@ export function priceRoomStay(input: {
     extra_guest_charge: round2(extra),
     total: round2(rp + extra),
     weekend_nights: weekendNights,
-    override_nights: overrideNights,
   };
 }
 
