@@ -3,7 +3,8 @@ import { useState, useMemo } from 'react'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAvailabilityRange } from '@/hooks/useAvailabilityRange'
 import { useBookings } from '@/hooks/useBookings'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ban } from 'lucide-react'
+import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { eachDate } from '@/lib/bookingAvailability'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -14,8 +15,10 @@ function AdminCalendar() {
   const { data: property, isLoading: propLoading } = useOwnerProperty()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [viewDate, setViewDate] = useState(new Date())
+  const [showBlock, setShowBlock] = useState(false)
 
   const rooms = property?.rooms ?? []
+  const activeRooms = rooms.filter((r: { is_active: boolean }) => r.is_active)
   const activeRoomId = selectedRoomId ?? rooms[0]?.id ?? null
 
   const year = viewDate.getFullYear()
@@ -104,13 +107,10 @@ function AdminCalendar() {
   const daysInMonth = new Date(year, month + 1, 0).getDate()
   const firstWeekday = new Date(year, month, 1).getDay()
 
-  const availMap: Record<string, { is_available: boolean; price_override: number | null }> = {}
+  const availMap: Record<string, { is_available: boolean }> = {}
   if (availability) {
     for (const slot of availability) {
-      availMap[slot.date] = {
-        is_available: slot.is_available,
-        price_override: slot.price_override,
-      }
+      availMap[slot.date] = { is_available: slot.is_available }
     }
   }
 
@@ -129,11 +129,17 @@ function AdminCalendar() {
       key="calendar-content"
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
     >
-      <h1 className="font-display text-2xl md:text-3xl font-semibold mb-6">Availability Calendar</h1>
-
-      <p className="text-xs text-muted-foreground mb-3">
-        To block dates, use the Block dates button on the Dashboard.
-      </p>
+      <div className="flex items-start justify-between gap-3 mb-6">
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
+        <button
+          type="button"
+          onClick={() => setShowBlock(true)}
+          disabled={activeRooms.length === 0}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+        >
+          <Ban className="h-4 w-4" /> Block dates
+        </button>
+      </div>
       <div className="flex gap-2 mb-6 flex-wrap">
         {rooms.map((room) => (
           <button
@@ -205,8 +211,6 @@ function AdminCalendar() {
               // check isBooked first before treating the slot as manually blocked.
               const isManuallyBlocked = !isBooked && slot?.is_available === false
 
-              const price = slot?.price_override
-
               const bgColor = isBooked
                 ? 'bg-blue-50'
                 : isManuallyBlocked
@@ -240,9 +244,6 @@ function AdminCalendar() {
                       {guestName.split(' ')[0]}
                     </div>
                   )}
-                  {price && !isBooked && (
-                    <div className="text-amber-600">₹{price}</div>
-                  )}
                 </div>
               )
             })}
@@ -264,6 +265,15 @@ function AdminCalendar() {
           Blocked
         </span>
       </div>
+
+      {showBlock && (
+        <BlockDatesModal
+          propertyId={property.id}
+          rooms={activeRooms}
+          property={property}
+          onClose={() => setShowBlock(false)}
+        />
+      )}
     </div>
   )
 }

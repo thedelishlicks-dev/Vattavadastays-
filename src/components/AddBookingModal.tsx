@@ -1,14 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
-import { stayDates } from "@/lib/quotes";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
@@ -141,39 +140,16 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
   // Room price = EXACTLY what the same stay costs a guest booking online
-  // (useCreateBooking): per-date price_override wins, otherwise base_price ×
-  // weekend_multiplier on Fri/Sat nights, plus extra-guest charges. Both flows
+  // (useCreateBooking): base_price × weekend_multiplier on Fri/Sat nights,
+  // plus extra-guest charges. Both flows
   // share priceRoomStay() so they can never drift apart again.
-  const nightDates = useMemo(
-    () => (nights > 0 && form.check_in && form.check_out ? stayDates(form.check_in, form.check_out) : []),
-    [nights, form.check_in, form.check_out],
-  );
-  const selectedIdsKey = selectedRooms.map((r) => r.id).join(",");
-  const { data: priceOverrides = [] } = useQuery({
-    queryKey: ["booking-price-overrides", selectedIdsKey, form.check_in, form.check_out],
-    enabled: nightDates.length > 0 && selectedRooms.length > 0,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("availability")
-        .select("room_id, date, price_override")
-        .in("room_id", selectedRooms.map((r) => r.id))
-        .in("date", nightDates);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   const liveRoomTotals = useMemo(() => selectedRooms.map((r) => {
-    const overrides: Record<string, number> = {};
-    for (const o of priceOverrides) {
-      if (o.room_id === r.id && o.price_override) overrides[o.date] = Number(o.price_override);
-    }
     const p = priceRoomStay({
       room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out, overrides,
+      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out,
     });
     return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
-  }), [selectedRooms, guestCount, form.check_in, form.check_out, priceOverrides]);
+  }), [selectedRooms, guestCount, form.check_in, form.check_out]);
 
   // Quote conversion: while the dates still match the quote, each quoted room
   // keeps EXACTLY the quoted price and guest count — the guest agreed to that

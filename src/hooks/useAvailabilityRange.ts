@@ -11,7 +11,7 @@ export const useAvailabilityRange = (
     queryFn: async () => {
       const { data, error } = await supabase
         .from("availability")
-        .select("date, is_available, price_override, note")
+        .select("date, is_available, note")
         .eq("room_id", roomId)
         .gte("date", startDate)
         .lte("date", endDate)

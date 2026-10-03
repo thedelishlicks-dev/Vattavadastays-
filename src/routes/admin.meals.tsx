@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { UtensilsCrossed, Loader2, Coffee, Truck } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { updateSharedAmenities } from "@/lib/propertyConfig";
 import { useQueryClient } from "@tanstack/react-query";
 import { type MealsConfig, type BreakfastPlan, parseMealsConfig, encodeMealsConfig, defaultMealsConfig } from "@/lib/meals";
 
@@ -45,12 +45,7 @@ function AdminMeals() {
     setSaving(true);
     setError("");
     try {
-      const updated = encodeMealsConfig(config, property.shared_amenities ?? []);
-      const { error: err } = await supabase
-        .from("properties")
-        .update({ shared_amenities: updated })
-        .eq("id", property.id);
-      if (err) throw err;
+      await updateSharedAmenities(property.id, (latest) => encodeMealsConfig(config, latest));
       queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);

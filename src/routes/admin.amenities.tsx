@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Check, Loader2, X } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { updateSharedAmenities } from "@/lib/propertyConfig";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/admin/amenities")({
@@ -84,13 +84,12 @@ function AdminAmenities() {
     setSaving(true);
     setError("");
     try {
-      // Preserve sentinel keys (meals config, policies, UPI etc.)
-      const sentinels = (property.shared_amenities ?? []).filter((a) => a.startsWith("__"));
-      const { error: err } = await supabase
-        .from("properties")
-        .update({ shared_amenities: [...selected, ...sentinels] })
-        .eq("id", property.id);
-      if (err) throw err;
+      // Preserve sentinel keys (meals config, policies, UPI etc.) — taken from
+      // the latest stored value, not the cached copy.
+      await updateSharedAmenities(property.id, (latest) => [
+        ...selected,
+        ...latest.filter((a) => a.startsWith("__")),
+      ]);
       queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -191,7 +190,7 @@ function AdminAmenities() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="font-semibold text-sm">Room Amenities</h2>
-            <span className="text-xs text-muted-foreground">Edit from Rooms tab</span>
+            <span className="text-xs text-muted-foreground">Edit in Rooms & Pricing → Rooms</span>
           </div>
           {rooms.map((room) => (
             <div key={room.id} className="bg-card border border-border rounded-xl p-4">

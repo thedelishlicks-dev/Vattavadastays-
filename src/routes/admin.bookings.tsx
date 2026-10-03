@@ -12,9 +12,8 @@ import {
   useGroupCharges, useAddGroupCharge, useDeleteGroupCharge,
 } from "@/hooks/useBookingCharges";
 import { supabase } from "@/lib/supabase";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { priceRoomStay } from "@/lib/quoteBuilder";
-import { stayDates } from "@/lib/quotes";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
@@ -672,29 +671,14 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const guestCount = Number(form.guest_count) || 1;
   // Same pricing rule as guest bookings and quotes (weekend multiplier +
-  // per-date overrides + extra guests) — see priceRoomStay().
-  const nightDates = useMemo(
-    () => (nights > 0 && form.check_in && form.check_out ? stayDates(form.check_in as string, form.check_out as string) : []),
-    [nights, form.check_in, form.check_out],
-  );
-  const { data: priceOverrides = [] } = useQuery({
-    queryKey: ["edit-stay-overrides", form.room_id, form.check_in, form.check_out],
-    enabled: nightDates.length > 0 && !!form.room_id,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("availability").select("room_id, date, price_override").eq("room_id", form.room_id).in("date", nightDates);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  // extra guests) — see priceRoomStay().
   const stay = useMemo(() => {
     if (!selectedRoom || nights === 0) return null;
-    const overrides: Record<string, number> = {};
-    for (const o of priceOverrides) if (o.price_override) overrides[o.date] = Number(o.price_override);
     return priceRoomStay({
       room: { ...selectedRoom, weekend_multiplier: selectedRoom.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string, overrides,
+      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string,
     });
-  }, [selectedRoom, nights, guestCount, form.check_in, form.check_out, priceOverrides]);
+  }, [selectedRoom, nights, guestCount, form.check_in, form.check_out]);
   const newTotal = stay?.total ?? 0;
   const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
   const handleSave = async () => {

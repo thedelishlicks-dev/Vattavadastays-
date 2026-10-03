@@ -9,12 +9,11 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Minus, Plus, Send, Trash2, TriangleAlert } from "lucide-react";
 import { Section, Field, inputCls } from "@/admin/formKit";
-import { supabase } from "@/lib/supabase";
 import { getConflictingDates } from "@/lib/bookingAvailability";
 import { useAddons, usePackages, useSeasons } from "@/hooks/useCatalog";
 import { useSaveQuote, type Quote, type QuoteInputs } from "@/hooks/useQuotes";
 import {
-  formatINR, nightsBetween, packageIncludes, packageSaving, priceLine, quoteWarnings, sumQuote, stayDates,
+  formatINR, nightsBetween, packageIncludes, packageSaving, priceLine, quoteWarnings, sumQuote,
   UNIT_LABELS, type Addon, type Package, type QuoteLine,
 } from "@/lib/quotes";
 import { buildQuoteText, priceRoomStay, quoteLink, todayStr, type QuoteRoom } from "@/lib/quoteBuilder";
@@ -56,22 +55,6 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const datesOk = !!checkIn && !!checkOut && nights > 0;
   const selectedRoomIds = Object.keys(roomSel);
 
-  // ── per-date room price overrides (same source the guest flow reads)
-  const { data: overrideRows = [] } = useQuery({
-    queryKey: ["quote-overrides", selectedRoomIds.join(","), checkIn, checkOut],
-    enabled: datesOk && selectedRoomIds.length > 0,
-    queryFn: async () => {
-      const dates = stayDates(checkIn, checkOut);
-      const { data, error } = await supabase
-        .from("availability")
-        .select("room_id, date, price_override")
-        .in("room_id", selectedRoomIds)
-        .in("date", dates);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   // ── soft availability warning (a quote never blocks dates)
   const { data: conflicts = {} } = useQuery({
     queryKey: ["quote-conflicts", property.id, selectedRoomIds.join(","), checkIn, checkOut],
@@ -89,12 +72,10 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       rooms
         .filter((r) => r.id in roomSel)
         .map((room) => {
-          const overrides: Record<string, number> = {};
-          for (const o of overrideRows) if (o.room_id === room.id && o.price_override) overrides[o.date] = Number(o.price_override);
-          return priceRoomStay({ room, guests: roomSel[room.id], checkIn, checkOut, overrides });
+          return priceRoomStay({ room, guests: roomSel[room.id], checkIn, checkOut });
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rooms.length, roomSel, checkIn, checkOut, overrideRows],
+    [rooms.length, roomSel, checkIn, checkOut],
   );
 
   const guestCount = Math.max(1, Object.values(roomSel).reduce((s, n) => s + n, 0));
@@ -249,11 +230,10 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
                     {datesOk && line && <div className="text-sm font-semibold">{formatINR(line.total)}</div>}
                   </div>
                 )}
-                {on && datesOk && line && (line.weekend_nights > 0 || line.override_nights > 0 || line.extra_guest_charge > 0) && (
+                {on && datesOk && line && (line.weekend_nights > 0 || line.extra_guest_charge > 0) && (
                   <p className="mt-2 text-[11px] text-muted-foreground">
                     {[
                       line.weekend_nights > 0 && `${line.weekend_nights} weekend night${line.weekend_nights > 1 ? "s" : ""}`,
-                      line.override_nights > 0 && `${line.override_nights} special-price night${line.override_nights > 1 ? "s" : ""}`,
                       line.extra_guest_charge > 0 && `extra guest charge ${formatINR(line.extra_guest_charge)}`,
                     ].filter(Boolean).join(" · ")}
                   </p>
@@ -272,7 +252,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
 
       <Section title="Add-ons & packages" description="Meals, campfire, kitchen, trekking… priced for the season of these dates.">
         {activePackages.length + activeAddons.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nothing in your catalog yet — add items on the Add-ons page.</p>
+          <p className="text-sm text-muted-foreground">Nothing in your catalog yet — add items in Property → Add-ons.</p>
         ) : (
           <select className={inputCls} value="" onChange={(e) => addCatalogItem(e.target.value)} disabled={!datesOk}>
             <option value="">{datesOk ? "＋ Add a package or add-on…" : "Pick dates first"}</option>

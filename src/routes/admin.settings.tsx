@@ -6,7 +6,20 @@ import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
+import { PaymentSetupSection } from '@/components/PaymentSetupSection'
+import { fetchSharedAmenities } from '@/lib/propertyConfig'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
+
+const JUMP_LINKS = [
+  { id: 'payment-setup-anchor', label: 'Payments' },
+  { id: 'photos', label: 'Photos' },
+  { id: 'branding', label: 'Branding' },
+  { id: 'basic-info', label: 'Basic info' },
+  { id: 'owner-info', label: 'Owner' },
+  { id: 'location', label: 'Location' },
+  { id: 'install-app', label: 'Install app' },
+  { id: 'password', label: 'Password' },
+]
 
 export const Route = createFileRoute('/admin/settings')({
   component: AdminSettings,
@@ -326,7 +339,8 @@ function AdminSettings() {
       payload.pending_hold_hours = updates.pending_hold_hours ? Math.round(Number(updates.pending_hold_hours)) : 24
       payload.theme = theme
       payload.heading_font = font
-      payload.shared_amenities = encodeTheme(theme, property.shared_amenities ?? [])
+      // Re-read the latest column so we never overwrite sentinels saved elsewhere (UPI, policies, meals…)
+      payload.shared_amenities = encodeTheme(theme, await fetchSharedAmenities(property.id))
       const { error } = await supabase.from('properties').update(payload).eq('id', property.id)
       if (error) throw error
     },
@@ -373,10 +387,30 @@ function AdminSettings() {
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4">
-      <h1 className="text-2xl font-bold text-stone-900 mb-6">Property Settings</h1>
+      <h1 className="text-2xl font-bold text-stone-900 mb-4">Property Settings</h1>
+
+      {/* Jump links — this page is long; one tap gets you to a section. */}
+      <nav aria-label="Jump to section" className="flex gap-2 overflow-x-auto pb-3 mb-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {JUMP_LINKS.map((j) => (
+          <button
+            key={j.id}
+            type="button"
+            onClick={() => document.getElementById(j.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            {j.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Payment setup has its own Save button (separate from the form below). */}
+      <div className="mb-6 scroll-mt-32" id="payment-setup-anchor">
+        <PaymentSetupSection />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
 
+        <div id="photos" className="space-y-6 scroll-mt-32">
         {/* ── Logo ── */}
         <ImageUploadField label="Logo" hint="Square image shown in the header. Recommended 120×120 px or larger square." bucket="hero-images" pathPrefix={property.id} stem="logo" preset="logo" currentUrl={form.logo_url || null} previewClassName="h-20 w-20 object-cover rounded-full" onUploaded={(url) => persistImage('logo_url', url)} onRemoved={() => persistImage('logo_url', null)} />
 
@@ -388,9 +422,10 @@ function AdminSettings() {
 
         {/* ── Static map ── */}
         <ImageUploadField label="Static Map Image" hint="A screenshot of your property location on Google Maps. Used instead of a map embed — loads in under 1 second on 2G." bucket="hero-images" pathPrefix={property.id} stem="map" preset="staticMap" currentUrl={form.static_map_image_url || null} onUploaded={(url) => persistImage('static_map_image_url', url)} onRemoved={() => persistImage('static_map_image_url', null)} />
+        </div>
 
         {/* ── Branding & Appearance ── */}
-        <div className="space-y-4">
+        <div id="branding" className="space-y-4 scroll-mt-32">
           <h2 className="text-sm font-semibold text-stone-900">Branding & Appearance</h2>
 
           <div className="bg-card border border-border rounded-xl p-5 space-y-4">
@@ -427,7 +462,7 @@ function AdminSettings() {
         </div>
 
         {/* ── Basic info ── */}
-        <div className="space-y-4">
+        <div id="basic-info" className="space-y-4 scroll-mt-32">
           <h2 className="text-sm font-semibold text-stone-900">Basic Info</h2>
           <div>
             <label className={labelCls}>Property Name</label>
@@ -447,7 +482,7 @@ function AdminSettings() {
 
         {/* ── Owner info ── */}
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-stone-900">Owner Info</h2>
+          <h2 id="owner-info" className="text-sm font-semibold text-stone-900 scroll-mt-32">Owner Info</h2>
           <div>
             <label className={labelCls}>Owner Name</label>
             <input type="text" name="owner_name" value={form.owner_name} onChange={handleChange} className={inputCls} />
@@ -502,7 +537,7 @@ function AdminSettings() {
         </div>
 
         {/* ── Location ── */}
-        <div className="space-y-4">
+        <div id="location" className="space-y-4 scroll-mt-32">
           <h2 className="text-sm font-semibold text-stone-900">Location</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -521,7 +556,7 @@ function AdminSettings() {
         </div>
 
         {/* ── Add to Home Screen ── */}
-        <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+        <div id="install-app" className="bg-card border border-border rounded-xl p-5 space-y-4 scroll-mt-32">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Smartphone className="h-5 w-5 text-primary" />
@@ -559,7 +594,9 @@ function AdminSettings() {
         </div>
 
         {/* ── Change Password ── */}
-        <ChangePasswordSection email={user?.email ?? ''} />
+        <div id="password" className="scroll-mt-32">
+          <ChangePasswordSection email={user?.email ?? ''} />
+        </div>
 
         {/* ── Save ── */}
         <div className="flex items-center gap-3 pt-2">

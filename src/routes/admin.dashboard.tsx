@@ -11,7 +11,6 @@ import {
   ChevronRight,
   Image,
   BedDouble,
-  CalendarCheck,
   CreditCard,
   ScrollText,
   Sparkles,
@@ -35,8 +34,16 @@ export const Route = createFileRoute("/admin/dashboard")({
 type Modal = "block" | "add" | "whatsapp" | null;
 
 // ---------------------------------------------------------------------------
-// Onboarding checklist (unchanged — already handles the empty/first-time
-// state well, so it's left as-is)
+// First-run checklist
+//
+// Ordered as a path, not a pile: four ESSENTIALS a property needs before it
+// can take its first booking (room → photo → payment → policy), then two
+// OPTIONAL polish items (logo, hero image). The first unfinished step is
+// highlighted as "Next" so a new owner always knows exactly one thing to do.
+//
+// (The old "Set room availability" step was dropped: it used the exact same
+// test as "Add a room" — rooms.length > 0 — so it could never be completed
+// separately and just made the list look longer.)
 // ---------------------------------------------------------------------------
 
 type ChecklistItem = {
@@ -46,17 +53,49 @@ type ChecklistItem = {
   icon: React.ComponentType<{ className?: string }>;
   done: boolean;
   href: string;
+  optional?: boolean;
 };
 
 function buildChecklist(property: Property | undefined): ChecklistItem[] {
   const amenities = property?.shared_amenities ?? [];
   const rooms = property?.rooms ?? [];
   const hasRoomPhoto = rooms.some((r) => r.images && r.images.length > 0);
-  const hasAvailability = rooms.length > 0;
   const hasUpi = amenities.some((a) => a.startsWith("__upi:"));
   const hasCancelPolicy = amenities.some((a) => a.startsWith("__cancel:"));
 
   return [
+    {
+      id: "rooms",
+      label: "Add your first room",
+      description: "Name, guests and nightly price — guests can't book without a room",
+      icon: BedDouble,
+      done: rooms.length > 0,
+      href: "/admin/rooms",
+    },
+    {
+      id: "room_photo",
+      label: "Add a room photo",
+      description: "Rooms with photos get far more bookings",
+      icon: Image,
+      done: hasRoomPhoto,
+      href: "/admin/rooms",
+    },
+    {
+      id: "upi",
+      label: "Add your UPI ID",
+      description: "So guests know where to send the advance (Settings → Payment setup)",
+      icon: CreditCard,
+      done: hasUpi,
+      href: "/admin/settings",
+    },
+    {
+      id: "policy",
+      label: "Set your cancellation policy",
+      description: "Guests see this before they book",
+      icon: ScrollText,
+      done: hasCancelPolicy,
+      href: "/admin/policies",
+    },
     {
       id: "logo",
       label: "Upload your logo",
@@ -64,75 +103,93 @@ function buildChecklist(property: Property | undefined): ChecklistItem[] {
       icon: Sparkles,
       done: !!property?.logo_url,
       href: "/admin/settings",
+      optional: true,
     },
     {
       id: "hero",
       label: "Add a hero image",
-      description: "Full-width photo guests see first on your booking page",
+      description: "The big photo guests see first on your booking page",
       icon: Image,
       done: !!property?.hero_image,
       href: "/admin/settings",
-    },
-    {
-      id: "rooms",
-      label: "Add at least one room",
-      description: "Guests can't book without rooms",
-      icon: BedDouble,
-      done: rooms.length > 0,
-      href: "/admin/rooms",
-    },
-    {
-      id: "room_photo",
-      label: "Upload a room photo",
-      description: "Photos increase bookings significantly",
-      icon: Image,
-      done: hasRoomPhoto,
-      href: "/admin/rooms",
-    },
-    {
-      id: "availability",
-      label: "Set room availability",
-      description: "Open dates so guests can book",
-      icon: CalendarCheck,
-      done: hasAvailability,
-      href: "/admin/calendar",
-    },
-    {
-      id: "upi",
-      label: "Add your UPI ID",
-      description: "Required for guests to pay advance online",
-      icon: CreditCard,
-      done: hasUpi,
-      href: "/admin/payments",
-    },
-    {
-      id: "policy",
-      label: "Set cancellation policy",
-      description: "Guests see this before booking",
-      icon: ScrollText,
-      done: hasCancelPolicy,
-      href: "/admin/policies",
+      optional: true,
     },
   ];
 }
 
+function ChecklistRow({ item, isNext }: { item: ChecklistItem; isNext: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.href}
+      className={[
+        "flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40",
+        item.done ? "opacity-50" : "",
+        isNext ? "bg-primary/5" : "",
+      ].join(" ")}
+    >
+      <div className="shrink-0">
+        {item.done ? (
+          <CheckCircle2 className="h-5 w-5 text-primary animate-in zoom-in-75 duration-200" />
+        ) : (
+          <Circle className={`h-5 w-5 ${isNext ? "text-primary" : "text-muted-foreground"}`} />
+        )}
+      </div>
+      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>{item.label}</div>
+        <div className="text-xs text-muted-foreground">{item.description}</div>
+      </div>
+      {isNext ? (
+        <span className="shrink-0 rounded-full bg-primary text-primary-foreground text-xs font-medium px-3 py-1">
+          Next
+        </span>
+      ) : (
+        !item.done && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+      )}
+    </Link>
+  );
+}
+
 function OnboardingChecklist({ property }: { property: Property | undefined }) {
+  const [copied, setCopied] = useState(false);
   const items = buildChecklist(property);
-  const doneCount = items.filter((i) => i.done).length;
-  const allDone = doneCount === items.length;
+  const essentials = items.filter((i) => !i.optional);
+  const polish = items.filter((i) => i.optional);
+  const essentialsDone = essentials.filter((i) => i.done).length;
+  const allEssentialsDone = essentialsDone === essentials.length;
+  const allDone = items.every((i) => i.done);
 
   if (allDone) return null;
 
-  const pct = Math.round((doneCount / items.length) * 100);
+  const pct = Math.round((essentialsDone / essentials.length) * 100);
+  const nextId = items.find((i) => !i.done)?.id;
+  const bookingUrl = property?.subdomain ? `https://${property.subdomain}.stayidom.in` : "";
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(bookingUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard blocked — the link is still shown and selectable */
+    }
+  };
 
   return (
     <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[var(--shadow-neu-flat)]">
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="font-semibold text-sm">Get your property ready</h2>
+            <h2 className="font-semibold text-sm">
+              {allEssentialsDone ? "You're ready for bookings" : "Get your property ready"}
+            </h2>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {doneCount} of {items.length} steps complete
+              {allEssentialsDone
+                ? "Finish the optional touches below to make your page shine"
+                : `${essentialsDone} of ${essentials.length} essentials done`}
             </p>
           </div>
           <span className="text-sm font-semibold text-primary">{pct}%</span>
@@ -144,43 +201,45 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
           />
         </div>
       </div>
-      <div className="divide-y divide-border">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.id}
-              to={item.href}
-              className={[
-                "flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5",
-                item.done ? "opacity-50" : "",
-              ].join(" ")}
-            >
-              <div className="shrink-0">
-                {item.done ? (
-                  <CheckCircle2 className="h-5 w-5 text-primary animate-in zoom-in-75 duration-200" />
-                ) : (
-                  <Circle className="h-5 w-5 text-muted-foreground" />
-                )}
-              </div>
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                <Icon className="h-4 w-4 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className={`text-sm font-medium ${item.done ? "line-through" : ""}`}>
-                  {item.label}
-                </div>
-                <div className="text-xs text-muted-foreground truncate">{item.description}</div>
-              </div>
-              {!item.done && <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />}
-            </Link>
-          );
-        })}
+
+      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+        Essentials to take bookings
       </div>
+      <div className="divide-y divide-border">
+        {essentials.map((item) => (
+          <ChecklistRow key={item.id} item={item} isNext={item.id === nextId} />
+        ))}
+      </div>
+
+      <div className="px-4 pt-4 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium border-t border-border">
+        Optional polish
+      </div>
+      <div className="divide-y divide-border">
+        {polish.map((item) => (
+          <ChecklistRow key={item.id} item={item} isNext={item.id === nextId} />
+        ))}
+      </div>
+
       <div className="px-4 py-3 bg-primary-light/30 border-t border-border">
-        <p className="text-xs text-muted-foreground">
-          Complete all steps to start accepting bookings from guests.
-        </p>
+        {allEssentialsDone && bookingUrl ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">Your booking page — share it with guests</p>
+              <p className="text-sm font-medium truncate">{bookingUrl.replace("https://", "")}</p>
+            </div>
+            <button
+              type="button"
+              onClick={copyLink}
+              className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium hover:bg-muted"
+            >
+              {copied ? "Copied!" : "Copy link"}
+            </button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Finish the four essentials and your booking page is ready to share.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -501,7 +560,7 @@ function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Dashboard</h1>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Home</h1>
         <p className="text-sm text-muted-foreground">
           Snapshot of bookings, revenue, and inquiries.
         </p>

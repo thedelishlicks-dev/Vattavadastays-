@@ -1,10 +1,12 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
   Wallet,
   Loader2,
   Check,
   X,
+  Pencil,
+  ExternalLink,
   IndianRupee,
   Download,
   Search,
@@ -16,7 +18,6 @@ import {
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useAuth } from "@/hooks/useAuth";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
@@ -31,17 +32,6 @@ const inputCls =
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const PAYMENT_METHODS = ["UPI", "Bank Transfer", "Cash on Arrival"];
-
-function parseUpiId(shared_amenities: string[] | null): string {
-  const entry = (shared_amenities ?? []).find((a) => a.startsWith("__upi:"));
-  return entry ? decodeURIComponent(entry.slice("__upi:".length)) : "";
-}
-
-function encodeUpiId(upiId: string, existing: string[]): string[] {
-  const filtered = existing.filter((a) => !a.startsWith("__upi:"));
-  if (!upiId.trim()) return filtered;
-  return [...filtered, `__upi:${encodeURIComponent(upiId.trim())}`];
-}
 
 // ---------------------------------------------------------------------------
 // Unified ledger row so standalone bookings and booking_groups can be
@@ -153,71 +143,183 @@ function pctColorCls(pct: number): string {
   return "text-destructive";
 }
 
+// ---------------------------------------------------------------------------
+// Payment action modal — the ONLY payment writes on this page.
+//
+//  "full"    → "Mark fully paid": records the remaining balance as a real
+//              payment (advance_amount += balance) with a method + optional
+//              reference, flips is_paid, and confirms a pending booking.
+//              This mirrors handleSavePayment / RecordPaymentForm in
+//              admin.bookings.tsx on purpose, so a payment recorded here is
+//              indistinguishable from one recorded there. (The old "Mark
+//              paid" toggle only flipped is_paid and left advance_amount
+//              behind, so a booking could read "Paid" with ₹0 collected.)
+//
+//  "correct" → fixes a mistaken total. Replaces the old "Mark unpaid"
+//              toggle: sets advance_amount to the amount actually received
+//              and derives is_paid from it, so the two can never disagree.
+// ---------------------------------------------------------------------------
+
+function PaymentActionModal({
+  item,
+  mode,
+  onClose,
+  onDone,
+}: {
+  item: LedgerItem;
+  mode: "full" | "correct";
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const gross = grossTotal(item);
+  const balance = balanceOf(item);
+  const [method, setMethod] = useState(item.payment_method ?? "UPI");
+  const [ref, setRef] = useState("");
+  const [collected, setCollected] = useState(String(item.advance_amount));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const table = item.kind === "group" ? "booking_groups" : "bookings";
+  const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+  const save = async () => {
+    setError("");
+    let patch: Record<string, unknown>;
+    let childPatch: Record<string, unknown>;
+
+    if (mode === "full") {
+      const newStatus = item.status === "pending" ? "confirmed" : item.status;
+      const hold = newStatus !== "pending" ? { hold_expires_at: null } : {};
+      patch = {
+        advance_amount: Number(item.advance_amount) + balance,
+        payment_method: method,
+        ...(ref.trim() ? { payment_reference: ref.trim() } : {}),
+        is_paid: true,
+        status: newStatus,
+        ...hold,
+      };
+      childPatch = { is_paid: true, status: newStatus, ...hold };
+    } else {
+      const value = Math.round(parseFloat(collected));
+      if (isNaN(value) || value < 0) { setError("Enter an amount of 0 or more"); return; }
+      if (value > gross) { setError(`Can't be more than the total of ${fmt(gross)}`); return; }
+      patch = { advance_amount: value, is_paid: value >= gross };
+      childPatch = { is_paid: value >= gross };
+    }
+
+    setSaving(true);
+    try {
+      const { error: err } = await supabase.from(table).update(patch).eq("id", item.id);
+      if (err) throw err;
+      if (item.kind === "group") {
+        // keep child bookings' flags in sync (same as the old toggle did)
+        const { error: childErr } = await supabase.from("bookings").update(childPatch).eq("group_id", item.id);
+        if (childErr) throw childErr;
+      }
+      onDone();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">
+              {mode === "full" ? "Mark fully paid" : "Correct collected amount"}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {item.guest_name}
+              {item.roomLabel ? ` · ${item.roomLabel}` : ""}
+            </p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm space-y-1">
+          <div className="flex justify-between"><span className="text-muted-foreground">Gross total</span><span className="font-medium">{fmt(gross)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Collected so far</span><span className="font-medium text-primary">{fmt(item.advance_amount)}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Balance due</span><span className="font-semibold">{fmt(balance)}</span></div>
+        </div>
+
+        {mode === "full" ? (
+          <>
+            <p className="text-sm">
+              {balance > 0
+                ? <>This records <strong>{fmt(balance)}</strong> as received and marks the booking fully paid.</>
+                : <>No balance is left — this will just mark the booking as settled.</>}
+            </p>
+            <div>
+              <label className={labelCls}>Payment method</label>
+              <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+                {[...new Set([method, ...PAYMENT_METHODS])].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Reference (optional)</label>
+              <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="UPI ref / receipt no." />
+            </div>
+          </>
+        ) : (
+          <div>
+            <label className={labelCls}>Total amount actually received (₹)</label>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              value={collected}
+              onChange={(e) => setCollected(e.target.value)}
+              className={inputCls}
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Use this to fix a mistaken entry. Set 0 to mark the booking unpaid.
+            </p>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
+            Cancel
+          </button>
+          <button
+            onClick={save}
+            disabled={saving}
+            className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {mode === "full" ? "Confirm payment" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
-  const { user } = useAuth();
   const { data: bookings = [] } = useBookings(property?.id ?? "");
   const { data: groups = [] } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
 
-  const [upiId, setUpiId] = useState("");
-  const [acceptedMethods, setAcceptedMethods] = useState<string[]>(["UPI", "Cash on Arrival"]);
-  const [savingConfig, setSavingConfig] = useState(false);
-  const [savedConfig, setSavedConfig] = useState(false);
-  const [configError, setConfigError] = useState("");
-  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const [payModal, setPayModal] = useState<{ item: LedgerItem; mode: "full" | "correct" } | null>(null);
 
   const [filterTab, setFilterTab] = useState<FilterTab>("outstanding");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("checkin");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [monthFilter, setMonthFilter] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (property) {
-      setUpiId(parseUpiId(property.shared_amenities ?? []));
-      const methodEntry = (property.shared_amenities ?? []).find((a) =>
-        a.startsWith("__pmethods:"),
-      );
-      if (methodEntry) {
-        try {
-          setAcceptedMethods(
-            JSON.parse(decodeURIComponent(methodEntry.slice("__pmethods:".length))),
-          );
-        } catch {
-          // keep default
-        }
-      }
-    }
-  }, [property?.id, property?.shared_amenities]);
-
-  const toggleMethod = (m: string) =>
-    setAcceptedMethods((prev) => (prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]));
-
-  const handleSaveConfig = async () => {
-    if (!property) return;
-    setSavingConfig(true);
-    setConfigError("");
-    try {
-      const base = encodeUpiId(upiId, property.shared_amenities ?? []);
-      const withMethods = [
-        ...base.filter((a) => !a.startsWith("__pmethods:")),
-        `__pmethods:${encodeURIComponent(JSON.stringify(acceptedMethods))}`,
-      ];
-      const { error: err } = await supabase
-        .from("properties")
-        .update({ shared_amenities: withMethods })
-        .eq("id", property.id);
-      if (err) throw err;
-      queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
-      setSavedConfig(true);
-      setTimeout(() => setSavedConfig(false), 2500);
-    } catch (e: unknown) {
-      setConfigError(e instanceof Error ? e.message : "Save failed");
-    } finally {
-      setSavingConfig(false);
-    }
-  };
 
   // A booking that belongs to a group is represented by the group row, not
   // its own row, so we don't double-count it in stats or the table below.
@@ -385,19 +487,22 @@ function AdminPayments() {
     }
   };
 
-  const togglePaid = async (item: LedgerItem) => {
-    setTogglingId(item.id);
-    // Never overwrite advance_amount — it holds the cumulative partial
-    // payments recorded in admin.bookings.tsx. Only flip the is_paid flag.
-    const table = item.kind === "group" ? "booking_groups" : "bookings";
-    await supabase.from(table).update({ is_paid: !item.is_paid }).eq("id", item.id);
-    if (item.kind === "group") {
-      // keep child bookings' is_paid flag in sync for consistency elsewhere
-      await supabase.from("bookings").update({ is_paid: !item.is_paid }).eq("group_id", item.id);
-    }
-    queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
-    queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
-    setTogglingId(null);
+  const refreshAfterPayment = () => {
+    queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
+  };
+
+  // Opens the guest's booking in the Bookings page (which handles the
+  // ?bookingId= / ?groupId= deep links) — the full payment history/form lives there.
+  const openBooking = (item: LedgerItem) => {
+    const prop = new URLSearchParams(window.location.search).get("property");
+    navigate({
+      to: "/admin/bookings",
+      search: {
+        ...(prop ? { property: prop } : {}),
+        ...(item.kind === "group" ? { groupId: item.id } : { bookingId: item.id }),
+      },
+    } as never);
   };
 
   const exportCsv = () => {
@@ -838,20 +943,34 @@ function AdminPayments() {
                           </span>
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => togglePaid(item)}
-                            disabled={togglingId === item.id}
-                            className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors disabled:opacity-50"
-                          >
-                            {togglingId === item.id ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : item.is_paid ? (
-                              <X className="h-3 w-3" />
+                          <div className="inline-flex items-center gap-1.5">
+                            {balance > 0 || !item.is_paid ? (
+                              <button
+                                onClick={() => setPayModal({ item, mode: "full" })}
+                                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                              >
+                                <Check className="h-3 w-3" /> Mark fully paid
+                              </button>
                             ) : (
-                              <Check className="h-3 w-3" />
+                              <span className="text-xs text-muted-foreground px-2">Settled</span>
                             )}
-                            {item.is_paid ? "Mark unpaid" : "Mark paid"}
-                          </button>
+                            <button
+                              onClick={() => setPayModal({ item, mode: "correct" })}
+                              title="Correct collected amount"
+                              aria-label="Correct collected amount"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => openBooking(item)}
+                              title="Open booking"
+                              aria-label="Open booking"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -863,62 +982,33 @@ function AdminPayments() {
         )}
       </div>
 
-      {/* Payment config */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
-        <h2 className="font-semibold text-sm flex items-center gap-2">
-          <Wallet className="h-4 w-4 text-primary" /> Payment Settings
-        </h2>
-
-        <div>
-          <label className={labelCls}>UPI ID</label>
-          <input
-            value={upiId}
-            onChange={(e) => setUpiId(e.target.value)}
-            className={inputCls}
-            placeholder="yourname@upi"
-          />
-          <p className="text-xs text-muted-foreground mt-1">
-            Shown to guests in payment reminder messages.
+      {/* Payment setup moved to Settings — one home for UPI / accepted methods */}
+      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Wallet className="h-4 w-4 text-primary shrink-0" />
+          <p className="text-sm text-muted-foreground">
+            UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.
           </p>
         </div>
-
-        <div>
-          <label className={labelCls}>Accepted payment methods</label>
-          <div className="flex flex-wrap gap-2 mt-1">
-            {PAYMENT_METHODS.map((m) => {
-              const active = acceptedMethods.includes(m);
-              return (
-                <button
-                  key={m}
-                  onClick={() => toggleMethod(m)}
-                  className={[
-                    "text-sm px-3 py-1.5 rounded-full border transition-colors",
-                    active
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border hover:bg-muted",
-                  ].join(" ")}
-                >
-                  {active && <Check className="inline h-3 w-3 mr-1" />}
-                  {m}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 pt-1">
-          <button
-            onClick={handleSaveConfig}
-            disabled={savingConfig}
-            className="rounded-full bg-primary text-primary-foreground px-5 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
-          >
-            {savingConfig && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Save settings
-          </button>
-          {savedConfig && <span className="text-sm text-primary font-medium">Saved ✓</span>}
-          {configError && <span className="text-sm text-destructive">{configError}</span>}
-        </div>
+        <Link
+          to="/admin/settings"
+          className="shrink-0 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+        >
+          Open
+        </Link>
       </div>
+
+      {payModal && (
+        <PaymentActionModal
+          item={payModal.item}
+          mode={payModal.mode}
+          onClose={() => setPayModal(null)}
+          onDone={() => {
+            refreshAfterPayment();
+            setPayModal(null);
+          }}
+        />
+      )}
     </div>
   );
 }

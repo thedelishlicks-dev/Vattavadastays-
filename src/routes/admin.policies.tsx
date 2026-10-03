@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { ScrollText, Loader2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { updateSharedAmenities } from "@/lib/propertyConfig";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseTimeToHHMM, formatTimeInput } from "@/lib/bookingAvailability";
 
@@ -125,16 +125,10 @@ function AdminPolicies() {
     setSaving(true);
     setError("");
     try {
-      const updatedAmenities = encodePolicies(form, property.shared_amenities ?? []);
-      const { error: err } = await supabase
-        .from("properties")
-        .update({
-          check_in_time: form.check_in_time,
-          check_out_time: form.check_out_time,
-          shared_amenities: updatedAmenities,
-        })
-        .eq("id", property.id);
-      if (err) throw err;
+      await updateSharedAmenities(property.id, (latest) => encodePolicies(form, latest), {
+        check_in_time: form.check_in_time,
+        check_out_time: form.check_out_time,
+      });
       queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);

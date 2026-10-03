@@ -1,83 +1,30 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  BedDouble,
-  CalendarDays,
-  ClipboardList,
-  Tag,
-  UtensilsCrossed,
-  Gift,
-  MessageSquareText,
-  Sparkles,
-  ScrollText,
-  Wallet,
-  Handshake,
-  Receipt,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-} from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { supabase } from "@/lib/supabase";
 import { DynamicManifest } from "@/components/DynamicManifest";
+import {
+  NAV_SECTIONS,
+  SECTION_HOME,
+  sectionByKey,
+  sectionForPath,
+  type NavSection,
+} from "@/admin/navConfig";
+import { SectionTabs } from "@/admin/SectionTabs";
 
-type NavItemDef = {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  disabled?: boolean;
-};
-
-// Kept as a flat list: the mobile bottom nav still reads NAV.slice(0, 4)
-// directly (unchanged, per instruction), and NAV_GROUPS below is derived
-// from this same list so path -> label -> icon stays defined in one place.
-const NAV: NavItemDef[] = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/rooms", label: "Rooms", icon: BedDouble },
-  { to: "/admin/calendar", label: "Calendar", icon: CalendarDays },
-  { to: "/admin/bookings", label: "Bookings", icon: ClipboardList },
-  { to: "/admin/pricing", label: "Pricing", icon: Tag },
-  { to: "/admin/meals", label: "Meals", icon: UtensilsCrossed },
-  { to: "/admin/addons", label: "Add-ons", icon: Gift },
-  { to: "/admin/quotes", label: "Quotes", icon: MessageSquareText },
-  { to: "/admin/amenities", label: "Amenities", icon: Sparkles },
-  { to: "/admin/policies", label: "Policies", icon: ScrollText },
-  { to: "/admin/payments", label: "Payments", icon: Wallet },
-  { to: "/admin/agents", label: "Agents", icon: Handshake },
-  { to: "/admin/commissions", label: "Commissions", icon: Receipt },
-  { to: "/admin/settings", label: "Settings", icon: Settings },
+// Navigation is defined in src/admin/navConfig.ts (6 sections; each owns one
+// or more existing pages, shown as tabs). Daily-use sections are listed first,
+// set-once configuration after.
+const NAV_GROUP_DEFS: { label: string; group: NavSection["group"] }[] = [
+  { label: "Daily", group: "daily" },
+  { label: "Setup", group: "setup" },
 ];
 
-function findNav(to: string): NavItemDef {
-  const item = NAV.find((n) => n.to === to);
-  if (!item) throw new Error(`AdminLayout: no NAV entry for ${to}`);
-  return item;
-}
-
-// Grouping only — same items, same icons, same hrefs. Order within each
-// group follows the plan's grouping, not NAV's declaration order (e.g.
-// Calendar is listed before Bookings here even though Rooms sits between
-// Dashboard and Calendar in the flat NAV array above).
-const NAV_GROUPS: { label: string; items: NavItemDef[] }[] = [
-  {
-    label: "Operations",
-    items: ["/admin/dashboard", "/admin/calendar", "/admin/bookings", "/admin/quotes"].map(findNav),
-  },
-  {
-    label: "Property",
-    items: ["/admin/rooms", "/admin/pricing", "/admin/amenities", "/admin/meals", "/admin/addons", "/admin/policies"].map(
-      findNav,
-    ),
-  },
-  {
-    label: "Money",
-    items: ["/admin/payments", "/admin/agents", "/admin/commissions"].map(findNav),
-  },
-];
-const SETTINGS_NAV = findNav("/admin/settings");
+// The mobile bottom bar shows the four daily sections + More. Rooms & Pricing
+// and Property (set-once configuration) live under More.
+const BOTTOM_NAV: NavSection[] = ["home", "calendar", "bookings", "money"].map(sectionByKey);
 
 function getPropertyParam(): string {
   const fromUrl = new URLSearchParams(window.location.search).get("property") ?? "";
@@ -141,6 +88,7 @@ export function AdminLayout() {
   const { user } = useAuth();
   const { data: property } = useOwnerProperty();
 
+  const activeSection = sectionForPath(path);
   const propertyParam = getPropertyParam();
   const search = propertyParam ? `?property=${encodeURIComponent(propertyParam)}` : "";
 
@@ -160,20 +108,19 @@ export function AdminLayout() {
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <PropertyIdentity name={propertyName} logoUrl={property?.logo_url} subdomain={property?.subdomain} />
         <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
-          {NAV_GROUPS.map((group) => (
-            <div key={group.label}>
+          {NAV_GROUP_DEFS.map((g) => (
+            <div key={g.label}>
               <div className="px-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                {group.label}
+                {g.label}
               </div>
               <div className="space-y-0.5">
-                {group.items.map((item) => (
+                {NAV_SECTIONS.filter((sec) => sec.group === g.group).map((sec) => (
                   <NavItem
-                    key={item.to}
-                    to={item.to}
-                    label={item.label}
-                    icon={item.icon}
-                    active={path === item.to}
-                    disabled={item.disabled}
+                    key={sec.key}
+                    to={SECTION_HOME(sec)}
+                    label={sec.label}
+                    icon={sec.icon}
+                    active={activeSection?.key === sec.key}
                     search={search}
                   />
                 ))}
@@ -181,15 +128,7 @@ export function AdminLayout() {
             </div>
           ))}
         </nav>
-        {/* Settings pinned above Log out, outside the grouped sections. */}
         <div className="p-3 border-t border-border space-y-0.5">
-          <NavItem
-            to={SETTINGS_NAV.to}
-            label={SETTINGS_NAV.label}
-            icon={SETTINGS_NAV.icon}
-            active={path === SETTINGS_NAV.to}
-            search={search}
-          />
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -216,21 +155,24 @@ export function AdminLayout() {
           </div>
         </header>
 
+        {activeSection && (
+          <SectionTabs section={activeSection} path={path} propertyParam={propertyParam} />
+        )}
+
         <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
           <Outlet />
         </main>
 
-        {/* Bottom nav: same four items, same order, same hrefs as before
-            (Dashboard, Rooms, Calendar, Bookings + More) — only change is
-            the pill highlight behind the icon on the active item. */}
+        {/* Bottom nav: the four daily sections + More (which opens the full
+            menu, including Rooms & Pricing and Property). */}
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
-          {NAV.slice(0, 4).map((item) => {
-            const Icon = item.icon;
-            const active = path === item.to;
+          {BOTTOM_NAV.map((sec) => {
+            const Icon = sec.icon;
+            const active = activeSection?.key === sec.key;
             return (
               <a
-                key={item.to}
-                href={`${item.to}${search}`}
+                key={sec.key}
+                href={`${SECTION_HOME(sec)}${search}`}
                 className={[
                   "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
                   active ? "text-primary font-medium" : "text-muted-foreground",
@@ -244,12 +186,21 @@ export function AdminLayout() {
                 >
                   <Icon className="h-5 w-5" />
                 </span>
-                {item.label}
+                {sec.label}
               </a>
             );
           })}
-          <button onClick={() => setMobileOpen(true)} className="flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] text-muted-foreground">
-            <span className="flex items-center justify-center h-7 w-10 rounded-full">
+          <button onClick={() => setMobileOpen(true)} className={[
+              "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
+              activeSection?.group === "setup" ? "text-primary font-medium" : "text-muted-foreground",
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "flex items-center justify-center h-7 w-10 rounded-full",
+                activeSection?.group === "setup" ? "bg-primary/10" : "",
+              ].join(" ")}
+            >
               <Menu className="h-5 w-5" />
             </span>
             More
@@ -272,20 +223,19 @@ export function AdminLayout() {
               </button>
             </div>
             <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
-              {NAV_GROUPS.map((group) => (
-                <div key={group.label}>
+              {NAV_GROUP_DEFS.map((g) => (
+                <div key={g.label}>
                   <div className="px-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
-                    {group.label}
+                    {g.label}
                   </div>
                   <div className="space-y-0.5">
-                    {group.items.map((item) => (
+                    {NAV_SECTIONS.filter((sec) => sec.group === g.group).map((sec) => (
                       <NavItem
-                        key={item.to}
-                        to={item.to}
-                        label={item.label}
-                        icon={item.icon}
-                        active={path === item.to}
-                        disabled={item.disabled}
+                        key={sec.key}
+                        to={SECTION_HOME(sec)}
+                        label={sec.label}
+                        icon={sec.icon}
+                        active={activeSection?.key === sec.key}
                         search={search}
                         onClick={() => setMobileOpen(false)}
                       />
@@ -295,14 +245,6 @@ export function AdminLayout() {
               ))}
             </nav>
             <div className="p-3 border-t border-border space-y-0.5">
-              <NavItem
-                to={SETTINGS_NAV.to}
-                label={SETTINGS_NAV.label}
-                icon={SETTINGS_NAV.icon}
-                active={path === SETTINGS_NAV.to}
-                search={search}
-                onClick={() => setMobileOpen(false)}
-              />
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"

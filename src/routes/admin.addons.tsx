@@ -1,9 +1,10 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { ChevronDown, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAddons, useDeleteRow, usePackages, useSaveRow, useSeasons } from "@/hooks/useCatalog";
 import { PageHeader, Section, Field, inputCls } from "@/admin/formKit";
+import { SeasonsEditor } from "@/components/SeasonsEditor";
 import {
   CATEGORY_LABELS,
   UNIT_LABELS,
@@ -44,9 +45,15 @@ function Catalog({ propertyId }: { propertyId: string }) {
 
       {seasons.length === 0 && (
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Prices change in peak season or festivals? Define your seasons once on the{" "}
-          <Link to="/admin/pricing" className="underline text-foreground">Pricing page</Link>, then come back to set a
-          price for each.
+          Prices change in peak season or festivals? Define your seasons once in{" "}
+          <button
+            type="button"
+            onClick={() => document.getElementById("seasons")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            className="underline text-foreground"
+          >
+            Seasons (bottom of this page)
+          </button>
+          , then set a price for each add-on.
         </div>
       )}
 
@@ -75,6 +82,11 @@ function Catalog({ propertyId }: { propertyId: string }) {
           <AddButton label="Add package" onClick={() => setAdding("package")} />
         )}
       </Section>
+
+      {/* Seasons moved here from the old Pricing page — they only price add-ons & packages. */}
+      <div id="seasons" className="scroll-mt-32">
+        <SeasonsEditor propertyId={propertyId} />
+      </div>
     </div>
   );
 }

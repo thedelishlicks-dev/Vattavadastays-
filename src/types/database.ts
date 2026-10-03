@@ -63,7 +63,6 @@ export interface Availability {
   room_id: string;
   date: string;
   is_available: boolean;
-  price_override?: number;
   note?: string;
 }
 
