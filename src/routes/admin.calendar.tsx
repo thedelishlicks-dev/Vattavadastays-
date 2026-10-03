@@ -133,7 +133,7 @@ function AdminCalendar() {
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
     >
       <div className="flex items-start justify-between gap-3 mb-6">
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Availability Calendar</h1>
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
         <button
           type="button"
           onClick={() => setShowBlock(true)}
