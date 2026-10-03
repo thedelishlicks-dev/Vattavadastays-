@@ -129,15 +129,6 @@ export function useCreateBooking() {
         }
       }
 
-      // Separate, minimal fetch of the availability mirror — used ONLY for
-      // per-date price overrides now (see Step 3), not for validation.
-      const { data: avail, error: availErr } = await supabase
-        .from("availability")
-        .select("room_id, date, price_override")
-        .in("room_id", roomIds)
-        .in("date", dates);
-      if (availErr) throw new Error("Could not load pricing.");
-
       // ── Step 3: Calculate price per room ──
       const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
 
@@ -146,16 +137,11 @@ export function useCreateBooking() {
         let roomPrice = 0;
 
         for (const date of dates) {
-          const row = avail?.find((a) => a.room_id === ri.roomId && a.date === date);
-          if (row?.price_override) {
-            roomPrice += Number(row.price_override);
-          } else {
-            const d = new Date(date);
-            const dow = d.getDay();
-            const isWeekend = dow === 5 || dow === 6;
-            const multiplier = isWeekend ? (room.weekend_multiplier ?? 1) : 1;
-            roomPrice += room.base_price * multiplier;
-          }
+          const d = new Date(date);
+          const dow = d.getDay();
+          const isWeekend = dow === 5 || dow === 6;
+          const multiplier = isWeekend ? (room.weekend_multiplier ?? 1) : 1;
+          roomPrice += room.base_price * multiplier;
         }
 
         const extraGuestCharge =
