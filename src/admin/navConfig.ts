@@ -6,8 +6,11 @@
 // dashboard-checklist links keep working. Sections are purely a navigation
 // layer on top of the existing routes.
 //
-//   Daily   → Home · Calendar · Bookings(+Quotes) · Money(Payments/Agents/Commissions)
+//   Daily   → Home · Calendar · Bookings(+Quotes) · Money(Payments + Agents & Commissions)
 //   Setup   → Rooms & Pricing · Property(Settings/Amenities/Meals/Add-ons/Policies)
+//
+// Retired URLs that now redirect: /admin/pricing → /admin/rooms,
+// /admin/commissions → /admin/agents.
 
 import {
   LayoutDashboard,
@@ -62,8 +65,7 @@ export const NAV_SECTIONS: NavSection[] = [
     group: "daily",
     tabs: [
       { to: "/admin/payments", label: "Payments" },
-      { to: "/admin/agents", label: "Agents" },
-      { to: "/admin/commissions", label: "Commissions" },
+      { to: "/admin/agents", label: "Agents & Commissions" },
     ],
   },
   {
@@ -71,10 +73,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Rooms & Pricing",
     icon: BedDouble,
     group: "setup",
-    tabs: [
-      { to: "/admin/rooms", label: "Rooms" },
-      { to: "/admin/pricing", label: "Pricing" },
-    ],
+    // Prices are edited inside the room editor, so this section is a single page.
+    tabs: [{ to: "/admin/rooms", label: "Rooms & Pricing" }],
   },
   {
     key: "property",
