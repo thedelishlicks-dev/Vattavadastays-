@@ -143,9 +143,9 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
 
   return (
     <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)]">
+      <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)] flex flex-col max-h-[calc(100dvh-2rem)]">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border">
+        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <Ban className="h-4 w-4 text-primary" />
             <h2 className="font-semibold text-sm">Block dates</h2>
@@ -158,7 +158,8 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
           </button>
         </div>
 
-        <div className="p-5 space-y-4">
+        {/* Body scrolls on its own so the Save button below is always reachable (iPad / phone). */}
+        <div className="p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
           {/* Room picker */}
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
@@ -299,7 +300,7 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 pb-5">
+        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border shrink-0">
           <button
             onClick={onClose}
             className="press-scale px-4 py-2 text-sm rounded-full border border-border hover:bg-muted transition-colors"
