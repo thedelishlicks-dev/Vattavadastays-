@@ -65,6 +65,70 @@ function CalendarSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// Day detail for the "All rooms" view. A cell can only say "1 free"; this shows
+// what each room is doing that day (tooltips don't exist on iPad/phone) and lets
+// the owner reopen a blocked room straight from here.
+// ---------------------------------------------------------------------------
+function DayDialog({
+  date,
+  rooms,
+  onClose,
+  onReopen,
+}: {
+  date: string
+  rooms: { id: string; name: string; state: DayState; guest?: string }[]
+  onClose: () => void
+  onReopen: (roomId: string) => void
+}) {
+  const pretty = new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+        <div className="flex items-start justify-between gap-3">
+          <h2 className="font-semibold">{pretty}</h2>
+          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {rooms.map((r) => {
+            const c = CELL[r.state]
+            return (
+              <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{r.name}</p>
+                  {r.guest && <p className="text-xs text-muted-foreground truncate">{r.guest}</p>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>
+                  {r.state === 'blocked' && (
+                    <button
+                      onClick={() => onReopen(r.id)}
+                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+                    >
+                      Reopen
+                    </button>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+        <button onClick={onClose} className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
+          Close
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Reopen a blocked date. The app could block dates but never unblock them, so a
 // mistaken block (or a leftover from a cancelled pending booking) stayed
 // "Blocked" forever. Only dates the calendar shows as Blocked (= no booking
@@ -160,6 +224,7 @@ function AdminCalendar() {
   const [viewDate, setViewDate] = useState(new Date())
   const [showBlock, setShowBlock] = useState(false)
   const [reopen, setReopen] = useState<{ roomId: string; roomName: string; date: string; note: string | null } | null>(null)
+  const [dayDetail, setDayDetail] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const rooms = property?.rooms ?? []
@@ -243,18 +308,21 @@ function AdminCalendar() {
   const summarize = (date: string) => {
     const r = summarizeDate(index, activeRooms, date)
     const title = r.lines.join('\n')
-    const taken = r.total - r.free
+    // say WHAT is taken, in colour — "1 free" alone doesn't tell you a room is blocked
+    const parts: { text: string; cls: string }[] = []
+    if (r.booked > 0) parts.push({ text: `${r.booked} booked`, cls: 'text-blue-600' })
+    if (r.blocked > 0) parts.push({ text: `${r.blocked} blocked`, cls: 'text-red-500 font-medium' })
     switch (r.kind) {
       case 'none':
-        return { label: '', sub: '', bg: 'bg-muted/30', text: 'text-muted-foreground', title }
+        return { label: '', parts, bg: 'bg-muted/30', text: 'text-muted-foreground', title }
       case 'open':
-        return { label: 'Open', sub: `${r.total} free`, bg: 'bg-green-50', text: 'text-green-700', title }
+        return { label: 'Open', parts: [{ text: 'all free', cls: 'text-muted-foreground' }], bg: 'bg-green-50', text: 'text-green-700', title }
       case 'some-free':
-        return { label: `${r.free} free`, sub: `${taken}/${r.total} taken`, bg: 'bg-green-50', text: 'text-green-700', title }
+        return { label: `${r.free} free`, parts, bg: 'bg-green-50', text: 'text-green-700', title }
       case 'blocked':
-        return { label: 'Blocked', sub: 'all rooms', bg: 'bg-red-50', text: 'text-red-500', title }
+        return { label: 'Blocked', parts: [{ text: 'all rooms', cls: 'text-muted-foreground' }], bg: 'bg-red-50', text: 'text-red-500', title }
       default:
-        return { label: 'Full', sub: r.blocked > 0 ? `${r.blocked} blocked` : `${r.total}/${r.total} booked`, bg: 'bg-blue-100', text: 'text-blue-700', title }
+        return { label: 'Full', parts, bg: 'bg-blue-100', text: 'text-blue-700', title }
     }
   }
 
@@ -355,11 +423,24 @@ function AdminCalendar() {
               if (isAll) {
                 const s = summarize(dateStr)
                 return (
-                  <div key={dateStr} className={`h-16 border-b border-r border-border/50 p-1.5 text-xs ${s.bg}`} title={s.title || undefined}>
+                  <button
+                    key={dateStr}
+                    type="button"
+                    onClick={() => setDayDetail(dateStr)}
+                    className={`h-16 border-b border-r border-border/50 p-1.5 text-xs text-left w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${s.bg}`}
+                    title={s.title || undefined}
+                  >
                     <div className="font-medium text-foreground">{day}</div>
                     <div className={`mt-0.5 truncate font-medium ${s.text}`}>{s.label}</div>
-                    <div className="text-muted-foreground truncate text-[10px]">{s.sub}</div>
-                  </div>
+                    <div className="truncate text-[10px] leading-tight">
+                      {s.parts.map((p, i) => (
+                        <span key={p.text} className={p.cls}>
+                          {i > 0 ? ' · ' : ''}
+                          {p.text}
+                        </span>
+                      ))}
+                    </div>
+                  </button>
                 )
               }
 
@@ -410,7 +491,9 @@ function AdminCalendar() {
         </div>
       )}
 
-      {!isAll && <p className="mt-3 text-xs text-muted-foreground">Tap a <strong>Blocked</strong> date to reopen it.</p>}
+      <p className="mt-3 text-xs text-muted-foreground">
+        {isAll ? <>Tap any date to see each room. Pick a room above to see its bookings.</> : <>Tap a <strong>Blocked</strong> date to reopen it.</>}
+      </p>
 
       <div className="flex gap-x-4 gap-y-2 mt-4 text-sm text-muted-foreground flex-wrap">
         {(isAll
@@ -433,6 +516,23 @@ function AdminCalendar() {
           </span>
         ))}
       </div>
+
+      {dayDetail && (
+        <DayDialog
+          date={dayDetail}
+          rooms={summarizeDate(index, activeRooms, dayDetail).rooms}
+          onClose={() => setDayDetail(null)}
+          onReopen={(roomId) => {
+            const room = activeRooms.find((r: { id: string }) => r.id === roomId)
+            const noteText =
+              (availRows as { room_id: string; date: string; note?: string | null }[]).find(
+                (r) => r.room_id === roomId && String(r.date).slice(0, 10) === dayDetail,
+              )?.note ?? null
+            setReopen({ roomId, roomName: room?.name ?? 'Room', date: dayDetail, note: noteText })
+            setDayDetail(null)
+          }}
+        />
+      )}
 
       {reopen && (
         <ReopenDialog
