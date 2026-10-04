@@ -87,11 +87,18 @@ export function stateOf(idx: CalIndex, roomId: string, date: string): DayInfo {
   return { state: "open", name: out }; // free; `name` is only an "Out: …" hint
 }
 
+export type RoomDay = { id: string; name: string; state: DayState; guest?: string };
+
 export type DaySummary = {
   kind: "none" | "open" | "some-free" | "full" | "blocked";
   free: number;
   total: number;
+  /** rooms closed by the owner */
   blocked: number;
+  /** rooms occupied by a guest (booked, pending, or on their check-out day) */
+  booked: number;
+  /** one entry per room — what the day-detail view shows (hover tooltips don't exist on touch screens) */
+  rooms: RoomDay[];
   lines: string[];
 };
 
@@ -100,11 +107,15 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   const total = rooms.length;
   let free = 0;
   let blocked = 0;
+  let booked = 0;
   const lines: string[] = [];
+  const perRoom: RoomDay[] = [];
   for (const r of rooms) {
     const info = stateOf(idx, r.id, date);
+    perRoom.push({ id: r.id, name: r.name, state: info.state, guest: info.state === "open" ? undefined : info.name });
     if (info.state === "open") free++;
     else if (info.state === "blocked") blocked++;
+    else booked++;
     const label = { open: "Open", booked: "Booked", pending: "Pending", checkout: "Check-out", blocked: "Blocked" }[info.state];
     lines.push(`${r.name}: ${label}${info.state !== "open" && info.name ? ` (${info.name})` : ""}`);
   }
@@ -114,5 +125,5 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   else if (free > 0) kind = "some-free";
   else if (blocked === total) kind = "blocked";
   else kind = "full";
-  return { kind, free, total, blocked, lines };
+  return { kind, free, total, blocked, booked, rooms: perRoom, lines };
 }
