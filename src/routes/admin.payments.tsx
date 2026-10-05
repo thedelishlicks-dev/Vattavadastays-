@@ -227,7 +227,7 @@ function PaymentActionModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4">
+      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="font-display text-lg font-semibold">
