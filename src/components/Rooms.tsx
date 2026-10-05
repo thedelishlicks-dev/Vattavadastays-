@@ -2,10 +2,10 @@ import { useMemo } from 'react'
 import { format } from 'date-fns'
 import { useProperty } from '@/hooks/useProperty'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
 import { Loader2, BedDouble, Users, CheckCircle2 } from 'lucide-react'
 import { getSubdomain } from '@/lib/subdomain'
 import type { Room } from '@/types/database'
+import { getBlockedDatesForRooms, isSameDayTurnoverSafe, eachDate, addOneDay } from '@/lib/bookingAvailability'
 
 interface RoomsProps {
   onSelect: (room: Room) => void
@@ -21,21 +21,32 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
   const checkInStr = checkIn ? format(checkIn, 'yyyy-MM-dd') : null
   const checkOutStr = checkOut ? format(checkOut, 'yyyy-MM-dd') : null
 
+  // Which rooms can't be booked for the chosen dates.
+  //
+  // This used to query the `bookings` table directly. Guests (the anon role) are
+  // NOT allowed to read `bookings`, so that query always came back empty and no
+  // room ever showed "Unavailable" — even for dates with a booking. It now uses
+  // the same helper as the date-picker calendar and the final booking check
+  // (getBlockedDatesForRooms: bookings where visible + the public `availability`
+  // table, which also carries the owner's manual blocks), so the room cards, the
+  // calendar and the submit-time check can never disagree.
+  //
+  // The key starts with "guest-bookings" on purpose: useCreateBooking and
+  // BlockDatesModal already invalidate that prefix, so this refreshes after a
+  // booking or a block without any other wiring.
+  const roomIdsForCheck = (property?.rooms ?? []).filter((r: Room) => r.is_active).map((r: Room) => r.id)
+  const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property])
   const { data: bookedRoomIds = [] } = useQuery({
-    queryKey: ['booked-rooms', property?.id, checkInStr, checkOutStr],
+    queryKey: ['guest-bookings', 'rooms-unavailable', roomIdsForCheck.join(','), checkInStr, checkOutStr, turnoverSafe],
     queryFn: async () => {
-      if (!property?.id || !checkInStr || !checkOutStr) return []
-      const { data, error } = await supabase
-        .from('bookings')
-        .select('room_id')
-        .eq('property_id', property.id)
-        .neq('status', 'cancelled')
-        .lt('check_in', checkOutStr)
-        .gt('check_out', checkInStr)
-      if (error) throw error
-      return (data ?? []).map((b) => b.room_id)
+      if (!checkInStr || !checkOutStr || roomIdsForCheck.length === 0) return []
+      const blocked = await getBlockedDatesForRooms(roomIdsForCheck, checkInStr, checkOutStr, turnoverSafe)
+      // Same night window the booking itself is validated against: check-in inclusive,
+      // check-out exclusive — widened by a day when same-day turnover isn't safe.
+      const nights = eachDate(checkInStr, turnoverSafe ? checkOutStr : addOneDay(checkOutStr))
+      return roomIdsForCheck.filter((id: string) => nights.some((n) => blocked[id]?.has(n)))
     },
-    enabled: !!property?.id && !!checkInStr && !!checkOutStr,
+    enabled: !!property?.id && !!checkInStr && !!checkOutStr && roomIdsForCheck.length > 0,
   })
 
   const bookedSet = useMemo(() => new Set(bookedRoomIds), [bookedRoomIds])
