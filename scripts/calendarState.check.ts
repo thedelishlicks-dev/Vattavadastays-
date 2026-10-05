@@ -71,4 +71,16 @@ eq("one booked + one blocked -> full", sum.kind, "full");
 eq("  counts: 1 booked, 1 blocked", [sum.booked, sum.blocked], [1, 1]);
 eq("  guest shown for booked room", sum.rooms.find((r) => r.id === "B")?.guest, "Anoop");
 eq("  no guest on blocked room", sum.rooms.find((r) => r.id === "A")?.guest, undefined);
+
+// 11. GUEST BOOKING AWAITING CONFIRMATION must read as PENDING in the All-rooms summary (not "booked")
+idx = buildCalendarIndex([book("A", "2026-10-14", "2026-10-16", "pending", "Guest from website")], av("A", "2026-10-14", "2026-10-15"));
+sum = summarizeDate(idx, rooms, "2026-10-14");
+eq("pending guest booking: some-free", sum.kind, "some-free");
+eq("  counts: booked 0, pending 1", [sum.booked, sum.pending], [0, 1]);
+eq("  per-room state is pending w/ guest", sum.rooms.find((r) => r.id === "A"), { id: "A", name: "Misty Ridge", state: "pending", guest: "Guest from website" });
+sum = summarizeDate(idx, rooms, "2026-10-16");
+eq("departure day: open, hint only", [sum.kind, sum.leaving], ["open", 0]);
+idx = buildCalendarIndex([book("A", "2026-10-14", "2026-10-16")], av("A", "2026-10-14", "2026-10-15", "2026-10-16"));
+sum = summarizeDate(idx, [rooms[0]], "2026-10-16");
+eq("single room on its check-out day (availability flagged) -> kind checkout", [sum.kind, sum.leaving], ["checkout", 1]);
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
