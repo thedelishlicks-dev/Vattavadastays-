@@ -311,6 +311,8 @@ function AdminCalendar() {
     // say WHAT is taken, in colour — "1 free" alone doesn't tell you a room is blocked
     const parts: { text: string; cls: string }[] = []
     if (r.booked > 0) parts.push({ text: `${r.booked} booked`, cls: 'text-blue-600' })
+    if (r.pending > 0) parts.push({ text: `${r.pending} pending`, cls: 'text-amber-700 font-medium' })
+    if (r.leaving > 0) parts.push({ text: `${r.leaving} check-out`, cls: 'text-sky-700' })
     if (r.blocked > 0) parts.push({ text: `${r.blocked} blocked`, cls: 'text-red-500 font-medium' })
     switch (r.kind) {
       case 'none':
@@ -321,6 +323,8 @@ function AdminCalendar() {
         return { label: `${r.free} free`, parts, bg: 'bg-green-50', text: 'text-green-700', title }
       case 'blocked':
         return { label: 'Blocked', parts: [{ text: 'all rooms', cls: 'text-muted-foreground' }], bg: 'bg-red-50', text: 'text-red-500', title }
+      case 'checkout':
+        return { label: 'Check-out', parts, bg: 'bg-sky-50', text: 'text-sky-700', title }
       default:
         return { label: 'Full', parts, bg: 'bg-blue-100', text: 'text-blue-700', title }
     }
