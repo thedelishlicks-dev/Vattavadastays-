@@ -90,13 +90,17 @@ export function stateOf(idx: CalIndex, roomId: string, date: string): DayInfo {
 export type RoomDay = { id: string; name: string; state: DayState; guest?: string };
 
 export type DaySummary = {
-  kind: "none" | "open" | "some-free" | "full" | "blocked";
+  kind: "none" | "open" | "some-free" | "full" | "blocked" | "checkout";
   free: number;
   total: number;
   /** rooms closed by the owner */
   blocked: number;
-  /** rooms occupied by a guest (booked, pending, or on their check-out day) */
+  /** rooms with a confirmed/completed booking tonight */
   booked: number;
+  /** rooms with an unconfirmed guest request (needs the owner's confirmation) */
+  pending: number;
+  /** rooms on a guest's check-out day (guest leaves; room not yet free) */
+  leaving: number;
   /** one entry per room — what the day-detail view shows (hover tooltips don't exist on touch screens) */
   rooms: RoomDay[];
   lines: string[];
@@ -108,6 +112,8 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   let free = 0;
   let blocked = 0;
   let booked = 0;
+  let pending = 0;
+  let leaving = 0;
   const lines: string[] = [];
   const perRoom: RoomDay[] = [];
   for (const r of rooms) {
@@ -115,6 +121,8 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
     perRoom.push({ id: r.id, name: r.name, state: info.state, guest: info.state === "open" ? undefined : info.name });
     if (info.state === "open") free++;
     else if (info.state === "blocked") blocked++;
+    else if (info.state === "pending") pending++;
+    else if (info.state === "checkout") leaving++;
     else booked++;
     const label = { open: "Open", booked: "Booked", pending: "Pending", checkout: "Check-out", blocked: "Blocked" }[info.state];
     lines.push(`${r.name}: ${label}${info.state !== "open" && info.name ? ` (${info.name})` : ""}`);
@@ -124,6 +132,7 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   else if (free === total) kind = "open";
   else if (free > 0) kind = "some-free";
   else if (blocked === total) kind = "blocked";
+  else if (leaving === total) kind = "checkout";
   else kind = "full";
-  return { kind, free, total, blocked, booked, rooms: perRoom, lines };
+  return { kind, free, total, blocked, booked, pending, leaving, rooms: perRoom, lines };
 }
