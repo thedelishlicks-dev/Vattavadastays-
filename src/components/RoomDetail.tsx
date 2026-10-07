@@ -125,6 +125,7 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
             <img
               src={room.images[0]}
               alt={room.name}
+              decoding="async"
               className="h-56 w-full object-cover rounded-xl"
             />
           )}
