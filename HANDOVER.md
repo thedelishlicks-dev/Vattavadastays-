@@ -286,6 +286,18 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 
 **Still open (needs a decision or input):** landing page rewrite not on `main`; `sync_availability_on_booking` migration (20261005…) not in the repo — export it from Supabase and commit it; plan-tier enforcement; deleting `/setup`, the `create-owner` function and `get_invite_by_token`; optimistic updates / service worker; agent portal; billing.
 
+### v9.3 — Loading performance
+
+Measured on the build output (guest first load = what a visitor to `demo.stayidom.in` downloads): **33 → 14 requests**, same ~191 KB gzip JS. Real-device timings were **not** measured (no browser in the build environment) — check with Chrome DevTools / Lighthouse on a throttled "Slow 4G" profile.
+
+- **Property data starts loading before the page code does** (`lib/prefetch.ts`, called from `main.tsx`): removes one network round-trip from the guest's first load. Only fires on guest pages (`scripts/prefetch.check.ts`). The decision mirrors `routes/index.tsx` `Index` — **if you change how guest vs landing is detected there, change `guestSlugForThisPage()` too.**
+- **Sensible caching** (`lib/queryClient.ts`): `staleTime` 30 s globally (was 0 → refetch on every mount and every app-switch), 60 s for the property. Mutations still invalidate immediately. Trade-off: an owner who edits settings and jumps straight to their own guest page in the same session can see the old version for up to 60 s.
+- **Fewer requests:** all lucide icons in one `vendor-icons` chunk (was ~18 one-icon files).
+- **Images:** room photos and the map load lazily; the hero image is marked high-priority.
+- **Fonts:** one Google Fonts request instead of two, duplicate preconnects removed.
+
+**Service worker — deliberately NOT added.** Static files already carry 1-year `immutable` cache headers (`vercel.json`), so repeat visits don't re-download code; a service worker would add little there. The slow part on weak signal is waiting for *data*, which a service worker can't fix because guests need live availability. It would also add a second cache layer to the exact stale-deploy problem v9.1 fixed. Revisit only if (a) owners need the admin to open with no signal at all, or (b) real measurements show repeat-visit load as the bottleneck. If added: cache-first for `/assets/*` only, network-first for `index.html`, never cache `/api/*` or Supabase responses.
+
 ---
 
 *Supabase project, Edge Function base URL and the v8 notes on onboarding, RLS and RPC grants are in `docs/HANDOVER_v8_ARCHIVE.md`.*

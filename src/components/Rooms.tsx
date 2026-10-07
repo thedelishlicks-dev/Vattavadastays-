@@ -129,6 +129,8 @@ export function Rooms({ onSelect, checkIn, checkOut, selectedRoomIds = [] }: Roo
                   <img
                     src={room.images[0]}
                     alt={room.name}
+                    loading="lazy"
+                    decoding="async"
                     className="aspect-[4/5] w-full object-cover transition-transform duration-500 ease-[var(--ease-smooth)] group-hover:scale-105"
                   />
                   {isBooked && (

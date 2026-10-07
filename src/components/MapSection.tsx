@@ -47,7 +47,7 @@ export function MapSection({ subdomain }: MapSectionProps) {
           {/* Static Map or Fallback */}
           {staticMapUrl ? (
             <div className="relative rounded-2xl overflow-hidden border border-border">
-              <img src={staticMapUrl} alt={`Map showing location of ${propertyName}`} className="w-full h-48 md:h-64 object-cover" />
+              <img src={staticMapUrl} alt={`Map showing location of ${propertyName}`} loading="lazy" decoding="async" className="w-full h-48 md:h-64 object-cover" />
               {lat && lng && (
                 <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur text-stone-900 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors">
                   <Navigation className="h-3.5 w-3.5" /> Open in Maps

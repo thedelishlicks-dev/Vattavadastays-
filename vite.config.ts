@@ -24,6 +24,9 @@ export default defineConfig({
           if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react";
           if (id.includes("@supabase")) return "vendor-supabase";
           if (id.includes("@tanstack")) return "vendor-tanstack";
+          // Every lucide icon was its own tiny file (~18 extra requests on a guest's
+          // first load); one chunk is one request.
+          if (id.includes("lucide-react")) return "vendor-icons";
           return undefined;
         },
       },

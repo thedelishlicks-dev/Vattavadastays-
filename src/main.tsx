@@ -3,8 +3,12 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
 import { reloadOnceForNewVersion } from "./lib/staleBuild";
+import { prefetchGuestProperty } from "./lib/prefetch";
 
 const router = getRouter();
+
+// Begin loading the property data now, in parallel with the route code.
+prefetchGuestProperty();
 
 // After a deploy, a browser holding an old cached index.html asks for JS chunks
 // that no longer exist and the route fails ("Something went wrong"). Reload once

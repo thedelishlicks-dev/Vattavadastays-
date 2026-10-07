@@ -1,9 +1,8 @@
 import { Outlet, Link, createRootRoute, useRouterState } from "@tanstack/react-router";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import "../styles.css";
-
-const queryClient = new QueryClient();
 
 function NotFoundComponent() {
   return (
