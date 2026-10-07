@@ -16,7 +16,7 @@ import {
   ChevronRight,
   Receipt,
 } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { MiniBarChart } from "@/components/MiniBarChart";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import { supabase } from "@/lib/supabase";
@@ -649,49 +649,7 @@ function AdminPayments() {
                     </span>
                   </div>
                 </div>
-                <div className="h-36">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={trendData} barGap={4}>
-                      <CartesianGrid
-                        vertical={false}
-                        stroke="var(--border)"
-                        strokeDasharray="3 3"
-                      />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        width={44}
-                        tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={(v: number) =>
-                          v >= 1000 ? `₹${Math.round(v / 1000)}k` : `₹${v}`
-                        }
-                      />
-                      <Tooltip
-                        cursor={{ fill: "var(--muted)" }}
-                        formatter={(value: number) => `₹${Number(value).toLocaleString("en-IN")}`}
-                        contentStyle={{
-                          background: "var(--card)",
-                          border: "1px solid var(--border)",
-                          borderRadius: 8,
-                          fontSize: 12,
-                        }}
-                      />
-                      <Bar dataKey="Collected" fill="var(--primary)" radius={[3, 3, 0, 0]} />
-                      <Bar
-                        dataKey="Outstanding"
-                        fill="var(--destructive)"
-                        fillOpacity={0.7}
-                        radius={[3, 3, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                <MiniBarChart data={trendData} />
               </div>
             )}
 

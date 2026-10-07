@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
@@ -13,8 +13,10 @@ import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
 import { useProperty } from "@/hooks/useProperty";
 import { getSubdomain } from "@/lib/subdomain";
-import LandingPage from "@/components/LandingPage";
 import type { Room } from "@/types/database";
+
+// Lazy: guests on a property page never download the marketing landing page.
+const LandingPage = lazy(() => import("@/components/LandingPage"));
 
 export const Route = createFileRoute("/")({
   component: Index,
@@ -37,7 +39,11 @@ function Index() {
     hostname === "127.0.0.1";
 
   if (isRootDomain) {
-    return <LandingPage />;
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background" />}>
+        <LandingPage />
+      </Suspense>
+    );
   }
 
   const subdomain = getSubdomain();
