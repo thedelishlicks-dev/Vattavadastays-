@@ -38,6 +38,7 @@ export function Hero() {
           height={1080}
           className="absolute inset-0 h-full w-full object-cover"
           loading="eager"
+          fetchPriority="high"
           decoding="async"
         />
       ) : (
