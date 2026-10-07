@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
+import { priceRoomStay } from "@/lib/quoteBuilder";
 
 export interface RoomBookingInput {
   roomId: string;
@@ -132,26 +133,30 @@ export function useCreateBooking() {
       // ── Step 3: Calculate price per room ──
       const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
 
+      // One shared calculator (lib/quoteBuilder.priceRoomStay) so the guest
+      // total, the owner-side AddBookingModal and the Quote Builder can never
+      // drift apart.
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId)!;
-        let roomPrice = 0;
-
-        for (const date of dates) {
-          const d = new Date(date);
-          const dow = d.getDay();
-          const isWeekend = dow === 5 || dow === 6;
-          const multiplier = isWeekend ? (room.weekend_multiplier ?? 1) : 1;
-          roomPrice += room.base_price * multiplier;
-        }
-
-        const extraGuestCharge =
-          Math.max(0, ri.guestCount - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
+        const line = priceRoomStay({
+          room: {
+            id: room.id,
+            name: room.name,
+            base_price: Number(room.base_price),
+            extra_guest_price: Number(room.extra_guest_price ?? 0),
+            weekend_multiplier: Number(room.weekend_multiplier ?? 1),
+            max_guests: Number(room.max_guests),
+          },
+          guests: ri.guestCount,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+        });
 
         roomPrices.push({
           roomId: ri.roomId,
-          roomPrice,
-          extraGuestCharge,
-          totalAmount: roomPrice + extraGuestCharge,
+          roomPrice: line.room_price,
+          extraGuestCharge: line.extra_guest_charge,
+          totalAmount: line.total,
         });
       }
 
