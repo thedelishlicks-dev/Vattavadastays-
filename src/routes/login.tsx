@@ -6,7 +6,7 @@ import { isSuperAdminEmail } from "@/lib/subdomain";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { email?: string } => ({
     email: (search.email as string) ?? "",
   }),
 });
