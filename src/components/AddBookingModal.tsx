@@ -1,3 +1,4 @@
+import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -394,7 +395,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       onSaved?.();
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(friendlyDbError(e, "Save failed"));
     } finally {
       setSaving(false);
     }

@@ -1,3 +1,4 @@
+import { friendlyDbError } from "@/lib/dbErrors";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import {
@@ -277,7 +278,7 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
       queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onSaved();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
@@ -347,7 +348,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const handleSavePayment = async (amount: number, method: string, ref: string) => {
     const newAdvance = advance + amount;
     const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
-    const newStatus = group.status === "pending" ? "confirmed" : group.status;
+    const newStatus: string = group.status === "pending" ? "confirmed" : group.status;
     const holdUpdate = newStatus !== "pending" ? { hold_expires_at: null } : {};
     // Errors are thrown so GroupPaymentForm can show them and stay open —
     // previously a failed save silently closed the form as if it had worked.
@@ -645,7 +646,7 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
     setSaving(true); setError("");
     try { const { error: err } = await supabase.from("bookings").update({ guest_name: form.guest_name.trim(), guest_phone: (form.guest_phone as string).trim(), guest_email: (form.guest_email as string).trim() || null, guest_count: Number(form.guest_count) || 1 }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
@@ -696,7 +697,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
       const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved();
-    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
@@ -727,7 +728,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
 function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booking; discount: number; onSaved: () => void; onCancel: () => void }) {
   const [amount, setAmount] = useState(discount > 0 ? String(discount) : ""); const [reason, setReason] = useState(booking.discount_reason ?? ""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient();
-  const handleSave = async () => { const amt = parseFloat(amount) || 0; if (amt < 0) { setError("Cannot be negative"); return; } if (amt > Number(booking.total_amount)) { setError("Cannot exceed total"); return; } setSaving(true); setError(""); try { const { error: err } = await supabase.from("bookings").update({ discount_amount: amt, discount_reason: reason.trim() || null }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); } };
+  const handleSave = async () => { const amt = parseFloat(amount) || 0; if (amt < 0) { setError("Cannot be negative"); return; } if (amt > Number(booking.total_amount)) { setError("Cannot exceed total"); return; } setSaving(true); setError(""); try { const { error: err } = await supabase.from("bookings").update({ discount_amount: amt, discount_reason: reason.trim() || null }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); } };
   const handleRemove = async () => { setSaving(true); await supabase.from("bookings").update({ discount_amount: 0, discount_reason: null }).eq("id", booking.id); queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
@@ -809,9 +810,9 @@ function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, 
     if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     if (newPayment > maxAllowed) { setError(maxAllowed <= 0 ? "Already fully paid" : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
     setSaving(true); setError("");
-    const newStatus = booking.status === "pending" ? "confirmed" : booking.status;
+    const newStatus: string = booking.status === "pending" ? "confirmed" : booking.status;
     try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: newStatus, ...(newStatus !== "pending" ? { hold_expires_at: null } : {}) }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
-    catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed"); } finally { setSaving(false); }
+    catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">

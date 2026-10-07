@@ -8,6 +8,9 @@ export type PropertyRow = {
   owner_name: string | null
   owner_phone: string | null
   owner_whatsapp: string | null
+  /** auth user linked as owner (null until the owner is linked) */
+  owner_id: string | null
+  owner_email?: string | null
   area: string | null
   is_active: boolean
   subscription_status: 'pending_setup' | 'active' | 'suspended'

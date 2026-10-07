@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 import { priceRoomStay } from "@/lib/quoteBuilder";
+import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 
 export interface RoomBookingInput {
   roomId: string;
@@ -236,6 +237,9 @@ export function useCreateBooking() {
         if (groupId) {
           await supabase.from("booking_groups").delete().eq("id", groupId);
         }
+        // A DB-level overlap (two guests booking the same room at the same
+        // moment) is reported clearly instead of as a generic failure.
+        if (isOverlapError(bookingErr)) throw new Error(OVERLAP_MESSAGE);
         throw new Error("Booking failed. Please try again.");
       }
 
