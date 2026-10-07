@@ -19,6 +19,7 @@ import {
 import { extractUPIId } from "@/utils/upi";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import { BookingInvoice } from "@/components/BookingInvoice";
+import { GuestPolicies } from "@/components/GuestPolicies";
 import type { BookingCharge } from "@/types/database";
 
 export const Route = createFileRoute("/booking-status")({
@@ -698,7 +699,7 @@ function ContactProperty({
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities",
+          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities, check_in_time, check_out_time",
         )
         .eq("id", propertyId)
         .single();
@@ -778,6 +779,12 @@ function ContactProperty({
           )}
         </div>
       </div>
+
+      <GuestPolicies
+        sharedAmenities={property.shared_amenities}
+        checkInTime={property.check_in_time}
+        checkOutTime={property.check_out_time}
+      />
     </div>
   );
 }
