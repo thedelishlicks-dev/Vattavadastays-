@@ -349,8 +349,14 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
     const newStatus = group.status === "pending" ? "confirmed" : group.status;
     const holdUpdate = newStatus !== "pending" ? { hold_expires_at: null } : {};
-    await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus, ...holdUpdate }).eq("id", group.id);
-    if (newStatus !== group.status) await supabase.from("bookings").update({ status: newStatus, ...holdUpdate }).eq("group_id", group.id);
+    // Errors are thrown so GroupPaymentForm can show them and stay open —
+    // previously a failed save silently closed the form as if it had worked.
+    const { error: groupErr } = await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus, ...holdUpdate }).eq("id", group.id);
+    if (groupErr) throw groupErr;
+    if (newStatus !== group.status) {
+      const { error: childErr } = await supabase.from("bookings").update({ status: newStatus, ...holdUpdate }).eq("group_id", group.id);
+      if (childErr) throw childErr;
+    }
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     onRefresh(); setShowPaymentForm(false);
@@ -499,10 +505,10 @@ function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: Book
   );
 }
 
-function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; chargesTotal: number; onSaved: (amount: number, method: string, ref: string) => void; onCancel: () => void }) {
-  const [amount, setAmount] = useState(""); const [method, setMethod] = useState(group.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [error, setError] = useState("");
+function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; chargesTotal: number; onSaved: (amount: number, method: string, ref: string) => Promise<void>; onCancel: () => void }) {
+  const [amount, setAmount] = useState(""); const [method, setMethod] = useState(group.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const newPayment = parseFloat(amount) || 0; const grandTotal = Number(group.total_amount) + chargesTotal; const maxAllowed = Math.max(0, grandTotal - discount - advance); const newAdvance = advance + newPayment; const bal = Math.max(0, grandTotal - discount - newAdvance);
-  const handleSave = () => { if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; } if (newPayment > maxAllowed) { setError(`Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; } onSaved(newPayment, method, ref.trim()); };
+  const handleSave = async () => { if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; } if (newPayment > maxAllowed) { setError(`Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; } setSaving(true); setError(""); try { await onSaved(newPayment, method, ref.trim()); } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed — check your connection and try again"); setSaving(false); } };
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
       <div className="text-sm font-medium">{advance > 0 ? "Record part payment" : "Record advance payment"}</div>
@@ -514,7 +520,7 @@ function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onC
       <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvance.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90">Save</button></div>
+      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
     </div>
   );
 }
