@@ -4,6 +4,7 @@ import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
+import { GuestPolicies } from "@/components/GuestPolicies";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
 
@@ -350,6 +351,13 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                   />
                 )}
 
+                <GuestPolicies
+                  sharedAmenities={property?.shared_amenities}
+                  checkInTime={property?.check_in_time}
+                  checkOutTime={property?.check_out_time}
+                  defaultOpen
+                />
+
                 {trackingUrl && (
                   <a
                     href={trackingUrl}
@@ -452,6 +460,12 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                     </a>
                   </div>
                 )}
+
+                <GuestPolicies
+                  sharedAmenities={property?.shared_amenities}
+                  checkInTime={property?.check_in_time}
+                  checkOutTime={property?.check_out_time}
+                />
 
                 {error && (
                   <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
