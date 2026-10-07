@@ -209,7 +209,7 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 ## 10. Known issues / watch points (verified Oct 2026)
 
 **Product gaps found while auditing claims**
-- ~~Cancellation policy and house rules are not shown to guests.~~ **Fixed v9.1:** `GuestPolicies` shows them on the booking form and the confirmation screen (not yet on the invoice/tracking page).
+- ~~Cancellation policy and house rules are not shown to guests.~~ **Fixed v9.1:** `GuestPolicies` shows them on the booking form and the confirmation screen and (v9.2) on the guest tracking page and printed on the invoice.
 - **No service worker.** `public/manifest.json` only enables "Add to Home Screen". There is **no offline mode and no PWA asset caching**, although v8's "Network Reality" listed it as a requirement and the old landing page claimed it.
 - **No optimistic updates** anywhere (`onMutate` absent), despite older docs saying "Admin uses optimistic updates".
 - **No agent-facing link/portal.** Agents can't log in or see availability on their own page; owners enter agent bookings. (Guests/agents can see free dates on the public booking page.)
@@ -222,9 +222,9 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 - The trigger function `trg_booking_status_change` and other Round 7/8 DB objects were created in the Supabase SQL editor and are **not in `supabase/migrations/`** (that folder holds only `create_leads` and two Round 8 files whose names contain spaces). Export them into versioned migrations.
 
 **Engineering**
-- Pre-existing **24 TypeScript errors** (after a build regenerates the route tree); `vite build` doesn't type-check so they never break deploys. When changing a file, compare error lists before/after rather than aiming for zero. ESLint output is mostly Prettier noise.
+- ~~24 TypeScript errors~~ **Fixed v9.2: `tsc` now reports 0.** Any new error is real — fix it. (`vite build` still doesn't type-check, so run `tsc` after a build.) ESLint output is mostly Prettier noise.
 - ~~`useCreateBooking.ts` duplicated the price loop.~~ **Fixed v9.1:** it now calls `priceRoomStay()` (`scripts/pricing.check.ts` passes in 4 time zones).
-- ~~`admin.payments` chunk ~111 KB gzip (recharts).~~ **Fixed v9.1:** `MiniBarChart` (no library) → ~7 KB gzip. `recharts` is still in `package.json` but nothing imports it (`components/ui/chart.tsx` is unused); remove both when convenient.
+- ~~`admin.payments` chunk ~111 KB gzip (recharts).~~ **Fixed v9.1:** `MiniBarChart` (no library) → ~7 KB gzip. `components/ui/chart.tsx` was deleted in v9.2. `recharts` is still listed in `package.json` (unused, not bundled); remove it with `npm uninstall recharts` from a terminal so `package-lock.json` stays in sync — do not hand-edit only `package.json`.
 - Entry chunk ≈ 156 KB gzip; first-load JS for a guest ≈ 174 KB gzip + 18 KB CSS (measured Oct 2026).
 - ~~Dead `Lead panel.tsx`~~ and duplicate `src/subdomain.ts` — **deleted v9.1** (verified nothing imported them).
 - `useOwnerProperty` key is `['ownerProperty', user?.id, propertySubdomain]`; invalidations use the 2-element prefix `['ownerProperty', user?.id]` (prefix match works). Don't switch to `exact`.
@@ -237,8 +237,8 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 0. **Run the availability trigger + diagnostics** (`docs/GUEST_AVAILABILITY_FIX.md`) if not done, then retest a guest booking end to end.
 1. **Show cancellation policy + house rules to guests** (booking form + confirmation). Then the checklist's policy step can honestly say "guests see this".
 2. **Landing:** set `PLATFORM_WHATSAPP`; get one real owner quote for `TESTIMONIAL`; decide the plan-matrix question (§10); native-speaker review of the Malayalam copy; remove the unused Playfair font link.
-3. **Phase 4B follow-up:** drop `availability.price_override` column (see §7).
-4. **DB-level double-booking guard** (e.g. exclusion constraint / atomic RPC — v8 notes `create_booking_atomic` needs Supabase Pro).
+3. **Phase 4B follow-up:** drop `availability.price_override` column (see §7) — check with `docs/DB_CHECKS.sql` query 2 first.
+4. **DB-level double-booking guard** — migration written and tested in v9.2 (`20261008000000_prevent_double_booking.sql`, exclusion constraint; works on the free tier). **Not yet run**: first run `docs/DB_CHECKS.sql` query 1 and resolve any overlaps; the migration also refuses to run if overlaps exist.
 5. ~~Payment guard~~ — **already enforced** in all three paths (booking form, group form, Payments modal). v9.1 also made the group form show save errors instead of silently closing.
 6. ~~Lighter chart on Payments~~ (done v9.1); consider real PWA caching (service worker) *or* keep claims honest.
 7. v8 cleanups still open: delete `/setup`, the `create-owner` Edge Function and `get_invite_by_token`; commit the Round 8 SQL migrations to `supabase/migrations/` (the two existing files were renamed v9.1 so the Supabase CLI can see them: spaces → underscores, `.sql` added).
@@ -249,7 +249,7 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 ## 12. How to verify a change
 
 1. `npm run build` must pass (also regenerates `routeTree.gen.ts`).
-2. Type-check *after* the build: `npx tsc --noEmit -p tsconfig.json`; compare to the baseline error list (24 today) rather than expecting zero.
+2. Type-check *after* the build: `npx tsc --noEmit -p tsconfig.json` — expect **0 errors** (since v9.2).
 3. Walk the relevant `PHASE*_CHANGES.md` checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single + group booking), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property" tab switching, guest booking total equals the estimate.
 4. For landing changes: view at 375 px width, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row appears in `leads`.
 
@@ -271,6 +271,20 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 **Repo drift warning.** The `main` branch at 7 Oct 2026 did **not** contain: the rewritten landing page (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL`), `docs/HANDOVER_v8_ARCHIVE.md`, `docs/LANDING_PAGE_NOTES.md`, `docs/GUEST_AVAILABILITY_FIX.md`, `PHASE*_CHANGES.md`, or the migration `20261005000000_sync_availability_on_booking.sql`. §8 and parts of §9 describe files that may only exist on your machine / in earlier chats. Either commit them or treat those sections as not yet shipped. `LandingPage.tsx` on `main` is still the old inline-styled version (953 lines) and still uses Playfair Display, so **do not** remove the Playfair `<link>` yet.
 
 **Verified:** `vite build` passes; `tsc` = same 24 baseline errors, no new ones; `calendarState.check.ts` 34/34; `pricing.check.ts` passes in IST/UTC/New York/Auckland. **Not verified:** a real-device pass (iPad Safari + phone) — please walk the checklist in §12 plus: submit a guest booking with a policy written, and record a payment on a multi-room booking.
+
+### v9.2 — 8 Oct 2026
+
+- **Availability trigger verified live:** cancelling a *pending* booking on demo returned its dates to Open. Remaining unexplained blocked dates (Misty Ridge Room, 12–13 Oct 2026) had no booking behind them — treated as manual blocks.
+- **Type check: 24 errors → 0.** Root causes fixed, not suppressed: `useOwnerProperty` and `useBookingGroups` are now typed; `PropertyRow` gained `owner_id` / `owner_email`; `/login` search param is optional; status narrowing in payment saves.
+- **Policies also shown** on the guest tracking page (`booking-status`) and on the printed invoice.
+- **Friendly database errors** (`src/lib/dbErrors.ts`): Supabase errors are plain objects, so `e instanceof Error` showed only "Save failed". Now used by guest booking, `AddBookingModal` and the owner booking forms; a double-booking conflict (SQLSTATE 23P01) reads "Those dates were just booked for this room."
+- **New SQL, tested on a Postgres engine, NOT yet run on Supabase:** `supabase/migrations/20261008000000_prevent_double_booking.sql` (exclusion constraint; aborts safely if overlaps exist; same-day turnover allowed; cancelled bookings ignored).
+- **`docs/DB_CHECKS.sql`:** five read-only diagnostics (overlaps, `price_override` count, unexplained blocks, booking triggers, owner policy completion).
+- Deleted unused `components/ui/chart.tsx`.
+
+**Order to run the new SQL:** (1) `DB_CHECKS.sql` query 1 → must return no rows; (2) the prevent-double-booking migration; (3) test: send two guest requests for the same room/dates from two devices — the second must show the friendly message.
+
+**Still open (needs a decision or input):** landing page rewrite not on `main`; `sync_availability_on_booking` migration (20261005…) not in the repo — export it from Supabase and commit it; plan-tier enforcement; deleting `/setup`, the `create-owner` function and `get_invite_by_token`; optimistic updates / service worker; agent portal; billing.
 
 ---
 
