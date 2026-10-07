@@ -7,6 +7,10 @@ database schema, trigger list, RPC list, RLS policy table and the superadmin
 onboarding flow. This document does **not** repeat those; it describes the app
 *as it is now* and what changed in the October 2026 UX-simplification work.
 
+> **Update 7 Oct 2026 (v9.1):** see §13 for what was fixed after v9, and the
+> **repo drift warning** there — `main` does not yet contain everything this
+> document describes.
+>
 > Read order for a new person or a new Claude session:
 > **§1 → §3 (rules) → §4 (admin map) → §5 (one-home table)**, then dip into the rest as needed.
 > Also read `AGENTS.md` (stack rules) before writing code.
@@ -205,7 +209,7 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 ## 10. Known issues / watch points (verified Oct 2026)
 
 **Product gaps found while auditing claims**
-- **Cancellation policy and house rules are not shown to guests anywhere.** Owners can write them (Property → Policies) but no guest component reads `__cancel:` / `__rules:`. High-value fix: show them on the guest booking form and in the confirmation/invoice.
+- ~~Cancellation policy and house rules are not shown to guests.~~ **Fixed v9.1:** `GuestPolicies` shows them on the booking form and the confirmation screen (not yet on the invoice/tracking page).
 - **No service worker.** `public/manifest.json` only enables "Add to Home Screen". There is **no offline mode and no PWA asset caching**, although v8's "Network Reality" listed it as a requirement and the old landing page claimed it.
 - **No optimistic updates** anywhere (`onMutate` absent), despite older docs saying "Admin uses optimistic updates".
 - **No agent-facing link/portal.** Agents can't log in or see availability on their own page; owners enter agent bookings. (Guests/agents can see free dates on the public booking page.)
@@ -219,10 +223,10 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 
 **Engineering**
 - Pre-existing **24 TypeScript errors** (after a build regenerates the route tree); `vite build` doesn't type-check so they never break deploys. When changing a file, compare error lists before/after rather than aiming for zero. ESLint output is mostly Prettier noise.
-- `useCreateBooking.ts` duplicates the weekend/extra-guest price loop instead of calling `priceRoomStay()`; it also detects weekends with local-time `getDay()` vs UTC in the lib. Equivalent in IST; keep both in sync or refactor to share.
-- `admin.payments` chunk is **~111 KB gzip** (the `recharts` bar chart) — the heaviest admin page for weak-signal owners. Candidate for a lighter chart.
+- ~~`useCreateBooking.ts` duplicated the price loop.~~ **Fixed v9.1:** it now calls `priceRoomStay()` (`scripts/pricing.check.ts` passes in 4 time zones).
+- ~~`admin.payments` chunk ~111 KB gzip (recharts).~~ **Fixed v9.1:** `MiniBarChart` (no library) → ~7 KB gzip. `recharts` is still in `package.json` but nothing imports it (`components/ui/chart.tsx` is unused); remove both when convenient.
 - Entry chunk ≈ 156 KB gzip; first-load JS for a guest ≈ 174 KB gzip + 18 KB CSS (measured Oct 2026).
-- `src/components/Lead panel.tsx` (note the space in the filename) exports `LeadsPanel` but nothing imports it — `superadmin.index.tsx` has its own leads UI. Likely dead; confirm and delete.
+- ~~Dead `Lead panel.tsx`~~ and duplicate `src/subdomain.ts` — **deleted v9.1** (verified nothing imported them).
 - `useOwnerProperty` key is `['ownerProperty', user?.id, propertySubdomain]`; invalidations use the 2-element prefix `['ownerProperty', user?.id]` (prefix match works). Don't switch to `exact`.
 - Supabase Free tier pauses on inactivity (first request can fail). Superadmin can *view* any property but can't *write* to owner-scoped tables of one it doesn't own (RLS) — test write flows logged in as the real owner.
 
@@ -235,9 +239,9 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 2. **Landing:** set `PLATFORM_WHATSAPP`; get one real owner quote for `TESTIMONIAL`; decide the plan-matrix question (§10); native-speaker review of the Malayalam copy; remove the unused Playfair font link.
 3. **Phase 4B follow-up:** drop `availability.price_override` column (see §7).
 4. **DB-level double-booking guard** (e.g. exclusion constraint / atomic RPC — v8 notes `create_booking_atomic` needs Supabase Pro).
-5. Payment guard — block recording more than the gross total (v8 backlog).
-6. Lighter chart on Payments; consider real PWA caching (service worker) *or* keep claims honest.
-7. v8 cleanups still open: delete `/setup`, the `create-owner` Edge Function and `get_invite_by_token`; commit the Round 8 SQL migrations to `supabase/migrations/`; delete dead `Lead panel.tsx`.
+5. ~~Payment guard~~ — **already enforced** in all three paths (booking form, group form, Payments modal). v9.1 also made the group form show save errors instead of silently closing.
+6. ~~Lighter chart on Payments~~ (done v9.1); consider real PWA caching (service worker) *or* keep claims honest.
+7. v8 cleanups still open: delete `/setup`, the `create-owner` Edge Function and `get_invite_by_token`; commit the Round 8 SQL migrations to `supabase/migrations/` (the two existing files were renamed v9.1 so the Supabase CLI can see them: spaces → underscores, `.sql` added).
 8. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (all from v8 roadmap).
 
 ---
@@ -248,6 +252,25 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 2. Type-check *after* the build: `npx tsc --noEmit -p tsconfig.json`; compare to the baseline error list (24 today) rather than expecting zero.
 3. Walk the relevant `PHASE*_CHANGES.md` checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single + group booking), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property" tab switching, guest booking total equals the estimate.
 4. For landing changes: view at 375 px width, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row appears in `leads`.
+
+---
+
+## 13. v9.1 — 7 Oct 2026
+
+**Fixed**
+- **Stale-deploy "Something went wrong" (found on iPad Safari, `demo.stayidom.in/login`).** Cause: a browser with a cached old `index.html` asks for hashed JS chunks that a new deploy deleted; Vercel's catch-all rewrite then served HTML for the missing `.js`. Now: (a) `vite:preloadError` + the error screen auto-reload once (`src/lib/staleBuild.ts`, max 1 per 30 s); (b) `vercel.json` no longer rewrites `/assets/*` or `/api/*` to `index.html`, so missing assets 404 cleanly. Manual workaround for an affected device: Settings → Safari → Advanced → Website Data → delete the site.
+- **Guests now see cancellation policy + house rules** (`src/lib/policies.ts`, `src/components/GuestPolicies.tsx`; wired into `BookingForm`). Hidden when the owner wrote nothing.
+- **Payments page 111 KB → 7 KB gzip** (`src/components/MiniBarChart.tsx`).
+- **Landing page lazy-loaded** → guest route chunk 33 KB → 19 KB gzip. **Vendor chunk split** (`vite.config.ts`): React / Supabase / TanStack cache separately from app code.
+- **One price calculator:** guest booking uses `priceRoomStay()`.
+- **Group payment errors are shown** (and the form stays open) instead of silently closing.
+- Housekeeping: dead files deleted, migration files renamed, `scripts/pricing.check.ts` added.
+
+**New SQL (not yet run — review first):** `supabase/migrations/20261007000000_free_nights_on_any_cancel.sql` frees a booking's nights when it is cancelled from *any* status (fixes orphan "Blocked" dates from cancelled/expired pending requests). Additive; does not replace `trg_booking_status_change`.
+
+**Repo drift warning.** The `main` branch at 7 Oct 2026 did **not** contain: the rewritten landing page (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL`), `docs/HANDOVER_v8_ARCHIVE.md`, `docs/LANDING_PAGE_NOTES.md`, `docs/GUEST_AVAILABILITY_FIX.md`, `PHASE*_CHANGES.md`, or the migration `20261005000000_sync_availability_on_booking.sql`. §8 and parts of §9 describe files that may only exist on your machine / in earlier chats. Either commit them or treat those sections as not yet shipped. `LandingPage.tsx` on `main` is still the old inline-styled version (953 lines) and still uses Playfair Display, so **do not** remove the Playfair `<link>` yet.
+
+**Verified:** `vite build` passes; `tsc` = same 24 baseline errors, no new ones; `calendarState.check.ts` 34/34; `pricing.check.ts` passes in IST/UTC/New York/Auckland. **Not verified:** a real-device pass (iPad Safari + phone) — please walk the checklist in §12 plus: submit a guest booking with a policy written, and record a payment on a multi-room booking.
 
 ---
 
