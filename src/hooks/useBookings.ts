@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
+import type { BookingGroup } from "../types/database";
 
 interface BookingFilters {
   status?: string;
@@ -31,7 +32,7 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
 
 export const useBookingGroups = (propertyId: string) => {
   const { isAuthenticated } = useAuth();
-  return useQuery({
+  return useQuery<BookingGroup[]>({
     queryKey: ["bookingGroups", propertyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -40,7 +41,7 @@ export const useBookingGroups = (propertyId: string) => {
         .eq("property_id", propertyId)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as BookingGroup[];
     },
     enabled: !!propertyId && isAuthenticated,
   });
