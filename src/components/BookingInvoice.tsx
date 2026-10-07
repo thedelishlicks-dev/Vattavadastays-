@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { Check, Copy, MessageCircle, Printer } from "lucide-react";
 import type { BookingCharge } from "@/types/database";
+import { extractPolicies } from "@/lib/policies";
 
 interface InvoiceProps {
   booking: {
@@ -29,6 +30,7 @@ interface InvoiceProps {
     area?: string | null;
     owner_name?: string | null;
     owner_phone?: string | null;
+    shared_amenities?: string[] | null;
   } | null;
   charges: BookingCharge[];
   chargesTotal: number;
@@ -84,6 +86,7 @@ export function BookingInvoice({
     year: "numeric",
   });
   const subtotal = Number(booking.total_amount) + chargesTotal;
+  const cancellation = extractPolicies(property?.shared_amenities).cancellation;
 
   const invoiceText = [
     `━━━━━━━━━━━━━━━━━━`,
@@ -200,6 +203,14 @@ export function BookingInvoice({
           <div className="text-xs text-muted-foreground border-t border-dashed border-border pt-2">
             Ref: {booking.payment_reference}
             {booking.payment_method && ` · ${booking.payment_method}`}
+          </div>
+        )}
+
+        {/* Cancellation policy (printed with the invoice) */}
+        {cancellation && (
+          <div className="text-xs text-muted-foreground border-t border-dashed border-border pt-2 whitespace-pre-line">
+            <span className="font-semibold">Cancellation policy: </span>
+            {cancellation}
           </div>
         )}
 
