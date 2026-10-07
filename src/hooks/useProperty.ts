@@ -34,19 +34,27 @@ export type Property = {
   rooms: import('@/types/database').Room[]
 }
 
+/** Shared by useProperty() and the pre-render prefetch in lib/prefetch.ts. */
+export const propertyQueryOptions = (slug: string) => ({
+  queryKey: ['property', slug] as const,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from('properties')
+      .select('*, rooms(*)')
+      .eq('subdomain', slug)
+      .single()
+    if (error) throw error
+    return data as Property
+  },
+  // Guest-facing data changes rarely; 60 s stops the ten components that call
+  // useProperty() from each triggering their own refetch.
+  staleTime: 60_000,
+})
+
 export function useProperty(subdomain?: string) {
   const slug = subdomain ?? getSubdomain()
   return useQuery({
-    queryKey: ['property', slug],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('properties')
-        .select('*, rooms(*)')
-        .eq('subdomain', slug)
-        .single()
-      if (error) throw error
-      return data as Property
-    },
+    ...propertyQueryOptions(slug),
     enabled: !!slug,
   })
 }
