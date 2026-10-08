@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect, useMemo } from "react";
 import {
   Wallet,
@@ -309,7 +309,7 @@ function PaymentActionModal({
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
   const { data: bookings = [] } = useBookings(property?.id ?? "");
-  const { data: groups = [] } = useBookingGroups(property?.id ?? "");
+  const { data: groups = [] } = useBookingGroups(property?.id ?? "", { slim: true });
   const queryClient = useQueryClient();
 
   const navigate = useNavigate();
