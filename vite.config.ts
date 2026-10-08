@@ -5,6 +5,11 @@ import tsconfigPaths from "vite-tsconfig-paths";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
+  // Git commit of this deploy (Vercel sets VERCEL_GIT_COMMIT_SHA at build time),
+  // attached to every logged error so you know which release broke.
+  define: {
+    __APP_VERSION__: JSON.stringify((process.env.VERCEL_GIT_COMMIT_SHA ?? "dev").slice(0, 7)),
+  },
   plugins: [
     TanStackRouterVite({ autoCodeSplitting: true }),
     tsconfigPaths(),
