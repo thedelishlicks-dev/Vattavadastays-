@@ -310,6 +310,25 @@ Guests' and owners' crashes/failures are now reported to Supabase and shown on *
 - **No regex lookbehind** in the logger (older iPad Safari throws a parse-time SyntaxError on it) — keep it that way; `errorLog.check.ts` enforces it.
 - To log from new code: `logClientError({ source: "booking" | "admin" | ..., error, context: { step: "..." } })` from `@/lib/errorLog`.
 
+### v9.5 — Admin speed
+
+**Problem found:** `useBookings()` and `useBookingGroups()` downloaded *every booking ever made* (each with all its charges, and each group's rooms a second time) on every admin page, and Supabase silently caps one request at 1,000 rows — so a busy property would eventually lose its oldest bookings from the Payments/Agents totals with no error shown.
+
+**Changes** (no screen's numbers or behaviour change, except the one noted below):
+- **Calendar** downloads only the viewed month: stays overlapping the month (`check_in <= month end AND check_out >= month start` — the `>=` matters because the Calendar names the guest leaving on a check-out day), and no charges. In the random test data one month was ~5% of the history (30 of 600 bookings).
+- **Dashboard** downloads from the start of *last month* onward (every figure on it is "this month", "upcoming" or "today"). "Total bookings" and the "has history" flag now come from a count-only request (`useBookingTotal`), so a property in its off-season doesn't look brand new. Standalone bookings are also excluded by `group_id`, so a room of a group can never be double-counted when only part of the data is loaded.
+- **Payments / Agents** keep **all-time** data (their totals are meant to cover the whole business, and Outstanding must include old unpaid balances), but ask for group rooms as ids only (`slim: true`) — they only used the ids and a count.
+- **Pagination** (`src/lib/paginate.ts`): every unbounded fetch now loops until it has all rows. Normal case (< 1,000 rows) is still exactly one request — the first page also asks for the total count.
+- **Indexes** (`supabase/migrations/20261010000000_admin_speed_indexes.sql`) on the columns the admin queries filter/join on. Verified the planner uses each (22,000-row test DB). Idempotent; check `docs/DB_CHECKS.sql` query 6 first. **Not yet run on Supabase.**
+- `docs/DB_CHECKS.sql` gained query 6 (existing indexes), 7 (table sizes) and 8 (RLS policies that call `auth.uid()` per row — a known Postgres slowdown; **no policy was changed blind**, send the output to get a rewrite).
+- `scripts/adminWindow.check.ts`: windowed Calendar == full-history Calendar for every room-day of 36 months (3,285 cells), dashboard figures equal on 7 different "today" dates, and pagination correctness (59 checks).
+
+**One behaviour change to know about:** the Dashboard's "Send WhatsApp reminder" picker now lists bookings from last month onward, not every booking ever (it is fed by the dashboard's windowed list). Reminders are about upcoming stays, but if owners need to message much older guests, give that modal its own query.
+
+**Rules for new code:** never call `useBookings()` / `useBookingGroups()` unwindowed on a screen that doesn't need all-time data; keep query keys starting with `"bookings"` / `"bookingGroups"` (every mutation invalidates by that prefix); anything that lists unbounded rows must go through `fetchAllRows()`.
+
+**Not done / next:** the Bookings page still loads all-time (it needs group room details and supports deep links to old bookings) — window it by its "Upcoming / By month" scope if it ever feels slow, adding a fetch-by-id for deep links; optimistic updates; RLS `(select auth.uid())` rewrite (needs query 8's output).
+
 ---
 
 *Supabase project, Edge Function base URL and the v8 notes on onboarding, RLS and RPC grants are in `docs/HANDOVER_v8_ARCHIVE.md`.*
