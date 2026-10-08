@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
+import { logClientError } from "@/lib/errorLog";
 
 export interface RoomBookingInput {
   roomId: string;
@@ -79,7 +80,10 @@ export function useCreateBooking() {
         .in("id", roomIds)
         .eq("is_active", true);
 
-      if (roomsErr || !roomDetails) throw new Error("Could not load room details.");
+      if (roomsErr || !roomDetails) {
+        logClientError({ source: "booking", error: roomsErr, message: "Could not load room details", context: { step: "load-rooms" } });
+        throw new Error("Could not load room details.");
+      }
 
       // Validate guest counts per room.
       // max_guests is the number of guests INCLUDED in the base price, not
@@ -199,6 +203,7 @@ export function useCreateBooking() {
           .single();
 
         if (groupErr || !groupData) {
+          logClientError({ source: "booking", error: groupErr, message: "Could not create group booking", context: { step: "create-group" } });
           throw new Error("Could not create group booking. Please try again.");
         }
         groupId = groupData.id;
@@ -240,6 +245,7 @@ export function useCreateBooking() {
         // A DB-level overlap (two guests booking the same room at the same
         // moment) is reported clearly instead of as a generic failure.
         if (isOverlapError(bookingErr)) throw new Error(OVERLAP_MESSAGE);
+        logClientError({ source: "booking", error: bookingErr, message: "Booking insert failed", context: { step: "create-booking" } });
         throw new Error("Booking failed. Please try again.");
       }
 

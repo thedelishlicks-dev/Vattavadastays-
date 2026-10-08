@@ -1,11 +1,15 @@
-import React from "react";
+ import React from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "@tanstack/react-router";
 import { getRouter } from "./router";
 import { reloadOnceForNewVersion } from "./lib/staleBuild";
 import { prefetchGuestProperty } from "./lib/prefetch";
+import { installGlobalErrorLogging } from "./lib/errorLog";
 
 const router = getRouter();
+
+// Report uncaught errors to the superadmin Errors tab.
+installGlobalErrorLogging();
 
 // Begin loading the property data now, in parallel with the route code.
 prefetchGuestProperty();

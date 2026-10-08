@@ -1,8 +1,10 @@
-// src/lib/dbErrors.ts
+ // src/lib/dbErrors.ts
 //
 // Turns Supabase/Postgres errors into messages people can act on.
 // Supabase returns plain objects ({ code, message }), not Error instances, so
 // `e instanceof Error` checks miss them and users only saw "Save failed".
+
+import { logClientError } from "@/lib/errorLog";
 
 type DbErrorLike = { code?: string; message?: string };
 
@@ -18,9 +20,16 @@ export function isOverlapError(e: unknown): boolean {
 export const OVERLAP_MESSAGE =
   "Those dates were just booked for this room. Please choose different dates.";
 
-/** Best human-readable message for any thrown value. */
+/**
+ * Best human-readable message for any thrown value.
+ *
+ * Every caller uses this on a save-failure path, so unexpected failures are also
+ * reported to the superadmin error log (the page URL recorded with the report
+ * says which screen it was). Overlap conflicts are expected and never logged.
+ */
 export function friendlyDbError(e: unknown, fallback = "Something went wrong. Please try again."): string {
   if (isOverlapError(e)) return OVERLAP_MESSAGE;
+  logClientError({ source: "admin", error: e });
   if (e instanceof Error && e.message) return e.message;
   const { message } = asDbError(e);
   return message || fallback;

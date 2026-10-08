@@ -298,6 +298,18 @@ Measured on the build output (guest first load = what a visitor to `demo.stayido
 
 **Service worker — deliberately NOT added.** Static files already carry 1-year `immutable` cache headers (`vercel.json`), so repeat visits don't re-download code; a service worker would add little there. The slow part on weak signal is waiting for *data*, which a service worker can't fix because guests need live availability. It would also add a second cache layer to the exact stale-deploy problem v9.1 fixed. Revisit only if (a) owners need the admin to open with no signal at all, or (b) real measurements show repeat-visit load as the bottleneck. If added: cache-first for `/assets/*` only, network-first for `index.html`, never cache `/api/*` or Supabase responses.
 
+### v9.4 — Error log
+
+Guests' and owners' crashes/failures are now reported to Supabase and shown on **/superadmin → Errors** (grouped: "×14 same error", newest first; filter by 24 h / 7 d / 30 d; "Hide network errors" is on by default because weak-signal "Failed to fetch" is expected; "Clear all" button).
+
+- **Table:** `client_errors` (`supabase/migrations/20261009000000_client_error_log.sql`). Anyone can INSERT; only the superadmin email can SELECT/DELETE. Self-defending because the public can write to it: size CHECK constraints, a trigger that refuses inserts after 1,000 rows/hour, and `purge_old_client_errors()` (30-day retention — schedule with the optional `cron.schedule` line at the bottom of the migration, or use "Clear all").
+- **What gets reported:** uncaught errors and unhandled promise rejections (`installGlobalErrorLogging()` in `main.tsx`); route crashes (the "Something went wrong" screen); real causes of failed guest bookings (previously hidden behind "Booking failed"); unexpected owner save failures (inside `friendlyDbError`). **Not** reported: stale-deploy chunk errors (they self-heal), double-booking conflicts (expected), ResizeObserver/extension/abort noise, anything while offline.
+- **Privacy:** `src/lib/errorLogCore.ts` strips emails, phone numbers, long tokens/UUIDs and URL query strings before anything leaves the browser; only the URL *path* is kept. Tested in `scripts/errorLog.check.ts`. **Do not add guest names, phone numbers or booking details to `context`.**
+- **Never throws, never blocks:** logging is fire-and-forget; each page load sends at most 10 reports and the same error at most once a minute. If the table doesn't exist yet the insert just fails silently.
+- **Version stamp:** every report carries the deploy's git commit (`__APP_VERSION__`, from Vercel's `VERCEL_GIT_COMMIT_SHA`; "dev" locally) so you can tell which release broke.
+- **No regex lookbehind** in the logger (older iPad Safari throws a parse-time SyntaxError on it) — keep it that way; `errorLog.check.ts` enforces it.
+- To log from new code: `logClientError({ source: "booking" | "admin" | ..., error, context: { step: "..." } })` from `@/lib/errorLog`.
+
 ---
 
 *Supabase project, Edge Function base URL and the v8 notes on onboarding, RLS and RPC grants are in `docs/HANDOVER_v8_ARCHIVE.md`.*
