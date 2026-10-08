@@ -47,3 +47,31 @@ select name,
        (select count(*) from unnest(shared_amenities) x where x like '\_\_rules:%')  as has_house_rules
   from public.properties
  order by name;
+
+-- 6. Existing indexes on the booking tables (run BEFORE 20261010000000_admin_speed_indexes.sql;
+--    skip any line of that file whose index you already have under another name).
+select tablename, indexname, indexdef
+  from pg_indexes
+ where schemaname = 'public'
+   and tablename in ('bookings','booking_groups','booking_charges','rooms','availability')
+ order by tablename, indexname;
+
+-- 7. How big are the tables? (Tells you whether speed work matters yet: tens of
+--    thousands of rows = yes; hundreds = barely.)
+select 'bookings' as tbl, count(*) as rows from public.bookings
+union all select 'booking_groups', count(*) from public.booking_groups
+union all select 'booking_charges', count(*) from public.booking_charges
+union all select 'availability', count(*) from public.availability
+union all select 'client_errors', count(*) from public.client_errors;
+
+-- 8. RLS policies that call auth.uid()/auth.email()/auth.jwt() directly. Postgres
+--    re-evaluates those once PER ROW; writing (select auth.uid()) evaluates it
+--    once per query — Supabase's own performance advisor flags this. Send me the
+--    result and I'll write the rewrite; I haven't changed any policy blind.
+select schemaname, tablename, policyname, cmd,
+       coalesce(qual, '') as using_expr, coalesce(with_check, '') as check_expr
+  from pg_policies
+ where schemaname = 'public'
+   and (coalesce(qual,'') ~ 'auth\.(uid|email|jwt)\(\)' or coalesce(with_check,'') ~ 'auth\.(uid|email|jwt)\(\)')
+   and not (coalesce(qual,'') ~ 'select auth\.' or coalesce(with_check,'') ~ 'select auth\.')
+ order by tablename, policyname;

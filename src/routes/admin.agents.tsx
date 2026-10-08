@@ -70,7 +70,7 @@ function AdminAgents() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   const { data: agents = [], isLoading: agentsLoading } = useAgents(property?.id ?? "");
   const { data: bookings = [] } = useBookings(property?.id ?? "");
-  const { data: groups = [] } = useBookingGroups(property?.id ?? "");
+  const { data: groups = [] } = useBookingGroups(property?.id ?? "", { slim: true });
   const queryClient = useQueryClient();
   const deleteAgent = useDeleteAgent();
 

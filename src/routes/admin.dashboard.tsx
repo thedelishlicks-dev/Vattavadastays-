@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings, useBookingGroups } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
@@ -465,8 +465,17 @@ function RecentBookings({
 
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  const { data: bookings = [], isLoading: bookLoading } = useBookings(property?.id ?? "");
-  const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "");
+  // Every figure on this screen is "this month", "upcoming" or "today", so it
+  // only needs bookings from the start of last month onward — not the whole
+  // history. "Total bookings" comes from a count-only request instead.
+  const windowFrom = useMemo(() => {
+    const d = new Date();
+    const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
+  }, []);
+  const { data: bookings = [], isLoading: bookLoading } = useBookings(property?.id ?? "", { from: windowFrom });
+  const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
+  const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const [modal, setModal] = useState<Modal>(null);
 
   const today = (() => {
@@ -483,7 +492,9 @@ function DashboardPage() {
     return ids;
   }, [groups]);
   const standaloneBookings = useMemo(
-    () => bookings.filter((b) => !groupBookingIds.has(b.id)),
+    // group_id check too: with a date window, a room of a group could fall inside
+    // the window while its group row doesn't — never count it as standalone.
+    () => bookings.filter((b) => !groupBookingIds.has(b.id) && !b.group_id),
     [bookings, groupBookingIds],
   );
 
@@ -555,7 +566,10 @@ function DashboardPage() {
   // Only show the stats strip once there's real booking history — an empty
   // "0" / "—" row on a brand-new property reads as broken, not as "no data
   // yet". The onboarding checklist already covers guidance for that state.
-  const hasBookingHistory = bookings.length > 0 || groups.length > 0;
+  // The count covers ALL history, so a property in its off-season (nothing in
+  // the window) doesn't suddenly look brand new.
+  const totalBookings = bookingTotal ?? bookings.length;
+  const hasBookingHistory = totalBookings > 0 || groups.length > 0;
 
   return (
     <div className="space-y-6">
@@ -606,7 +620,7 @@ function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
                 <MessageSquare className="h-3.5 w-3.5" /> Total bookings
               </div>
-              <div className="mt-1.5 font-display text-xl font-semibold">{bookings.length}</div>
+              <div className="mt-1.5 font-display text-xl font-semibold">{totalBookings}</div>
             </div>
           </div>
         </div>

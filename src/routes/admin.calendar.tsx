@@ -271,7 +271,13 @@ function AdminCalendar() {
     data: bookings = [],
     isLoading: bookingsLoading,
     isError: bookingsError,
-  } = useBookings(property?.id ?? '')
+  } = useBookings(property?.id ?? '', {
+    // Only this month's stays (a stay that straddles the month edge still
+    // overlaps it) — not the property's entire history. No charges needed.
+    overlapFrom: startDate,
+    overlapTo: endDate,
+    withCharges: false,
+  })
 
   // Pure logic lives in src/lib/calendarState.ts (and is unit-tested there).
   const index = useMemo(
