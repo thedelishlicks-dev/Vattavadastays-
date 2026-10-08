@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useAllProperties, useCreateProperty, useUpdateSubscription } from '@/hooks/useSuperAdmin'
 import { useLeads } from '../hooks/useLeads'
+import { useClientErrors, useClearClientErrors, groupErrors } from '../hooks/useClientErrors'
 import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight, Link2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/superadmin/')({
 const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
-type Tab = 'properties' | 'leads'
+type Tab = 'properties' | 'leads' | 'errors'
 
 type NewPropertyForm = {
   name: string
@@ -605,6 +606,107 @@ function PropertiesTab() {
   )
 }
 
+// ─── Errors Tab ───────────────────────────────────────────────────────────────
+
+function timeAgo(iso: string) {
+  const mins = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.round(mins / 60)
+  if (hrs < 48) return `${hrs} h ago`
+  return `${Math.round(hrs / 24)} d ago`
+}
+
+function ErrorsTab() {
+  const [days, setDays] = useState(7)
+  const [hideNetwork, setHideNetwork] = useState(true)
+  const [open, setOpen] = useState<string | null>(null)
+  const { data: rows = [], isLoading, isError, refetch, isFetching } = useClientErrors(days)
+  const clear = useClearClientErrors()
+
+  const hiddenNetwork = rows.filter((r) => r.category === 'network').length
+  const groups = useMemo(
+    () => groupErrors(hideNetwork ? rows.filter((r) => r.category !== 'network') : rows),
+    [rows, hideNetwork],
+  )
+
+  if (isLoading) {
+    return <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />)}</div>
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-border p-8 text-center text-muted-foreground">
+        Failed to load the error log. If you haven&apos;t run the error-log SQL migration yet, run it in Supabase first.{' '}
+        <button onClick={() => refetch()} className="text-primary underline">Retry</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3 text-sm">
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm">
+          <option value={1}>Last 24 hours</option>
+          <option value={7}>Last 7 days</option>
+          <option value={30}>Last 30 days</option>
+        </select>
+        <label className="inline-flex items-center gap-2 text-muted-foreground">
+          <input type="checkbox" checked={hideNetwork} onChange={(e) => setHideNetwork(e.target.checked)} />
+          Hide network errors{hiddenNetwork ? ` (${hiddenNetwork})` : ''}
+        </label>
+        <button onClick={() => refetch()} disabled={isFetching} className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-muted disabled:opacity-50">
+          {isFetching ? 'Refreshing…' : 'Refresh'}
+        </button>
+        {rows.length > 0 && (
+          <button
+            onClick={() => { if (window.confirm('Delete ALL logged errors? This cannot be undone.')) clear.mutate() }}
+            disabled={clear.isPending}
+            className="ml-auto rounded-full border border-destructive/40 text-destructive px-3 py-1.5 text-xs hover:bg-destructive/10 disabled:opacity-50"
+          >
+            {clear.isPending ? 'Clearing…' : 'Clear all'}
+          </button>
+        )}
+      </div>
+
+      {groups.length === 0 ? (
+        <div className="rounded-xl border border-border p-10 text-center text-muted-foreground">
+          No errors in this period. 🎉
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {groups.map((g) => {
+            const isOpen = open === g.key
+            return (
+              <li key={g.key} className="rounded-xl border border-border bg-card">
+                <button onClick={() => setOpen(isOpen ? null : g.key)} className="w-full text-left p-4 flex items-start gap-3">
+                  <span className="mt-0.5 rounded-full bg-destructive/10 text-destructive text-xs font-semibold px-2 py-0.5 shrink-0">×{g.count}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium break-words">{g.message}</span>
+                    <span className="block text-xs text-muted-foreground mt-1">
+                      {g.source}{g.category === 'network' ? ' · network' : ''} · last {timeAgo(g.lastSeen)}
+                      {g.hosts.length ? ` · ${g.hosts.slice(0, 3).join(', ')}${g.hosts.length > 3 ? '…' : ''}` : ''}
+                      {g.versions.length ? ` · v${g.versions.join(', v')}` : ''}
+                    </span>
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="border-t border-border px-4 py-3 space-y-2 text-xs text-muted-foreground">
+                    <p><span className="font-medium text-foreground">First seen:</span> {formatDate(g.firstSeen)} · <span className="font-medium text-foreground">Page:</span> {g.sample.url ?? '—'}</p>
+                    {g.sample.context && <p className="break-all"><span className="font-medium text-foreground">Context:</span> {JSON.stringify(g.sample.context)}</p>}
+                    {g.sample.user_agent && <p className="break-words"><span className="font-medium text-foreground">Device:</span> {g.sample.user_agent}</p>}
+                    {g.sample.stack && <pre className="whitespace-pre-wrap break-words rounded-lg bg-muted p-3 text-[11px] leading-relaxed max-h-64 overflow-auto">{g.sample.stack}</pre>}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ─── Page root ────────────────────────────────────────────────────────────────
 
 function SuperAdminIndex() {
@@ -617,10 +719,10 @@ function SuperAdminIndex() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl md:text-3xl font-semibold">
-            {tab === 'properties' ? 'Properties' : 'Demo Requests'}
+            {tab === 'properties' ? 'Properties' : tab === 'leads' ? 'Demo Requests' : 'Error Log'}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {tab === 'properties' ? 'All properties on the platform' : 'Leads from the marketing page'}
+            {tab === 'properties' ? 'All properties on the platform' : tab === 'leads' ? 'Leads from the marketing page' : 'Crashes and failures reported by guests and owners'}
           </p>
         </div>
         {tab === 'properties' && (
@@ -634,6 +736,7 @@ function SuperAdminIndex() {
         {([
           { key: 'properties', label: 'Properties' },
           { key: 'leads', label: `Demo Requests${leads.length ? ` (${leads.length})` : ''}` },
+          { key: 'errors', label: 'Errors' },
         ] as { key: Tab; label: string }[]).map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tab === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             {label}
@@ -641,7 +744,7 @@ function SuperAdminIndex() {
         ))}
       </div>
 
-      {tab === 'properties' ? <PropertiesTab /> : <LeadsTab />}
+      {tab === 'properties' ? <PropertiesTab /> : tab === 'leads' ? <LeadsTab /> : <ErrorsTab />}
 
       {showAddModal && <AddPropertyModal onClose={() => setShowAddModal(false)} />}
     </div>
