@@ -75,3 +75,20 @@ select schemaname, tablename, policyname, cmd,
    and (coalesce(qual,'') ~ 'auth\.(uid|email|jwt)\(\)' or coalesce(with_check,'') ~ 'auth\.(uid|email|jwt)\(\)')
    and not (coalesce(qual,'') ~ 'select auth\.' or coalesce(with_check,'') ~ 'select auth\.')
  order by tablename, policyname;
+
+-- 9. Exclusion constraints on bookings (double-booking guards). If TWO rows come
+--    back with the same definition, every booking write maintains two identical
+--    indexes — drop one. Keep `bookings_no_overlap` (the app and docs refer to it):
+--      alter table public.bookings drop constraint bookings_no_overlapping_active_stays;
+--    (If the older one shows up in query 6 but NOT here, it is only a plain index
+--    and enforces nothing: drop index public.bookings_no_overlapping_active_stays;)
+select conname, contype, pg_get_constraintdef(oid) as definition
+  from pg_constraint
+ where conrelid = 'public.bookings'::regclass
+   and contype = 'x'
+ order by conname;
+
+-- 10. Redundant plain indexes (identical columns to the primary key / another index).
+--     availability_pkey already indexes (room_id, date), so idx_availability_room_date
+--     only adds write cost on every availability upsert:
+--       drop index if exists public.idx_availability_room_date;
