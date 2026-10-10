@@ -284,7 +284,7 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
+      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{group.group_reference}</p></div>
@@ -399,7 +399,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     <>
       <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col">
           <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
           <div className="px-5 pt-3 pb-4 border-b border-border">
             <div className="flex items-start justify-between">
@@ -424,7 +424,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             {tab === "overview" && (
               <div className="p-5 space-y-4">
                 <Section title="Stay details">
@@ -591,7 +591,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
     <>
       <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
         <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92vh] flex flex-col">
+        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col">
           <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
           <div className="px-5 pt-3 pb-4 border-b border-border">
             <div className="flex items-start justify-between"><div><h2 className="font-display text-lg font-semibold">{booking.guest_name}</h2><div className="flex items-center gap-2 mt-1"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button></div>
@@ -612,7 +612,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
               </button>
             ))}
           </div>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
             {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
             {tab === "charges" && (
               <div className="p-5 space-y-4">
@@ -652,7 +652,7 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
+      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{booking.id.slice(0, 8).toUpperCase()}</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-5 space-y-3">
@@ -733,7 +733,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   return (
     <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl">
+      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
         <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Stay Details</h2><p className="text-xs text-muted-foreground mt-0.5">Total will be recalculated</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-5 space-y-3">
@@ -891,8 +891,8 @@ type BookingListItem =
 
 function BookingsAdmin() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  const { data: bookings = [], isLoading: bookingsLoading } = useBookings(property?.id ?? "");
-  const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "");
+  const { data: bookings = [], isLoading: bookingsLoading, isFetched: bookingsFetched } = useBookings(property?.id ?? "");
+  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
@@ -916,6 +916,12 @@ function BookingsAdmin() {
   // wouldn't currently show under the active filters (e.g. its stay has
   // already ended, or a status filter is applied).
   useEffect(() => {
+    // Wait until the property is known AND both lists have really been fetched.
+    // On a full page load (e.g. the dashboard's plain <a> link) the property is
+    // still loading, the queries are disabled and the lists are empty — running
+    // before that point found nothing and then erased ?bookingId= from the URL,
+    // so the booking card never opened.
+    if (!property?.id || !bookingsFetched || !groupsFetched) return;
     if (bookingsLoading || groupsLoading) return;
     const params = new URLSearchParams(window.location.search);
     const bookingId = params.get("bookingId");
@@ -935,7 +941,7 @@ function BookingsAdmin() {
     url.searchParams.delete("bookingId");
     url.searchParams.delete("groupId");
     window.history.replaceState({}, "", url.toString());
-  }, [bookingsLoading, groupsLoading, bookings, groups]);
+  }, [property?.id, bookingsFetched, groupsFetched, bookingsLoading, groupsLoading, bookings, groups]);
 
   const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
   const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; (property?.rooms ?? []).forEach((r) => { map[r.id] = r.name; }); return map; }, [property]);
