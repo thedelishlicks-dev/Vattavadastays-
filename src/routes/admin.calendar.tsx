@@ -270,6 +270,7 @@ function AdminCalendar() {
   const {
     data: bookings = [],
     isLoading: bookingsLoading,
+    isFetched: bookingsFetched,
     isError: bookingsError,
   } = useBookings(property?.id ?? '', {
     // Only this month's stays (a stay that straddles the month edge still
@@ -307,7 +308,7 @@ function AdminCalendar() {
   const prevMonth = () => setViewDate(new Date(year, month - 1, 1))
   const nextMonth = () => setViewDate(new Date(year, month + 1, 1))
   const monthLabel = viewDate.toLocaleString('default', { month: 'long', year: 'numeric' })
-  const isLoading = availLoading || bookingsLoading
+  const isLoading = availLoading || bookingsLoading || (!!property?.id && !bookingsFetched && !bookingsError)
   const isAll = view === ALL
 
   // "All rooms" cell: summarise a date across every active room.
