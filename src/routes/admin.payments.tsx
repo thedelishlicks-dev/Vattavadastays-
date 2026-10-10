@@ -353,7 +353,9 @@ function AdminPayments() {
         advance_amount: Number(b.advance_amount ?? 0),
         payment_method: b.payment_method ?? null,
         payment_reference: b.payment_reference ?? null,
-        is_paid: b.is_paid,
+        // Derived from the real numbers, not the stored flag: the flag goes stale
+        // when extras/discount/dates change after the last payment was recorded.
+        is_paid: Math.max(0, Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0) - Number(b.advance_amount ?? 0)) === 0,
         roomLabel: "",
       }));
 
@@ -372,7 +374,9 @@ function AdminPayments() {
         advance_amount: Number(g.advance_amount ?? 0),
         payment_method: g.payment_method ?? null,
         payment_reference: g.payment_reference ?? null,
-        is_paid: g.is_paid,
+        // Derived from the real numbers, not the stored flag: the flag goes stale
+        // when extras/discount/dates change after the last payment was recorded.
+        is_paid: Math.max(0, Number(g.total_amount) + chargesSum(g.booking_charges) - Number(g.discount_amount ?? 0) - Number(g.advance_amount ?? 0)) === 0,
         roomLabel: `${(g.bookings ?? []).length} rooms`,
       }));
 

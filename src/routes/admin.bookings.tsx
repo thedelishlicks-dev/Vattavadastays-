@@ -693,14 +693,39 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const stayAdvance = Number(booking.advance_amount ?? 0);
   const stayChargesTotal = stayCharges.reduce((s, c) => s + c.qty * c.unit_price, 0);
   const after = computeBalance({ roomTotal: newTotal, chargesTotal: stayChargesTotal, discount: stayDiscount, advance: stayAdvance });
+
+  // Agent commission follows the room rate. For percentage-type agents, scale the
+  // saved commission by new/old room rate (keeps any one-off rate the owner typed
+  // when creating the booking). Fixed-amount agents are left alone, and so is a
+  // commission that has already been paid out.
+  const [agentType, setAgentType] = useState<string | null>(null);
+  useEffect(() => {
+    if (!booking.agent_id) return;
+    let live = true;
+    supabase.from("agents").select("default_commission_type").eq("id", booking.agent_id).maybeSingle()
+      .then(({ data }) => { if (live) setAgentType((data as { default_commission_type?: string } | null)?.default_commission_type ?? null); });
+    return () => { live = false; };
+  }, [booking.agent_id]);
+  const oldCommission = booking.commission_amount != null ? Number(booking.commission_amount) : null;
+  const oldRoomRate = Number(booking.room_price ?? 0);
+  const newRoomRate = stay?.room_price ?? 0;
+  const isAgentStay = booking.source === "agent" && oldCommission != null;
+  const commissionPaid = !!booking.commission_paid;
+  const newCommission = isAgentStay && !commissionPaid && agentType === "percentage" && oldRoomRate > 0 && newRoomRate > 0
+    ? Math.round(oldCommission! * (newRoomRate / oldRoomRate) * 100) / 100
+    : null;
   const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
+  const commissionNote = !(isAgentStay && hasChanges && nights > 0 && newRoomRate !== oldRoomRate) ? ""
+    : newCommission !== null && newCommission !== oldCommission ? `Agent commission will update from ₹${oldCommission!.toLocaleString("en-IN")} to ₹${newCommission.toLocaleString("en-IN")}.`
+    : commissionPaid ? "Agent commission was already paid, so it won't change — adjust it manually if needed."
+    : agentType && agentType !== "percentage" ? "Agent commission is a fixed amount and stays the same." : "";
   const handleSave = async () => {
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     setSaving(true); setError("");
     try {
       const roomCost = stay?.room_price ?? 0;
       const extraCharge = stay?.extra_guest_charge ?? 0;
-      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal, is_paid: after.balance === 0 && after.netTotal > 0 }).eq("id", booking.id);
+      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal, is_paid: after.balance === 0 && after.netTotal > 0, ...(newCommission !== null ? { commission_amount: newCommission } : {}) }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved();
     } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
@@ -721,6 +746,9 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
               {guestCount > selectedRoom.max_guests && <div className="flex justify-between text-sm text-muted-foreground"><span>{guestCount - selectedRoom.max_guests} extra guest{guestCount - selectedRoom.max_guests > 1 ? "s" : ""}</span><span>₹{(Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")}</span></div>}
               <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1"><span>New total</span><span>₹{newTotal.toLocaleString("en-IN")}</span></div>
             </div>
+          )}
+          {commissionNote && (
+            <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs">{commissionNote}</div>
           )}
           {(stayAdvance > 0 || stayDiscount > 0) && hasChanges && nights > 0 && (
             <div className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
