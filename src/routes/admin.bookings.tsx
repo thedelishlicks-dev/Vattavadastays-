@@ -1035,7 +1035,7 @@ function BookingsAdmin() {
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
   };
 
-  const isLoading = propLoading || bookingsLoading || groupsLoading;
+  const isLoading = propLoading || bookingsLoading || groupsLoading || (!!property?.id && (!bookingsFetched || !groupsFetched));
   const totalItems = sortedItems.length;
 
   if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;

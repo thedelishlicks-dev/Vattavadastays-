@@ -473,8 +473,8 @@ function DashboardPage() {
     const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
     return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
   }, []);
-  const { data: bookings = [], isLoading: bookLoading } = useBookings(property?.id ?? "", { from: windowFrom });
-  const { data: groups = [], isLoading: groupsLoading } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
+  const { data: bookings = [], isLoading: bookLoading, isFetched: bookFetched } = useBookings(property?.id ?? "", { from: windowFrom });
+  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const [modal, setModal] = useState<Modal>(null);
 
@@ -528,7 +528,10 @@ function DashboardPage() {
   const recent = [...bookings]
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 6);
-  const isLoading = propLoading || bookLoading || groupsLoading;
+  // Also wait for the FIRST fetch of both lists once the property is known. While the
+  // property resolves the booking queries are disabled and report "not loading" with
+  // empty data, which flashed the empty/onboarding dashboard before the real one.
+  const isLoading = propLoading || bookLoading || groupsLoading || (!!property?.id && (!bookFetched || !groupsFetched));
 
   const roomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
