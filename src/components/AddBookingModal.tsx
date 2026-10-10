@@ -420,13 +420,13 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
       <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
       <div className="animate-in fade-in duration-200 absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
+      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92dvh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="font-display text-lg font-semibold">{fromQuote ? "Convert quote to booking" : "Add Booking"}</h2>
           <button onClick={onClose} className="press-scale h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
           {fromQuote && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
               <p className="font-medium text-foreground">Pre-filled from the quote you sent.</p>
@@ -706,7 +706,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           )}
         </div>
 
-        <div className="px-5 py-4 border-t border-border space-y-2">
+        <div className="shrink-0 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border space-y-2">
           {error && <p className="text-xs text-destructive">{error}</p>}
           {hasConflicts && (
             <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
