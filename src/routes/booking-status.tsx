@@ -21,6 +21,7 @@ import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { GuestPolicies } from "@/components/GuestPolicies";
 import type { BookingCharge } from "@/types/database";
+import { computeBalance } from "@/lib/balance";
 
 export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
@@ -86,6 +87,10 @@ interface BookingStatusEntry {
   advance: number;
   discount: number;
   balance: number;
+  /** Guest paid more than the (revised) net total — amount owed back. */
+  refundDue: number;
+  /** roomTotal + extras − discount. */
+  netTotal: number;
   isGroup: boolean;
   groupReference?: string;
   roomNames?: string[];
@@ -182,7 +187,7 @@ function BookingStatusPage() {
 
           const discount = Number(group.discount_amount ?? 0);
           const advance = Number(group.advance_amount ?? 0);
-          const balance = Math.max(0, Number(group.total_amount) + chargesTotal - discount - advance);
+          const { balance, refundDue, netTotal } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
 
           const synthesizedBooking = {
             ...roomsInGroup[0],
@@ -213,6 +218,8 @@ function BookingStatusPage() {
             advance,
             discount,
             balance,
+            refundDue,
+            netTotal,
             isGroup: true,
             groupReference: group.group_reference,
             roomNames: roomsInGroup.map((b) => b.rooms?.name ?? "Room"),
@@ -232,8 +239,8 @@ function BookingStatusPage() {
           const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
           const discount = Number(booking.discount_amount ?? 0);
           const advance = Number(booking.advance_amount ?? 0);
-          const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
-          return { booking, charges, chargesTotal, advance, discount, balance, isGroup: false };
+          const { balance, refundDue, netTotal } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
+          return { booking, charges, chargesTotal, advance, discount, balance, refundDue, netTotal, isGroup: false };
         },
       );
 
@@ -534,14 +541,23 @@ function BookingStatusPage() {
                     </div>
                   )}
                   <div className="border-t border-border pt-2 flex justify-between font-semibold">
-                    <span>Balance due</span>
+                    <span>{selected.refundDue > 0 ? "Refund due" : "Balance due"}</span>
                     <span className={selected.balance === 0 ? "text-primary" : "text-amber-700"}>
-                      {selected.balance === 0
-                        ? "Fully paid ✓"
-                        : `₹${selected.balance.toLocaleString("en-IN")}`}
+                      {selected.refundDue > 0
+                        ? `₹${selected.refundDue.toLocaleString("en-IN")}`
+                        : selected.balance === 0
+                          ? "Fully paid ✓"
+                          : `₹${selected.balance.toLocaleString("en-IN")}`}
                     </span>
                   </div>
                 </div>
+
+                {selected.refundDue > 0 && (
+                  <div className="rounded-lg bg-green-50 border border-green-100 px-3 py-2.5 text-xs text-green-800 leading-relaxed">
+                    Your booking total was revised and you've paid ₹{selected.refundDue.toLocaleString("en-IN")} more
+                    than the new total. No payment is needed — the owner will refund or adjust this with you.
+                  </div>
+                )}
 
                 {/* Explanatory note — shown when balance is still due */}
                 {selected.balance > 0 && (
@@ -603,7 +619,7 @@ function BookingStatusPage() {
             <ContactProperty
               propertyId={selected.booking.property_id}
               booking={selected.booking}
-              totalAmount={Number(selected.booking.total_amount) + selected.chargesTotal}
+              totalAmount={selected.netTotal}
               advancePaid={selected.advance}
               showUPI={!isCancelled && selected.booking.payment_method !== "Cash on Arrival"}
               roomNameOverride={selected.isGroup ? selected.roomNames?.join(", ") : undefined}

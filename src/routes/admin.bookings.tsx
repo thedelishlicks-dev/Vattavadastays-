@@ -21,6 +21,7 @@ import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
+import { computeBalance } from "@/lib/balance";
 
 export const Route = createFileRoute("/admin/bookings")({
   component: BookingsAdmin,
@@ -331,7 +332,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const discount = Number(group.discount_amount ?? 0);
   const advance = Number(group.advance_amount ?? 0);
   const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-  const balance = Math.max(0, Number(group.total_amount) + chargesTotal - discount - advance);
+  const { balance, refundDue } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
   const ownerPhone = property?.owner_phone ?? "";
   const canAct = !["cancelled", "completed"].includes(group.status);
 
@@ -444,12 +445,12 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                   {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
                   {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
                   {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
-                  <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
+                  <div className="border-t border-border pt-2 mt-1"><Row label={refundDue > 0 ? "Refund due" : "Balance due"} value={refundDue > 0 ? `₹${refundDue.toLocaleString("en-IN")}` : balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
                 </Section>
                 {canAct && !showDiscountForm && !showPaymentForm && <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>}
                 {showDiscountForm && <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />}
                 {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
-                {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
+                {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">{refundDue > 0 ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust` : "Fully paid ✓"}</div>}
                 {showPaymentForm && <GroupPaymentForm group={group} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />}
                 {group.guest_phone && (
                   <Section title="Send to guest">
@@ -676,6 +677,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient(); const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
+  const { data: stayCharges = [] } = useBookingCharges(booking.id);
   const guestCount = Number(form.guest_count) || 1;
   // Same pricing rule as guest bookings and quotes (weekend multiplier +
   // extra guests) — see priceRoomStay().
@@ -687,6 +689,10 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
     });
   }, [selectedRoom, nights, guestCount, form.check_in, form.check_out]);
   const newTotal = stay?.total ?? 0;
+  const stayDiscount = Number(booking.discount_amount ?? 0);
+  const stayAdvance = Number(booking.advance_amount ?? 0);
+  const stayChargesTotal = stayCharges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+  const after = computeBalance({ roomTotal: newTotal, chargesTotal: stayChargesTotal, discount: stayDiscount, advance: stayAdvance });
   const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
   const handleSave = async () => {
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
@@ -694,7 +700,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
     try {
       const roomCost = stay?.room_price ?? 0;
       const extraCharge = stay?.extra_guest_charge ?? 0;
-      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal }).eq("id", booking.id);
+      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal, is_paid: after.balance === 0 && after.netTotal > 0 }).eq("id", booking.id);
       if (err) throw err;
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved();
     } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
@@ -716,7 +722,13 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
               <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1"><span>New total</span><span>₹{newTotal.toLocaleString("en-IN")}</span></div>
             </div>
           )}
-          {Number(booking.advance_amount) > 0 && hasChanges && nights > 0 && <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">⚠️ Advance of ₹{Number(booking.advance_amount).toLocaleString("en-IN")} already recorded. New balance will be ₹{Math.max(0, newTotal - Number(booking.discount_amount ?? 0) - Number(booking.advance_amount)).toLocaleString("en-IN")}.</div>}
+          {(stayAdvance > 0 || stayDiscount > 0) && hasChanges && nights > 0 && (
+            <div className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+              <div>New total ₹{newTotal.toLocaleString("en-IN")}{stayChargesTotal > 0 ? ` + extras ₹${stayChargesTotal.toLocaleString("en-IN")}` : ""}{stayDiscount > 0 ? ` − discount ₹${stayDiscount.toLocaleString("en-IN")}` : ""} − advance ₹{stayAdvance.toLocaleString("en-IN")}</div>
+              <div className="font-semibold">{after.refundDue > 0 ? `Guest has overpaid by ₹${after.refundDue.toLocaleString("en-IN")} — refund or adjust after saving.` : after.balance === 0 ? "Fully paid after this change." : `New balance due: ₹${after.balance.toLocaleString("en-IN")}`}</div>
+              {stayDiscount > newTotal && <div>⚠️ The existing ₹{stayDiscount.toLocaleString("en-IN")} discount is larger than the new room total — review the discount after saving.</div>}
+            </div>
+          )}
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2 pt-1"><button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving || !hasChanges} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save changes</button></div>
         </div>
@@ -745,6 +757,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
   booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string; upiId?: string;
 }) {
   const [showPaymentForm, setShowPaymentForm] = useState(false); const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const { refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
   return (
     <div className="p-5 space-y-4">
       <Section title="Stay details">
@@ -760,12 +773,12 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
         {discount > 0 && <Row label={`Discount${booking.discount_reason ? ` (${booking.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
         {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
         {booking.payment_reference && <Row label="Reference" value={booking.payment_reference} small />}
-        <div className="border-t border-border pt-2 mt-1"><Row label="Balance due" value={balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
+        <div className="border-t border-border pt-2 mt-1"><Row label={refundDue > 0 ? "Refund due" : "Balance due"} value={refundDue > 0 ? `₹${refundDue.toLocaleString("en-IN")}` : balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
       </Section>
       {!showDiscountForm && !showPaymentForm && !["cancelled", "completed"].includes(booking.status) && <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>}
       {showDiscountForm && <DiscountForm booking={booking} discount={discount} onSaved={() => { setShowDiscountForm(false); onPaymentSaved(); }} onCancel={() => setShowDiscountForm(false)} />}
       {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
-      {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">Fully paid ✓</div>}
+      {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">{refundDue > 0 ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust` : "Fully paid ✓"}</div>}
       {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />}
       <Section title="Send to guest">
         <div className="space-y-2">
@@ -803,7 +816,7 @@ function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { b
 }
 
 function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, onCancel }: { booking: Booking; advance: number; discount: number; chargesTotal: number; onSaved: () => void; onCancel: () => void }) {
-  const suggested = Math.round(Number(booking.total_amount) * 0.25);
+  const suggested = Math.round(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal * 0.25);
   const [amount, setAmount] = useState(""); const [method, setMethod] = useState(booking.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient(); const grandTotal = Number(booking.total_amount) + chargesTotal; const newPayment = parseFloat(amount) || 0; const newAdvanceTotal = advance + newPayment; const maxAllowed = Math.max(0, grandTotal - discount - advance); const bal = Math.max(0, grandTotal - discount - newAdvanceTotal);
   const handleSave = async () => {

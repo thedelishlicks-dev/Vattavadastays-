@@ -27,7 +27,7 @@ function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-stone-100 flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-stone-100 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm p-6">
         <h1 className="text-xl font-bold text-stone-900 mb-1">Owner Login</h1>
         <p className="text-sm text-stone-500 mb-6">Sign in to manage your property</p>
