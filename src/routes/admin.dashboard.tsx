@@ -346,7 +346,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
           return (
             <a
               key={`${row.kind}-${row.id}`}
-              href={`/admin/bookings?${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
+              href={`/admin/bookings?${(() => { const prop = new URLSearchParams(window.location.search).get("property"); return prop ? `property=${encodeURIComponent(prop)}&` : ""; })()}${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
               className="flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5"
             >
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
