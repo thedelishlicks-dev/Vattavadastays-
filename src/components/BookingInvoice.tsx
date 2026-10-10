@@ -21,6 +21,7 @@ interface InvoiceProps {
     extra_guest_charge: number;
     total_amount: number;
     advance_amount: number;
+    discount_amount?: number | null;
     payment_method?: string | null;
     payment_reference?: string | null;
   };
@@ -86,6 +87,8 @@ export function BookingInvoice({
     year: "numeric",
   });
   const subtotal = Number(booking.total_amount) + chargesTotal;
+  const discount = Number(booking.discount_amount ?? 0);
+  const refundDue = Math.max(0, advance - Math.max(0, subtotal - discount));
   const cancellation = extractPolicies(property?.shared_amenities).cancellation;
 
   const invoiceText = [
@@ -110,9 +113,12 @@ export function BookingInvoice({
     ),
     `━━━━━━━━━━━━━━━━━━`,
     `Subtotal         ₹${subtotal.toLocaleString("en-IN")}`,
+    discount > 0 ? `Discount        -₹${discount.toLocaleString("en-IN")}` : null,
     advance > 0 ? `Advance paid    -₹${advance.toLocaleString("en-IN")}` : null,
     `━━━━━━━━━━━━━━━━━━`,
-    `BALANCE DUE      ₹${balance.toLocaleString("en-IN")}`,
+    refundDue > 0
+      ? `REFUND DUE       ₹${refundDue.toLocaleString("en-IN")}`
+      : `BALANCE DUE      ₹${balance.toLocaleString("en-IN")}`,
     `━━━━━━━━━━━━━━━━━━`,
   ]
     .filter(Boolean)
@@ -186,11 +192,12 @@ export function BookingInvoice({
         {/* Totals */}
         <div className="border-t border-dashed border-border pt-2 space-y-1.5">
           <InvLine label="Subtotal" amount={subtotal} bold />
+          {discount > 0 && <InvLine label="Discount" amount={-discount} color="text-green-600" />}
           {advance > 0 && <InvLine label="Advance paid" amount={-advance} color="text-primary" />}
           <div className="border-t border-border pt-1.5">
             <InvLine
-              label="BALANCE DUE"
-              amount={balance}
+              label={refundDue > 0 ? "REFUND DUE" : "BALANCE DUE"}
+              amount={refundDue > 0 ? refundDue : balance}
               bold
               large
               color={balance === 0 ? "text-primary" : "text-amber-700"}
