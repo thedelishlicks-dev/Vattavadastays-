@@ -19,6 +19,7 @@ interface Booking {
   advance_amount: number;
   discount_amount?: number | null;
   room_id: string;
+  property_id?: string;
   /** Extra charges tab entries, joined in via useBookings(). */
   booking_charges?: { qty: number; unit_price: number }[] | null;
 }
@@ -27,6 +28,7 @@ interface Props {
   bookings: Booking[];
   roomNameMap: Record<string, string>;
   property: {
+    id?: string;
     name: string;
     owner_phone: string | null;
     owner_whatsapp: string | null;
@@ -70,7 +72,7 @@ function buildMessage(
         checkIn,
         checkOut,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone),
+        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
       });
 
     case "reminder":
@@ -94,7 +96,7 @@ function buildMessage(
         propertyName: prop,
         upiId: property.upiId ?? undefined,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone),
+        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
       });
     }
 
