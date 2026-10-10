@@ -1,6 +1,6 @@
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag } from "lucide-react";
+import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
@@ -120,6 +120,16 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const [discountReason, setDiscountReason] = useState(fromQuote && fromQuote.discount > 0 ? "As quoted" : "");
   const [discountError, setDiscountError] = useState("");
 
+  // Extra charges entered by the owner while creating the booking (blanket,
+  // meals, etc.). Saved to booking_charges exactly like the Extras tab does,
+  // and included in the total + the 25% advance shown in the WhatsApp message.
+  const [manualExtras, setManualExtras] = useState<{ description: string; qty: string; unit_price: string }[]>([]);
+  const updateExtra = (i: number, k: "description" | "qty" | "unit_price", v: string) =>
+    setManualExtras((xs) => xs.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)));
+  const cleanManualExtras = manualExtras
+    .map((x) => ({ description: x.description.trim(), qty: Math.max(1, parseInt(x.qty) || 1), unit_price: Number(x.unit_price) || 0 }))
+    .filter((x) => x.description && x.unit_price > 0);
+
   const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
 
   const nights = useMemo(() => {
@@ -164,7 +174,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   );
   const priceDrift = useMemo(() => quotePriceDrift(liveRoomTotals, roomTotals), [liveRoomTotals, roomTotals]);
   const extraLines = fromQuote?.lines ?? [];
-  const extrasTotal = extraLines.reduce((s, l) => s + l.subtotal, 0);
+  const quoteExtrasTotal = extraLines.reduce((s, l) => s + l.subtotal, 0);
+  const manualExtrasTotal = cleanManualExtras.reduce((s, x) => s + x.qty * x.unit_price, 0);
+  const extrasTotal = quoteExtrasTotal + manualExtrasTotal;
 
   const grandTotal = roomTotals.reduce((s, r) => s + r.total, 0);
   // Commission base is room rate only (not extra-guest charges), matching
@@ -337,18 +349,19 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       // already saved by now, so a failure here must NOT throw (the owner
       // would retry and hit "dates unavailable") — warn instead.
       let extrasWarning = "";
-      if (fromQuote) {
-        const charges = chargesFromQuote(fromQuote.lines);
-        if (charges.length > 0) {
-          const owner = createdGroupId ? { group_id: createdGroupId } : { booking_id: createdBookingId };
-          const { error: chargeErr } = await supabase.from("booking_charges").insert(charges.map((c) => ({ ...owner, ...c })));
-          if (chargeErr) {
-            extrasWarning = "The booking was created, but its add-ons could not be added automatically. Please add them in the booking's Extras tab:\n" +
-              fromQuote.lines.map((l) => `• ${l.name} — ₹${l.subtotal.toLocaleString("en-IN")}`).join("\n");
-          }
-          queryClient.invalidateQueries({ queryKey: ["bookingCharges"], exact: false });
-          queryClient.invalidateQueries({ queryKey: ["groupCharges"], exact: false });
+      const quoteCharges = fromQuote ? chargesFromQuote(fromQuote.lines) : [];
+      const allCharges = [...quoteCharges, ...cleanManualExtras];
+      if (allCharges.length > 0) {
+        const owner = createdGroupId ? { group_id: createdGroupId } : { booking_id: createdBookingId };
+        const { error: chargeErr } = await supabase.from("booking_charges").insert(allCharges.map((c) => ({ ...owner, ...c })));
+        if (chargeErr) {
+          extrasWarning = "The booking was created, but its extra charges could not be added automatically. Please add them in the booking's Extras tab:\n" +
+            allCharges.map((c) => `• ${c.description} — ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`).join("\n");
         }
+        queryClient.invalidateQueries({ queryKey: ["bookingCharges"], exact: false });
+        queryClient.invalidateQueries({ queryKey: ["groupCharges"], exact: false });
+      }
+      if (fromQuote) {
         try { await fromQuote.onConverted?.(createdBookingId); } catch { /* linking the quote is best-effort */ }
       }
 
@@ -376,7 +389,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             : paymentReminderLink({
                 guestPhone: form.guest_phone,
                 guestName: form.guest_name,
-                totalAmount: grandTotal + extrasTotal,
+                totalAmount: grandTotal,
+                chargesTotal: extrasTotal,
                 discount: discountAmt,
                 advancePaid: 0,
                 checkIn: form.check_in,
@@ -642,6 +656,24 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             </div>
           )}
 
+          {/* Extra charges (blanket, meals, …) */}
+          {nights > 0 && selectedRooms.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Extra charges <span className="normal-case font-normal">(optional)</span></p>
+              {manualExtras.map((x, i) => (
+                <div key={i} className="grid grid-cols-[1fr_56px_80px_28px] gap-2 items-center">
+                  <input value={x.description} onChange={(e) => updateExtra(i, "description", e.target.value)} className={inputCls} placeholder="e.g. Extra blanket" />
+                  <input type="number" min={1} value={x.qty} onChange={(e) => updateExtra(i, "qty", e.target.value)} className={inputCls} placeholder="Qty" />
+                  <input type="number" min={0} value={x.unit_price} onChange={(e) => updateExtra(i, "unit_price", e.target.value)} className={inputCls} placeholder="₹ each" />
+                  <button type="button" onClick={() => setManualExtras((xs) => xs.filter((_, idx) => idx !== i))} className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Remove extra charge"><X className="h-3.5 w-3.5" /></button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setManualExtras((xs) => [...xs, { description: "", qty: "1", unit_price: "" }])} className="w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors flex items-center justify-center gap-2">
+                <Plus className="h-4 w-4" /> Add extra charge
+              </button>
+            </div>
+          )}
+
           {/* Summary */}
           {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
@@ -654,6 +686,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
               )}
               {extraLines.map((l, i) => (
                 <div key={i} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{l.name}{l.variant_label && l.variant_label.toLowerCase() !== "standard" ? ` (${l.variant_label})` : ""} <span className="text-[11px]">· extra</span></span><span className="font-medium shrink-0">₹{l.subtotal.toLocaleString("en-IN")}</span></div>
+              ))}
+              {cleanManualExtras.map((x, i) => (
+                <div key={`m${i}`} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{x.description}{x.qty > 1 ? ` × ${x.qty}` : ""} <span className="text-[11px]">· extra</span></span><span className="font-medium shrink-0">₹{(x.qty * x.unit_price).toLocaleString("en-IN")}</span></div>
               ))}
               {discountValue > 0 && (
                 <div className="flex justify-between text-sm text-green-700 font-medium"><span>Discount{discountReason.trim() ? ` (${discountReason.trim()})` : ""}</span><span>-₹{discountValue.toLocaleString("en-IN")}</span></div>
