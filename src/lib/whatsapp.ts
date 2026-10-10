@@ -4,6 +4,8 @@
  * Indian numbers only — always prefixes 91.
  */
 
+import { computeBalance } from "@/lib/balance";
+
 export function clean(phone: string): string {
   const digits = phone.replace(/\D/g, "");
   if (digits.startsWith("91") && digits.length === 12) return digits;
@@ -219,32 +221,48 @@ export function buildPaymentReminderText({
   ownerPhone,
   trackingUrl,
 }: PaymentReminderInput): string {
-  const grandTotal = totalAmount + chargesTotal - discount;
-  const due     = paymentDueAmount(grandTotal, advancePaid);
-  const balance = Math.max(0, grandTotal - advancePaid);
+  const { netTotal: grandTotal, balance, refundDue } = computeBalance({
+    roomTotal: totalAmount, chargesTotal, discount, advance: advancePaid,
+  });
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
   const breakdownLine = chargesTotal > 0 || discount > 0
-    ? `(Room: ₹${totalAmount.toLocaleString("en-IN")}` +
-      (chargesTotal > 0 ? ` + Extra charges: ₹${chargesTotal.toLocaleString("en-IN")}` : "") +
-      (discount > 0 ? ` − Discount: ₹${discount.toLocaleString("en-IN")}` : "") +
+    ? `(Room: ${inr(totalAmount)}` +
+      (chargesTotal > 0 ? ` + Extra charges: ${inr(chargesTotal)}` : "") +
+      (discount > 0 ? ` − Discount: ${inr(discount)}` : "") +
       `)\n`
     : "";
 
+  const helpLine = ownerPhone
+    ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
+    : "Call us if you need help.";
+
+  // Nothing to collect → never send a "payment pending / Pay ₹0" message.
+  // (Previously this produced "Payment of fully paid ✓ is pending…".)
+  if (balance === 0) {
+    const body = refundDue > 0
+      ? `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) has been updated.\n\n` +
+        `Revised total: ${inr(grandTotal)}\n${breakdownLine}` +
+        `Advance paid: ${inr(advancePaid)}\n` +
+        `You've paid ${inr(refundDue)} more than the revised total — we'll refund or adjust this with you. No further payment is needed.\n\n`
+      : `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) is fully paid ✓\n\n` +
+        `Total: ${inr(grandTotal)}\n${breakdownLine}\n`;
+    return body + `📋 Booking details & invoice:\n${trackingUrl}\n\n` + helpLine;
+  }
+
+  const due = paymentDueAmount(grandTotal, advancePaid);
   let amountLine: string;
   let contextLine: string;
 
   if (advancePaid === 0) {
-    amountLine  = `₹${due.toLocaleString("en-IN")} (25% advance to confirm your booking)`;
-    contextLine = `Total booking amount: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
-  } else if (balance > 0) {
-    amountLine  = `₹${due.toLocaleString("en-IN")} (remaining balance)`;
-    contextLine = `Advance paid: ₹${advancePaid.toLocaleString("en-IN")} · Total: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
+    amountLine  = `${inr(due)} (25% advance to confirm your booking)`;
+    contextLine = `Total booking amount: ${inr(grandTotal)}\n${breakdownLine}`;
   } else {
-    amountLine  = "fully paid ✓";
-    contextLine = `Total: ₹${grandTotal.toLocaleString("en-IN")}\n${breakdownLine}`;
+    amountLine  = `${inr(due)} (remaining balance)`;
+    contextLine = `Advance paid: ${inr(advancePaid)} · Total: ${inr(grandTotal)}\n${breakdownLine}`;
   }
 
-  const payBlock = `👉 Pay ₹${due.toLocaleString("en-IN")} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
+  const payBlock = `👉 Pay ${inr(due)} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
 
   const upiFallback = upiId
     ? (
@@ -252,10 +270,6 @@ export function buildPaymentReminderText({
         `${upiId}\n\n`
       )
     : "";
-
-  const helpLine = ownerPhone
-    ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
-    : "Call us if you need help.";
 
   return (
     `Hi ${guestName}, friendly reminder 🙏\n\n` +
