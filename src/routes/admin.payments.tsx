@@ -308,8 +308,8 @@ function PaymentActionModal({
 
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
-  const { data: bookings = [] } = useBookings(property?.id ?? "");
-  const { data: groups = [] } = useBookingGroups(property?.id ?? "", { slim: true });
+  const { data: bookings = [], isFetched: bookFetched } = useBookings(property?.id ?? "");
+  const { data: groups = [], isFetched: groupsFetched } = useBookingGroups(property?.id ?? "", { slim: true });
   const queryClient = useQueryClient();
 
   const navigate = useNavigate();
@@ -568,7 +568,7 @@ function AdminPayments() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
+  if (isLoading || (!!property?.id && (!bookFetched || !groupsFetched))) {
     return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
   }
 
