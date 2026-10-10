@@ -58,7 +58,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted/40 flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-muted/40 flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-sm p-6 md:p-8">
         {/* Brand */}
         <div className="flex items-center gap-3 mb-6">
