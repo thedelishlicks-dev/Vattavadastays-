@@ -333,7 +333,7 @@ The /setup token flow is DEPRECATED. Use this flow instead:
 
 An onboarding checklist on the admin dashboard helps owners track their setup progress.
 
-The /setup route still exists but is no longer used. Safe to delete in a future cleanup.
+The /setup route, the `create-owner` Edge Function and the `create_owner_auth_user` / `consume_invite_token` DB functions are no longer used (the DB functions are revoked from public access). Delete the Edge Function; remove /setup in a future cleanup.
 
 ---
 
@@ -343,6 +343,8 @@ The /setup route still exists but is no longer used. Safe to delete in a future 
 - **Recording Payment**: When the owner records a new payment (instalment) in the admin dashboard, the frontend adds this new amount to the existing `advance_amount` and saves the result.
 - **Payment Methods**: Supported methods are "UPI", "Bank Transfer", and "Cash on Arrival".
 - **UPI Flow**: Guest taps Pay → `upi://` deep link opens their payment app → pays → WhatsApp prompt appears automatically → guest sends payment screenshot to owner via WhatsApp.
+- **All balance / refund / 25% advance maths lives in `src/lib/balance.ts`** — use `computeBalance`, `chargesSum`, `advanceAmount`, `paymentDueAmount`; never hand-roll `total + extras - discount - advance` or `Math.max(0, …)` (it hides overpayment). `bookings.is_paid` can go stale; derive "paid" from `computeBalance(...).isPaid`. Tests: `npm test`.
+- **Guest tracking links** must include the property id: `guestTrackingUrl(origin, phone, propertyId)`.
 - **Notifications**: Guests notify owner via WhatsApp deep link after booking. Owner sends payment reminders via WhatsApp deep links from booking details.
 
 ---
