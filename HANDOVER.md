@@ -11,6 +11,11 @@ onboarding flow. This document does **not** repeat those; it describes the app
 > **repo drift warning** there — `main` does not yet contain everything this
 > document describes.
 >
+> **Update 11 Oct 2026 (v9.6):** see the **v9.6** section at the end — money maths moved
+> into `src/lib/balance.ts`, a security review of the live database (several fixes applied
+> in Supabase, listed there), and loading / scrolling / link fixes. Read it before touching
+> payments, WhatsApp links or anything in `supabase/`.
+>
 > Read order for a new person or a new Claude session:
 > **§1 → §3 (rules) → §4 (admin map) → §5 (one-home table)**, then dip into the rest as needed.
 > Also read `AGENTS.md` (stack rules) before writing code.
@@ -89,6 +94,14 @@ Run `vite build` first, then `tsc`.
 9. **Owner Calendar labels come only from `src/lib/calendarState.ts`** — don't re-derive Booked/Blocked in the page.
 10. **Guest-side code must NEVER read the `bookings` table** — guests (role `anon`) have no SELECT on it, so a query there silently returns nothing (no error). Guests learn what's taken only from the public `availability` table (via `getBlockedDatesForRooms` / `getConflictingDates` in `lib/bookingAvailability.ts`) or from a SECURITY DEFINER RPC. `Rooms.tsx` broke this rule (room cards never showed "Unavailable") until Oct 2026.
 11. **`availability` is a mirror kept in sync by the database,** not by the browser: trigger `trg_mark_booking_nights` marks the nights of every non-cancelled booking (any source). Guests can't write `availability`; don't rely on client-side upserts for correctness.
+
+**Rules added in v9.6 (11 Oct 2026):**
+12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides **overpayment** (a shortened stay after an advance showed "Fully paid" and the refund was invisible). Show `refundDue` when it is > 0. Tests: `npm test` (`src/lib/balance.test.ts`, runs through `npx tsx`, no extra dependency).
+13. **Every guest tracking link must carry the property id:** `guestTrackingUrl(origin, phone, propertyId)`. Without `&property=` the `/booking-status` page shows "booking link needed". Use `booking.property_id` / `group.property_id`.
+14. **"Paid" is derived, never trusted from `bookings.is_paid`.** The stored flag goes stale when extras, discount or dates change after the last payment. The Payments page now derives it with `computeBalance(...).isPaid`.
+15. **Wait for the first fetch, not just `isLoading`.** While the property is still loading, `useBookings(property?.id ?? "")` is disabled, reports `isLoading = false` and returns `[]`. Pages must also wait for `isFetched` once `property?.id` exists (Dashboard, Bookings, Payments, Calendar do) — otherwise the empty/onboarding view flashes, and the Bookings deep link (`?bookingId=` / `?groupId=`) used to be erased before the list arrived.
+16. **Modals:** use `dvh`, not `vh` (`vh` is taller than a phone's visible screen, so Save slid off-screen). A panel with no height cap must have `max-h-[92dvh] overflow-y-auto overscroll-contain`; a flex-col sheet needs `min-h-0` on its scrolling body. Login/loading screens use `min-h-dvh`.
+17. **Security rules (see v9.6 §Security):** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (DB trigger enforces it); owners must not edit billing columns (DB trigger enforces it).
 
 ---
 
@@ -241,7 +254,7 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 4. **DB-level double-booking guard** — migration written and tested in v9.2 (`20261008000000_prevent_double_booking.sql`, exclusion constraint; works on the free tier). **Not yet run**: first run `docs/DB_CHECKS.sql` query 1 and resolve any overlaps; the migration also refuses to run if overlaps exist.
 5. ~~Payment guard~~ — **already enforced** in all three paths (booking form, group form, Payments modal). v9.1 also made the group form show save errors instead of silently closing.
 6. ~~Lighter chart on Payments~~ (done v9.1); consider real PWA caching (service worker) *or* keep claims honest.
-7. v8 cleanups still open: delete `/setup`, the `create-owner` Edge Function and `get_invite_by_token`; commit the Round 8 SQL migrations to `supabase/migrations/` (the two existing files were renamed v9.1 so the Supabase CLI can see them: spaces → underscores, `.sql` added).
+7. v8 cleanups still open: delete the `create-owner` Edge Function in the Supabase dashboard **now** (unused — see v9.6 §Security — and public), then the `/setup` route, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token`; commit the Round 8 SQL migrations to `supabase/migrations/` (the two existing files were renamed v9.1 so the Supabase CLI can see them: spaces → underscores, `.sql` added).
 8. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (all from v8 roadmap).
 
 ---
@@ -284,7 +297,7 @@ Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs
 
 **Order to run the new SQL:** (1) `DB_CHECKS.sql` query 1 → must return no rows; (2) the prevent-double-booking migration; (3) test: send two guest requests for the same room/dates from two devices — the second must show the friendly message.
 
-**Still open (needs a decision or input):** landing page rewrite not on `main`; `sync_availability_on_booking` migration (20261005…) not in the repo — export it from Supabase and commit it; plan-tier enforcement; deleting `/setup`, the `create-owner` function and `get_invite_by_token`; optimistic updates / service worker; agent portal; billing.
+**Still open (needs a decision or input):** landing page rewrite not on `main`; `sync_availability_on_booking` migration (20261005…) not in the repo — export it from Supabase and commit it; plan-tier enforcement; deleting `/setup`, the `create-owner` function and `get_invite_by_token` (**see v9.6: the function is unused and should be deleted first**); optimistic updates / service worker; agent portal; billing.
 
 ### v9.3 — Loading performance
 
@@ -329,6 +342,45 @@ Guests' and owners' crashes/failures are now reported to Supabase and shown on *
 **Rules for new code:** never call `useBookings()` / `useBookingGroups()` unwindowed on a screen that doesn't need all-time data; keep query keys starting with `"bookings"` / `"bookingGroups"` (every mutation invalidates by that prefix); anything that lists unbounded rows must go through `fetchAllRows()`.
 
 **Not done / next:** the Bookings page still loads all-time (it needs group room details and supports deep links to old bookings) — window it by its "Upcoming / By month" scope if it ever feels slow, adding a fetch-by-id for deep links; optimistic updates; RLS `(select auth.uid())` rewrite (needs query 8's output).
+
+---
+
+### v9.6 — 11 Oct 2026: money maths, links, loading, and a database security review
+
+**Calculations & WhatsApp (code, in the repo)**
+- New `src/lib/balance.ts` is the single source of truth (rule 12). Replaced hand-rolled formulas in: owner booking card + group card + both payment forms, Payments ledger (balance, status, outstanding), Dashboard revenue, tracking page, invoice, UPI card (25% / 50% / remaining), public booking form's suggested advance, `useBookingStatus.ts`, WhatsApp reminders. `whatsapp.ts` still re-exports `paymentDueAmount`.
+- **Overpaid is now visible:** "Refund due ₹X" on the owner card, group card, tracking page and invoice; the WhatsApp text for a settled/overpaid booking no longer says "Payment of fully paid ✓ is pending… Pay ₹0".
+- The invoice now includes the discount (it used to show subtotal minus advance only).
+- `AddBookingModal` has an **Extra charges** section (saved to `booking_charges`); the 25% advance in its WhatsApp message is on room + extras − discount. "Suggested 25%" in Record payment is on the same net total (it used the room total only).
+- Edit Stay: shows new total / refund before saving, warns if the old discount exceeds the new room total, keeps `is_paid` in sync, and **scales the agent's commission** by new/old room rate for percentage agents (not for fixed agents, not once `commission_paid`).
+- **Links:** the booking card's top WhatsApp button, Payment reminder, group reminder and `WhatsAppReminderModal` now pass `property_id` (rule 13). Links already sent from those buttons are broken and must be resent.
+- Dashboard "Needs attention" links keep `?property=`; the Bookings deep link waits for data (rule 15).
+- Scrolling/centering: rule 16 applied to the login pages, `AddBookingModal`, booking/group detail modals and the Edit Stay / Edit Guest / group-guest-edit modals. `admin.tsx`: removed the slide-in animation on the whole admin shell (it made the page jump on load) and a conflicting animation on the spinner.
+
+**Known limits left on purpose:** discount and advance are not auto-adjusted when a stay is shortened (the modal warns; owner edits by hand). There is no "record refund" button — lower "Collected so far" on the Payments page. Edit Stay for a room *inside a group* doesn't update the group total (no UI path reaches it today). `useBookingStatus.ts` is unused and should be deleted.
+
+**Security — what was reviewed and changed in the LIVE Supabase project (10–11 Oct 2026)**
+Files are in `/security` of the review bundle; they were run in the SQL editor and are **not yet in `supabase/migrations/`** (commit them — see Open items).
+| File | What | Status |
+|---|---|---|
+| `00_URGENT_close_create_owner.sql` | `create_owner_auth_user()` was SECURITY DEFINER, callable by `anon`, and never checked its token: anyone with the public anon key could reset any account's password (incl. superadmin) or take over any property. Execute revoked from public/anon/authenticated (also `consume_invite_token`). | applied |
+| `03_storage_policies.sql` | Hero/room image upload+delete limited to the owner's own `<property_id>/` folder (+ superadmin). Buckets already cap size and type; `maps` bucket is unused. | applied |
+| `07_protect_billing_columns.sql` | Trigger: only the superadmin (or server code with no user) may change `subscription_status/tier/end_date`, `setup_fee_paid`, `is_active` on `properties`. | applied |
+| `05_revoke_unneeded_access.sql` | Revoked `TRUNCATE/TRIGGER/REFERENCES` from anon/authenticated. | applied |
+| `02_leads_flood_guard.sql` | Size limits + 200/hour cap on public `leads` inserts. | applied |
+| `09_booking_room_must_match_property.sql` | Trigger: a booking's room must belong to its property (stops one owner blocking another's room). | applied |
+| `10_keep_superadmin_separate.sql` (step 2) | Trigger: the superadmin login can never be set as a property's owner. | applied |
+Also: superadmin password was reset after the above. Row-level security is ON for every table (verified). Policies on bookings/groups/charges/agents/quotes/properties/rooms/availability/add-ons/packages/seasons/leads/client_errors were read and are owner-scoped; `invite_tokens` is locked to nobody (`false`).
+
+**Onboarding reality check (corrects an earlier note):** the live flow is the one in `AGENTS.md` — Add property → Supabase **Invite user** → owner sets password → **Link Owner** (`link_property_owner`). `/setup`, the `create-owner` Edge Function, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token` are **not used**. The Edge Function is a public endpoint with the service key; the old code trusted the email/property in the request, so it should be **deleted** (a hardened replacement exists as `create-owner-edge-function.ts` if it is ever needed again).
+
+**Open items (in priority order)**
+1. **Guest tracking page: the phone number is the only secret.** `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` take property id + phone (the property id is in every link and in public room data) and return the whole booking row minus a deny-list of columns. Fix: a random per-booking token in the link (+ allow-list of columns, + limit what a phone-only lookup returns).
+2. **Delete the `create-owner` Edge Function** in the Supabase dashboard; then remove the `/setup` route and `get_invite_by_token` in a code cleanup.
+3. **Commit the live DB objects to `supabase/migrations/`:** the SQL files above, `lookup_*`, `create_property_with_invite`, `link_property_owner`, the booking triggers and the base-table policies. The repo's `create_leads` migration no longer matches the live policy (live checks the superadmin email in the JWT).
+4. Public booking prices are calculated in the browser and not validated by the insert policy (`total_amount`); move pricing to a server-side function.
+5. Hard-coded superadmin email in many policies/triggers; consider a `superadmins` table. Add security headers in `vercel.json`. `handle_booking_status_change` has no `SET search_path`.
+6. Revisit `SECURITY DEFINER` + public `EXECUTE` whenever a function is added: run `01_audit_queries.sql` query 4 after each DB change.
 
 ---
 
