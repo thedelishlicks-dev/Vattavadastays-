@@ -318,22 +318,15 @@ it does not propagate to child routes. Always use `window.location.search`.
 
 ---
 
-## Superadmin Onboarding Flow (current — June 2026)
+## Superadmin Onboarding Flow (current — October 2026)
 
-The /setup token flow is DEPRECATED. Use this flow instead:
+1. Superadmin presses **Add property** in /superadmin (name, subdomain, owner email, owner name/phone, area).
+2. Press **Invite owner now** (or later **Invite owner** on the row → **Send invite & link**). The `invite-owner` Edge Function emails the owner a set-password link and links their login to the property in one step. (If the owner already has a login, **Link existing account** / the same button just links it.)
+3. Superadmin presses **Manage** on the row and sets up rooms, prices, UPI ID, policies and a hero photo. The row's progress bar / expanded checklist shows what is left.
+4. Owner opens the invite email, sets a password, signs in at stayidom.in/login.
+5. Superadmin presses **Activate** once the setup fee is paid (sets setup fee paid + renewal in 30 days). Trial and legacy `pending_setup` properties both show Activate.
 
-1. Superadmin creates property in /superadmin dashboard (fills name, subdomain, owner details)
-2. Superadmin clicks **Manage** on the new property row
-3. Superadmin sets up rooms, availability, pricing, UPI ID, policies in the admin dashboard
-4. Superadmin goes to Supabase → Authentication → Users → **Invite user** with owner email
-5. Owner receives Supabase invite email, clicks link, sets their own password
-6. Owner logs in at stayidom.in/login
-7. Superadmin clicks **Link Owner** on the property row in /superadmin to connect the Supabase account
-8. Superadmin clicks **Activate** on the property once setup fee is paid
-
-An onboarding checklist on the admin dashboard helps owners track their setup progress.
-
-The /setup route, the `create-owner` Edge Function and the `create_owner_auth_user` / `consume_invite_token` DB functions are no longer used (the DB functions are revoked from public access). Delete the Edge Function; remove /setup in a future cleanup.
+The superadmin login (thedelishlicks@gmail.com) is never a property owner (database trigger). The old `/setup` route, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token` are unused; the `create-owner` Edge Function was deleted.
 
 ---
 
