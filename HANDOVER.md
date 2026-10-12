@@ -102,6 +102,7 @@ Run `vite build` first, then `tsc`.
 15. **Wait for the first fetch, not just `isLoading`.** While the property is still loading, `useBookings(property?.id ?? "")` is disabled, reports `isLoading = false` and returns `[]`. Pages must also wait for `isFetched` once `property?.id` exists (Dashboard, Bookings, Payments, Calendar do) — otherwise the empty/onboarding view flashes, and the Bookings deep link (`?bookingId=` / `?groupId=`) used to be erased before the list arrived.
 16. **Modals:** use `dvh`, not `vh` (`vh` is taller than a phone's visible screen, so Save slid off-screen). A panel with no height cap must have `max-h-[92dvh] overflow-y-auto overscroll-contain`; a flex-col sheet needs `min-h-0` on its scrolling body. Login/loading screens use `min-h-dvh`.
 17. **Security rules (see v9.6 §Security):** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (DB trigger enforces it); owners must not edit billing columns (DB trigger enforces it).
+18. **Superadmin screen logic lives in `src/lib/onboarding.ts`** (statuses incl. `trial`, renewal state, setup checklist, filters, validation, WhatsApp numbers/messages). Don't re-derive "overdue" or "pending" in the page; add a test when adding a rule.
 
 ---
 
@@ -376,11 +377,37 @@ Also: superadmin password was reset after the above. Row-level security is ON fo
 
 **Open items (in priority order)**
 1. **Guest tracking page: the phone number is the only secret.** `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` take property id + phone (the property id is in every link and in public room data) and return the whole booking row minus a deny-list of columns. Fix: a random per-booking token in the link (+ allow-list of columns, + limit what a phone-only lookup returns).
-2. **Delete the `create-owner` Edge Function** in the Supabase dashboard; then remove the `/setup` route and `get_invite_by_token` in a code cleanup.
+2. ~~Delete the `create-owner` Edge Function~~ — **done 11 Oct 2026.** Still to do in a code cleanup: remove the `/setup` route and `get_invite_by_token`, and drop `create_owner_auth_user` / `consume_invite_token`.
 3. **Commit the live DB objects to `supabase/migrations/`:** the SQL files above, `lookup_*`, `create_property_with_invite`, `link_property_owner`, the booking triggers and the base-table policies. The repo's `create_leads` migration no longer matches the live policy (live checks the superadmin email in the JWT).
 4. Public booking prices are calculated in the browser and not validated by the insert policy (`total_amount`); move pricing to a server-side function.
 5. Hard-coded superadmin email in many policies/triggers; consider a `superadmins` table. Add security headers in `vercel.json`. `handle_booking_status_change` has no `SET search_path`.
 6. Revisit `SECURITY DEFINER` + public `EXECUTE` whenever a function is added: run `01_audit_queries.sql` query 4 after each DB change.
+
+---
+
+### v9.7 — 11 Oct 2026: superadmin onboarding & control
+
+**Bugs fixed on `/superadmin`**
+- New properties start as **`trial`**, but the screen only knew `pending_setup`: trial properties had **no Activate button** and the "Pending setup" counter read 0. Both names now mean the same stage (`SubStatus` in `src/lib/onboarding.ts`; the card is now "On trial").
+- Renewal showed "in -109 days" for an overdue property and it still counted in MRR. It now says "Overdue by N days" (red) with the date, "due soon" under 7 days, and the MRR card shows the overdue amount.
+- **Mark Renewed** used to set renewal to "30 days from now" even when renewing early (shortening the period paid for). It now adds 30 days to the later of today and the current end date, and asks to confirm.
+- Owner WhatsApp links were broken for numbers stored as `+91 …` (the code always prepended 91 → `91919…`). Use `waNumber()` / `waLink()` from `src/lib/onboarding.ts`.
+- Add property / Invite owner modals use `dvh`; subdomain is validated (3–30 chars, not reserved, not already used) and the owner email is validated and can never be the superadmin address.
+
+**New on `/superadmin`**
+- Search box and filter chips (All / Needs action / Trial / Active / Overdue / Suspended, with counts).
+- Per-property **setup checklist** (9 steps: owner linked, rooms, prices, UPI, policies, hero photo, setup fee, activated, first booking) shown as a progress bar on the row; click it to expand. "Needs action" reasons: owner not linked, renewal overdue / due soon, ready to activate.
+- Expanded row also has activity (rooms, bookings, last booking), copyable guest and owner-login links, ready-made WhatsApp messages (dashboard ready, renewal reminder) and an editable **Plan & billing** form (tier, monthly fee, setup fee, private notes → `billing_notes`).
+- **One-click owner invite:** "Invite owner" (unlinked) / "Re-link" (linked) → **Send invite & link** emails the owner a set-password link and links the account in one step; **Link existing account** keeps the old `link_property_owner` path. After "Add property" there is an **Invite owner now** button. Replacing an existing owner needs a confirm tick.
+- Logic is pure and tested: `src/lib/onboarding.ts` + `onboarding.test.ts` (`npm test` now runs both test files).
+
+**`invite-owner` Edge Function** (`supabase/functions/invite-owner/index.ts`, deployed by hand in the Supabase dashboard, "Verify JWT" ON)
+- Security: the gateway only checks that *some* key was sent (the public anon key passes), so the function itself calls `auth.getUser(jwt)` and refuses everyone except the superadmin email. It never resets an existing account's password, refuses the superadmin email as an owner, and is not a public onboarding endpoint (unlike the deleted `create-owner`).
+- It invites via `auth.admin.inviteUserByEmail` with `redirectTo = https://stayidom.in/reset-password` (that page already accepts an invite session and asks for a new password), or just links if the email already has a login, then sets `properties.owner_id`.
+- **One-time Supabase setup:** (1) deploy the function; (2) Authentication → URL Configuration → Redirect URLs: add `https://stayidom.in/reset-password`; (3) Supabase's built-in email sender allows only a few emails per hour — add your own SMTP (Authentication → SMTP) before inviting several owners; the screen shows a clear message when the limit is hit.
+- Test with a throwaway email you control: invite → email arrives → set password → sign in → owner dashboard opens that property. If the function is not deployed the modal says so and points to the Supabase-dashboard route.
+
+**Known limits:** the new screen was type-checked, built and logic-tested but not visually tested in a browser before this note — look at it on a phone and an iPad. Setup-progress numbers come from one request for rooms and one count request per property (fine for dozens of properties; revisit with hundreds). An owner login attached to two properties will see only one dashboard.
 
 ---
 
