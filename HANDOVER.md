@@ -385,7 +385,9 @@ Also: superadmin password was reset after the above. Row-level security is ON fo
 
 ---
 
-### v9.7 — 11 Oct 2026: superadmin onboarding & control
+### v9.7 — 11–12 Oct 2026: superadmin onboarding & control
+
+**Status (12 Oct 2026): live on the Vercel preview and tested.** `invite-owner` is deployed in Supabase. A real test invite worked end to end: email arrived → link opened `/reset-password` → password set → redirected to the login page; the property showed *linked / trial / setup fee pending* on `/superadmin`.
 
 **Bugs fixed on `/superadmin`**
 - New properties start as **`trial`**, but the screen only knew `pending_setup`: trial properties had **no Activate button** and the "Pending setup" counter read 0. Both names now mean the same stage (`SubStatus` in `src/lib/onboarding.ts`; the card is now "On trial").
@@ -403,11 +405,18 @@ Also: superadmin password was reset after the above. Row-level security is ON fo
 
 **`invite-owner` Edge Function** (`supabase/functions/invite-owner/index.ts`, deployed by hand in the Supabase dashboard, "Verify JWT" ON)
 - Security: the gateway only checks that *some* key was sent (the public anon key passes), so the function itself calls `auth.getUser(jwt)` and refuses everyone except the superadmin email. It never resets an existing account's password, refuses the superadmin email as an owner, and is not a public onboarding endpoint (unlike the deleted `create-owner`).
-- It invites via `auth.admin.inviteUserByEmail` with `redirectTo = https://stayidom.in/reset-password` (that page already accepts an invite session and asks for a new password), or just links if the email already has a login, then sets `properties.owner_id`.
+- It invites via `auth.admin.inviteUserByEmail` with `redirectTo = https://stayidom.in/reset-password` (that page already accepts an invite session and asks for a new password), or just links if the email already has a confirmed login (no email), and **re-sends the invite** if that login was invited but never accepted (lost/expired email), then sets `properties.owner_id`.
 - **One-time Supabase setup:** (1) deploy the function; (2) Authentication → URL Configuration → Redirect URLs: add `https://stayidom.in/reset-password`; (3) Supabase's built-in email sender allows only a few emails per hour — add your own SMTP (Authentication → SMTP) before inviting several owners; the screen shows a clear message when the limit is hit.
+- **Supabase Auth settings that must stay correct:**
+  - **Site URL = `https://stayidom.in`.** It was left on a property address (`bleafmudhouse.stayidom.in`), which is why the first invite email said "invited to create a user on https://bleafmudhouse.stayidom.in/". The email templates print the Site URL. Not a code bug.
+  - **Redirect URLs** must include `https://stayidom.in/reset-password` (used by the invite) and a wildcard such as `https://*.stayidom.in/**` (the owner Settings → "send reset email" button redirects to each property's own subdomain).
+  - **Email template → "Invite user"**: customised wording (subject "You're invited to stayidom.in", button "Set my password", sign-in at stayidom.in/login). Keep `{{ .ConfirmationURL }}` — it is the link. If the template is ever reset, the default text will reappear.
+  - **SMTP:** the built-in sender is limited to a few emails per hour and adds a "powered by Supabase / opt out" footer. Add your own SMTP (Authentication → SMTP) before inviting several owners.
+- **Test invites in a private window / another browser / another device, never in the browser where you are signed in as superadmin.** A browser holds one session per site, so opening the invite link replaces the superadmin login with the new owner's; the open superadmin tab then shows **"Access Denied"** (`superadmin.tsx` guard for non-superadmin sessions). That is expected, not a bug — sign back in at `/admin/login`. Real owners open the email on their own device, so it never happens to them.
 - Test with a throwaway email you control: invite → email arrives → set password → sign in → owner dashboard opens that property. If the function is not deployed the modal says so and points to the Supabase-dashboard route.
 
 **Known limits:** the new screen was type-checked, built and logic-tested but not visually tested in a browser before this note — look at it on a phone and an iPad. Setup-progress numbers come from one request for rooms and one count request per property (fine for dozens of properties; revisit with hundreds). An owner login attached to two properties will see only one dashboard.
+**Housekeeping after testing:** delete the test property (Supabase → Table Editor → `properties`) and its test login (Authentication → Users). There is no delete button in the UI, and I did not confirm that deleting a property cascades to its rooms/bookings — check those tables afterwards. Demo and test properties (Mist Valley "demo", Bleaf Mud House) still count toward MRR / "Needs action" if they are active or ready to activate; a "demo / internal" flag that excludes them is a possible follow-up (set a property's monthly fee to 0 and add a note in the meantime). The `/superadmin` page shell still has the slide-in load animation and `min-h-screen` that were removed from `/admin` in v9.6 (rule 16); apply the same fix if it jumps on load.
 
 ---
 
