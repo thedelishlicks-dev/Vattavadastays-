@@ -9,7 +9,8 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Minus, Plus, Send, Trash2, TriangleAlert } from "lucide-react";
 import { Section, Field, inputCls } from "@/admin/formKit";
-import { getConflictingDates } from "@/lib/bookingAvailability";
+import { getConflictingDates, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
+import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { useAddons, usePackages, useSeasons } from "@/hooks/useCatalog";
 import { useSaveQuote, type Quote, type QuoteInputs } from "@/hooks/useQuotes";
 import {
@@ -54,6 +55,10 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
   const datesOk = !!checkIn && !!checkOut && nights > 0;
   const selectedRoomIds = Object.keys(roomSel);
+  // Calendar availability: the rooms picked so far, or — dates-first flow,
+  // nothing picked yet — every active room, flagging only fully-booked days.
+  const calendarRoomIds = selectedRoomIds.length > 0 ? selectedRoomIds : rooms.map((r) => r.id);
+  const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property as never), [property]);
 
   // ── soft availability warning (a quote never blocks dates)
   const { data: conflicts = {} } = useQuery({
@@ -188,16 +193,24 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       </Section>
 
       <Section title="Stay">
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Check-in">
-            <input type="date" className={inputCls} value={checkIn} onChange={(e) => {
-              setCheckIn(e.target.value);
-              if (checkOut && e.target.value >= checkOut) setCheckOut("");
-            }} />
-          </Field>
-          <Field label="Check-out">
-            <input type="date" className={inputCls} min={checkIn || undefined} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
-          </Field>
+        <RoomAvailabilityCalendar
+          roomIds={calendarRoomIds}
+          checkIn={checkIn}
+          checkOut={checkOut}
+          turnoverSafe={turnoverSafe}
+          softBlock
+          blockedWhen={selectedRoomIds.length > 0 ? "any" : "all"}
+          onChange={(ci, co) => { setCheckIn(ci); setCheckOut(co); }}
+        />
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="rounded-lg border border-border px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
+            <div className="mt-0.5 font-medium">{checkIn || "Select date"}</div>
+          </div>
+          <div className="rounded-lg border border-border px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
+            <div className="mt-0.5 font-medium">{checkOut || "Select date"}</div>
+          </div>
         </div>
         {datesOk && <p className="text-sm text-muted-foreground">{nights} night{nights > 1 ? "s" : ""}</p>}
       </Section>
