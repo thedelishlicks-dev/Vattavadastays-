@@ -36,9 +36,24 @@ interface RoomAvailabilityCalendarProps {
    * checkout date either — a full clear day is required between stays.
    */
   turnoverSafe: boolean;
+  /**
+   * Quote mode. Quotes never block dates (they're a price estimate, not a
+   * hold), so booked days are still painted red for context but remain
+   * selectable, and a range spanning booked days is allowed. The caller
+   * keeps showing its own "already booked" warning.
+   */
+  softBlock?: boolean;
+  /**
+   * How `roomIds` combine into one "blocked" state per day.
+   * "any" (default): blocked if ANY room is taken — right for a booking,
+   * which needs every selected room free at once.
+   * "all": blocked only if EVERY room is taken (i.e. fully booked) — right
+   * for a quote before any room has been picked.
+   */
+  blockedWhen?: "any" | "all";
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any" }: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -62,7 +77,10 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomKey, gridStart, gridEnd, turnoverSafe]);
 
-  const isDateBlocked = (dateStr: string) => roomIds.some((id) => blockedByRoom[id]?.has(dateStr));
+  const isDateBlocked = (dateStr: string) =>
+    blockedWhen === "all"
+      ? roomIds.length > 0 && roomIds.every((id) => blockedByRoom[id]?.has(dateStr))
+      : roomIds.some((id) => blockedByRoom[id]?.has(dateStr));
 
   const getDateState = (date: Date): DateState => {
     if (!isSameMonth(date, month)) return "out-of-month";
@@ -83,6 +101,17 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
   const handlePick = (d: Date) => {
     const state = getDateState(d);
     if (state === "past" || state === "out-of-month") return;
+
+    // Quote mode: availability is informational only, so any non-past day
+    // can be either end of the range — no blocked-day or night-by-night checks.
+    if (softBlock) {
+      if (!checkInDate || checkOutDate || !isAfter(d, checkInDate)) {
+        onChange(format(d, "yyyy-MM-dd"), "");
+      } else {
+        onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
+      }
+      return;
+    }
 
     // A day can be "blocked" simply because ANOTHER booking's stay starts
     // that day — that's not automatically a reason to refuse it as OUR
@@ -158,7 +187,9 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
           let cellCls = "aspect-square rounded-md text-xs font-medium transition-colors ";
           if (state === "out-of-month") cellCls += "text-muted-foreground/20 cursor-default";
           else if (state === "past") cellCls += "text-muted-foreground/30 cursor-default line-through";
-          else if (state === "blocked") cellCls += "bg-red-50 text-red-300 cursor-not-allowed";
+          else if (state === "blocked" && !(softBlock && (isStart || isEnd))) {
+            cellCls += softBlock ? "bg-red-50 text-red-400 cursor-pointer hover:bg-red-100" : "bg-red-50 text-red-300 cursor-not-allowed";
+          }
           else if (isStart || isEnd) cellCls += "bg-primary text-primary-foreground cursor-pointer";
           else if (selected) cellCls += "bg-primary-light text-primary cursor-pointer";
           else cellCls += "text-foreground hover:bg-primary-light cursor-pointer";
@@ -167,9 +198,9 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
             <button
               key={i}
               type="button"
-              disabled={state === "past" || state === "out-of-month" || (state === "blocked" && !isStart && !isEnd)}
+              disabled={state === "past" || state === "out-of-month" || (state === "blocked" && !softBlock && !isStart && !isEnd)}
               onClick={() => handlePick(d)}
-              title={state === "blocked" ? "Not available" : undefined}
+              title={state === "blocked" ? (softBlock ? "Already booked — you can still quote" : "Not available") : undefined}
               className={cellCls}
             >
               {format(d, "d")}
@@ -180,7 +211,7 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-background border border-border" />Available</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200" />Not available</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200" />{blockedWhen === "all" ? "Fully booked" : "Not available"}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-primary" />Selected</span>
       </div>
 
