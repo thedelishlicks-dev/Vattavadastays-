@@ -323,8 +323,10 @@ it does not propagate to child routes. Always use `window.location.search`.
 1. Superadmin presses **Add property** in /superadmin (name, subdomain, owner email, owner name/phone, area).
 2. Press **Invite owner now** (or later **Invite owner** on the row → **Send invite & link**). The `invite-owner` Edge Function emails the owner a set-password link and links their login to the property in one step. (If the owner already has a login, **Link existing account** / the same button just links it.)
 3. Superadmin presses **Manage** on the row and sets up rooms, prices, UPI ID, policies and a hero photo. The row's progress bar / expanded checklist shows what is left.
-4. Owner opens the invite email, sets a password, signs in at stayidom.in/login.
+4. Owner opens the invite email on their own device, sets a password, signs in at stayidom.in/login. (When testing, open the link in a private window — opening it in the superadmin's browser replaces the superadmin session and shows "Access Denied".)
 5. Superadmin presses **Activate** once the setup fee is paid (sets setup fee paid + renewal in 30 days). Trial and legacy `pending_setup` properties both show Activate.
+
+Supabase Auth must have Site URL `https://stayidom.in`, Redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`, and a customised "Invite user" email template (see HANDOVER v9.7).
 
 The superadmin login (thedelishlicks@gmail.com) is never a property owner (database trigger). The old `/setup` route, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token` are unused; the `create-owner` Edge Function was deleted.
 
