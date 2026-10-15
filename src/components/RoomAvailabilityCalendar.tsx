@@ -51,9 +51,15 @@ interface RoomAvailabilityCalendarProps {
    * for a quote before any room has been picked.
    */
   blockedWhen?: "any" | "all";
+  /**
+   * Picking DAYS rather than a stay: the second tap is the LAST day itself
+   * (it may equal the first), not a check-out morning. Only meaningful with
+   * `softBlock`. Used to pick a seasonal-rate period.
+   */
+  inclusiveEnd?: boolean;
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any" }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any", inclusiveEnd = false }: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -105,7 +111,8 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     // Quote mode: availability is informational only, so any non-past day
     // can be either end of the range — no blocked-day or night-by-night checks.
     if (softBlock) {
-      if (!checkInDate || checkOutDate || !isAfter(d, checkInDate)) {
+      const endsRange = inclusiveEnd ? !isBefore(d, checkInDate ?? d) : !!checkInDate && isAfter(d, checkInDate);
+      if (!checkInDate || checkOutDate || !endsRange) {
         onChange(format(d, "yyyy-MM-dd"), "");
       } else {
         onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
