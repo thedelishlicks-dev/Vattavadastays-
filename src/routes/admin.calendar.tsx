@@ -4,8 +4,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2 } from 'lucide-react'
 import { BlockDatesModal } from '@/components/BlockDatesModal'
+import { ChannelSyncModal } from '@/components/ChannelSyncModal'
+import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
+import { friendlyNote, isIcalNote } from '@/lib/icalClient'
 import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, type DayState } from '@/lib/calendarState'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -192,8 +195,13 @@ function ReopenDialog({
         </div>
         {note && (
           <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
-            <span className="text-muted-foreground">Reason you gave: </span>
-            {note}
+            <span className="text-muted-foreground">{isIcalNote(note) ? 'Source: ' : 'Reason you gave: '}</span>
+            {friendlyNote(note)}
+          </p>
+        )}
+        {isIcalNote(note) && (
+          <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+            This night is held by a booking on another site. Reopening it here won&apos;t cancel that booking, and the next sync will block it again. To free it, cancel the booking on the other site.
           </p>
         )}
         <p className="text-sm text-muted-foreground">
@@ -223,6 +231,8 @@ function AdminCalendar() {
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [viewDate, setViewDate] = useState(new Date())
   const [showBlock, setShowBlock] = useState(false)
+  const [showSync, setShowSync] = useState(false)
+  useIcalAutoSync(property?.id)
   const [reopen, setReopen] = useState<{ roomId: string; roomName: string; date: string; note: string | null } | null>(null)
   const [dayDetail, setDayDetail] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -344,14 +354,24 @@ function AdminCalendar() {
     >
       <div className="flex items-start justify-between gap-3 mb-6">
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
-        <button
-          type="button"
-          onClick={() => setShowBlock(true)}
-          disabled={activeRooms.length === 0}
-          className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-        >
-          <Ban className="h-4 w-4" /> Block dates
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSync(true)}
+            disabled={activeRooms.length === 0}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            <Link2 className="h-4 w-4" /> Sync with other sites
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowBlock(true)}
+            disabled={activeRooms.length === 0}
+            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+          >
+            <Ban className="h-4 w-4" /> Block dates
+          </button>
+        </div>
       </div>
 
       {(bookingsError || availError) && (
@@ -469,7 +489,7 @@ function AdminCalendar() {
                     type="button"
                     onClick={() => setReopen({ roomId: view as string, roomName, date: dateStr, note: noteText })}
                     className={`h-16 border-b border-r border-border/50 p-1.5 text-xs text-left w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${c.bg}`}
-                    title={noteText ? `Blocked — ${noteText}. Tap to reopen.` : 'Blocked. Tap to reopen.'}
+                    title={noteText ? `Blocked — ${friendlyNote(noteText)}. Tap to reopen.` : 'Blocked. Tap to reopen.'}
                   >
                     <div className="font-medium text-foreground">{day}</div>
                     <div className={`mt-0.5 truncate ${c.text}`}>{c.label}</div>
@@ -560,6 +580,10 @@ function AdminCalendar() {
             setReopen(null)
           }}
         />
+      )}
+
+      {showSync && property && (
+        <ChannelSyncModal propertyId={property.id} rooms={activeRooms} onClose={() => setShowSync(false)} />
       )}
 
       {showBlock && (
