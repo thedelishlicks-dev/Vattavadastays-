@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
 import type { Room } from '@/types/database'
 import { validateAndCompress, compressionSummary } from '@/lib/imageUtils'
+import { RoomRatesEditor } from '@/components/RoomRatesEditor'
 import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
 
 export const Route = createFileRoute('/admin/rooms')({
@@ -333,6 +334,14 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
             maxGuests={form.max_guests}
           />
           </div>
+
+          {room ? (
+            <RoomRatesEditor propertyId={propertyId} room={{ id: room.id, name: room.name, base_price: room.base_price }} />
+          ) : (
+            <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">
+              Save the room first, then reopen it to add seasonal rates (peak / off-season prices).
+            </p>
+          )}
 
           <div>
             <label className={labelCls}>Amenities</label>

@@ -12,6 +12,7 @@ import { Section, Field, inputCls } from "@/admin/formKit";
 import { getConflictingDates, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { useAddons, usePackages, useSeasons } from "@/hooks/useCatalog";
+import { useRoomRates } from "@/hooks/useRoomRates";
 import { useSaveQuote, type Quote, type QuoteInputs } from "@/hooks/useQuotes";
 import {
   formatINR, nightsBetween, packageIncludes, packageSaving, priceLine, quoteWarnings, sumQuote,
@@ -34,6 +35,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const { data: addons = [] } = useAddons(property.id);
   const { data: packages = [] } = usePackages(property.id);
   const save = useSaveQuote();
+  const { data: rates } = useRoomRates(property.id);
 
   const rooms = (property.rooms ?? []).filter((r) => r.is_active !== false);
 
@@ -77,10 +79,10 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       rooms
         .filter((r) => r.id in roomSel)
         .map((room) => {
-          return priceRoomStay({ room, guests: roomSel[room.id], checkIn, checkOut });
+          return priceRoomStay({ room, guests: roomSel[room.id], checkIn, checkOut, rates });
         }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rooms.length, roomSel, checkIn, checkOut],
+    [rooms.length, roomSel, checkIn, checkOut, rates],
   );
 
   const guestCount = Math.max(1, Object.values(roomSel).reduce((s, n) => s + n, 0));
@@ -243,9 +245,10 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
                     {datesOk && line && <div className="text-sm font-semibold">{formatINR(line.total)}</div>}
                   </div>
                 )}
-                {on && datesOk && line && (line.weekend_nights > 0 || line.extra_guest_charge > 0) && (
+                {on && datesOk && line && (line.weekend_nights > 0 || line.extra_guest_charge > 0 || (line.seasonal_nights ?? 0) > 0) && (
                   <p className="mt-2 text-[11px] text-muted-foreground">
                     {[
+                      (line.seasonal_nights ?? 0) > 0 && `${line.seasonal_nights} night${line.seasonal_nights! > 1 ? "s" : ""} at ${(line.rate_labels ?? []).join(", ") || "seasonal"} rate`,
                       line.weekend_nights > 0 && `${line.weekend_nights} weekend night${line.weekend_nights > 1 ? "s" : ""}`,
                       line.extra_guest_charge > 0 && `extra guest charge ${formatINR(line.extra_guest_charge)}`,
                     ].filter(Boolean).join(" · ")}

@@ -6,6 +6,7 @@
 
 import { clean } from "./whatsapp";
 import { formatINR, lineToCharges, nightsBetween, stayDates, UNIT_LABELS, type QuoteLine } from "./quotes";
+import { pickRate, rateBasePrice, type RoomRate } from "./roomRates";
 
 // ── Rooms ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +28,10 @@ export interface RoomQuoteLine {
   extra_guest_charge: number;
   total: number;
   weekend_nights: number;
+  /** Nights priced by a seasonal rate period instead of the room's base price. */
+  seasonal_nights?: number;
+  /** Names of the rate periods that applied (e.g. "Christmas / New Year"). */
+  rate_labels?: string[];
 }
 
 /** Friday and Saturday nights — the same rule as the guest booking flow. */
@@ -39,7 +44,9 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Prices one room for a stay with EXACTLY the rule guests are charged:
- *  - per night: base_price × weekend_multiplier on Fri/Sat nights, else base_price;
+ *  - per night: the night's base × weekend_multiplier on Fri/Sat nights, else the base.
+ *    The base is the room's base_price unless a seasonal rate period (room_rates)
+ *    covers that night — see lib/roomRates.ts for the precedence rules;
  *  - extra guests = max(0, guests − max_guests) × extra_guest_price × nights.
  * (Per-date price overrides were removed — nothing in the admin could set them.)
  */
@@ -48,6 +55,8 @@ export function priceRoomStay(input: {
   guests: number;
   checkIn: string;
   checkOut: string;
+  /** Seasonal rate periods (all of the property's; filtered per night here). */
+  rates?: readonly RoomRate[];
 }): RoomQuoteLine {
   const { room, checkIn, checkOut } = input;
   // Empty / partial dates → 0 nights (never NaN, which would show as ₹NaN).
@@ -58,10 +67,20 @@ export function priceRoomStay(input: {
 
   let roomPrice = 0;
   let weekendNights = 0;
+  let seasonalNights = 0;
+  const rateLabels: string[] = [];
   for (const date of dates) {
     const weekend = isWeekendNight(date);
     if (weekend && (room.weekend_multiplier ?? 1) !== 1) weekendNights += 1;
-    roomPrice += room.base_price * (weekend ? (room.weekend_multiplier ?? 1) : 1);
+    const rate = pickRate(date, room.id, input.rates);
+    let nightBase = room.base_price;
+    if (rate) {
+      nightBase = rateBasePrice(rate, room.base_price);
+      seasonalNights += 1;
+      const label = (rate.label ?? "").trim();
+      if (label && !rateLabels.includes(label)) rateLabels.push(label);
+    }
+    roomPrice += nightBase * (weekend ? (room.weekend_multiplier ?? 1) : 1);
   }
   const extra = Math.max(0, guests - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
   const rp = round2(roomPrice);
@@ -74,6 +93,8 @@ export function priceRoomStay(input: {
     extra_guest_charge: round2(extra),
     total: round2(rp + extra),
     weekend_nights: weekendNights,
+    seasonal_nights: seasonalNights,
+    rate_labels: rateLabels,
   };
 }
 

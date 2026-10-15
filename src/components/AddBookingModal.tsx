@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { useRoomRates } from "@/hooks/useRoomRates";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
@@ -103,6 +104,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   const { data: agents = [] } = useAgents(propertyId);
+  const { data: rates } = useRoomRates(propertyId);
   const [showNewAgentModal, setShowNewAgentModal] = useState(false);
   // Commission is auto-filled whenever the agent (or the room-rate total it's
   // based on) changes, but stays editable for one-off negotiated rates. Once
@@ -157,10 +159,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const liveRoomTotals = useMemo(() => selectedRooms.map((r) => {
     const p = priceRoomStay({
       room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out,
+      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out, rates,
     });
     return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
-  }), [selectedRooms, guestCount, form.check_in, form.check_out]);
+  }), [selectedRooms, guestCount, form.check_in, form.check_out, rates]);
 
   // Quote conversion: while the dates still match the quote, each quoted room
   // keeps EXACTLY the quoted price and guest count — the guest agreed to that

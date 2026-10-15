@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { priceRoomStay } from "@/lib/quoteBuilder";
+import { useRoomRates } from "@/hooks/useRoomRates";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
@@ -678,6 +679,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
   const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const { data: stayCharges = [] } = useBookingCharges(booking.id);
+  const { data: rates } = useRoomRates(booking.property_id);
   const guestCount = Number(form.guest_count) || 1;
   // Same pricing rule as guest bookings and quotes (weekend multiplier +
   // extra guests) — see priceRoomStay().
@@ -685,9 +687,9 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
     if (!selectedRoom || nights === 0) return null;
     return priceRoomStay({
       room: { ...selectedRoom, weekend_multiplier: selectedRoom.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string,
+      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string, rates,
     });
-  }, [selectedRoom, nights, guestCount, form.check_in, form.check_out]);
+  }, [selectedRoom, nights, guestCount, form.check_in, form.check_out, rates]);
   const newTotal = stay?.total ?? 0;
   const stayDiscount = Number(booking.discount_amount ?? 0);
   const stayAdvance = Number(booking.advance_amount ?? 0);
