@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 import { priceRoomStay } from "@/lib/quoteBuilder";
+import { fetchRoomRates } from "@/hooks/useRoomRates";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 
@@ -135,6 +136,11 @@ export function useCreateBooking() {
         }
       }
 
+      // Seasonal rate periods (fresh, so a price the owner just changed is used).
+      // If this fails we fall back to base prices — the DB re-prices the
+      // booking server-side anyway (enforce_guest_booking_terms).
+      const rates = await fetchRoomRates(input.propertyId).catch(() => []);
+
       // ── Step 3: Calculate price per room ──
       const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
 
@@ -155,6 +161,7 @@ export function useCreateBooking() {
           guests: ri.guestCount,
           checkIn: input.checkIn,
           checkOut: input.checkOut,
+          rates,
         });
 
         roomPrices.push({
@@ -234,7 +241,7 @@ export function useCreateBooking() {
       const { data: insertedBookings, error: bookingErr } = await supabase
         .from("bookings")
         .insert(bookingInserts)
-        .select("id, room_id");
+        .select("id, room_id, room_price, extra_guest_charge, total_amount");
 
       if (bookingErr || !insertedBookings || insertedBookings.length === 0) {
         // Roll back the group row if booking insert failed, so we don't leave
@@ -283,6 +290,12 @@ export function useCreateBooking() {
         }
       }
 
+      // Show the guest what the DATABASE stored: enforce_guest_booking_terms
+      // re-prices every guest booking server-side, so these are the
+      // authoritative numbers (they equal our estimate unless a rate changed
+      // in the last few seconds). Falls back to the estimate if a column
+      // isn't returned.
+      const num = (v: unknown, fallback: number) => (v != null && Number.isFinite(Number(v)) ? Number(v) : fallback);
       const roomResults: RoomBookingResult[] = insertedBookings.map((b) => {
         const pricing = roomPrices.find((p) => p.roomId === b.room_id)!;
         const room = roomDetails.find((r) => r.id === b.room_id)!;
@@ -290,16 +303,17 @@ export function useCreateBooking() {
           bookingId: b.id,
           roomId: b.room_id,
           roomName: room.name,
-          totalAmount: pricing.totalAmount,
-          roomPrice: pricing.roomPrice,
-          extraGuestCharge: pricing.extraGuestCharge,
+          totalAmount: num(b.total_amount, pricing.totalAmount),
+          roomPrice: num(b.room_price, pricing.roomPrice),
+          extraGuestCharge: num(b.extra_guest_charge, pricing.extraGuestCharge),
         };
       });
+      const confirmedTotal = roomResults.reduce((sum, r) => sum + r.totalAmount, 0);
 
       return {
         bookingId: firstBookingId,
         groupRef: displayRef,
-        totalAmount: grandTotal,
+        totalAmount: confirmedTotal,
         rooms: roomResults,
         nights,
       };
