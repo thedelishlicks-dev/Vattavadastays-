@@ -4,6 +4,7 @@ import { X, Minus, Plus, Coffee, UtensilsCrossed, Truck } from "lucide-react";
 import type { Room } from "@/types/database";
 import { parseMealsConfig, hasMealInfo } from "@/lib/meals";
 import { priceRoomStay } from "@/lib/quoteBuilder";
+import { useRoomRates } from "@/hooks/useRoomRates";
 
 type Props = {
   room: Room;
@@ -50,11 +51,18 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
   const checkOutStr = checkOut ? format(checkOut, "yyyy-MM-dd") : "";
   // Same weekend rule the booking flow charges (useCreateBooking), so the
   // estimate shown here matches the final price.
+  const { data: rates } = useRoomRates(room.property_id);
   const totals = useMemo(() => {
     let roomCost = room.base_price * nights;
+    let seasonalNights = 0;
+    let rateLabels: string[] = [];
     if (checkInStr && checkOutStr) {
-      const stay = priceRoomStay({ room, guests: 1, checkIn: checkInStr, checkOut: checkOutStr });
-      if (stay.nights > 0) roomCost = stay.room_price;
+      const stay = priceRoomStay({ room, guests: 1, checkIn: checkInStr, checkOut: checkOutStr, rates });
+      if (stay.nights > 0) {
+        roomCost = stay.room_price;
+        seasonalNights = stay.seasonal_nights ?? 0;
+        rateLabels = stay.rate_labels ?? [];
+      }
     }
     // Extra charge applies only above max_guests (the included capacity the owner set).
     // This already covers where an extra guest sleeps — most properties don't
@@ -65,8 +73,8 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
     const extraGuestCharge =
       Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
     const total = roomCost + extraGuestCharge;
-    return { roomCost, extraGuestCharge, total };
-  }, [room, nights, adults, checkInStr, checkOutStr]);
+    return { roomCost, extraGuestCharge, total, seasonalNights, rateLabels };
+  }, [room, nights, adults, checkInStr, checkOutStr, rates]);
 
   const Stepper = ({
     value,
@@ -207,6 +215,11 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
               <span>Room ({nights} night{nights > 1 ? "s" : ""})</span>
               <span>₹{totals.roomCost.toLocaleString("en-IN")}</span>
             </div>
+            {totals.seasonalNights > 0 && (
+              <p className="text-xs text-muted-foreground -mt-1">
+                {totals.rateLabels.length > 0 ? `Includes ${totals.rateLabels.join(", ")} rates` : "Includes special seasonal rates"} for {totals.seasonalNights} night{totals.seasonalNights > 1 ? "s" : ""}.
+              </p>
+            )}
             {totals.extraGuestCharge > 0 && (
               <div className="flex justify-between text-muted-foreground">
                 <span>Extra guests ({adults - room.max_guests} × ₹{room.extra_guest_price}/night)</span>
