@@ -112,12 +112,19 @@ async function syncOne(feed: Feed, c: Creds): Promise<Result> {
     // 2. What this feed already owns, and what else is blocked on those nights.
     const sel = (qs: string) => fetch(`${SUPABASE_URL}/rest/v1/${qs}`, { headers: rest(c) })
     const [ownRes, blockedRes, bookRes] = await Promise.all([
-      sel(`availability?room_id=eq.${feed.room_id}&note=like.${encodeURIComponent(marker + '*')}&select=date&limit=5000`),
+      sel(`availability?room_id=eq.${feed.room_id}&note=like.${encodeURIComponent(marker + '*')}&select=date,is_available&limit=5000`),
       sel(`availability?room_id=eq.${feed.room_id}&is_available=eq.false&date=gte.${today}&select=date,note&limit=5000`),
       sel(`bookings?room_id=eq.${feed.room_id}&status=neq.cancelled&check_out=gt.${today}&select=check_in,check_out&limit=2000`),
     ])
     if (!ownRes.ok || !blockedRes.ok) throw new Error('Could not read this room\'s calendar from the database.')
-    const own = new Set<string>(((await ownRes.json()) as { date: string }[]).map((r) => String(r.date).slice(0, 10)))
+    // Rows carrying this feed's note. A row can still carry the note while being
+    // OPEN: the database's free_nights_on_cancel trigger flips is_available back
+    // to true when one of OUR bookings on that night is cancelled, without
+    // touching the note. Such a row is not blocking anything, so it must be
+    // re-blocked if the channel still holds the night — hence two sets.
+    const ownRows = (await ownRes.json()) as { date: string; is_available: boolean | null }[]
+    const own = new Set<string>(ownRows.map((r) => String(r.date).slice(0, 10)))            // every row with our note (for removal)
+    const ownBlocked = new Set<string>(ownRows.filter((r) => r.is_available === false).map((r) => String(r.date).slice(0, 10)))
     const otherBlocked = new Set<string>(
       ((await blockedRes.json()) as { date: string; note: string | null }[])
         .filter((r) => !(r.note ?? '').startsWith(marker))
@@ -135,7 +142,7 @@ async function syncOne(feed: Feed, c: Creds): Promise<Result> {
 
     // 3. Reconcile.
     const toRemove = [...own].filter((d) => !desired.has(d))
-    const toAdd = [...desired].filter((d) => !own.has(d) && !otherBlocked.has(d))
+    const toAdd = [...desired].filter((d) => !ownBlocked.has(d) && !otherBlocked.has(d))
 
     for (const part of chunk(toRemove, 80)) {
       const del = await fetch(
