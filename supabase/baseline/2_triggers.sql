@@ -1,0 +1,13 @@
+CREATE TRIGGER trg_enforce_guest_group_terms BEFORE INSERT ON public.booking_groups FOR EACH ROW EXECUTE FUNCTION enforce_guest_group_terms();
+CREATE TRIGGER trg_booking_room_matches_property BEFORE INSERT OR UPDATE OF room_id, property_id ON public.bookings FOR EACH ROW EXECUTE FUNCTION enforce_booking_room_matches_property();
+CREATE TRIGGER trg_booking_status_change AFTER UPDATE OF status ON public.bookings FOR EACH ROW EXECUTE FUNCTION handle_booking_status_change();
+CREATE TRIGGER trg_enforce_guest_booking_terms BEFORE INSERT ON public.bookings FOR EACH ROW EXECUTE FUNCTION enforce_guest_booking_terms();
+CREATE TRIGGER trg_free_nights_on_cancel AFTER UPDATE OF status ON public.bookings FOR EACH ROW WHEN (((new.status = 'cancelled'::text) AND (old.status IS DISTINCT FROM 'cancelled'::text))) EXECUTE FUNCTION free_nights_on_cancel();
+CREATE TRIGGER trg_mark_booking_nights AFTER INSERT OR UPDATE OF room_id, check_in, check_out, status ON public.bookings FOR EACH ROW EXECUTE FUNCTION mark_booking_nights_unavailable();
+CREATE TRIGGER trg_sync_guest_group_total AFTER INSERT ON public.bookings FOR EACH ROW EXECUTE FUNCTION sync_guest_group_total();
+CREATE TRIGGER trg_client_errors_flood_guard BEFORE INSERT ON public.client_errors FOR EACH ROW EXECUTE FUNCTION client_errors_flood_guard();
+CREATE TRIGGER trg_leads_flood_guard BEFORE INSERT ON public.leads FOR EACH ROW EXECUTE FUNCTION leads_flood_guard();
+CREATE TRIGGER trg_prevent_superadmin_as_owner BEFORE INSERT OR UPDATE OF owner_id ON public.properties FOR EACH ROW EXECUTE FUNCTION prevent_superadmin_as_owner();
+CREATE TRIGGER trg_protect_property_billing_columns BEFORE UPDATE ON public.properties FOR EACH ROW EXECUTE FUNCTION protect_property_billing_columns();
+CREATE TRIGGER trg_room_ical_feeds_room_matches_property BEFORE INSERT OR UPDATE OF room_id, property_id ON public.room_ical_feeds FOR EACH ROW EXECUTE FUNCTION room_ical_feeds_room_matches_property();
+CREATE TRIGGER trg_room_rates_room_matches_property BEFORE INSERT OR UPDATE ON public.room_rates FOR EACH ROW EXECUTE FUNCTION room_rates_room_matches_property();
