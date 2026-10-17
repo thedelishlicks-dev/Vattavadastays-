@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { syncIcalFeeds } from "@/lib/icalClient";
+import { CHANNEL_SYNC_ENABLED } from "@/lib/features";
 
 export interface IcalFeed {
   id: string;
@@ -21,7 +22,7 @@ export const icalFeedsKey = (propertyId: string | undefined) => ["icalFeeds", pr
 export function useIcalFeeds(propertyId: string | undefined) {
   return useQuery({
     queryKey: icalFeedsKey(propertyId),
-    enabled: !!propertyId,
+    enabled: !!propertyId && CHANNEL_SYNC_ENABLED,
     staleTime: 30_000,
     retry: 1,
     queryFn: async (): Promise<IcalFeed[]> => {
