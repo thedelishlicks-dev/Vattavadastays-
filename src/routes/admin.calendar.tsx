@@ -9,6 +9,7 @@ import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
 import { friendlyNote, isIcalNote } from '@/lib/icalClient'
+import { CHANNEL_SYNC_ENABLED } from '@/lib/features'
 import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, type DayState } from '@/lib/calendarState'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -355,14 +356,16 @@ function AdminCalendar() {
       <div className="flex items-start justify-between gap-3 mb-6">
         <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
         <div className="flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={() => setShowSync(true)}
-            disabled={activeRooms.length === 0}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
-            <Link2 className="h-4 w-4" /> Sync with other sites
-          </button>
+          {CHANNEL_SYNC_ENABLED && (
+            <button
+              type="button"
+              onClick={() => setShowSync(true)}
+              disabled={activeRooms.length === 0}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              <Link2 className="h-4 w-4" /> Sync with other sites
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowBlock(true)}
@@ -582,7 +585,7 @@ function AdminCalendar() {
         />
       )}
 
-      {showSync && property && (
+      {CHANNEL_SYNC_ENABLED && showSync && property && (
         <ChannelSyncModal propertyId={property.id} rooms={activeRooms} onClose={() => setShowSync(false)} />
       )}
 
