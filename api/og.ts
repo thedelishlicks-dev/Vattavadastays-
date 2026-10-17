@@ -8,7 +8,7 @@
  * generic platform tags in index.html, so every shared property link looked
  * the same. Google also indexes the server-rendered tags immediately.
  *
- * Wired in vercel.json: only "/" on *.stayidom.in hosts is rewritten here.
+ * Wired in vercel.json: "/" on every host is rewritten here (non-property hosts get the plain shell).
  * Fail-safe: if anything goes wrong we 307 to "/?_og=skip", which the rewrite
  * deliberately does not match, so visitors always get the normal app.
  */
@@ -40,8 +40,9 @@ export default async function handler(req: Request): Promise<Response> {
   const origin = `https://${host.split(':')[0]}`
 
   try {
-    // The static shell (headers in vercel.json keep it uncached at the browser).
-    const shellRes = await fetch(`${origin}/index.html`, { headers: { Accept: 'text/html' } })
+    // The static app shell. The build renames dist/index.html to _shell.html (scripts/post-build.mjs)
+    // so that "/" is not answered from a real file before this function can run.
+    const shellRes = await fetch(`${origin}/_shell.html`, { headers: { Accept: 'text/html' } })
     if (!shellRes.ok) return bail()
     let html = await shellRes.text()
     if (!html.includes('<div id="root">')) return bail()
