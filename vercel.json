@@ -17,12 +17,6 @@
     },
     {
       "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "(?<sub>[^.]+)\\.stayidom\\.in"
-        }
-      ],
       "missing": [
         {
           "type": "query",
@@ -33,7 +27,7 @@
     },
     {
       "source": "/((?!api/|assets/).*)",
-      "destination": "/index.html"
+      "destination": "/_shell.html"
     }
   ],
   "headers": [
@@ -47,7 +41,7 @@
       ]
     },
     {
-      "source": "/index.html",
+      "source": "/_shell.html",
       "headers": [
         {
           "key": "Cache-Control",
