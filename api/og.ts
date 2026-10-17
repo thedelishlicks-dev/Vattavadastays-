@@ -34,41 +34,69 @@ function subdomainFromHost(host: string | null): string | null {
 
 const bail = (): Response => new Response(null, { status: 307, headers: { Location: '/?_og=skip', 'Cache-Control': 'no-store' } })
 
-export default async function handler(req: Request): Promise<Response> {
+/**
+ * Does the actual work and records what happened in `diag`.
+ * Open /?_ogdebug=1 on any host to see `diag` as JSON instead of the page
+ * (booleans, statuses and the outcome only — never keys or URLs from env).
+ */
+async function run(req: Request, diag: Record<string, unknown>): Promise<Response> {
   const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host')
-  if (!host) return bail()
+  diag.host = host
+  if (!host) { diag.result = 'bail: no host header'; return bail() }
   const origin = `https://${host.split(':')[0]}`
 
-  try {
-    // The static app shell. The build renames dist/index.html to _shell.html (scripts/post-build.mjs)
-    // so that "/" is not answered from a real file before this function can run.
-    const shellRes = await fetch(`${origin}/_shell.html`, { headers: { Accept: 'text/html' } })
-    if (!shellRes.ok) return bail()
-    let html = await shellRes.text()
-    if (!html.includes('<div id="root">')) return bail()
+  // The static app shell. The build renames dist/index.html to _shell.html (scripts/post-build.mjs)
+  // so that "/" is not answered from a real file before this function can run.
+  const shellRes = await fetch(`${origin}/_shell.html`, { headers: { Accept: 'text/html' } })
+  diag.shellStatus = shellRes.status
+  if (!shellRes.ok) { diag.result = 'bail: could not load _shell.html'; return bail() }
+  let html = await shellRes.text()
+  diag.shellHasRoot = html.includes('<div id="root">')
+  if (!diag.shellHasRoot) { diag.result = 'bail: shell has no root div'; return bail() }
 
-    const sub = subdomainFromHost(host)
-    if (sub) {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/properties?subdomain=eq.${encodeURIComponent(sub)}` +
-          `&select=name,description,hero_image,logo_url,area,owner_phone,location_lat,location_lng,shared_amenities&limit=1`,
-        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, Accept: 'application/json' } },
-      )
-      if (res.ok) {
-        const property = (await res.json())?.[0]
-        if (property) html = injectSeo(html, buildSeo(property, `${origin}/`))
+  const sub = subdomainFromHost(host)
+  diag.subdomain = sub
+  diag.supabaseEnvSet = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY)
+  diag.injected = false
+  if (sub) {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/properties?subdomain=eq.${encodeURIComponent(sub)}` +
+        `&select=name,description,hero_image,logo_url,area,owner_phone,location_lat,location_lng,shared_amenities&limit=1`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, Accept: 'application/json' } },
+    )
+    diag.propertyStatus = res.status
+    if (res.ok) {
+      const property = (await res.json())?.[0]
+      diag.propertyFound = Boolean(property)
+      if (property) {
+        html = injectSeo(html, buildSeo(property, `${origin}/`))
+        diag.injected = true
+        diag.title = String(property.name ?? '')
       }
     }
+  }
+  diag.result = diag.injected ? 'ok: property tags injected' : 'ok: served plain shell'
 
-    return new Response(html, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        // Browsers always revalidate (new deploys must never serve a stale shell);
-        // Vercel's CDN keeps it for 5 min and refreshes in the background.
-        'Cache-Control': 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=3600',
-      },
-    })
-  } catch {
-    return bail()
+  return new Response(html, {
+    headers: {
+      'Content-Type': 'text/html; charset=utf-8',
+      // Browsers always revalidate (new deploys must never serve a stale shell);
+      // Vercel's CDN keeps it for 5 min and refreshes in the background.
+      'Cache-Control': 'public, max-age=0, must-revalidate, s-maxage=300, stale-while-revalidate=3600',
+    },
+  })
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  const debug = new URL(req.url).searchParams.get('_ogdebug') === '1'
+  const diag: Record<string, unknown> = { fn: 'api/og' }
+  const asJson = () => new Response(JSON.stringify(diag, null, 2), { headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } })
+  try {
+    const res = await run(req, diag)
+    return debug ? asJson() : res
+  } catch (e) {
+    diag.result = 'error'
+    diag.error = e instanceof Error ? e.message : String(e)
+    return debug ? asJson() : bail()
   }
 }
