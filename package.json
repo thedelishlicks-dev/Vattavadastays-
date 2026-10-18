@@ -8,10 +8,12 @@
     "build": "vite build && node scripts/post-build.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "npx --yes tsx --test src/lib/balance.test.ts src/lib/onboarding.test.ts",
+    "test": "npx --yes tsx --test src/lib/*.test.ts tests/api/*.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "typecheck": "bash scripts/typecheck.sh",
+    "check": "bash scripts/run-checks.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
