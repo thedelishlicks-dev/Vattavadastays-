@@ -1,0 +1,74 @@
+# Runs on every pull request and every push to main/Dev.
+# Goal: a broken build, a type error or a failed pricing/availability check is
+# caught in GitHub — before Vercel deploys it to a live property.
+# Needs no secrets: the tests use fakes, and the build only needs placeholder
+# VITE_ values.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, Dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # Also regenerates src/routeTree.gen.ts, which the type check needs.
+      - name: Build
+        run: npm run build
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests (pricing, rates, iCal, SEO, balance)
+        run: npm test
+
+      - name: Behaviour checks (calendar, admin window, error log, prefetch)
+        run: npm run check
+
+  # Applies the new SQL migrations to a throw-away Postgres (with a minimal
+  # Supabase-like stub) and runs the pricing / RLS / trigger tests, twice, so a
+  # bad migration is caught before it ever touches the live database.
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install psql
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+      - name: Migrations + database tests
+        run: bash supabase/tests/run.sh
