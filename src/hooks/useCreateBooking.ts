@@ -6,6 +6,23 @@ import { fetchRoomRates } from "@/hooks/useRoomRates";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 
+/**
+ * A random UUID for rows the browser creates itself. crypto.randomUUID() is
+ * missing on older phones (Android WebView < 92, iOS < 15.4), so fall back to
+ * getRandomValues, then Math.random as a last resort.
+ */
+function newId(): string {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  const b = new Uint8Array(16);
+  if (c && typeof c.getRandomValues === "function") c.getRandomValues(b);
+  else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  b[6] = (b[6] & 0x0f) | 0x40; // version 4
+  b[8] = (b[8] & 0x3f) | 0x80; // variant
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 export interface RoomBookingInput {
   roomId: string;
   guestCount: number; // guests assigned to this specific room
@@ -186,12 +203,24 @@ export function useCreateBooking() {
       // block these dates forever either. See pendingHoldExpiry() docs.
       const holdExpiresAt = pendingHoldExpiry(input.propertyPendingHoldHours ?? undefined);
 
+      // IMPORTANT — anonymous guests may INSERT bookings but have no SELECT on
+      // `bookings` / `booking_groups` (HANDOVER rule 10). A PostgREST insert that
+      // asks for the new row back (.select()) is therefore rejected by row-level
+      // security, which made every logged-out booking fail. So ids are generated
+      // here and nothing is read back: the insert is "return=minimal".
+      // (A signed-in owner testing their own page can read rows back, which is
+      // why this went unnoticed — always test the guest page in a private tab.)
+      let displayRef: string | null = null;
       if (input.rooms.length > 1) {
-        const { data: groupData, error: groupErr } = await supabase
+        groupId = newId();
+        const groupRef = "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        displayRef = groupRef;
+        const { error: groupErr } = await supabase
           .from("booking_groups")
           .insert({
+            id: groupId,
             property_id: input.propertyId,
-            group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+            group_reference: groupRef,
             guest_name: input.guestName,
             guest_phone: input.guestPhone,
             guest_email: input.guestEmail ?? null,
@@ -205,20 +234,18 @@ export function useCreateBooking() {
             payment_method: input.paymentMethod ?? "Cash on Arrival",
             is_paid: false,
             hold_expires_at: holdExpiresAt,
-          })
-          .select("id")
-          .single();
+          });
 
-        if (groupErr || !groupData) {
+        if (groupErr) {
           logClientError({ source: "booking", error: groupErr, message: "Could not create group booking", context: { step: "create-group" } });
           throw new Error("Could not create group booking. Please try again.");
         }
-        groupId = groupData.id;
       }
 
       const bookingInserts = input.rooms.map((ri, idx) => {
         const pricing = roomPrices[idx];
         return {
+          id: newId(),
           property_id: input.propertyId,
           room_id: ri.roomId,
           guest_name: input.guestName,
@@ -238,12 +265,11 @@ export function useCreateBooking() {
         };
       });
 
-      const { data: insertedBookings, error: bookingErr } = await supabase
+      const { error: bookingErr } = await supabase
         .from("bookings")
-        .insert(bookingInserts)
-        .select("id, room_id, room_price, extra_guest_charge, total_amount");
+        .insert(bookingInserts);
 
-      if (bookingErr || !insertedBookings || insertedBookings.length === 0) {
+      if (bookingErr) {
         // Roll back the group row if booking insert failed, so we don't leave
         // an orphaned empty group behind.
         if (groupId) {
@@ -256,64 +282,34 @@ export function useCreateBooking() {
         throw new Error("Booking failed. Please try again.");
       }
 
-      // ── Step 5: Mark all dates unavailable for all rooms ──
-      // Build upsert rows for every room × date combination. This upsert is
-      // also what creates the missing availability rows for properties that
-      // were never pre-seeded — after this, those dates will have an
-      // explicit row going forward.
-      const unavailRows = roomIds.flatMap((roomId) =>
-        dates.map((date) => ({
-          room_id: roomId,
-          date,
-          is_available: false,
-        }))
-      );
-
-      await supabase
-        .from("availability")
-        .upsert(unavailRows, { onConflict: "room_id,date" });
+      // The nights are blocked by the database itself: the trigger
+      // mark_booking_nights_unavailable() writes the availability rows when the
+      // booking is inserted. (The browser used to upsert them too, but a guest
+      // has no write access to `availability`, so that request was always refused.)
 
       // ── Build result ──
-      const firstBookingId = insertedBookings[0].id;
+      // The DATABASE re-prices every guest booking (enforce_guest_booking_terms)
+      // from the same inputs, so these figures match what it stored.
+      const firstBookingId = bookingInserts[0].id;
+      if (!displayRef) displayRef = `#${firstBookingId.slice(0, 8).toUpperCase()}`;
 
-      // For group bookings, look up the group_reference we just created so the
-      // guest sees the same reference the owner sees on their dashboard.
-      let displayRef = `#${firstBookingId.slice(0, 8).toUpperCase()}`;
-      if (groupId) {
-        const { data: groupRow } = await supabase
-          .from("booking_groups")
-          .select("group_reference")
-          .eq("id", groupId)
-          .single();
-        if (groupRow?.group_reference) {
-          displayRef = groupRow.group_reference;
-        }
-      }
-
-      // Show the guest what the DATABASE stored: enforce_guest_booking_terms
-      // re-prices every guest booking server-side, so these are the
-      // authoritative numbers (they equal our estimate unless a rate changed
-      // in the last few seconds). Falls back to the estimate if a column
-      // isn't returned.
-      const num = (v: unknown, fallback: number) => (v != null && Number.isFinite(Number(v)) ? Number(v) : fallback);
-      const roomResults: RoomBookingResult[] = insertedBookings.map((b) => {
-        const pricing = roomPrices.find((p) => p.roomId === b.room_id)!;
+      const roomResults: RoomBookingResult[] = bookingInserts.map((b, idx) => {
+        const pricing = roomPrices[idx];
         const room = roomDetails.find((r) => r.id === b.room_id)!;
         return {
           bookingId: b.id,
           roomId: b.room_id,
           roomName: room.name,
-          totalAmount: num(b.total_amount, pricing.totalAmount),
-          roomPrice: num(b.room_price, pricing.roomPrice),
-          extraGuestCharge: num(b.extra_guest_charge, pricing.extraGuestCharge),
+          totalAmount: pricing.totalAmount,
+          roomPrice: pricing.roomPrice,
+          extraGuestCharge: pricing.extraGuestCharge,
         };
       });
-      const confirmedTotal = roomResults.reduce((sum, r) => sum + r.totalAmount, 0);
 
       return {
         bookingId: firstBookingId,
         groupRef: displayRef,
-        totalAmount: confirmedTotal,
+        totalAmount: grandTotal,
         rooms: roomResults,
         nights,
       };
