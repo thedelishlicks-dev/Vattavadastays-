@@ -13,6 +13,7 @@ import {
   useGroupCharges, useAddGroupCharge, useDeleteGroupCharge,
 } from "@/hooks/useBookingCharges";
 import { supabase } from "@/lib/supabase";
+import { setBookingStatus, cancelBooking, setGroupStatus, cancelGroup, setGroupDiscount, saveFailMessage } from "@/lib/bookingActions";
 import { useQueryClient } from "@tanstack/react-query";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { useRoomRates } from "@/hooks/useRoomRates";
@@ -325,6 +326,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showEditGroupGuest, setShowEditGroupGuest] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [actionError, setActionError] = useState("");
   const queryClient = useQueryClient();
   const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
   const { data: charges = [] } = useGroupCharges(group.id);
@@ -339,12 +341,19 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
 
   const handleStatus = async (status: string) => {
     setUpdatingStatus(true);
-    const holdUpdate = status !== "pending" ? { hold_expires_at: null } : {};
-    await supabase.from("booking_groups").update({ status, ...holdUpdate }).eq("id", group.id);
-    await supabase.from("bookings").update({ status, ...holdUpdate }).eq("group_id", group.id);
-    queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
-    queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    onRefresh(); setUpdatingStatus(false);
+    setActionError("");
+    try {
+      // Throws if the group or any of its rooms can't be saved (the group is put back
+      // if only the rooms fail), so a failed save never looks like a success.
+      await setGroupStatus(supabase, group, status);
+      queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onRefresh();
+    } catch (e) {
+      setActionError(saveFailMessage(e));
+    } finally {
+      setUpdatingStatus(false);
+    }
   };
 
   const handleSavePayment = async (amount: number, method: string, ref: string) => {
@@ -366,7 +375,8 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   };
 
   const handleSaveDiscount = async (amount: number, reason: string) => {
-    await supabase.from("booking_groups").update({ discount_amount: amount, discount_reason: reason || null }).eq("id", group.id);
+    // Throws if it wasn't saved; GroupDiscountForm shows the message and stays open.
+    await setGroupDiscount(supabase, group.id, amount, reason);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     onRefresh(); setShowDiscountForm(false);
   };
@@ -417,6 +427,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
               {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
               {group.guest_phone && <a href={`https://wa.me/${group.guest_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>}
             </div>
+            {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
           </div>
           <div className="flex border-b border-border px-5">
             {([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: GroupModalTab; label: string }[]).map((t) => (
@@ -461,7 +472,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                     </div>
                   </Section>
                 )}
-                {canAct && <GroupCancelButton groupId={group.id} rooms={bookings.map((b) => ({ roomId: b.room_id, checkIn: b.check_in, checkOut: b.check_out }))} onCancelled={() => { onRefresh(); onClose(); }} />}
+                {canAct && <GroupCancelButton group={group} rooms={bookings.map((b) => ({ roomId: b.room_id, checkIn: b.check_in, checkOut: b.check_out }))} onCancelled={() => { onRefresh(); onClose(); }} />}
               </div>
             )}
             {tab === "charges" && (
@@ -494,9 +505,15 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   );
 }
 
-function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: BookingGroup; discount: number; onSaved: (amount: number, reason: string) => void; onCancel: () => void }) {
+function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: BookingGroup; discount: number; onSaved: (amount: number, reason: string) => void | Promise<void>; onCancel: () => void }) {
   const [amount, setAmount] = useState(discount > 0 ? String(discount) : ""); const [reason, setReason] = useState(group.discount_reason ?? ""); const [error, setError] = useState("");
-  const handleSave = () => { const amt = parseFloat(amount) || 0; if (amt < 0) { setError("Cannot be negative"); return; } if (amt > Number(group.total_amount)) { setError("Cannot exceed total"); return; } onSaved(amt, reason.trim()); };
+  const handleSave = async () => {
+    const amt = parseFloat(amount) || 0;
+    if (amt < 0) { setError("Cannot be negative"); return; }
+    if (amt > Number(group.total_amount)) { setError("Cannot exceed total"); return; }
+    setError("");
+    try { await onSaved(amt, reason.trim()); } catch (e) { setError(saveFailMessage(e)); }
+  };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
       <div className="text-sm font-medium text-green-900">{discount > 0 ? "Edit discount" : "Add discount"}</div>
@@ -528,21 +545,29 @@ function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onC
   );
 }
 
-function GroupCancelButton({ groupId, rooms, onCancelled }: { groupId: string; rooms: { roomId: string; checkIn: string; checkOut: string }[]; onCancelled: () => void }) {
-  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const queryClient = useQueryClient();
+function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string; status: string; hold_expires_at?: string | null }; rooms: { roomId: string; checkIn: string; checkOut: string }[]; onCancelled: () => void }) {
+  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient();
   const handleCancel = async () => {
-    setLoading(true);
-    await supabase.from("booking_groups").update({ status: "cancelled" }).eq("id", groupId);
-    await supabase.from("bookings").update({ status: "cancelled" }).eq("group_id", groupId);
+    setLoading(true); setError("");
+    try {
+      // Throws if the group or its rooms can't be saved — then the dialog stays open and says so.
+      await cancelGroup(supabase, group);
+    } catch (e) {
+      setError(saveFailMessage(e, "Couldn't cancel. Please try again — nothing was cancelled."));
+      setLoading(false);
+      return;
+    }
     await Promise.all(rooms.map((r) => releaseDatesIfUnblocked(r.roomId, r.checkIn, r.checkOut).catch(() => {})));
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    setLoading(false);
     onCancelled();
   };
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel all rooms</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Cancel all rooms in this booking? Cannot be undone.</p>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all</button></div>
     </div>
   );
@@ -587,7 +612,13 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
   const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0); const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
   const ownerPhone = property?.owner_phone ?? ""; const lat = property?.location_lat; const lng = property?.location_lng; const canEditStay = !["completed", "cancelled"].includes(booking.status);
   const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
-  const handleStatus = async (status: string) => { setUpdating(true); await onStatusChange(booking.id, status); setUpdating(false); };
+  const [actionError, setActionError] = useState("");
+  const handleStatus = async (status: string) => {
+    setUpdating(true); setActionError("");
+    try { await onStatusChange(booking.id, status); }
+    catch (e) { setActionError(saveFailMessage(e)); }   // failed save: say so, no "confirmed" message
+    finally { setUpdating(false); }
+  };
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
@@ -605,6 +636,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
               <a href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.guest_phone, booking.property_id) })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
               {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
             </div>
+            {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
           </div>
           <div className="flex border-b border-border px-5">
             {([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: ModalTab; label: string }[]).map((t) => (
@@ -826,20 +858,26 @@ function WALink({ href, label }: { href: string; label: string }) {
 }
 
 function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { bookingId: string; roomId: string; checkIn: string; checkOut: string; onCancelled: () => void }) {
-  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const queryClient = useQueryClient();
+  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient();
   const handleCancel = async () => {
-    setLoading(true);
-    const { error } = await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
-    if (!error) {
-      try { await releaseDatesIfUnblocked(roomId, checkIn, checkOut); } catch { /* non-fatal: booking is still cancelled either way */ }
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    setLoading(true); setError("");
+    try {
+      // Throws on any failure — then the dialog stays open and says so (it used to close as if it had worked).
+      await cancelBooking(supabase, bookingId);
+    } catch (e) {
+      setError(saveFailMessage(e, "Couldn't cancel. Please try again — nothing was cancelled."));
+      setLoading(false);
+      return;
     }
+    try { await releaseDatesIfUnblocked(roomId, checkIn, checkOut); } catch { /* non-fatal: booking is still cancelled either way */ }
+    queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     setLoading(false); onCancelled();
   };
   if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel booking</button>;
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Are you sure? This cannot be undone.</p>
+      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button></div>
     </div>
   );
@@ -1016,10 +1054,10 @@ function BookingsAdmin() {
   }, [allItems]);
 
   const updateStatus = async (id: string, newStatus: string) => {
-    const updates: Record<string, unknown> = { status: newStatus };
-    if (newStatus === "completed") updates.checked_out_at = new Date().toISOString();
-    if (newStatus !== "pending") updates.hold_expires_at = null;
-    await supabase.from("bookings").update(updates).eq("id", id);
+    // Throws if the save failed (network error, expired login, no row updated). The
+    // dialog shows the message; nothing below runs, so the guest is never sent
+    // "your booking is confirmed" for a booking that is still pending.
+    const updates = await setBookingStatus(supabase, id, newStatus);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
     if (newStatus === "confirmed" && property) {
