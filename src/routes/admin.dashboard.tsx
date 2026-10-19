@@ -393,21 +393,26 @@ function chargesSum(charges?: ChargeLine[] | null): number {
   return (charges ?? []).reduce((s, c) => s + c.qty * c.unit_price, 0);
 }
 
+type RecentRow = {
+  id: string;
+  guest_name: string;
+  room_id: string | null;
+  /** Shown instead of the room name for a multi-room (group) booking. */
+  roomLabel?: string;
+  created_at?: string | null;
+  check_in: string;
+  check_out: string;
+  status: string;
+  total_amount: number;
+  discount_amount?: number;
+  booking_charges?: ChargeLine[] | null;
+};
+
 function RecentBookings({
   recent,
   roomNameMap,
 }: {
-  recent: Array<{
-    id: string;
-    guest_name: string;
-    room_id: string | null;
-    check_in: string;
-    check_out: string;
-    status: string;
-    total_amount: number;
-    discount_amount?: number;
-    booking_charges?: ChargeLine[] | null;
-  }>;
+  recent: RecentRow[];
   roomNameMap: Record<string, string>;
 }) {
   return (
@@ -436,7 +441,7 @@ function RecentBookings({
                   <div className="min-w-0">
                     <div className="font-medium text-sm truncate">{b.guest_name}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {roomNameMap[b.room_id ?? ""] ?? "—"} · {b.check_in} → {b.check_out}
+                      {b.roomLabel ?? roomNameMap[b.room_id ?? ""] ?? "—"} · {b.check_in} → {b.check_out}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -525,11 +530,26 @@ function DashboardPage() {
     return { upcoming, monthlyRevenue };
   }, [standaloneBookings, groups, today]);
 
-  const attentionRows = useAttentionRows(bookings, groups, today);
+  // Standalone bookings only: the rooms of a multi-room booking are represented by
+  // the group row, so listing them too showed one booking three times.
+  const attentionRows = useAttentionRows(standaloneBookings, groups, today);
 
-  const recent = [...bookings]
-    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-    .slice(0, 6);
+  // One row per BOOKING: a multi-room booking is a single group row ("2 rooms"), not
+  // one row per room — its discount and extras live on the group, so per-room rows
+  // showed the wrong amounts.
+  const recent = useMemo(() => {
+    const rows: RecentRow[] = [
+      ...standaloneBookings,
+      ...groups.map((g) => ({
+        ...g,
+        room_id: null,
+        roomLabel: (g.bookings?.length ?? 0) > 1 ? `${g.bookings!.length} rooms` : "Multi-room",
+      })),
+    ];
+    return rows
+      .sort((a, b) => new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime())
+      .slice(0, 6);
+  }, [standaloneBookings, groups]);
   // Also wait for the FIRST fetch of both lists once the property is known. While the
   // property resolves the booking queries are disabled and report "not loading" with
   // empty data, which flashed the empty/onboarding dashboard before the real one.
@@ -637,6 +657,7 @@ function DashboardPage() {
         <BlockDatesModal
           propertyId={property.id}
           rooms={activeRooms}
+          property={property}
           onClose={() => setModal(null)}
         />
       )}
