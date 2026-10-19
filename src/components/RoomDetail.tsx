@@ -5,6 +5,7 @@ import type { Room } from "@/types/database";
 import { parseMealsConfig, hasMealInfo } from "@/lib/meals";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { useRoomRates } from "@/hooks/useRoomRates";
+import { clampParty, extraGuestCount, maxGuestsFor, stepperLimits } from "@/lib/guestCount";
 
 type Props = {
   room: Room;
@@ -42,6 +43,18 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
     setChildren(0);
   }, [room.id, room.max_guests]);
 
+  // Adults and children share one cap (see lib/guestCount.ts): never let the
+  // pair add up to more than the room can take.
+  const limits = stepperLimits(room.max_guests, adults, children);
+  const guestCap = maxGuestsFor(room.max_guests);
+  const totalGuests = adults + children;
+  const extraGuests = extraGuestCount(totalGuests, room.max_guests);
+  useEffect(() => {
+    const fixed = clampParty(room.max_guests, adults, children);
+    if (fixed.adults !== adults) setAdults(fixed.adults);
+    if (fixed.children !== children) setChildren(fixed.children);
+  }, [room.max_guests, adults, children]);
+
   const nights =
     checkIn && checkOut
       ? Math.max(1, differenceInCalendarDays(checkOut, checkIn))
@@ -64,17 +77,18 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
         rateLabels = stay.rate_labels ?? [];
       }
     }
-    // Extra charge applies only above max_guests (the included capacity the owner set).
+    // Extra charge applies to every guest (adults AND children) above max_guests — the
+    // included capacity the owner set — exactly as the booking is stored and priced.
     // This already covers where an extra guest sleeps — most properties don't
     // charge a separate "extra bed" fee on top of the per-head charge. If a
     // guest wants a bed without adding a guest (e.g. splitting a bed for
     // kids), that's a one-off request the owner handles directly and adds
     // to the booking's Extras tab, same as any other add-on.
     const extraGuestCharge =
-      Math.max(0, adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights;
+      extraGuestCount(adults + children, room.max_guests) * (room.extra_guest_price ?? 0) * nights;
     const total = roomCost + extraGuestCharge;
     return { roomCost, extraGuestCharge, total, seasonalNights, rateLabels };
-  }, [room, nights, adults, checkInStr, checkOutStr, rates]);
+  }, [room, nights, adults, children, checkInStr, checkOutStr, rates]);
 
   const Stepper = ({
     value,
@@ -192,20 +206,22 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
           <div className="rounded-xl border border-border p-4 space-y-3">
             <h4 className="font-medium text-sm">Guests</h4>
 
-            {/* Adults stepper — max is room.max_guests (included) + reasonable overflow */}
+            {/* Adults and children share one cap, and all guests above the included number are charged. */}
             <Stepper
               value={adults}
               set={setAdults}
               min={1}
-              max={room.max_guests + 4}
-              label={`Adults (${room.max_guests} included in price)`}
+              max={limits.maxAdults}
+              label="Adults"
             />
-            <Stepper value={children} set={setChildren} max={4} label="Children" />
+            <Stepper value={children} set={setChildren} max={limits.maxChildren} label="Children" />
+            <p className="text-xs text-muted-foreground">
+              Price includes {room.max_guests} guest{room.max_guests > 1 ? "s" : ""} (adults and children). Up to {guestCap} guests in this room.
+            </p>
 
-            {/* Show extra charge hint once adults exceed included capacity */}
-            {adults > room.max_guests && (
+            {extraGuests > 0 && (
               <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
-                {adults - room.max_guests} extra guest{adults - room.max_guests > 1 ? "s" : ""} above included capacity · ₹{((adults - room.max_guests) * (room.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")} charge
+                {extraGuests} extra guest{extraGuests > 1 ? "s" : ""} above included capacity · ₹{(extraGuests * (room.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")} charge
               </div>
             )}
           </div>
@@ -222,7 +238,7 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
             )}
             {totals.extraGuestCharge > 0 && (
               <div className="flex justify-between text-muted-foreground">
-                <span>Extra guests ({adults - room.max_guests} × ₹{room.extra_guest_price}/night)</span>
+                <span>Extra guests ({extraGuests} × ₹{room.extra_guest_price}/night)</span>
                 <span>₹{totals.extraGuestCharge.toLocaleString("en-IN")}</span>
               </div>
             )}
