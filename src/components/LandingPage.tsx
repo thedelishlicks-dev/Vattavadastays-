@@ -120,6 +120,7 @@ function Slide({ children }: { children: React.ReactNode }) {
 function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onClose: () => void; preselectedTier: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
   const [form, setForm]           = useState({ name: "", phone: "", property: "", tier: preselectedTier });
 
   useEffect(() => {
@@ -143,8 +144,16 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try { await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier }); } catch {}
-    finally { setLoading(false); setSubmitted(true); }
+    setError("");
+    try {
+      await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
+      setSubmitted(true);               // "thank you" only when the request really was saved
+    } catch {
+      // Used to show "thank you" even when the save failed, silently losing the lead.
+      setError("We couldn't send your request just now. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -180,6 +189,7 @@ function DemoModal({ isOpen, onClose, preselectedTier }: { isOpen: boolean; onCl
               <option value="growth">Growth — 6–10 rooms · ₹10,000 setup</option>
               <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
             </select>
+            {error && <p role="alert" style={{ color: "#fecaca", fontSize: ".9rem", margin: "0 0 .25rem", textAlign: "center" }}>{error}</p>}
             <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
               {loading ? "Submitting..." : "Setup Call ബുക്ക് ചെയ്യൂ →"}
             </button>
@@ -850,6 +860,7 @@ function Pricing({ onSelectTier }: { onSelectTier: (tier: string) => void }) {
 function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState("");
   const [form, setForm]           = useState({ name: "", phone: "", property: "", tier: preselectedTier });
 
   if (form.tier !== preselectedTier && preselectedTier !== "") {
@@ -861,8 +872,16 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    try { await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier }); } catch {}
-    finally { setLoading(false); setSubmitted(true); }
+    setError("");
+    try {
+      await submitLead({ name: form.name, phone: form.phone, property_name: form.property, tier: form.tier });
+      setSubmitted(true);               // "thank you" only when the request really was saved
+    } catch {
+      // Used to show "thank you" even when the save failed, silently losing the lead.
+      setError("We couldn't send your request just now. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -887,6 +906,7 @@ function SignupCTA({ preselectedTier }: { preselectedTier: string }) {
               <option value="growth">Growth — 6–10 rooms · ₹10,000 setup</option>
               <option value="pro">Pro — 10+ rooms · ₹25,000 setup</option>
             </select>
+            {error && <p role="alert" style={{ color: "#fecaca", fontSize: ".9rem", margin: "0 0 .25rem", textAlign: "center" }}>{error}</p>}
             <button type="submit" disabled={loading} style={{ background: C.amber, color: C.dark, border: "none", padding: "1.0625rem", borderRadius: 99, fontSize: "1.0625rem", fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1, marginTop: "0.5rem" }}>
               {loading ? "Submitting..." : "Setup Call ബുക്ക് ചെയ്യൂ →"}
             </button>
