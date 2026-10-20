@@ -207,7 +207,8 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
   const advance = Number(group.advance_amount ?? 0);
   const chargesTotal = chargesSum(group.booking_charges);
   const displayTotal = Number(group.total_amount) + chargesTotal - discount;
-  const balance = Math.max(0, Number(group.total_amount) + chargesTotal - discount - advance);
+  // computeBalance keeps overpayment visible (refundDue); a bare Math.max(0, …) showed "Paid ✓" for it.
+  const { balance, refundDue } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
   const bookings = group.bookings ?? [];
   return (
     <div className="bg-card border border-primary/20 rounded-2xl overflow-hidden shadow-sm">
@@ -236,7 +237,7 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
           {advance > 0 ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
-              {balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
+              {refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-0.5">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
             </div>
           ) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>}
         </div>
@@ -578,7 +579,7 @@ function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string;
 // ---------------------------------------------------------------------------
 
 function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomName: string; onClick: () => void }) {
-  const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = chargesSum(booking.booking_charges); const displayTotal = Number(booking.total_amount) + chargesTotal - discount; const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance); const isActive = !["cancelled", "completed"].includes(booking.status);
+  const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = chargesSum(booking.booking_charges); const displayTotal = Number(booking.total_amount) + chargesTotal - discount; const { balance, refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance }); const isActive = !["cancelled", "completed"].includes(booking.status);
   return (
     <button onClick={onClick} className="w-full text-left bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/30 transition-all active:scale-[0.99] group">
       <div className="flex items-start justify-between gap-3 mb-3">
@@ -593,7 +594,7 @@ function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomNam
       </div>
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <div className="text-xs text-muted-foreground">Total <span className="font-semibold text-foreground">₹{displayTotal.toLocaleString("en-IN")}</span>{chargesTotal > 0 && <span className="ml-1.5 text-amber-700 font-medium">+₹{chargesTotal.toLocaleString("en-IN")} extras</span>}{discount > 0 && <span className="ml-1.5 text-green-600 font-medium">-₹{discount.toLocaleString("en-IN")} disc</span>}</div>
-        {isActive && (advance > 0 ? (<div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
+        {isActive && (advance > 0 ? (<div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-0.5">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
       </div>
       {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (<div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800 flex items-center gap-1.5"><IndianRupee className="h-3 w-3 shrink-0" />Guest may have paid — tap to record advance</div>)}
     </button>
