@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { fetchRoomRates } from "@/hooks/useRoomRates";
+import { EXTRA_GUEST_ALLOWANCE } from "@/lib/guestCount";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 
@@ -108,7 +109,6 @@ export function useCreateBooking() {
       // a hard cap — guests can exceed it up to EXTRA_GUEST_ALLOWANCE more,
       // charged at extra_guest_price per night. This must match the ceiling
       // used by the adults stepper in RoomDetail.tsx (room.max_guests + 4).
-      const EXTRA_GUEST_ALLOWANCE = 4;
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId);
         if (!room) throw new Error("One or more selected rooms are no longer available.");
