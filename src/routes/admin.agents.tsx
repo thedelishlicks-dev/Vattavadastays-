@@ -1,3 +1,4 @@
+import { csvCell } from "@/lib/csv";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import {
@@ -59,11 +60,6 @@ function commissionLabel(type: CommissionType, value: number) {
 function thisMonthKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-}
-
-function csvEscape(value: string | number): string {
-  const s = String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function AdminAgents() {
@@ -207,12 +203,13 @@ function AdminAgents() {
         i.commission_paid_date ? i.commission_paid_date.slice(0, 10) : "",
       ]),
     );
-    const csv = [header, ...rows].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `commission-ledger-${thisMonth}.csv`;
+    // The file holds ALL agent commissions to date, so it is named by the day it was exported (it used to claim the current month).
+    a.download = `commission-ledger-${new Date().toLocaleDateString("en-CA")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

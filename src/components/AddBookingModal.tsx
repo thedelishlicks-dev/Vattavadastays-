@@ -1,3 +1,4 @@
+import { formatIndianPhoneInput, isValidIndianMobile } from "@/lib/phone";
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag, Plus } from "lucide-react";
@@ -230,6 +231,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
   const handleSave = async () => {
     if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
+    // A blank or partial number breaks the booking-status link and WhatsApp reminders.
+    if (!isValidIndianMobile(form.guest_phone)) { setError("Enter the guest's 10-digit mobile number — it's needed for the booking link and reminders"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
     if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
@@ -450,7 +453,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest details</p>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" /></div>
-              <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} /></div>
+              <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", formatIndianPhoneInput(e.target.value))} className={inputCls} /></div>
             </div>
             <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
           </div>

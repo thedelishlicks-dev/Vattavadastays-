@@ -1,3 +1,4 @@
+import { waDigits } from './phone'
 /**
  * Pure logic for the superadmin Properties screen: renewal state, setup
  * checklist, "needs attention" reasons and filters. No React / Supabase here
@@ -194,11 +195,7 @@ export function validateOwnerEmail(email: string): string {
  * became 91919…, a broken link.
  */
 export function waNumber(phone: string): string {
-  const d = phone.replace(/\D/g, '')
-  if (d.length === 10) return `91${d}`
-  if (d.length === 12 && d.startsWith('91')) return d
-  if (d.length === 11 && d.startsWith('0')) return `91${d.slice(1)}`
-  return d
+  return waDigits(phone)   // one set of rules for every wa.me link: lib/phone.ts
 }
 
 export function waLink(phone: string, text: string): string {

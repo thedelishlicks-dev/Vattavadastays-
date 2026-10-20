@@ -1,3 +1,4 @@
+import { formatIndianPhoneInput, isValidIndianMobile } from "@/lib/phone";
 import { useState, useRef } from "react";
 import { Check, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
@@ -39,13 +40,9 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   const { data: property } = useProperty(subdomain);
   const { mutateAsync: createBooking, isPending } = useCreateBooking();
 
-  const handlePhoneChange = (val: string) => {
-    if (!val.startsWith("+91")) {
-      setPhone("+91 ");
-    } else {
-      setPhone(val);
-    }
-  };
+  // Typing or pasting in any usual form ("98765 43210", "+91…", "091…", "0091…") keeps
+  // the number; it used to wipe anything pasted without "+91".
+  const handlePhoneChange = (val: string) => setPhone(formatIndianPhoneInput(val));
 
   // Derived totals across all selected rooms
   const totalNights = selections[0]?.nights ?? 0;
@@ -66,8 +63,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
     setError("");
     if (!hasSelection) return;
 
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length !== 12) {
+    if (!isValidIndianMobile(phone)) {
       setError("Please enter a valid 10-digit Indian mobile number.");
       return;
     }

@@ -5,12 +5,12 @@
  */
 
 import { computeBalance } from "@/lib/balance";
+import { waDigits } from "@/lib/phone";
 
 export function clean(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.startsWith("91") && digits.length === 12) return digits;
-  if (digits.length === 10) return `91${digits}`;
-  return digits;
+  // Shared rules (lib/phone.ts): 10 digits, +91, 91…, 0091… and a leading 0 all
+  // become 91XXXXXXXXXX. A leading 0 used to produce a dead wa.me link.
+  return waDigits(phone);
 }
 
 function link(phone: string, text: string): string {
