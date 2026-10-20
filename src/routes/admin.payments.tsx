@@ -1,4 +1,5 @@
- import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { csvCell } from "@/lib/csv";
 import { useState, useEffect, useMemo } from "react";
 import {
   Wallet,
@@ -83,11 +84,6 @@ function balanceOf(
   item: Pick<LedgerItem, "total_amount" | "discount_amount" | "charges_total" | "advance_amount">,
 ): number {
   return Math.max(0, grossTotal(item) - Number(item.advance_amount));
-}
-
-function csvEscape(value: string | number): string {
-  const s = String(value);
-  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 type FilterTab = "outstanding" | "paid" | "all";
@@ -556,7 +552,7 @@ function AdminPayments() {
       "",
       "",
     ];
-    const csv = [header, ...rows, totalsRow].map((r) => r.map(csvEscape).join(",")).join("\n");
+    const csv = [header, ...rows, totalsRow].map((r) => r.map(csvCell).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
