@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { roomsFreeForStay } from "@/lib/stayAvailability";
 import {
   addMonths,
   differenceInCalendarDays,
@@ -40,11 +41,19 @@ type Props = {
   setCheckOut: (d: Date | null) => void;
 };
 
+/** How far ahead guests can book. The data below is loaded for exactly this window, so the calendar must not go past it. */
+const BOOKING_HORIZON_MONTHS = 12;
+
 export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Props) {
   const [month, setMonth] = useState(new Date());
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const horizonEnd = addMonths(today, BOOKING_HORIZON_MONTHS);
+  // Previously the arrows went on forever while blocked dates were loaded for only 6 months,
+  // so any month beyond that looked completely free.
+  const canGoPrev = startOfMonth(month) > startOfMonth(today);
+  const canGoNext = startOfMonth(month) < startOfMonth(horizonEnd);
   const subdomain = getSubdomain();
 
   const { data: property } = useProperty(subdomain);
@@ -67,10 +76,10 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
   // hand) — it's the same function the owner-side calendar paints from, so
   // this view can never disagree with what the owner sees as blocked.
   const { data: blockedByRoom = {} } = useQuery({
-    queryKey: ["blocked-dates", activeRoomIds.join(","), turnoverSafe],
+    queryKey: ["blocked-dates", activeRoomIds.join(","), turnoverSafe, BOOKING_HORIZON_MONTHS],
     queryFn: () => {
       const from = format(new Date(), "yyyy-MM-dd");
-      const to = format(addMonths(new Date(), 6), "yyyy-MM-dd");
+      const to = format(horizonEnd, "yyyy-MM-dd");
       return getBlockedDatesForRooms(activeRoomIds, from, to, turnoverSafe);
     },
     enabled: activeRoomIds.length > 0,
@@ -98,6 +107,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
     const d = date;
     d.setHours(0, 0, 0, 0);
     if (isBefore(d, today)) return "past";
+    if (isAfter(d, horizonEnd)) return "past";   // beyond the loaded window: not bookable here
     if (totalRooms === 0) return "available";
     const bookedCount = bookedDateCounts[format(date, "yyyy-MM-dd")]?.size ?? 0;
     if (bookedCount === 0) return "available";
@@ -160,6 +170,18 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
   const nights =
     checkIn && checkOut ? Math.max(0, differenceInCalendarDays(checkOut, checkIn)) : 0;
 
+  // A stay can pass the per-night check above and still have no ONE room free for every night
+  // (room A taken the first nights, room B the last). Say so here, instead of leaving the guest
+  // with a list of rooms that all say "Not available".
+  const noRoomFree =
+    !!checkIn && !!checkOut && totalRooms > 0 &&
+    roomsFreeForStay(
+      activeRoomIds,
+      blockedByRoom,
+      { checkIn: format(checkIn, "yyyy-MM-dd"), checkOut: format(checkOut, "yyyy-MM-dd") },
+      turnoverSafe,
+    ).length === 0;
+
   return (
     <section id="availability" className="py-16 md:py-24 bg-background">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
@@ -175,7 +197,8 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
             <div className="flex items-center justify-between mb-5">
               <button
                 onClick={() => setMonth(addMonths(month, -1))}
-                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)]"
+                disabled={!canGoPrev}
+                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)] disabled:opacity-30 disabled:pointer-events-none"
                 aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -185,7 +208,8 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </div>
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
-                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)]"
+                disabled={!canGoNext}
+                className="press-scale h-10 w-10 rounded-full hover:bg-accent flex items-center justify-center transition-colors duration-[var(--duration-fast)] disabled:opacity-30 disabled:pointer-events-none"
                 aria-label="Next month"
               >
                 <ChevronRight className="h-4 w-4" />
@@ -263,8 +287,12 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               })}
             </div>
 
+            <p className="mt-4 text-xs text-muted-foreground">
+              Bookings open up to {BOOKING_HORIZON_MONTHS} months ahead. For later dates, please contact the host.
+            </p>
+
             {/* Legend */}
-            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-5 text-xs text-muted-foreground">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="w-3 h-3 rounded-sm bg-background border border-border" />
                 Available
@@ -314,6 +342,13 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
                   : "Select check-in and check-out dates to see available rooms."}
               </p>
             </div>
+
+            {noRoomFree && (
+              <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <span className="font-medium">No single room is free for all {nights} night{nights > 1 ? "s" : ""}.</span>{" "}
+                Try fewer nights or different dates, or book separate stays.
+              </div>
+            )}
 
             {totalRooms > 1 && (
               <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-800">
