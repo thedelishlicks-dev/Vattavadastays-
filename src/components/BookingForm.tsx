@@ -1,5 +1,5 @@
-import { formatIndianPhoneInput, isValidIndianMobile } from "@/lib/phone";
-import { useState, useRef } from "react";
+import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useProperty } from "@/hooks/useProperty";
@@ -8,8 +8,14 @@ import { extractUPIId } from "@/utils/upi";
 import { GuestPolicies } from "@/components/GuestPolicies";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/components/RoomDetail";
+import { guestPaymentOptions, paymentNote, type GuestPayment } from "@/lib/guestPayment";
+import {
+  browserStore, clearConfirmation, loadConfirmation, saveConfirmation, selectionKey,
+  type Confirmation,
+} from "@/lib/bookingConfirmation";
 
-type Payment = "UPI" | "Cash on Arrival";
+type Payment = GuestPayment;
+type Property = NonNullable<ReturnType<typeof useProperty>["data"]>;
 
 type Props = {
   selections: BookingDetails[];
@@ -26,19 +32,28 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   const [email, setEmail] = useState("");
   const [requests, setRequests] = useState("");
   const [payment, setPayment] = useState<Payment>("UPI");
-  const [submitted, setSubmitted] = useState(false);
-  const [submittedName, setSubmittedName] = useState("");
-  const [submittedPhone, setSubmittedPhone] = useState("");
-  const [bookingId, setBookingId] = useState<string | null>(null);
-  const [groupRef, setGroupRef] = useState<string | null>(null);
-  const [ownerNotifyLink, setOwnerNotifyLink] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+
+  // The "Request sent!" screen is drawn from this saved snapshot, not from the current
+  // selection, and survives a reload (see lib/bookingConfirmation.ts).
+  const store = useMemo(() => browserStore(), []);
+  const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const waRef = useRef<HTMLAnchorElement>(null);
 
   const { data: property } = useProperty(subdomain);
   const { mutateAsync: createBooking, isPending } = useCreateBooking();
+
+  useEffect(() => {
+    if (property?.id) setConfirmation(loadConfirmation(store, property.id));
+  }, [property?.id, store]);
+
+  const upiId = property ? extractUPIId(property.shared_amenities) : null;
+  const paymentOptions = guestPaymentOptions(property?.shared_amenities, upiId);
+  const paymentOptionsKey = paymentOptions.join("|");
+  useEffect(() => {
+    if (!paymentOptions.includes(payment)) setPayment(paymentOptions[0]);
+  }, [paymentOptionsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Typing or pasting in any usual form ("98765 43210", "+91…", "091…", "0091…") keeps
   // the number; it used to wipe anything pasted without "+91".
@@ -50,12 +65,13 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   const totalGuests = selections.reduce((sum, s) => sum + s.adults + (s.children ?? 0), 0);
   const hasSelection = selections.length > 0;
 
-  const handleCopyRef = () => {
-    if (!groupRef) return;
-    navigator.clipboard.writeText(groupRef).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+  const currentKey = selectionKey(selections.map((s) => ({ roomId: s.room.id, checkIn: s.checkIn, checkOut: s.checkOut })));
+  // The form is replaced by the confirmation only for the selection that was just booked.
+  const justBooked = !!confirmation && hasSelection && confirmation.selectionKey === currentKey;
+
+  const dismissConfirmation = () => {
+    clearConfirmation(store);
+    setConfirmation(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,33 +109,50 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
         propertyPendingHoldHours: property?.pending_hold_hours ?? null,
       });
 
-      setSubmittedName(name);
-      setSubmittedPhone(phone);
-      setBookingId(result.bookingId);
-      setGroupRef(result.groupRef);
+      const cleanRequests = requests.trim().slice(0, 500);
+      const link = property?.owner_whatsapp
+        ? buildOwnerNotifyLink({
+            ownerWhatsapp: property.owner_whatsapp,
+            guestName: name,
+            guestPhone: phone,
+            propertyName: property.name,
+            rooms: selections.map((s) => ({ name: s.room.name, guests: s.adults + (s.children ?? 0) })),
+            checkIn: selections[0].checkIn,
+            checkOut: selections[0].checkOut,
+            totalGuests,
+            grandTotal: result.totalAmount,
+            bookingId: result.bookingId,
+            requests: cleanRequests,
+          })
+        : null;
 
-      if (property?.owner_whatsapp) {
-        const link = buildOwnerNotifyLink({
-          ownerWhatsapp: property.owner_whatsapp,
-          guestName: name,
-          guestPhone: phone,
-          propertyName: property.name,
-          rooms: selections.map((s) => ({ name: s.room.name, guests: s.adults + (s.children ?? 0) })),
-          checkIn: selections[0].checkIn,
-          checkOut: selections[0].checkOut,
-          totalGuests,
-          grandTotal: result.totalAmount,
-          bookingId: result.bookingId,
-        });
-        setOwnerNotifyLink(link);
+      const snapshot: Confirmation = {
+        v: 1,
+        savedAt: Date.now(),
+        propertyId,
+        name,
+        phone,
+        bookingId: result.bookingId,
+        groupRef: result.groupRef,
+        ownerNotifyLink: link,
+        rooms: result.rooms.map((r) => ({ name: r.roomName, total: r.totalAmount })),
+        checkIn: selections[0].checkIn,
+        checkOut: selections[0].checkOut,
+        nights: result.nights,
+        totalGuests,
+        grandTotal: result.totalAmount,
+        payment,
+        requests: cleanRequests,
+        selectionKey: currentKey,
+      };
+      saveConfirmation(store, snapshot);   // survives a reload (e.g. after the GPay round trip)
+      setConfirmation(snapshot);
+      setRequests("");
 
-        if (waRef.current) {
-          waRef.current.href = link;
-          waRef.current.click();
-        }
+      if (link && waRef.current) {
+        waRef.current.href = link;
+        waRef.current.click();
       }
-
-      setSubmitted(true);
     } catch (err: unknown) {
       const msg =
         err instanceof Error && err.message ? err.message : "Booking failed — please try again.";
@@ -136,14 +169,10 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
           checkIn: selections[0].checkIn,
           checkOut: selections[0].checkOut,
           guests: totalGuests,
-          guestName: submitted ? submittedName : name,
-          guestPhone: submitted ? submittedPhone : phone,
+          guestName: name,
+          guestPhone: phone,
         })
       : null;
-
-  const trackingUrl = submittedPhone ? guestTrackingUrl(window.location.origin, submittedPhone, property?.id) : null;
-
-  const upiId = property ? extractUPIId(property.shared_amenities) : null;
 
   return (
     <section id="booking" className="py-16 md:py-24 bg-background">
@@ -158,14 +187,24 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
         </div>
 
-        {!hasSelection && (
+        {confirmation && (
+          <ConfirmationCard
+            confirmation={confirmation}
+            property={property}
+            upiId={upiId}
+            onDismiss={dismissConfirmation}
+            showDismissLabel={justBooked ? "Book another stay" : "Dismiss"}
+          />
+        )}
+
+        {!hasSelection && !confirmation && (
           <div className="rounded-2xl border border-dashed border-border p-8 text-center text-muted-foreground">
             Select a room above to continue.
           </div>
         )}
 
-        {hasSelection && (
-          <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
+        {hasSelection && !justBooked && (
+          <div className={["bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]", confirmation ? "mt-8" : ""].join(" ")}>
             {/* ── Room cart summary ── */}
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 space-y-3">
               <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
@@ -185,8 +224,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                     <span className="text-sm font-semibold text-primary">
                       ₹{s.total.toLocaleString("en-IN")}
                     </span>
-                    {!submitted && (
-                      <button
+                                          <button
                         type="button"
                         onClick={() => onRemoveRoom(s.room.id)}
                         className="h-6 w-6 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors"
@@ -194,7 +232,6 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                       >
                         <X className="h-3.5 w-3.5" />
                       </button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -224,152 +261,15 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
             </div>
 
             {/* Add another room CTA — shown pre-submission */}
-            {!submitted && (
-              <a
+                          <a
                 href="#rooms"
                 className="flex items-center justify-center gap-2 w-full mb-5 rounded-xl border border-dashed border-primary/40 py-2.5 text-xs font-medium text-primary hover:bg-primary-light/30 transition-colors"
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add another room
               </a>
-            )}
 
-            {submitted ? (
-              /* ── SUCCESS STATE ── */
-              <div className="space-y-5">
-                <div className="text-center">
-                  <div className="mx-auto h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-3">
-                    <Check className="h-6 w-6" />
-                  </div>
-                  <h3 className="font-display text-xl font-semibold">Request sent!</h3>
-                  <p className="mt-1 text-sm text-muted-foreground max-w-xs mx-auto">
-                    {property?.owner_name ?? "The host"} will confirm your booking shortly.
-                  </p>
-                </div>
-
-                {/* Booking reference */}
-                {groupRef && (
-                  <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-4 text-center space-y-1">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
-                      Booking reference
-                    </p>
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="font-mono text-2xl font-semibold text-primary tracking-widest">
-                        {groupRef}
-                      </span>
-                      <button
-                        onClick={handleCopyRef}
-                        className="text-muted-foreground hover:text-primary transition-colors p-1 rounded"
-                        aria-label="Copy booking reference"
-                      >
-                        {copied ? (
-                          <CheckCheck className="h-4 w-4 text-primary" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Quote this number when contacting the host.
-                    </p>
-                  </div>
-                )}
-
-                {/* WhatsApp CTA */}
-                {ownerNotifyLink && (
-                  <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
-                    <p className="text-xs text-muted-foreground text-center">
-                      Tap below to notify {property?.owner_name ?? "the host"} on WhatsApp so they confirm faster.
-                    </p>
-                    <a
-                      href={ownerNotifyLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-5 py-3 text-sm font-medium hover:opacity-90 transition-opacity w-full justify-center"
-                    >
-                      <MessageCircle className="h-4 w-4" />
-                      Notify {property?.owner_name ?? "host"} on WhatsApp
-                    </a>
-                  </div>
-                )}
-
-                {/* Stay summary */}
-                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
-                  <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
-                    Your booking
-                  </div>
-                  {selections.map((s) => (
-                    <div key={s.room.id} className="flex justify-between">
-                      <span className="text-muted-foreground">{s.room.name}</span>
-                      <span className="font-medium">₹{s.total.toLocaleString("en-IN")}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between pt-1 border-t border-border">
-                    <span className="text-muted-foreground">Check-in</span>
-                    <span className="font-medium">{selections[0].checkIn}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Check-out</span>
-                    <span className="font-medium">{selections[0].checkOut}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total guests</span>
-                    <span className="font-medium">{totalGuests}</span>
-                  </div>
-                  <div className="flex justify-between pt-1 border-t border-border">
-                    <span className="text-muted-foreground">Grand total</span>
-                    <span className="font-semibold text-primary">
-                      ₹{grandTotal.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                  {payment === "Cash on Arrival" && (
-                    <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
-                      Full payment of ₹{grandTotal.toLocaleString("en-IN")} is due on arrival.
-                      No advance needed.
-                    </div>
-                  )}
-                </div>
-
-                {/* UPI Payment — only for UPI, shown for first room as the combined total */}
-                {upiId && payment === "UPI" && (
-                  <UPIPaymentSection
-                    upiId={upiId}
-                    payeeName={property?.owner_name ?? property?.name ?? ""}
-                    totalAmount={grandTotal}
-                    advancePaid={0}
-                    bookingNote={`Booking – ${property?.name} – ${selections[0].checkIn}`}
-                    ownerWhatsapp={property?.owner_whatsapp ?? ""}
-                    guestName={submittedName}
-                    propertyName={property?.name ?? ""}
-                    roomName={selections.map((s) => s.room.name).join(", ")}
-                    checkIn={selections[0].checkIn}
-                    bookingId={bookingId ?? undefined}
-                  />
-                )}
-
-                <GuestPolicies
-                  sharedAmenities={property?.shared_amenities}
-                  checkInTime={property?.check_in_time}
-                  checkOutTime={property?.check_out_time}
-                  defaultOpen
-                />
-
-                {trackingUrl && (
-                  <a
-                    href={trackingUrl}
-                    className="flex items-center justify-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Track booking status
-                  </a>
-                )}
-
-                <p className="text-center text-xs text-muted-foreground">
-                  {selections[0].checkIn} → {selections[0].checkOut} · {totalNights} night{totalNights > 1 ? "s" : ""}
-                </p>
-              </div>
-            ) : (
-              /* ── BOOKING FORM ── */
+            {/* ── BOOKING FORM ── */}
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <Field label="Full name" required>
@@ -412,13 +312,13 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                     placeholder="Arrival time, dietary needs, etc."
                   />
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Send these to the owner via WhatsApp after booking.
+                    Included in your booking message to the host on WhatsApp.
                   </p>
                 </Field>
 
                 <Field label="Payment method">
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["UPI", "Cash on Arrival"] as Payment[]).map((p) => (
+                  <div className={paymentOptions.length > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
+                    {paymentOptions.map((p) => (
                       <button
                         type="button"
                         key={p}
@@ -435,10 +335,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                     ))}
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {payment === "UPI" &&
-                      "Pay 25% advance via UPI to confirm. Full balance due on arrival."}
-                    {payment === "Cash on Arrival" &&
-                      "No advance needed. Pay the full amount on arrival at the property."}
+                    {paymentNote(payment)}
                   </p>
                 </Field>
 
@@ -482,11 +379,185 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                     : "Send Booking Request"}
                 </button>
               </form>
-            )}
           </div>
         )}
       </div>
     </section>
+  );
+}
+
+/**
+ * "Request sent!" — drawn ONLY from the saved snapshot (never from the current room
+ * selection), so changing dates or reloading the page cannot alter or lose it.
+ */
+function ConfirmationCard({
+  confirmation: c,
+  property,
+  upiId,
+  onDismiss,
+  showDismissLabel,
+}: {
+  confirmation: Confirmation;
+  property: Property | null | undefined;
+  upiId: string | null;
+  onDismiss: () => void;
+  showDismissLabel: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const ownerName = property?.owner_name ?? "The host";
+  const trackingUrl = guestTrackingUrl(window.location.origin, c.phone, property?.id ?? c.propertyId);
+  const ref = c.groupRef;
+
+  const handleCopyRef = () => {
+    if (!ref) return;
+    navigator.clipboard.writeText(ref).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => { /* clipboard blocked: the reference is on screen anyway */ });
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)] space-y-5">
+      <div className="text-center">
+        <div className="mx-auto h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-3">
+          <Check className="h-6 w-6" />
+        </div>
+        <h3 className="font-display text-xl font-semibold">Request sent!</h3>
+        <p className="mt-1 text-sm text-muted-foreground max-w-xs mx-auto">
+          {ownerName} will confirm your booking shortly.
+        </p>
+      </div>
+
+      {/* Booking reference */}
+      {ref && (
+        <div className="rounded-xl border border-primary/20 bg-primary-light/30 p-4 text-center space-y-1">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+            Booking reference
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <span className="font-mono text-2xl font-semibold text-primary tracking-widest">{ref}</span>
+            <button
+              type="button"
+              onClick={handleCopyRef}
+              className="text-muted-foreground hover:text-primary transition-colors p-1 rounded"
+              aria-label="Copy booking reference"
+            >
+              {copied ? <CheckCheck className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">Quote this number when contacting the host.</p>
+        </div>
+      )}
+
+      {/* WhatsApp CTA */}
+      {c.ownerNotifyLink && (
+        <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
+          <p className="text-xs text-muted-foreground text-center">
+            Tap below to notify {property?.owner_name ?? "the host"} on WhatsApp so they confirm faster.
+          </p>
+          <a
+            href={c.ownerNotifyLink}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-[#25D366] text-white px-5 py-3 text-sm font-medium hover:opacity-90 transition-opacity w-full justify-center"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Notify {property?.owner_name ?? "host"} on WhatsApp
+          </a>
+        </div>
+      )}
+
+      {/* Stay summary */}
+      <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">Your booking</div>
+        {c.rooms.map((r, i) => (
+          <div key={`${r.name}-${i}`} className="flex justify-between">
+            <span className="text-muted-foreground">{r.name}</span>
+            <span className="font-medium">₹{r.total.toLocaleString("en-IN")}</span>
+          </div>
+        ))}
+        <div className="flex justify-between pt-1 border-t border-border">
+          <span className="text-muted-foreground">Check-in</span>
+          <span className="font-medium">{c.checkIn}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Check-out</span>
+          <span className="font-medium">{c.checkOut}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Total guests</span>
+          <span className="font-medium">{c.totalGuests}</span>
+        </div>
+        <div className="flex justify-between pt-1 border-t border-border">
+          <span className="text-muted-foreground">Grand total</span>
+          <span className="font-semibold text-primary">₹{c.grandTotal.toLocaleString("en-IN")}</span>
+        </div>
+        {c.requests && (
+          <div className="pt-1 border-t border-border">
+            <span className="text-muted-foreground">Your requests</span>
+            <p className="mt-0.5 font-medium whitespace-pre-wrap break-words">{c.requests}</p>
+          </div>
+        )}
+        {c.payment === "Cash on Arrival" && (
+          <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+            Full payment of ₹{c.grandTotal.toLocaleString("en-IN")} is due on arrival. No advance needed.
+          </div>
+        )}
+      </div>
+
+      {/* UPI payment — only when the host has a UPI ID; otherwise tell the guest what happens next */}
+      {c.payment === "UPI" && upiId && (
+        <UPIPaymentSection
+          upiId={upiId}
+          payeeName={property?.owner_name ?? property?.name ?? ""}
+          totalAmount={c.grandTotal}
+          advancePaid={0}
+          bookingNote={`Booking – ${property?.name ?? ""} – ${c.checkIn}`}
+          ownerWhatsapp={property?.owner_whatsapp ?? ""}
+          guestName={c.name}
+          propertyName={property?.name ?? ""}
+          roomName={c.rooms.map((r) => r.name).join(", ")}
+          checkIn={c.checkIn}
+          bookingId={c.bookingId}
+        />
+      )}
+      {c.payment === "UPI" && !upiId && (
+        <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+          {ownerName} will share payment details with you on WhatsApp or by phone.
+        </div>
+      )}
+
+      <GuestPolicies
+        sharedAmenities={property?.shared_amenities}
+        checkInTime={property?.check_in_time}
+        checkOutTime={property?.check_out_time}
+        defaultOpen
+      />
+
+      <a
+        href={trackingUrl}
+        className="flex items-center justify-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+      >
+        <ExternalLink className="h-4 w-4" />
+        Track booking status
+      </a>
+
+      <p className="text-center text-xs text-muted-foreground">
+        {c.checkIn} → {c.checkOut} · {c.nights} night{c.nights > 1 ? "s" : ""}
+      </p>
+
+      <div className="border-t border-border pt-4 flex flex-col items-center gap-1">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
+        >
+          <Plus className="h-4 w-4" />
+          {showDismissLabel}
+        </button>
+        <p className="text-[11px] text-muted-foreground">This confirmation is kept on this phone for 24 hours.</p>
+      </div>
+    </div>
   );
 }
 
@@ -522,6 +593,7 @@ function buildOwnerNotifyLink({
   totalGuests,
   grandTotal,
   bookingId,
+  requests,
 }: {
   ownerWhatsapp: string;
   guestName: string;
@@ -533,15 +605,8 @@ function buildOwnerNotifyLink({
   totalGuests: number;
   grandTotal: number;
   bookingId: string;
+  requests?: string;
 }): string {
-  const digits = ownerWhatsapp.replace(/\D/g, "");
-  const normalized =
-    digits.startsWith("91") && digits.length === 12
-      ? digits
-      : digits.length === 10
-      ? `91${digits}`
-      : digits;
-
   const shortId = bookingId.slice(0, 8).toUpperCase();
   const roomLines = rooms
     .map((r) => `  • ${r.name} (${r.guests} guest${r.guests > 1 ? "s" : ""})`)
@@ -556,8 +621,10 @@ function buildOwnerNotifyLink({
     `Total guests: ${totalGuests}\n` +
     `Rooms:\n${roomLines}\n` +
     `Total: ₹${grandTotal.toLocaleString("en-IN")}\n` +
+    (requests ? `Special requests: ${requests}\n` : "") +
     `Ref: #${shortId}\n\n` +
     `Please confirm this booking.`;
 
-  return `https://wa.me/${normalized}?text=${encodeURIComponent(text)}`;
+  // Shared number rules (lib/phone.ts): handles 10 digits, +91…, 91… and a leading 0.
+  return `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(text)}`;
 }
