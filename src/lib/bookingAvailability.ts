@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { fetchAllPages } from "./pagination";
 
 /**
  * Every night a stay occupies a room: check-in date inclusive, check-out
@@ -197,30 +198,40 @@ export async function getBlockedDatesForRooms(
   roomIds.forEach((id) => (blocked[id] = new Set()));
   if (roomIds.length === 0) return blocked;
 
-  const [{ data: bookings, error: bookingsErr }, { data: availRows, error: availErr }] = await Promise.all([
-    supabase
-      .from("bookings")
-      .select("room_id, check_in, check_out")
-      .in("room_id", roomIds)
-      .neq("status", "cancelled")
-      .gte("check_out", rangeStart)
-      .lte("check_in", rangeEnd),
-    supabase
-      .from("availability")
-      .select("room_id, date")
-      .in("room_id", roomIds)
-      .eq("is_available", false)
-      .gte("date", rangeStart)
-      .lte("date", rangeEnd),
+  // Paged: one request returns at most 1,000 rows and says nothing when it stops there, so a
+  // busy property's later dates used to be silently missing (and look free to guests).
+  const [bookings, availRows] = await Promise.all([
+    fetchAllPages<{ room_id: string; check_in: string; check_out: string }>((from, to) =>
+      supabase
+        .from("bookings")
+        .select("room_id, check_in, check_out")
+        .in("room_id", roomIds)
+        .neq("status", "cancelled")
+        .gte("check_out", rangeStart)
+        .lte("check_in", rangeEnd)
+        .order("check_in", { ascending: true })
+        .order("room_id", { ascending: true })
+        .range(from, to),
+    ),
+    fetchAllPages<{ room_id: string; date: string }>((from, to) =>
+      supabase
+        .from("availability")
+        .select("room_id, date")
+        .in("room_id", roomIds)
+        .eq("is_available", false)
+        .gte("date", rangeStart)
+        .lte("date", rangeEnd)
+        .order("date", { ascending: true })
+        .order("room_id", { ascending: true })
+        .range(from, to),
+    ),
   ]);
-  if (bookingsErr) throw bookingsErr;
-  if (availErr) throw availErr;
 
-  (bookings ?? []).forEach((b) => {
+  bookings.forEach((b) => {
     const effectiveCheckOut = turnoverSafe ? b.check_out : addOneDay(b.check_out);
     eachDate(b.check_in, effectiveCheckOut).forEach((d) => blocked[b.room_id]?.add(d));
   });
-  (availRows ?? []).forEach((row) => {
+  availRows.forEach((row) => {
     blocked[row.room_id]?.add(row.date);
   });
 
@@ -386,4 +397,3 @@ export async function releaseDatesIfUnblocked(roomId: string, checkIn: string, c
     .in("date", toRelease);
   if (delErr) throw delErr;
 }
-
