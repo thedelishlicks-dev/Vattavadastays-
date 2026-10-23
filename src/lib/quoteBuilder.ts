@@ -238,12 +238,14 @@ export function lockToQuote<T extends RoomTotalLike>(
   quoteRooms: RoomQuoteLine[] | undefined,
   active: boolean,
   fallbackGuests: number,
+  /** Guests for each room not locked to the quote (multi-room split); falls back to `fallbackGuests`. */
+  guestsByRoom?: Record<string, number>,
 ): (T & { guests: number; locked: boolean })[] {
   return live.map((rt) => {
     const q = active ? quoteRooms?.find((r) => r.room_id === rt.room.id) : undefined;
     return q
       ? { ...rt, roomPrice: q.room_price, extraCharge: q.extra_guest_charge, total: q.total, guests: q.guests, locked: true }
-      : { ...rt, guests: fallbackGuests, locked: false };
+      : { ...rt, guests: guestsByRoom?.[rt.room.id] ?? fallbackGuests, locked: false };
   });
 }
 

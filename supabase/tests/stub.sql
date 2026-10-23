@@ -15,6 +15,7 @@ create function auth.role() returns text language sql stable as $$ select nullif
 create table public.properties (id uuid primary key, owner_id uuid, subscription_status text default 'trial', pending_hold_hours int default 24);
 create table public.rooms (id uuid primary key, property_id uuid references public.properties, base_price numeric, extra_guest_price numeric default 0,
   weekend_multiplier numeric default 1, max_guests int, is_active boolean default true);
+create table public.agents (id uuid primary key, property_id uuid, name text);
 create table public.bookings (id uuid primary key default gen_random_uuid(), property_id uuid, room_id uuid, group_id uuid, guest_name text, guest_phone text,
   guest_count int, check_in date, check_out date, room_price numeric, extra_guest_charge numeric, total_amount numeric, advance_amount numeric default 0,
   discount_amount numeric default 0, discount_reason text, status text, is_paid boolean default false, payment_method text, source text default 'direct',

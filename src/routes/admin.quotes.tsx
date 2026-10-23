@@ -2,12 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { CalendarCheck, MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useDeleteQuote, useMarkQuoteConverted, useQuotes, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
+import { useDeleteQuote, useMarkQuoteConverted, useQuotes, useSaveQuote, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
 import { PageHeader } from "@/admin/formKit";
 import { formatINR, nightsBetween } from "@/lib/quotes";
-import { buildQuoteText, displayStatus, quoteLink, type DisplayStatus } from "@/lib/quoteBuilder";
+import { buildQuoteText, displayStatus, quoteLink, todayStr, type DisplayStatus } from "@/lib/quoteBuilder";
 import { telLink } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/admin/quotes")({
@@ -68,14 +68,16 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
     return q.status === filter;
   });
 
-  const resendLink = (q: Quote) =>
+  const saveQuote = useSaveQuote();
+
+  const resendLink = (q: Quote, validUntil: string | null = q.valid_until) =>
     quoteLink(
       q.guest_phone,
       buildQuoteText({
         propertyName: property.name, guestName: q.guest_name === "Guest" ? "" : q.guest_name,
         checkIn: q.check_in, checkOut: q.check_out, guestCount: q.guest_count,
         rooms: q.rooms, lines: q.lines, discount: q.discount_amount, total: q.total_amount,
-        validUntil: q.valid_until, ownerPhone: property.owner_phone,
+        validUntil, ownerPhone: property.owner_phone,
       }),
     );
 
@@ -138,7 +140,19 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                   href={resendLink(q)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: q.status === "draft" ? "sent" : q.status, markSent: true })}
+                  onClick={(e) => {
+                    // Never send an offer whose "valid till" date has already passed without asking:
+                    // offer a fresh 3-day validity (saved on the quote) or cancel.
+                    if (q.valid_until && q.valid_until < todayStr() && !q.converted_booking_id) {
+                      e.preventDefault();
+                      const newUntil = todayStr(3);
+                      if (!window.confirm(`This quote's "valid till" date (${q.valid_until}) has passed.\n\nSend it again with a new valid-till date of ${newUntil}?`)) return;
+                      window.open(resendLink(q, newUntil), "_blank", "noopener,noreferrer");
+                      saveQuote.mutate({ propertyId: property.id, id: q.id, values: { valid_until: newUntil, status: "sent", sent_at: new Date().toISOString() } });
+                      return;
+                    }
+                    setStatus.mutate({ propertyId: property.id, id: q.id, status: q.status === "draft" ? "sent" : q.status, markSent: true });
+                  }}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-white"
                 >
                   <Send className="h-3.5 w-3.5" /> {q.status === "draft" ? "Send" : "Resend"}
