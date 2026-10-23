@@ -158,4 +158,28 @@ do $$ declare n int; begin
   reset role;
 end $$;
 
+-- 10. delete_agent_with_commissions: clears commission records, keeps bookings, deletes the agent --------
+insert into agents values ('99999999-9999-4999-8999-999999999991', :'A1', 'Anil'), ('99999999-9999-4999-8999-999999999992', :'A1', 'Other agent');
+insert into booking_groups (id, property_id, group_reference, guest_name, check_in, check_out, source, agent_id, commission_amount, commission_paid, status, total_amount)
+  values ('88888888-8888-4888-8888-888888888881', :'A1', 'GRP-AG', 'G', '2027-05-01', '2027-05-03', 'agent', '99999999-9999-4999-8999-999999999991', 700, true, 'confirmed', 100);
+insert into bookings (id, property_id, room_id, guest_name, guest_phone, guest_count, check_in, check_out, room_price, total_amount, status, source, agent_id, commission_amount, commission_paid) values
+  ('77777777-7777-4777-8777-777777777771', :'A1', :'C1', 'A', '9', 2, '2027-06-01', '2027-06-03', 1000, 1000, 'confirmed', 'agent', '99999999-9999-4999-8999-999999999991', 250, false),
+  ('77777777-7777-4777-8777-777777777772', :'A1', :'C2', 'B', '9', 2, '2027-07-01', '2027-07-03', 1000, 1000, 'cancelled', 'agent', '99999999-9999-4999-8999-999999999991', 300, true),
+  ('77777777-7777-4777-8777-777777777773', :'A1', :'C2', 'Keep', '9', 2, '2027-08-01', '2027-08-03', 1000, 1000, 'confirmed', 'agent', '99999999-9999-4999-8999-999999999992', 100, false);
+select t_assert((select (r->>'bookings')::int = 2 and (r->>'groups')::int = 1 from (select delete_agent_with_commissions('99999999-9999-4999-8999-999999999991') as r) x), 'returns how many records it cleared');
+select t_assert((select count(*) = 1 from agents), 'only the chosen agent is deleted');
+select t_assert((select count(*) = 0 from bookings where id in ('77777777-7777-4777-8777-777777777771','77777777-7777-4777-8777-777777777772') and (agent_id is not null or commission_amount is not null or commission_paid)), 'commission records on the agents bookings are cleared');
+select t_assert((select count(*) = 2 from bookings where id in ('77777777-7777-4777-8777-777777777771','77777777-7777-4777-8777-777777777772') and source = 'agent' and total_amount = 1000), 'the bookings themselves, their amounts and source are kept');
+select t_assert((select agent_id is null and commission_amount is null and not commission_paid from booking_groups where id = '88888888-8888-4888-8888-888888888881'), 'group commission cleared too');
+select t_assert((select agent_id is not null and commission_amount = 100 from bookings where id = '77777777-7777-4777-8777-777777777773'), 'another agents bookings are untouched');
+do $$ begin
+  begin
+    perform delete_agent_with_commissions('99999999-9999-4999-8999-999999999999');
+    raise exception 'TEST_NO_ERROR unknown agent';
+  exception when others then
+    if sqlerrm like 'TEST_NO_ERROR%' then raise; end if;
+    perform t_assert(sqlerrm = 'AGENT_NOT_FOUND', 'unknown agent raises AGENT_NOT_FOUND');
+  end;
+end $$;
+
 \echo 'ALL DATABASE TESTS PASSED'
