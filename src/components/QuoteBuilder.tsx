@@ -5,7 +5,8 @@
 // link (not window.open) so iPad/iPhone Safari never blocks it, and it works
 // even if the background save fails on a weak signal.
 
-import { useMemo, useState } from "react";
+import { createSerialQueue } from "@/lib/serialQueue";
+import { useMemo, useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Loader2, Minus, Plus, Send, Trash2, TriangleAlert } from "lucide-react";
 import { Section, Field, inputCls } from "@/admin/formKit";
@@ -52,6 +53,8 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const [validUntil, setValidUntil] = useState(initial?.valid_until ?? todayStr(3));
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [savedId, setSavedId] = useState<string | undefined>(initial?.id);
+  const savedIdRef = useRef<string | undefined>(initial?.id);
+  const saveQueue = useRef(createSerialQueue());
   const [saveMsg, setSaveMsg] = useState("");
 
   const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
@@ -124,8 +127,12 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const link = phoneOk ? quoteLink(guestPhone, text) : "#";
 
   // ── save (draft or sent). Fire-and-forget safe: sending never waits on this.
-  const persist = async (status: "draft" | "sent") => {
-    if (!canSend) return;
+  //
+  // Saves are queued, one after another. Before, a fast second tap (Send twice, or Send then Save
+  // draft) read the saved id from component state — which is only set once the FIRST save has
+  // finished — so both saved as NEW and the owner ended up with two copies of the quote.
+  const persist = (status: "draft" | "sent"): Promise<void> => {
+    if (!canSend) return Promise.resolve();
     const values: Record<string, unknown> = {
       guest_name: guestName.trim() || "Guest",
       guest_phone: phoneDigits,
@@ -144,13 +151,17 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       status: status === "sent" ? "sent" : (initial?.status ?? "draft"),
     };
     if (status === "sent") values.sent_at = new Date().toISOString();
-    try {
-      const id = await save.mutateAsync({ propertyId: property.id, id: savedId, values });
-      setSavedId(id);
-      setSaveMsg(status === "sent" ? "Saved as sent" : "Draft saved");
-    } catch {
-      setSaveMsg("Couldn't save — your message was still sent. Try Save again.");
-    }
+    return saveQueue.current.enqueue(async () => {
+      try {
+        // Read the id when THIS save runs (after the earlier one finished), not when it was tapped.
+        const id = await save.mutateAsync({ propertyId: property.id, id: savedIdRef.current, values });
+        savedIdRef.current = id;
+        setSavedId(id);
+        setSaveMsg(status === "sent" ? "Saved as sent" : "Draft saved");
+      } catch {
+        setSaveMsg("Couldn't save — your message was still sent. Try Save again.");
+      }
+    });
   };
 
   // ── item helpers
