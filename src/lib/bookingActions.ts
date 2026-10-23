@@ -36,6 +36,7 @@ export const OFFLINE_MESSAGE =
 export function saveFailMessage(e: unknown, fallback = "Couldn't save. Please try again — nothing was changed."): string {
   if (e instanceof NotSavedError) return NOT_SAVED_MESSAGE;
   const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
+  if (/AGENT_NOT_FOUND/.test(msg)) return "That agent no longer exists (or isn't yours). Refresh the page.";
   // fetch() failures read differently per browser (Chrome / Safari / Firefox).
   if (/failed to fetch|load failed|networkerror|network request failed|timeout/i.test(msg)) return OFFLINE_MESSAGE;
   return msg ? `${fallback.replace(/\.$/, "")} (${msg})` : fallback;
@@ -104,4 +105,33 @@ export async function setGroupDiscount(db: Db, groupId: string, amount: number, 
     .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new NotSavedError();
+}
+
+/**
+ * Mark an agent's commission paid / not paid (single booking or group). Throws if it wasn't
+ * saved; "no error but no row changed" (expired login) counts as a failure too.
+ */
+export async function setCommissionPaid(db: Db, kind: "booking" | "group", id: string, paid: boolean, now: Date = new Date()): Promise<void> {
+  const { data, error } = await db
+    .from(kind === "group" ? "booking_groups" : "bookings")
+    .update({ commission_paid: paid, commission_paid_date: paid ? now.toISOString() : null })
+    .eq("id", id)
+    .select("id");
+  if (error) throw error;
+  if (!data || data.length === 0) throw new NotSavedError();
+}
+
+/**
+ * Delete an agent together with their commission records, as ONE database step
+ * (delete_agent_with_commissions): either everything is cleared and the agent is gone,
+ * or nothing changes. The bookings themselves are kept.
+ */
+export async function deleteAgentWithCommissions(
+  db: Pick<SupabaseClient, "rpc">,
+  agentId: string,
+): Promise<{ bookings: number; groups: number }> {
+  const { data, error } = await db.rpc("delete_agent_with_commissions", { p_agent_id: agentId });
+  if (error) throw error;
+  const r = (data ?? {}) as { bookings?: number; groups?: number };
+  return { bookings: Number(r.bookings ?? 0), groups: Number(r.groups ?? 0) };
 }
