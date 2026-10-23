@@ -1,3 +1,4 @@
+import { splitGuests, sumGuests } from "@/lib/guestSplit";
 import { formatIndianPhoneInput, isValidIndianMobile } from "@/lib/phone";
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -118,6 +119,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   // the booking. Same shape (amount + optional reason) and same validation
   // as the "Add discount" form on the booking detail page, so a booking
   // created here looks identical to one discounted after the fact.
+  // Owner's own guests-per-room numbers for a multi-room booking (see lib/guestSplit.ts).
+  const [roomGuestOverrides, setRoomGuestOverrides] = useState<Record<string, string>>({});
+  // When the dates differ from the quote, its add-ons (priced for the ORIGINAL dates and guests) are left out unless the owner opts in.
+  const [includeStaleAddons, setIncludeStaleAddons] = useState(false);
   const [showDiscount, setShowDiscount] = useState((fromQuote?.discount ?? 0) > 0);
   const [discountAmount, setDiscountAmount] = useState<string>(fromQuote && fromQuote.discount > 0 ? String(fromQuote.discount) : "");
   const [discountReason, setDiscountReason] = useState(fromQuote && fromQuote.discount > 0 ? "As quoted" : "");
@@ -147,10 +152,14 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
         : [...prev, roomId]
     );
     setConflicts((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
+    setRoomGuestOverrides((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
   };
 
   const guestCount = Number(form.guest_count) || 1;
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
+  // Guests are shared between the rooms (4 guests in two 2-guest rooms = 2 + 2), not applied to each room.
+  const overrideNums = Object.fromEntries(Object.entries(roomGuestOverrides).map(([k, v]) => [k, parseInt(v) || 0]));
+  const guestSplit = splitGuests(guestCount, selectedRooms, overrideNums);
   const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
   // Room price = EXACTLY what the same stay costs a guest booking online
@@ -160,10 +169,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const liveRoomTotals = useMemo(() => selectedRooms.map((r) => {
     const p = priceRoomStay({
       room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in, checkOut: form.check_out, rates,
+      guests: guestSplit[r.id] ?? guestCount, checkIn: form.check_in, checkOut: form.check_out, rates,
     });
     return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
-  }), [selectedRooms, guestCount, form.check_in, form.check_out, rates]);
+  }), [selectedRooms, guestCount, JSON.stringify(guestSplit), form.check_in, form.check_out, rates]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Quote conversion: while the dates still match the quote, each quoted room
   // keeps EXACTLY the quoted price and guest count — the guest agreed to that
@@ -172,11 +181,13 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   // are saved as normal Extras charges (same mechanism as every other extra).
   const quoteLocked = !!fromQuote && form.check_in === fromQuote.checkIn && form.check_out === fromQuote.checkOut;
   const roomTotals = useMemo(
-    () => lockToQuote(liveRoomTotals, fromQuote?.rooms, quoteLocked, guestCount),
-    [liveRoomTotals, fromQuote, quoteLocked, guestCount],
+    () => lockToQuote(liveRoomTotals, fromQuote?.rooms, quoteLocked, guestCount, guestSplit),
+    [liveRoomTotals, fromQuote, quoteLocked, guestCount, JSON.stringify(guestSplit)], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const priceDrift = useMemo(() => quotePriceDrift(liveRoomTotals, roomTotals), [liveRoomTotals, roomTotals]);
-  const extraLines = fromQuote?.lines ?? [];
+  const quoteAddonsApply = !!fromQuote && (quoteLocked || includeStaleAddons);
+  const extraLines = quoteAddonsApply ? (fromQuote?.lines ?? []) : [];
+  const staleAddonsTotal = (fromQuote?.lines ?? []).reduce((s, l) => s + l.subtotal, 0);
   const quoteExtrasTotal = extraLines.reduce((s, l) => s + l.subtotal, 0);
   const manualExtrasTotal = cleanManualExtras.reduce((s, x) => s + x.qty * x.unit_price, 0);
   const extrasTotal = quoteExtrasTotal + manualExtrasTotal;
@@ -305,7 +316,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             property_id: propertyId,
             group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
             guest_name: form.guest_name, guest_phone: form.guest_phone,
-            guest_email: form.guest_email || null, guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : guestCount,
+            guest_email: form.guest_email || null, guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : sumGuests(guestSplit),
             check_in: form.check_in, check_out: form.check_out,
             total_amount: grandTotal, advance_amount: 0, discount_amount: discountAmt,
             discount_reason: finalDiscountReason,
@@ -354,7 +365,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       // already saved by now, so a failure here must NOT throw (the owner
       // would retry and hit "dates unavailable") — warn instead.
       let extrasWarning = "";
-      const quoteCharges = fromQuote ? chargesFromQuote(fromQuote.lines) : [];
+      const quoteCharges = fromQuote && quoteAddonsApply ? chargesFromQuote(fromQuote.lines) : [];
       const allCharges = [...quoteCharges, ...cleanManualExtras];
       if (allCharges.length > 0) {
         const owner = createdGroupId ? { group_id: createdGroupId } : { booking_id: createdBookingId };
@@ -438,7 +449,18 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
               {quoteLocked ? (
                 <p className="text-muted-foreground">Room prices are kept exactly as quoted. Add-ons are saved as Extras on the booking.</p>
               ) : (
-                <p className="text-amber-700">Dates differ from the quote, so rooms are priced at today&apos;s rates. Add-ons keep their quoted prices — adjust them in Extras if needed.</p>
+                <div className="space-y-1.5">
+                  <p className="text-amber-700">Dates differ from the quote, so rooms are priced at today&apos;s rates.</p>
+                  {(fromQuote.lines ?? []).length > 0 && (
+                    <label className="flex items-start gap-2 text-amber-800 cursor-pointer select-none">
+                      <input type="checkbox" className="mt-0.5" checked={includeStaleAddons} onChange={(e) => setIncludeStaleAddons(e.target.checked)} />
+                      <span>
+                        {includeStaleAddons ? "Including" : "Not including"} the quoted add-ons (₹{staleAddonsTotal.toLocaleString("en-IN")}). They were priced for the
+                        original dates and guests, so check the amounts. Tick to include them anyway.
+                      </span>
+                    </label>
+                  )}
+                </div>
               )}
               {priceDrift.length > 0 && (
                 <p className="text-amber-700">
@@ -602,9 +624,32 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => { setRoomGuestOverrides({}); set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1); }} className={inputCls} /></div>
               <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
             </div>
+            {selectedRooms.length > 1 && !quoteLocked && (
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Guests per room — split from the total; change a number to adjust (the total follows).</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedRooms.map((r) => (
+                    <label key={r.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate">{r.name}</span>
+                      <input
+                        type="number" min={1} max={50} value={guestSplit[r.id] ?? 1}
+                        onChange={(e) => {
+                          const v = Math.max(1, parseInt(e.target.value) || 1);
+                          const next: Record<string, string> = Object.fromEntries(selectedRooms.map((x) => [x.id, String(guestSplit[x.id] ?? 1)]));
+                          next[r.id] = String(v);
+                          setRoomGuestOverrides(next);
+                          set("guest_count", Object.values(next).reduce((t, n) => t + Number(n), 0));
+                        }}
+                        className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-sm text-right"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Discount — for a rate the guest negotiated before this booking
