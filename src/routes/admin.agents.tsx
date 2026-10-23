@@ -1,3 +1,5 @@
+import { buildLedgerItems, summarizeItems, agentDeletePreview, deleteAgentMessage, type CommissionItem } from "@/lib/commissionLedger";
+import { setCommissionPaid, saveFailMessage } from "@/lib/bookingActions";
 import { csvCell } from "@/lib/csv";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
@@ -37,22 +39,6 @@ export const Route = createFileRoute("/admin/agents")({
 // /admin/commissions still exists and redirects here.
 // ---------------------------------------------------------------------------
 
-// Unified "commission item" so standalone agent-bookings and agent
-// booking_groups are listed / toggled / summed identically (same pattern as
-// the unification in admin.payments.tsx, applied to commission).
-type CommissionItem = {
-  id: string;
-  kind: "booking" | "group";
-  agent_id: string;
-  guest_name: string;
-  check_in: string;
-  roomLabel: string; // "2 rooms" for groups, blank for single bookings
-  commission_amount: number;
-  commission_paid: boolean;
-  commission_paid_date: string | null;
-  status: string;
-};
-
 function commissionLabel(type: CommissionType, value: number) {
   return type === "percentage" ? `${value}%` : `₹${value.toLocaleString("en-IN")} flat`;
 }
@@ -84,53 +70,12 @@ function AdminAgents() {
       return next;
     });
 
-  // A booking that belongs to a group is represented by the group row for
-  // commission purposes (group commission is stored once on booking_groups,
-  // not split across member rows) — same de-duplication as admin.payments.tsx.
-  const groupBookingIds = useMemo(() => {
-    const ids = new Set<string>();
-    (groups as BookingGroup[]).forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id)));
-    return ids;
-  }, [groups]);
-
-  const items: CommissionItem[] = useMemo(() => {
-    const fromBookings: CommissionItem[] = (bookings as Booking[])
-      .filter((b) => !groupBookingIds.has(b.id))
-      .filter((b) => b.source === "agent" && b.agent_id && b.commission_amount != null)
-      .map((b) => ({
-        id: b.id,
-        kind: "booking",
-        agent_id: b.agent_id as string,
-        guest_name: b.guest_name,
-        check_in: b.check_in,
-        roomLabel: "",
-        commission_amount: Number(b.commission_amount),
-        commission_paid: b.commission_paid,
-        commission_paid_date: b.commission_paid_date ?? null,
-        status: b.status,
-      }));
-
-    const fromGroups: CommissionItem[] = (groups as BookingGroup[])
-      .filter((g) => g.source === "agent" && g.agent_id && g.commission_amount != null)
-      .map((g) => ({
-        id: g.id,
-        kind: "group",
-        agent_id: g.agent_id as string,
-        guest_name: g.guest_name,
-        check_in: g.check_in,
-        roomLabel: `${(g.bookings ?? []).length} rooms`,
-        commission_amount: Number(g.commission_amount),
-        commission_paid: g.commission_paid,
-        commission_paid_date: g.commission_paid_date ?? null,
-        status: g.status,
-      }));
-
-    // Cancelled bookings never owed commission — exclude them so a
-    // cancellation doesn't inflate an agent's outstanding total.
-    return [...fromBookings, ...fromGroups]
-      .filter((i) => i.status !== "cancelled")
-      .sort((a, b) => new Date(b.check_in).getTime() - new Date(a.check_in).getTime());
-  }, [bookings, groups, groupBookingIds]);
+  // Which commissions are listed (cancelled hidden unless already paid out; a group once, not per room)
+  // lives in lib/commissionLedger.ts, where it is tested.
+  const items: CommissionItem[] = useMemo(
+    () => buildLedgerItems(bookings as Booking[], groups as BookingGroup[]),
+    [bookings, groups],
+  );
 
   const itemsByAgent = useMemo(() => {
     const map = new Map<string, CommissionItem[]>();
@@ -149,12 +94,12 @@ function AdminAgents() {
       .map((agent) => {
         const agentItems = itemsByAgent.get(agent.id) ?? [];
         const bookingsThisMonth = agentItems.filter((i) => i.check_in?.slice(0, 7) === thisMonth).length;
-        // "Owed" is the unpaid balance across all time — a commission doesn't
-        // stop being owed because the calendar month rolled over.
-        const commissionOwed = agentItems
-          .filter((i) => !i.commission_paid)
-          .reduce((s, i) => s + i.commission_amount, 0);
-        return { agent, items: agentItems, bookingsThisMonth, commissionOwed };
+        // "Owed" = unpaid commission on CONFIRMED / COMPLETED stays, across all time (it doesn't stop
+        // being owed because the month rolled over). Pending requests are shown separately: they may
+        // expire, so counting them made the total jump around.
+        const totals = summarizeItems(agentItems);
+        const commissionOwed = totals.owed;
+        return { agent, items: agentItems, bookingsThisMonth, commissionOwed, totals };
       })
       .sort((a, b) => b.commissionOwed - a.commissionOwed || a.agent.name.localeCompare(b.agent.name));
   }, [agents, itemsByAgent, thisMonth]);
@@ -163,35 +108,38 @@ function AdminAgents() {
 
   const handleDelete = async (agent: Agent) => {
     if (!property) return;
-    if (!confirm(`Remove ${agent.name}? Past bookings tied to this agent keep their commission records.`)) return;
+    // Say exactly what will be erased (it used to promise that records are kept, while they silently dropped out).
+    const preview = agentDeletePreview(bookings as Booking[], groups as BookingGroup[], agent.id);
+    if (!confirm(deleteAgentMessage(agent.name, preview))) return;
     setDeletingId(agent.id);
+    setActionError("");
     try {
       await deleteAgent.mutateAsync({ id: agent.id, propertyId: property.id });
+    } catch (e) {
+      setActionError(saveFailMessage(e, "Couldn't delete the agent. Please try again — nothing was deleted."));
     } finally {
       setDeletingId(null);
     }
   };
 
   const togglePaid = async (item: CommissionItem) => {
+    const nextPaid = !item.commission_paid;
+    // The "Paid" pill is also the undo button; clearing a paid mark also clears its date, so ask first.
+    if (!nextPaid && !confirm(`Mark ${item.guest_name}'s ₹${item.commission_amount.toLocaleString("en-IN")} commission as NOT paid? The paid date will be cleared.`)) return;
     setTogglingId(item.id);
     setActionError("");
-    const table = item.kind === "group" ? "booking_groups" : "bookings";
-    const nextPaid = !item.commission_paid;
-    const { error } = await supabase
-      .from(table)
-      .update({
-        commission_paid: nextPaid,
-        commission_paid_date: nextPaid ? new Date().toISOString() : null,
-      })
-      .eq("id", item.id);
-    if (error) setActionError(error.message || "Couldn't update commission — please try again.");
+    try {
+      await setCommissionPaid(supabase, item.kind, item.id, nextPaid);
+    } catch (e) {
+      setActionError(saveFailMessage(e, "Couldn't update commission. Please try again — nothing was changed."));
+    }
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
     setTogglingId(null);
   };
 
   const exportCsv = () => {
-    const header = ["Agent", "Guest", "Check-in", "Rooms", "Commission", "Paid", "Paid date"];
+    const header = ["Agent", "Guest", "Check-in", "Rooms", "Commission", "Paid", "Paid date", "Booking status"];
     const rows = agentRows.flatMap((row) =>
       row.items.map((i) => [
         row.agent.name,
@@ -201,6 +149,7 @@ function AdminAgents() {
         i.commission_amount.toFixed(2),
         i.commission_paid ? "Yes" : "No",
         i.commission_paid_date ? i.commission_paid_date.slice(0, 10) : "",
+        i.status,
       ]),
     );
     const csv = [header, ...rows].map((r) => r.map(csvCell).join(",")).join("\n");
@@ -238,7 +187,7 @@ function AdminAgents() {
       {agentRows.length > 0 && (
         <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">Total commission owed</p>
+            <p className="text-xs text-muted-foreground mb-1">Total commission owed (confirmed stays)</p>
             <p className="font-display text-2xl font-semibold text-primary">₹{totalOwed.toLocaleString("en-IN")}</p>
           </div>
           <button
@@ -263,7 +212,7 @@ function AdminAgents() {
         </div>
       ) : (
         <div className="space-y-3">
-          {agentRows.map(({ agent, items: agentItems, bookingsThisMonth, commissionOwed }) => {
+          {agentRows.map(({ agent, items: agentItems, bookingsThisMonth, commissionOwed, totals }) => {
             const isExpanded = expanded.has(agent.id);
             const hasItems = agentItems.length > 0;
             return (
@@ -310,6 +259,12 @@ function AdminAgents() {
                     <div className="text-right pr-1 pt-1">
                       <p className="font-semibold text-sm">₹{commissionOwed.toLocaleString("en-IN")}</p>
                       <p className="text-xs text-muted-foreground">owed</p>
+                      {totals.pending > 0 && (
+                        <p className="text-[10px] text-muted-foreground">+ ₹{totals.pending.toLocaleString("en-IN")} awaiting confirmation</p>
+                      )}
+                      {totals.paidOnCancelled > 0 && (
+                        <p className="text-[10px] text-amber-700">₹{totals.paidOnCancelled.toLocaleString("en-IN")} paid on cancelled stays</p>
+                      )}
                     </div>
                     <button
                       onClick={() => setModalAgent(agent)}
@@ -340,6 +295,16 @@ function AdminAgents() {
                         <div className="min-w-0">
                           <div className="text-sm font-medium flex items-center gap-1.5">
                             <span className="truncate">{item.guest_name}</span>
+                            {item.status === "cancelled" && (
+                              <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-100 px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                                Cancelled — paid
+                              </span>
+                            )}
+                            {item.status === "pending" && (
+                              <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium shrink-0">
+                                Awaiting confirmation
+                              </span>
+                            )}
                             {item.roomLabel && (
                               <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium shrink-0">
                                 {item.roomLabel}
