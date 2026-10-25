@@ -28,7 +28,7 @@ stayidom.in is a SaaS platform giving vacation rental and homestay owners across
 | Auth          | Supabase Auth             | Client-side, localStorage managed by Supabase SDK         |
 | Data fetching | TanStack Query v5         | `useQuery` + `useMutation` only                           |
 | Hosting       | Vercel                    | Static SPA + Vercel Edge Functions in `api/`              |
-| Edge (Supabase) | Deno Edge Function      | `src/supabase/functions/invite-owner/` (see HANDOVER §10) |
+| Edge (Supabase) | Deno Edge Function      | `supabase/functions/invite-owner/` (see HANDOVER §10) |
 
 ---
 
@@ -124,7 +124,6 @@ src/
   admin/                ← AdminLayout, navConfig.ts (navigation is data), SectionTabs
   components/           ← UI (see HANDOVER §3 for the "one home" components)
   routes/               ← TanStack file routes (admin.*, superadmin*, index, booking-status, …)
-  supabase/functions/   ← invite-owner (Deno; see HANDOVER §10 item 9)
 supabase/
   baseline/             ← live DB snapshot (16 Oct 2026) — the reference schema
   migrations/           ← changes since the baseline; run in order
@@ -157,7 +156,7 @@ Key tables (short form):
 
 ## Access rules (RLS and triggers)
 
-- Public can read active properties and rooms (no auth). Guests **cannot** read `bookings` — they use `availability` and the phone-lookup RPCs.
+- Public can read active properties and rooms (no auth). Guests **cannot** read `bookings` — they use `availability`, `room_booked_ranges()` and the phone-lookup RPCs.
 - Anyone (anon) can insert a booking, but BEFORE INSERT triggers **re-price it and force `pending`/unpaid** (see Booking flow below).
 - Public can insert `leads` (rate-limited by trigger).
 - Owners manage only their own property's data (`owner_id = auth.uid()`).
@@ -242,7 +241,7 @@ Edge-only secrets (never in the browser): `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_
 No RPC. Direct client calls in sequence:
 
 1. Load room details and seasonal rates (`fetchRoomRates`).
-2. Check availability through `getBlockedDatesForRooms` (see HANDOVER §10 item 1 — it reads `bookings`, which guests can't).
+2. Check availability through `getBlockedDatesForRooms`, which gets booked dates from `room_booked_ranges()` (guests can't read `bookings` directly).
 3. Price the stay with `priceRoomStay()` (`src/lib/quoteBuilder.ts`) — the same calculator as the owner side.
 4. Insert the booking (and group, if multi-room) as `pending`.
 5. Insert is re-checked by the database:
@@ -288,7 +287,7 @@ Superadmin can open any property's dashboard:
 
 Supabase Auth must have: Site URL `https://stayidom.in`; Redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`; a customised "Invite user" template. Details in HANDOVER §9 (v9.7).
 
-The superadmin login is never a property owner (trigger). Unused and to be deleted: `/setup`, `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token`.
+The superadmin login is never a property owner (trigger). The `/setup` route is removed. Still to drop in the DB: `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token`.
 
 ---
 
@@ -312,6 +311,7 @@ The superadmin login is never a property owner (trigger). Unused and to be delet
 - For any DB change: write a migration under `supabase/migrations/`, make it idempotent, and add a query to `docs/DB_CHECKS.sql` if it changes what the app reads.
 - Never add a second editor for data that already has a home (HANDOVER §5).
 - Never claim a feature on the landing page or in checklists that the app can't back up.
+- Stay dates: always use `RoomAvailabilityCalendar` (the Add Booking picker). Never a plain `<input type="date">` for stay dates (HANDOVER rule 24).
 
 ---
 
@@ -328,11 +328,13 @@ The superadmin login is never a property owner (trigger). Unused and to be delet
 - [x] Superadmin invite-owner flow, setup checklist, renewal states
 - [x] Client error log on `/superadmin`
 - [x] CI: build, typecheck, unit tests, behaviour checks, DB migration tests
-- [ ] Guest paths free of `bookings` reads (HANDOVER §10 item 1)
-- [ ] Cleanup: duplicate migration, dead hook, test route, `/setup`, old functions, lockfile, `recharts`
+- [x] Guest paths read booked dates via `room_booked_ranges()`, not `bookings`
+- [x] Cleanup: duplicate migration, dead hook, test route, `/setup`, lockfile, invite function location
+- [ ] Cleanup: `recharts`, old DB functions
 - [ ] Tracking-link token (replace phone-only lookup)
-- [ ] Security headers in `vercel.json`
+- [x] Security headers in `vercel.json` (no CSP yet)
 - [ ] Landing page rewrite on `main`
+- [ ] Edit Stay date picker matches the app calendar (HANDOVER §10 item 21)
 - [ ] Plan-tier enforcement decision
 - [ ] Channel sync (iCal import) — built, switched off (`CHANNEL_SYNC_ENABLED`)
 - [ ] Agent self-service, WhatsApp Business API, billing, central listing
