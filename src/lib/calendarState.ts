@@ -8,7 +8,11 @@
 //   pending   an unconfirmed guest request / hold occupies the night
 //   checkout  the booking's own departure day (availability may say
 //             "unavailable" because of that booking — it is NOT a manual block)
-//   blocked   unavailable with no booking behind it = closed by the owner
+//   blocked   unavailable with no booking behind it = closed by the owner.
+//             On a guest's check-out day the "unavailable" row is ambiguous (the
+//             booking's own, or the owner closing that night) — unless it carries a
+//             note (the owner's reason, or a synced calendar's name), which only a
+//             deliberate block has, so a note makes it "blocked".
 //   open      free
 //
 // Nights follow the app-wide rule: check-in inclusive, check-out exclusive.
@@ -26,12 +30,15 @@ export interface CalBooking {
 export interface CalAvailRow {
   room_id: string;
   date: string;
+  note?: string | null;
 }
 
 export interface CalIndex {
   occupied: Map<string, Map<string, { name: string; status: string }>>;
   checkouts: Map<string, Map<string, string>>;
   unavailable: Map<string, Set<string>>;
+  /** Non-empty notes on unavailable rows: room -> date -> note. */
+  notes: Map<string, Map<string, string>>;
 }
 
 const day = (s: string) => String(s).slice(0, 10);
@@ -52,6 +59,7 @@ export function buildCalendarIndex(bookings: CalBooking[], availRows: CalAvailRo
   const occupied: CalIndex["occupied"] = new Map();
   const checkouts: CalIndex["checkouts"] = new Map();
   const unavailable: CalIndex["unavailable"] = new Map();
+  const notes: CalIndex["notes"] = new Map();
 
   for (const b of bookings) {
     if (b.status === "cancelled" || !b.room_id) continue;
@@ -73,8 +81,14 @@ export function buildCalendarIndex(bookings: CalBooking[], availRows: CalAvailRo
     const set = unavailable.get(r.room_id) ?? new Set<string>();
     set.add(day(r.date));
     unavailable.set(r.room_id, set);
+    const note = (r.note ?? "").trim();
+    if (note) {
+      const m = notes.get(r.room_id) ?? new Map<string, string>();
+      m.set(day(r.date), note);
+      notes.set(r.room_id, m);
+    }
   }
-  return { occupied, checkouts, unavailable };
+  return { occupied, checkouts, unavailable, notes };
 }
 
 export function stateOf(idx: CalIndex, roomId: string, date: string): DayInfo {
@@ -82,7 +96,11 @@ export function stateOf(idx: CalIndex, roomId: string, date: string): DayInfo {
   if (occ) return { state: occ.status === "pending" ? "pending" : "booked", name: occ.name };
   const out = idx.checkouts.get(roomId)?.get(date);
   const unavail = idx.unavailable.get(roomId)?.has(date) ?? false;
-  if (out && unavail) return { state: "checkout", name: out };
+  if (out && unavail) {
+    // A note means someone closed this night on purpose (reason typed, or a synced calendar):
+    // show it as blocked so it can be seen and reopened. No note: it may just be the booking's own row.
+    return idx.notes.get(roomId)?.has(date) ? { state: "blocked" } : { state: "checkout", name: out };
+  }
   if (unavail) return { state: "blocked" };
   return { state: "open", name: out }; // free; `name` is only an "Out: …" hint
 }
@@ -135,4 +153,31 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   else if (leaving === total) kind = "checkout";
   else kind = "full";
   return { kind, free, total, blocked, booked, pending, leaving, rooms: perRoom, lines };
+}
+
+// ---------------------------------------------------------------------------
+// Which booking is behind a calendar cell — so a tap can open it.
+// ---------------------------------------------------------------------------
+
+export interface CalBookingRef extends CalBooking {
+  id: string;
+  group_id?: string | null;
+}
+
+/**
+ * The booking to show for (room, date):
+ *   booked / pending -> the booking whose nights include that date (a confirmed one wins over a pending one);
+ *   checkout         -> the booking that leaves that day.
+ */
+export function bookingForCell<T extends CalBookingRef>(
+  bookings: T[],
+  roomId: string,
+  date: string,
+  state: DayState,
+): T | undefined {
+  const mine = bookings.filter((b) => b.room_id === roomId && b.status !== "cancelled");
+  if (state === "checkout") return mine.find((b) => day(b.check_out) === date);
+  if (state !== "booked" && state !== "pending") return undefined;
+  const covering = mine.filter((b) => day(b.check_in) <= date && date < day(b.check_out));
+  return covering.find((b) => b.status !== "pending") ?? covering[0];
 }
