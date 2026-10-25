@@ -1,3 +1,4 @@
+import { NotSavedError } from '@/lib/bookingActions'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { PropertyActivity } from '@/lib/onboarding'
@@ -95,11 +96,15 @@ export function useUpdateSubscription() {
       setup_fee_amount?: number
       billing_notes?: string | null
     }) => {
-      const { error } = await supabase
+      // .select('id'): ask for the changed row back. If the login has expired the database changes
+      // NOTHING and reports no error — an empty answer must count as a failure, not a success.
+      const { data, error } = await supabase
         .from('properties')
         .update(updates)
         .eq('id', propertyId)
+        .select('id')
       if (error) throw error
+      if (!data || data.length === 0) throw new NotSavedError()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'properties'] })

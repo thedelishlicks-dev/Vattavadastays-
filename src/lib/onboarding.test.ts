@@ -4,7 +4,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  renewalState, nextRenewalDate, setupChecklist, setupProgress, attentionReasons,
+  renewalState, nextRenewalDate, addCalendarMonths, setupChecklist, setupProgress, attentionReasons,
   matchesFilter, matchesQuery, readSentinel, validateSubdomain, validateOwnerEmail,
   type OnboardingProperty, type PropertyActivity,
 } from './onboarding'
@@ -32,12 +32,23 @@ test('only active subscriptions have a renewal', () => {
   for (const s of ['trial', 'pending_setup', 'suspended']) assert.equal(renewalState(s, iso('2026-06-01T00:00:00Z'), NOW).kind, 'none')
   assert.equal(renewalState('active', null, NOW).kind, 'none')
 })
-test('renewing early adds 30 days to the existing end date; renewing late starts from today', () => {
+test('renewing early adds ONE MONTH to the existing end date; renewing late starts from today', () => {
   const early = nextRenewalDate(iso('2026-10-21T10:00:00Z'), NOW)
-  assert.equal(early.toISOString().slice(0, 10), '2026-11-20')
+  assert.equal(early.toISOString().slice(0, 10), '2026-11-21')
   const late = nextRenewalDate(iso('2026-06-24T10:00:00Z'), NOW)
-  assert.equal(late.toISOString().slice(0, 10), '2026-11-10')
-  assert.equal(nextRenewalDate(null, NOW).toISOString().slice(0, 10), '2026-11-10')
+  assert.equal(late.toISOString().slice(0, 10), '2026-11-11')
+  assert.equal(nextRenewalDate(null, NOW).toISOString().slice(0, 10), '2026-11-11')
+})
+test('a month is a calendar month: month ends clamp, years roll, and twelve renewals land exactly a year on (no drift)', () => {
+  const d = (y: number, m: number, day: number) => new Date(y, m - 1, day, 12)
+  const ymd = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  assert.equal(ymd(addCalendarMonths(d(2027, 1, 31), 1)), '2027-02-28')   // 31 Jan -> 28 Feb
+  assert.equal(ymd(addCalendarMonths(d(2028, 1, 31), 1)), '2028-02-29')   // leap year
+  assert.equal(ymd(addCalendarMonths(d(2026, 12, 15), 1)), '2027-01-15')  // year rolls over
+  assert.equal(ymd(addCalendarMonths(d(2026, 10, 5), 12)), '2027-10-05')
+  let end = d(2026, 10, 5)
+  for (let i = 0; i < 12; i++) end = addCalendarMonths(end, 1)
+  assert.equal(ymd(end), '2027-10-05')                                    // 12 x "+30 days" would be 5 days early
 })
 
 // ── checklist ───────────────────────────────────────────────────────────────

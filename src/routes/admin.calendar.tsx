@@ -4,13 +4,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
 import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
 import { friendlyNote, isIcalNote } from '@/lib/icalClient'
 import { CHANNEL_SYNC_ENABLED } from '@/lib/features'
-import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, type DayState } from '@/lib/calendarState'
+import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, bookingForCell, type CalBookingRef, type DayState } from '@/lib/calendarState'
+import { waDigits } from '@/lib/phone'
 
 export const Route = createFileRoute('/admin/calendar')({
   component: AdminCalendar,
@@ -69,6 +70,97 @@ function CalendarSkeleton() {
 }
 
 // ---------------------------------------------------------------------------
+// A booked / pending / check-out cell, tapped: who is it, and a way into the booking.
+// (These cells used to be dead — the owner had to search the Bookings page by hand.)
+// ---------------------------------------------------------------------------
+type PeekBooking = CalBookingRef & {
+  guest_phone?: string | null
+  guest_count?: number | null
+  total_amount?: number | string | null
+}
+
+function BookingPeek({
+  booking,
+  roomName,
+  date,
+  state,
+  nightClosed,
+  onClose,
+  onReopen,
+}: {
+  booking: PeekBooking
+  roomName: string
+  date: string
+  state: DayState
+  /** On a check-out day: that night is also marked unavailable (the owner may have closed it). */
+  nightClosed: boolean
+  onClose: () => void
+  onReopen: () => void
+}) {
+  const nights = Math.max(
+    1,
+    Math.round((Date.parse(`${String(booking.check_out).slice(0, 10)}T00:00:00Z`) - Date.parse(`${String(booking.check_in).slice(0, 10)}T00:00:00Z`)) / 86400000),
+  )
+  const pretty = (d: string) =>
+    new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })
+  // Keep ?property= (used when a platform admin views a property), as the dashboard's links do.
+  const prop = new URLSearchParams(window.location.search).get('property')
+  const href = `/admin/bookings?${prop ? `property=${encodeURIComponent(prop)}&` : ''}${booking.group_id ? 'groupId' : 'bookingId'}=${booking.group_id ?? booking.id}`
+  const phone = booking.guest_phone ?? ''
+  const wa = waDigits(phone)
+  const total = Number(booking.total_amount ?? 0)
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="font-semibold truncate">{booking.guest_name}</h2>
+            <p className="text-xs text-muted-foreground">
+              {roomName} · {state === 'checkout' ? `checks out ${pretty(date)}` : pretty(date)}
+            </p>
+          </div>
+          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center shrink-0" aria-label="Close">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <dl className="rounded-xl border border-border divide-y divide-border text-sm">
+          <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Status</dt><dd className="font-medium capitalize">{booking.status}</dd></div>
+          <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Stay</dt><dd className="font-medium">{pretty(booking.check_in)} → {pretty(booking.check_out)} ({nights} night{nights > 1 ? 's' : ''})</dd></div>
+          {booking.guest_count ? <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Guests</dt><dd className="font-medium">{booking.guest_count}</dd></div> : null}
+          {total > 0 && <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Room total</dt><dd className="font-medium">₹{total.toLocaleString('en-IN')}</dd></div>}
+        </dl>
+
+        {phone && (
+          <div className="flex gap-2">
+            <a href={`tel:+${wa}`} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-border py-2 text-sm font-medium hover:bg-muted">
+              <Phone className="h-4 w-4" /> Call
+            </a>
+            <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-border py-2 text-sm font-medium hover:bg-muted">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </a>
+          </div>
+        )}
+
+        {state === 'checkout' && nightClosed && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 space-y-2">
+            <p>The night starting this day is also marked unavailable. If you closed it yourself, you can reopen it — the guest's stay is not affected.</p>
+            <button onClick={onReopen} className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium hover:bg-amber-100">
+              Reopen this night
+            </button>
+          </div>
+        )}
+
+        <a href={href} className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90">
+          <ExternalLink className="h-4 w-4" /> Open booking
+        </a>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Day detail for the "All rooms" view. A cell can only say "1 free"; this shows
 // what each room is doing that day (tooltips don't exist on iPad/phone) and lets
 // the owner reopen a blocked room straight from here.
@@ -78,11 +170,13 @@ function DayDialog({
   rooms,
   onClose,
   onReopen,
+  onView,
 }: {
   date: string
   rooms: { id: string; name: string; state: DayState; guest?: string }[]
   onClose: () => void
   onReopen: (roomId: string) => void
+  onView: (roomId: string, state: DayState) => void
 }) {
   const pretty = new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'long',
@@ -117,6 +211,14 @@ function DayDialog({
                       className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
                     >
                       Reopen
+                    </button>
+                  )}
+                  {(r.state === 'booked' || r.state === 'pending' || r.state === 'checkout') && (
+                    <button
+                      onClick={() => onView(r.id, r.state)}
+                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+                    >
+                      View
                     </button>
                   )}
                 </div>
@@ -236,6 +338,7 @@ function AdminCalendar() {
   useIcalAutoSync(property?.id)
   const [reopen, setReopen] = useState<{ roomId: string; roomName: string; date: string; note: string | null } | null>(null)
   const [dayDetail, setDayDetail] = useState<string | null>(null)
+  const [peek, setPeek] = useState<{ roomId: string; date: string; state: DayState } | null>(null)
   const queryClient = useQueryClient()
 
   const rooms = property?.rooms ?? []
@@ -500,11 +603,22 @@ function AdminCalendar() {
                   </button>
                 )
               }
+              // Booked / pending / check-out cells open that booking's card.
+              const tappable = info.state === 'booked' || info.state === 'pending' || info.state === 'checkout'
+              const openPeek = () => setPeek({ roomId: view as string, date: dateStr, state: info.state })
               return (
                 <div
                   key={dateStr}
-                  className={`h-16 border-b border-r border-border/50 p-1.5 text-xs ${c.bg}`}
-                  title={info.name ? `${c.label} — ${info.name}` : c.label}
+                  className={`h-16 border-b border-r border-border/50 p-1.5 text-xs ${c.bg} ${tappable ? 'cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary' : ''}`}
+                  title={info.name ? `${c.label} — ${info.name}${tappable ? '. Tap for details.' : ''}` : c.label}
+                  {...(tappable
+                    ? {
+                        role: 'button' as const,
+                        tabIndex: 0,
+                        onClick: openPeek,
+                        onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPeek() } },
+                      }
+                    : {})}
                 >
                   <div className="font-medium text-foreground">{day}</div>
                   <div className={`mt-0.5 truncate ${c.text}`}>
@@ -565,8 +679,35 @@ function AdminCalendar() {
             setReopen({ roomId, roomName: room?.name ?? 'Room', date: dayDetail, note: noteText })
             setDayDetail(null)
           }}
+          onView={(roomId, state) => {
+            setPeek({ roomId, date: dayDetail, state })
+            setDayDetail(null)
+          }}
         />
       )}
+
+      {peek && (() => {
+        const booking = bookingForCell(bookings as unknown as PeekBooking[], peek.roomId, peek.date, peek.state)
+        if (!booking) return null
+        const roomName = activeRooms.find((r: { id: string }) => r.id === peek.roomId)?.name ?? 'Room'
+        const rows = availRows as { room_id: string; date: string; note?: string | null }[]
+        const nightClosed = rows.some((r) => r.room_id === peek.roomId && String(r.date).slice(0, 10) === peek.date)
+        return (
+          <BookingPeek
+            booking={booking}
+            roomName={roomName}
+            date={peek.date}
+            state={peek.state}
+            nightClosed={nightClosed}
+            onClose={() => setPeek(null)}
+            onReopen={() => {
+              const noteText = rows.find((r) => r.room_id === peek.roomId && String(r.date).slice(0, 10) === peek.date)?.note ?? null
+              setReopen({ roomId: peek.roomId, roomName, date: peek.date, note: noteText })
+              setPeek(null)
+            }}
+          />
+        )
+      })()}
 
       {reopen && (
         <ReopenDialog

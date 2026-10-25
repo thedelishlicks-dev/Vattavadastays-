@@ -1,6 +1,6 @@
 // Run from the repo root:  npx tsx scripts/calendarState.check.ts
 // Logic checks for the owner Calendar (src/lib/calendarState.ts). No test runner needed.
-import { buildCalendarIndex, stateOf, summarizeDate, nightsOf } from "../src/lib/calendarState";
+import { buildCalendarIndex, stateOf, summarizeDate, nightsOf, bookingForCell } from "../src/lib/calendarState";
 let pass = 0, fail = 0;
 const eq = (name: string, got: unknown, want: unknown) => { const ok = JSON.stringify(got) === JSON.stringify(want); ok ? pass++ : fail++; console.log((ok ? "PASS " : "FAIL ") + name + (ok ? "" : `\n   got  ${JSON.stringify(got)}\n   want ${JSON.stringify(want)}`)); };
 
@@ -83,4 +83,29 @@ eq("departure day: open, hint only", [sum.kind, sum.leaving], ["open", 0]);
 idx = buildCalendarIndex([book("A", "2026-10-14", "2026-10-16")], av("A", "2026-10-14", "2026-10-15", "2026-10-16"));
 sum = summarizeDate(idx, [rooms[0]], "2026-10-16");
 eq("single room on its check-out day (availability flagged) -> kind checkout", [sum.kind, sum.leaving], ["checkout", 1]);
+
+// 6. Check-out day: a NOTE on the unavailable row means someone closed that night on purpose
+const noted = (room: string, date: string, note: string) => ({ room_id: room, date, note });
+idx = buildCalendarIndex([book("A", "2026-10-05", "2026-10-07")], [...av("A", "2026-10-05", "2026-10-06"), noted("A", "2026-10-07", "Maintenance")]);
+eq("check-out day with a reason -> blocked (can be seen and reopened)", stateOf(idx, "A", "2026-10-07"), { state: "blocked" });
+idx = buildCalendarIndex([book("A", "2026-10-05", "2026-10-07")], [...av("A", "2026-10-05", "2026-10-06"), noted("A", "2026-10-07", "ical:abc:Booking.com")]);
+eq("check-out day closed by a synced calendar -> blocked", stateOf(idx, "A", "2026-10-07"), { state: "blocked" });
+idx = buildCalendarIndex([book("A", "2026-10-05", "2026-10-07")], [...av("A", "2026-10-05", "2026-10-06"), noted("A", "2026-10-07", "   ")]);
+eq("a blank note does not turn it into a block", stateOf(idx, "A", "2026-10-07"), { state: "checkout", name: "Ravi Nair" });
+idx = buildCalendarIndex([book("A", "2026-10-05", "2026-10-07")], [...av("A", "2026-10-05", "2026-10-06"), { room_id: "A", date: "2026-10-07", note: null }]);
+eq("no note on a check-out day stays checkout (legacy booking row)", stateOf(idx, "A", "2026-10-07"), { state: "checkout", name: "Ravi Nair" });
+idx = buildCalendarIndex([], [noted("A", "2026-10-12", "Festival")]);
+eq("a noted block with no booking is still just blocked", stateOf(idx, "A", "2026-10-12"), { state: "blocked" });
+
+// 7. Which booking is behind a tapped cell
+const bk = (id: string, room: string, ci: string, co: string, status = "confirmed", name = "G") => ({ id, room_id: room, status, guest_name: name, check_in: ci, check_out: co, group_id: null });
+const list = [bk("b1", "A", "2026-10-05", "2026-10-07", "confirmed", "Ravi"), bk("b2", "A", "2026-10-07", "2026-10-09", "pending", "Priya"), bk("b3", "B", "2026-10-05", "2026-10-06"), bk("b4", "A", "2026-10-20", "2026-10-22", "cancelled")];
+eq("a night in a booking -> that booking", bookingForCell(list, "A", "2026-10-06", "booked")?.id, "b1");
+eq("a pending night -> the pending request", bookingForCell(list, "A", "2026-10-08", "pending")?.id, "b2");
+eq("check-out day -> the booking that leaves (not the one arriving)", bookingForCell(list, "A", "2026-10-07", "checkout")?.id, "b1");
+eq("other room is not mixed up", bookingForCell(list, "B", "2026-10-05", "booked")?.id, "b3");
+eq("cancelled bookings are never returned", bookingForCell(list, "A", "2026-10-21", "booked"), undefined);
+eq("open / blocked cells have no booking", bookingForCell(list, "A", "2026-10-06", "open"), undefined);
+eq("confirmed beats pending on the same night", bookingForCell([bk("p", "A", "2026-11-01", "2026-11-03", "pending"), bk("c", "A", "2026-11-01", "2026-11-03", "confirmed")], "A", "2026-11-02", "booked")?.id, "c");
+
 console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

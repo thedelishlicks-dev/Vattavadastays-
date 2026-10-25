@@ -1,3 +1,4 @@
+import { saveFailMessage } from '@/lib/bookingActions'
 import { createFileRoute } from '@tanstack/react-router'
 import { Fragment, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -626,7 +627,24 @@ function PropertyDetails({ p, activity, now }: { p: PropertyRow; activity: Prope
 function PropertiesTab({ onLinkOwner }: { onLinkOwner: (t: LinkTarget) => void }) {
   const { data: properties = [], isLoading } = useAllProperties()
   const { data: activity } = usePropertyActivity(properties.map((p) => p.id))
-  const { mutate: updateSubscription } = useUpdateSubscription()
+  const { mutateAsync: updateSubscriptionAsync } = useUpdateSubscription()
+  // One action at a time; the row it is working on shows a spinner label, and a failure is shown on that row
+  // (it used to do nothing visible on a weak connection, so a failed Activate/Suspend looked like it had worked).
+  const [acting, setActing] = useState<{ id: string; label: string } | null>(null)
+  const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null)
+  type SubscriptionUpdate = Omit<Parameters<typeof updateSubscriptionAsync>[0], 'propertyId'>
+  const runSubscription = async (propertyId: string, label: string, updates: SubscriptionUpdate) => {
+    setRowError(null)
+    setActing({ id: propertyId, label })
+    try {
+      await updateSubscriptionAsync({ propertyId, ...updates })
+    } catch (e) {
+      setRowError({ id: propertyId, message: saveFailMessage(e, `Couldn't ${label}.`) })
+    } finally {
+      setActing(null)
+    }
+  }
+  const working = (id: string, label: string, idle: string, busy: string) => (acting?.id === id && acting.label === label ? busy : idle)
   const [filter, setFilter] = useState<PropertyFilter>('all')
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -723,15 +741,15 @@ function PropertiesTab({ onLinkOwner }: { onLinkOwner: (t: LinkTarget) => void }
                 const waiting = p.subscription_status === 'trial' || p.subscription_status === 'pending_setup'
 
                 const handleActivate = () => {
-                  if (!window.confirm(`Activate ${p.name}? This marks the setup fee as paid and sets renewal to 30 days from now.`)) return
+                  if (!window.confirm(`Activate ${p.name}? This marks the setup fee as paid and sets renewal to one month from now.`)) return
                   const end = nextRenewalDate(null, new Date())
-                  updateSubscription({ propertyId: p.id, subscription_status: 'active', setup_fee_paid: true, subscription_end_date: end.toISOString() })
+                  void runSubscription(p.id, 'activate', { subscription_status: 'active', setup_fee_paid: true, subscription_end_date: end.toISOString() })
                 }
 
                 const handleRenew = () => {
                   const end = nextRenewalDate(p.subscription_end_date, new Date())
                   if (!window.confirm(`Renew ${p.name} until ${shortDate(end.toISOString())}?`)) return
-                  updateSubscription({ propertyId: p.id, subscription_end_date: end.toISOString() })
+                  void runSubscription(p.id, 'renew', { subscription_end_date: end.toISOString() })
                 }
 
                 return (
@@ -812,18 +830,19 @@ function PropertiesTab({ onLinkOwner }: { onLinkOwner: (t: LinkTarget) => void }
                             </a>
                           )}
                           {waiting && (
-                            <button onClick={handleActivate} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">Activate</button>
+                            <button onClick={handleActivate} disabled={!!acting} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50">{working(p.id, 'activate', 'Activate', 'Activating…')}</button>
                           )}
                           {p.subscription_status === 'active' && (
                             <>
-                              <button onClick={handleRenew} className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200">Mark Renewed</button>
-                              <button onClick={() => { if (window.confirm(`Suspend ${p.name}? Guests will no longer be able to open its booking page.`)) updateSubscription({ propertyId: p.id, subscription_status: 'suspended' }) }} className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200">Suspend</button>
+                              <button onClick={handleRenew} disabled={!!acting} className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 disabled:opacity-50">{working(p.id, 'renew', 'Mark Renewed', 'Renewing…')}</button>
+                              <button onClick={() => { if (window.confirm(`Suspend ${p.name}? Guests will no longer be able to open its booking page.`)) void runSubscription(p.id, 'suspend', { subscription_status: 'suspended' }) }} disabled={!!acting} className="text-xs px-2.5 py-1 rounded-full bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50">{working(p.id, 'suspend', 'Suspend', 'Suspending…')}</button>
                             </>
                           )}
                           {p.subscription_status === 'suspended' && (
-                            <button onClick={() => { if (window.confirm(`Re-activate ${p.name}?`)) updateSubscription({ propertyId: p.id, subscription_status: 'active' }) }} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200">Re-activate</button>
+                            <button onClick={() => { if (window.confirm(`Re-activate ${p.name}?`)) void runSubscription(p.id, 're-activate', { subscription_status: 'active' }) }} disabled={!!acting} className="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50">{working(p.id, 're-activate', 'Re-activate', 'Re-activating…')}</button>
                           )}
                         </div>
+                        {rowError?.id === p.id && <p role="alert" className="mt-1 text-[11px] text-destructive text-right">{rowError.message}</p>}
                       </td>
                     </tr>
                     {isOpen && (

@@ -16,6 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { eachDate, addOneDay, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
+import { saveFailMessage } from "@/lib/bookingActions";
+import { blockRows, chunk, datesBetween, findBlockConflicts, partialSaveMessage } from "@/lib/blockDates";
 
 interface Props {
   propertyId: string;
@@ -44,9 +46,13 @@ function buildMonthDays(month: Date) {
 
 export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props) {
   const qc = useQueryClient();
-  const [roomId, setRoomId] = useState(rooms[0]?.id ?? "");
+  // Several rooms can be closed at once (a festival, maintenance of the whole property).
+  const [roomIds, setRoomIds] = useState<Set<string>>(new Set(rooms[0] ? [rooms[0].id] : []));
   const [month, setMonth] = useState(new Date());
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // Range mode: tap the first and last day instead of every day in between.
+  const [rangeMode, setRangeMode] = useState(false);
+  const [anchor, setAnchor] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -55,88 +61,118 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
 
   const days = buildMonthDays(month);
   const today = new Date(new Date().toDateString());
+  const selectedRoomIds = rooms.filter((r) => roomIds.has(r.id)).map((r) => r.id);
+  const roomIdsKey = selectedRoomIds.join(",");
+  const allSelected = rooms.length > 0 && selectedRoomIds.length === rooms.length;
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
 
-  // Dates this room already has an active booking on — so blocking them
-  // "works" (the availability row still gets written) but doesn't do what
-  // an owner picking them almost certainly means: it was silently letting
-  // an owner block an already-booked date with zero indication anything
-  // was off, when what they usually want in that situation is to look at
-  // the existing booking instead (reschedule/cancel it), not shadow-block
-  // over it. This only ever WARNS — it never blocks the click itself,
-  // since there can be legitimate reasons to mark a double-booked date
-  // (e.g. flagging it while sorting out which guest to move).
-  const { data: bookedDates = new Set<string>() } = useQuery({
-    queryKey: ["room-bookings-for-block", roomId],
+  // For each chosen room, the dates that already have an active booking — so blocking them
+  // doesn't silently shadow a real booking. This only ever WARNS; it never stops the click
+  // (there can be legitimate reasons to mark a date while sorting out a double-booking).
+  const { data: bookedByRoom = {} as Record<string, string[]> } = useQuery({
+    queryKey: ["room-bookings-for-block", roomIdsKey, turnoverSafe],
+    enabled: selectedRoomIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bookings")
-        .select("check_in, check_out")
-        .eq("room_id", roomId)
+        .select("room_id, check_in, check_out")
+        .in("room_id", selectedRoomIds)
         .neq("status", "cancelled")
         .gte("check_out", format(today, "yyyy-MM-dd"));
       if (error) throw error;
-      const set = new Set<string>();
+      const byRoom: Record<string, Set<string>> = {};
       (data ?? []).forEach((b) => {
         const effectiveCheckOut = turnoverSafe ? b.check_out : addOneDay(b.check_out);
+        const set = (byRoom[b.room_id] ??= new Set<string>());
         eachDate(b.check_in, effectiveCheckOut).forEach((d) => set.add(d));
       });
-      return set;
+      return Object.fromEntries(Object.entries(byRoom).map(([k, v]) => [k, Array.from(v)])) as Record<string, string[]>;
     },
-    enabled: !!roomId,
   });
+  const bookedAny = useMemo(() => new Set(Object.values(bookedByRoom).flat()), [bookedByRoom]);
 
-  const conflictDates = useMemo(
-    () => Array.from(selected).filter((d) => bookedDates.has(d)).sort(),
-    [selected, bookedDates],
+  const selectedList = useMemo(() => Array.from(selected).sort(), [selected]);
+  const conflicts = useMemo(
+    () => findBlockConflicts(selectedList, selectedRoomIds, bookedByRoom),
+    [selectedList, roomIdsKey, bookedByRoom], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? "Room";
+  const rowCount = selectedRoomIds.length * selected.size;
+
+  const toggleRoom = (id: string) => {
+    setRoomIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) { if (next.size > 1) next.delete(id); } else next.add(id);   // always keep at least one room
+      return next;
+    });
+    setAcknowledgedConflict(false);
+  };
+  const toggleAllRooms = () => {
+    setRoomIds(allSelected ? new Set(rooms[0] ? [rooms[0].id] : []) : new Set(rooms.map((r) => r.id)));
+    setAcknowledgedConflict(false);
+  };
 
   const toggleDay = (d: Date) => {
     if (isBefore(d, today)) return;
     if (!isSameMonth(d, month)) return;
     const key = format(d, "yyyy-MM-dd");
     setAcknowledgedConflict(false);
+    if (rangeMode) {
+      if (!anchor) { setAnchor(key); setSelected((prev) => new Set(prev).add(key)); return; }
+      // second tap: add every day between the two taps
+      const todayKey = format(today, "yyyy-MM-dd");
+      setSelected((prev) => {
+        const next = new Set(prev);
+        datesBetween(anchor, key).filter((x) => x >= todayKey).forEach((x) => next.add(x));
+        return next;
+      });
+      setAnchor(null);
+      return;
+    }
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const selectWholeMonth = () => {
+    const todayKey = format(today, "yyyy-MM-dd");
+    const first = format(startOfMonth(month), "yyyy-MM-dd");
+    const last = format(endOfMonth(month), "yyyy-MM-dd");
+    setAcknowledgedConflict(false);
+    setSelected((prev) => {
+      const next = new Set(prev);
+      datesBetween(first, last).filter((x) => x >= todayKey).forEach((x) => next.add(x));
       return next;
     });
   };
 
   const handleSave = async () => {
-    if (!roomId || selected.size === 0) return;
-    if (conflictDates.length > 0 && !acknowledgedConflict) return;
+    if (selectedRoomIds.length === 0 || selected.size === 0) return;
+    if (conflicts.length > 0 && !acknowledgedConflict) return;
     setSaving(true);
     setError("");
+    const rows = blockRows(selectedRoomIds, selectedList, note);
+    let saved = 0;
     try {
-      const rows = Array.from(selected).map((date) => ({
-        room_id: roomId,
-        date,
-        is_available: false,
-        note: note.trim() || null,
-      }));
-      const { error: err } = await supabase
-        .from("availability")
-        .upsert(rows, { onConflict: "room_id,date" });
-      if (err) throw err;
-      qc.invalidateQueries({ queryKey: ["bookings"], exact: false });
-      qc.invalidateQueries({ queryKey: ["guest-bookings"], exact: false });
-      // Also refresh the two other places that read blocked dates from a
-      // separate cached query, so a newly-blocked date shows up right away
-      // instead of only after a full reload: the guest-facing "pick your
-      // dates" calendar (Availability.tsx) and the owner's own calendar
-      // page (admin.calendar.tsx).
-      qc.invalidateQueries({ queryKey: ["blocked-dates"], exact: false });
-      qc.invalidateQueries({ queryKey: ["availability-range"], exact: false });
+      for (const part of chunk(rows)) {
+        const { error: err } = await supabase.from("availability").upsert(part, { onConflict: "room_id,date" });
+        if (err) throw err;
+        saved += part.length;
+      }
       setDone(true);
       setTimeout(onClose, 1200);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      const reason = saveFailMessage(e, "Couldn't save.");
+      setError(saved > 0 ? partialSaveMessage(saved, rows.length, reason) : reason);
     } finally {
+      // refresh everything that shows blocked dates, even after a partial save
+      qc.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      qc.invalidateQueries({ queryKey: ["guest-bookings"], exact: false });
+      // the guest-facing "pick your dates" calendar (Availability.tsx) and the owner's calendar page
+      qc.invalidateQueries({ queryKey: ["blocked-dates"], exact: false });
+      qc.invalidateQueries({ queryKey: ["availability-range"], exact: false });
       setSaving(false);
     }
   };
@@ -153,6 +189,7 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
           <button
             onClick={onClose}
             className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+            aria-label="Close"
           >
             <X className="h-4 w-4" />
           </button>
@@ -160,34 +197,45 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
 
         {/* Body scrolls on its own so the Save button below is always reachable (iPad / phone). */}
         <div className="p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
-          {/* Room picker */}
+          {/* Rooms */}
           <div>
             <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Room
+              Rooms
             </label>
-            <select
-              value={roomId}
-              onChange={(e) => {
-                setRoomId(e.target.value);
-                setSelected(new Set());
-                setAcknowledgedConflict(false);
-              }}
-              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
-            >
-              {rooms.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {rooms.length > 1 && (
+                <button
+                  type="button"
+                  onClick={toggleAllRooms}
+                  className={["press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", allSelected ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"].join(" ")}
+                >
+                  All rooms
+                </button>
+              )}
+              {rooms.map((r) => {
+                const on = roomIds.has(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => toggleRoom(r.id)}
+                    aria-pressed={on}
+                    className={["press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", on ? "bg-primary/10 text-primary border-primary" : "border-border text-muted-foreground hover:bg-muted"].join(" ")}
+                  >
+                    {r.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* Mini calendar */}
           <div>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <button
                 onClick={() => setMonth(addMonths(month, -1))}
                 className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                aria-label="Previous month"
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
@@ -195,9 +243,29 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
                 className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+                aria-label="Next month"
               >
                 <ChevronRight className="h-4 w-4" />
               </button>
+            </div>
+            {/* Shortcuts */}
+            <div className="flex flex-wrap gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => { setRangeMode((v) => !v); setAnchor(null); }}
+                aria-pressed={rangeMode}
+                className={["press-scale rounded-full border px-3 py-1 text-xs font-medium transition-colors", rangeMode ? "bg-primary/10 text-primary border-primary" : "border-border hover:bg-muted"].join(" ")}
+              >
+                {rangeMode ? (anchor ? "Tap the last day" : "Tap the first day") : "Select a range"}
+              </button>
+              <button type="button" onClick={selectWholeMonth} className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors">
+                Whole month
+              </button>
+              {selected.size > 0 && (
+                <button type="button" onClick={() => { setSelected(new Set()); setAnchor(null); setAcknowledgedConflict(false); }} className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">
+                  Clear
+                </button>
+              )}
             </div>
             <div className="grid grid-cols-7 gap-0.5 text-center text-xs text-muted-foreground mb-1">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
@@ -212,13 +280,14 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
                 const outOfMonth = !isSameMonth(d, month);
                 const key = format(d, "yyyy-MM-dd");
                 const isSelected = selected.has(key);
-                const isBooked = bookedDates.has(key);
+                const isBooked = bookedAny.has(key);
+                const isAnchor = anchor === key;
                 return (
                   <button
                     key={i}
                     disabled={isPast || outOfMonth}
                     onClick={() => toggleDay(d)}
-                    title={isBooked ? "Already has a booking on this room" : undefined}
+                    title={isBooked ? "Already has a booking on a chosen room" : undefined}
                     className={[
                       "relative aspect-square rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
                       outOfMonth ? "opacity-0 pointer-events-none" : "",
@@ -228,6 +297,7 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
                         : !isPast && !outOfMonth
                           ? "press-scale hover:bg-muted"
                           : "",
+                      isAnchor && !isSelected ? "ring-2 ring-red-400" : "",
                       isBooked && !isSelected ? "text-amber-700" : "",
                     ].join(" ")}
                   >
@@ -249,9 +319,9 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
           {/* Selected count */}
           {selected.size > 0 && (
             <p className="text-xs text-muted-foreground">
-              {selected.size} date{selected.size > 1 ? "s" : ""} selected — will be marked
-              unavailable
-              {bookedDates.size > 0 && (
+              {selected.size} date{selected.size > 1 ? "s" : ""}
+              {selectedRoomIds.length > 1 ? ` × ${selectedRoomIds.length} rooms` : ""} will be marked unavailable
+              {bookedAny.size > 0 && (
                 <span className="inline-flex items-center gap-1 ml-1.5">
                   <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" /> = already booked
                 </span>
@@ -259,14 +329,14 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
             </p>
           )}
 
-          {conflictDates.length > 0 && (
+          {conflicts.length > 0 && (
             <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
               <div className="flex items-start gap-2 text-xs text-amber-800">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>
-                  {conflictDates.length} of your selected date{conflictDates.length > 1 ? "s" : ""} already{" "}
-                  {conflictDates.length > 1 ? "have" : "has"} a booking on this room ({conflictDates.join(", ")}).
-                  Blocking it doesn't cancel that booking — if you meant to free up the room, open that
+                  Some of these dates already have a booking:{" "}
+                  {conflicts.map((c) => `${roomName(c.roomId)} (${c.dates.join(", ")})`).join("; ")}.
+                  Blocking a date doesn't cancel that booking — if you meant to free up the room, open that
                   booking instead. Only continue if you're intentionally flagging it (e.g. sorting out a
                   double-booking).
                 </span>
@@ -292,11 +362,11 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Maintenance, personal use…"
-              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
+              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] focus:outline-none"
             />
           </div>
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
         </div>
 
         {/* Footer */}
@@ -309,13 +379,13 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
           </button>
           <button
             onClick={handleSave}
-            disabled={saving || selected.size === 0 || done || (conflictDates.length > 0 && !acknowledgedConflict)}
-            className="press-scale px-5 py-2 text-sm rounded-full bg-red-500 text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:bg-red-600 active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
+            disabled={saving || selected.size === 0 || selectedRoomIds.length === 0 || done || (conflicts.length > 0 && !acknowledgedConflict)}
+            className="press-scale px-5 py-2 text-sm rounded-full bg-red-500 text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
           >
             {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {done
               ? "Blocked ✓"
-              : `Block ${selected.size > 0 ? selected.size : ""} date${selected.size !== 1 ? "s" : ""}`}
+              : `Block ${rowCount > 0 ? rowCount : ""} night${rowCount !== 1 ? "s" : ""}${selectedRoomIds.length > 1 && rowCount > 0 ? " in total" : ""}`}
           </button>
         </div>
       </div>
