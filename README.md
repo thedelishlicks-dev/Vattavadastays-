@@ -1,100 +1,112 @@
 # stayidom.in
 
-A white-label, commission-free booking and property management platform for vacation rentals and homestays across Kerala's tourism belt — mountains, backwaters, and beaches — engineered from day one for patchy rural connectivity rather than assuming city-grade signal everywhere.
+A commission-free booking and property-management platform for vacation rentals and homestays across Kerala's tourism belt — mountains, backwaters and beaches. Each property gets its own branded booking website at its own subdomain (e.g. `bleafmudhouse.stayidom.in`).
 
-## Project Overview
+Built for patchy rural connectivity. The pilot is in **Vattavada**, a mountain village in Idukki with weak 2G-grade Jio/BSNL signal. If the guest booking flow and owner dashboard work there, they'll work in the backwaters or on the coast.
 
-stayidom.in gives vacation rental and homestay owners across Kerala their own branded booking websites. It is built as a multi-tenant application where each property gets a unique subdomain (e.g., `bleafmudhouse.stayidom.in`).
+## Key features
 
-We're currently piloting the platform in **Vattavada**, a remote mountain village in Idukki with only weak 2G-grade BSNL/Jio signal — deliberately one of the toughest connectivity environments in the state. The idea: if the guest booking flow and owner dashboard hold up here, they'll hold up just as well in the backwaters (Alleppey, Kumarakom) or on the coast (Varkala, Kovalam) later. Vattavada is the pilot market, not the ceiling.
+- **Guest booking site.** Mobile-first, lightweight. Seasonal and weekend pricing, server-checked price, booking reference (`#XXXXXXXX`) shown on confirmation and sent to the owner on WhatsApp.
+- **Owner dashboard (`/admin`).** Rooms and seasonal rates, bookings, owner calendar (all-rooms and per-room), block dates, quotes, payments (part-payments, refund due), agents and commissions, settings, payment setup (UPI), policies, meals, add-ons.
+- **Superadmin (`/superadmin`).** Add properties, invite owners by email, setup checklist, renewal and billing notes, client error log, leads.
+- **WhatsApp, no API needed.** Deep links for booking notices, payment and directions reminders, and payment screenshots.
+- **UPI payments.** Direct `upi://` links to the owner's UPI ID. Money goes straight to the owner.
+- **Link previews, SEO.** Per-property title, photo and JSON-LD for WhatsApp, Instagram and Google; per-host `robots.txt` and `sitemap.xml`.
+- **Channel sync (iCal)** — export works; import is built but switched off (`src/lib/features.ts`).
 
-### Key Features
+## Tech stack
 
-- **Guest Booking Engine**: Lightweight, mobile-first booking interface optimized for 2G networks.
-- **Booking Reference**: Guest receives a short reference ID (`#XXXXXXXX`) on confirmation, included in WhatsApp notification to owner.
-- **Multi-Tenant Architecture**: Secure data isolation using Supabase Row Level Security (RLS).
-- **Owner Dashboard**: Manage rooms, availability, and bookings from a mobile-responsive interface.
-- **Agent Booking Tracking**: Owners can log which bookings came through an agent, track commission (percentage or flat rate, auto-calculated but editable per booking), and see a per-agent commission ledger with mark-as-paid and CSV export. Agent self-service (agents logging in themselves) is not built yet — owner-entered only.
-- **Owner-side Availability Calendar**: The owner's Add Booking form shows a visual month calendar of booked/blocked dates for the selected room(s), same interaction as the guest-facing calendar, instead of blind date inputs.
-- **Superadmin Panel**: Platform management, property onboarding, and subscription tracking. Superadmin can manage any property dashboard directly.
-- **WhatsApp Integration**: Deep links for guest inquiries, booking notifications, and payment screenshot sharing. No heavy API required.
-- **UPI Payments**: Direct UPI deep links to owner's UPI ID. Guest pays owner directly — zero commission, instant settlement.
-- **Offline-Ready Maps**: Native map deep links instead of heavy JavaScript SDKs.
-- **Auto-availability Blocking**: Confirming a booking blocks those dates for future bookings — both guest-created and owner-created bookings sync the availability table immediately at creation (owner-side bookings previously didn't; fixed Round 7, see HANDOVER.md). Cancelling re-opens them.
+- **Frontend:** React 19, Vite 7, TypeScript, Tailwind CSS 4
+- **Routing:** TanStack Router (file-based, pinned at 1.166.7)
+- **Data:** TanStack Query 5, Supabase JS 2
+- **Backend:** Supabase (Postgres, Auth, Storage, one Deno Edge Function)
+- **Hosting:** Vercel (static SPA + Edge Functions in `api/`)
 
-## Tech Stack
-
-- **Frontend**: React (Vite), TypeScript, Tailwind CSS v4
-- **Routing**: TanStack Router (File-based, pinned at 1.166.7)
-- **Data Fetching**: TanStack Query v5
-- **Backend**: Supabase (Database, Auth, Storage, Edge Functions)
-- **Hosting**: Vercel (Static SPA)
-
-## Getting Started
+## Getting started
 
 ### Prerequisites
 
-- Node.js (v18+)
-- Bun or npm
+- Node.js 22 (CI uses 22)
+- npm (the repo uses `package-lock.json`)
 
-### Local Development
+### Local development
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/thedelishlicks-dev/Vattavadastays-.git
-   cd Vattavadastays-
-   ```
+```bash
+git clone https://github.com/thedelishlicks-dev/Vattavadastays-.git
+cd Vattavadastays-
+npm ci
+cp .env.example .env     # then fill in the values below
+npm run dev
+```
 
-2. Install dependencies:
-   ```bash
-   bun install
-   # or
-   npm install
-   ```
+`.env`:
 
-3. Set up environment variables. Create a `.env` file:
-   ```env
-   VITE_SUPABASE_URL=your_supabase_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-   VITE_PROPERTY_SUBDOMAIN=bleafmudhouse
-   VITE_SUPERADMIN_EMAIL=admin@stayidom.in
-   ```
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_PROPERTY_SUBDOMAIN=bleafmudhouse
+VITE_SUPERADMIN_EMAIL=your_superadmin_email
+```
 
-4. Start the development server:
-   ```bash
-   bun dev
-   # or
-   npm run dev
-   ```
+Open `http://localhost:5173`. To test a property locally, add `?slug=bleafmudhouse`.
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser.
+### Checks
 
-   To test a specific property locally, add `?slug=bleafmudhouse` to the URL.
+```bash
+npm run build       # must pass; regenerates src/routeTree.gen.ts
+npm run typecheck   # run after build; expects 0 errors
+npm test            # unit tests (src/lib) and API tests (tests/api)
+npm run check       # behaviour checks (scripts/*.check.ts)
+```
 
-## Architecture & Constraints
+CI (`.github/workflows/ci.yml`) runs all of the above plus migration tests against a throw-away Postgres.
 
-This project follows strict performance and architectural guidelines developed against Vattavada's low-signal pilot environment — the toughest network conditions we design for, and the baseline every feature is held to before it ships anywhere else:
+## Project layout
 
-- **No SSR**: Pure Vite SPA. Never use `@tanstack/react-start` or `@supabase/ssr`.
-- **No Heavy SDKs**: Google Maps JS SDK and other heavy libraries are prohibited on the guest page.
-- **Sentinel Keys**: Property configurations (meals, policies, UPI etc.) are stored within the `shared_amenities` column using a `__prefix:` pattern to avoid schema bloat.
-- **RLS First**: Security is enforced at the database level.
-- **TanStack Router pinned**: Never upgrade `@tanstack/react-router` from 1.166.7.
-- **window.location.search for ?property= param**: The superadmin Manage flow passes `?property=subdomain` — always read this via `window.location.search`, not TanStack `useSearch`.
+```
+api/              Vercel Edge Functions (og, seo, manifest, ical, ical-sync)
+src/
+  routes/         TanStack Router file routes
+  components/     UI
+  hooks/          TanStack Query hooks
+  lib/            Business logic (balance, pricing, calendar state, onboarding …) — pure and tested
+  admin/          Admin shell and navigation (navConfig.ts)
+  supabase/functions/   Supabase Edge Function (invite-owner)
+supabase/
+  baseline/       Live database snapshot (16 Oct 2026)
+  migrations/     Changes since the baseline
+  tests/          Migration and RLS tests
+scripts/          Behaviour checks, typecheck and build helpers
+docs/             Parked features, polish notes, diagnostics
+```
 
-## Onboarding a New Property (Superadmin)
+## Architecture and constraints
 
-1. Go to `/superadmin` → Add property
-2. Click **Manage** on the new property row
-3. Set up rooms, availability, pricing, UPI ID, and policies
-4. Supabase → Authentication → Users → **Invite user** with owner email
-5. Owner sets password via Supabase email, logs in at `/login`
-6. Click **Activate** in superadmin once setup fee is paid
+- **No SSR.** Pure Vite SPA. No `@tanstack/react-start`, no `@supabase/ssr`.
+- **No heavy SDKs on the guest page.** No Google Maps JS SDK, no analytics or chat widgets. Maps are deep links.
+- **Config in `shared_amenities`.** Meals, policies, UPI, payment methods and theme are stored with a `__prefix:` sentinel to avoid schema churn. Writes go through `src/lib/propertyConfig.ts`.
+- **Security in the database.** Row-level security on every table; triggers prevent guest-side price tampering and double bookings; billing columns are owner-protected.
+- **Money in one place.** All balance, refund and advance maths lives in `src/lib/balance.ts`.
+- **Pinned router.** Don't upgrade `@tanstack/react-router` from 1.166.7.
+- **`?property=` is read from `window.location.search`**, not TanStack `useSearch`.
+
+## Onboarding a new property (superadmin)
+
+1. In `/superadmin`, press **Add property** and fill in name, subdomain, owner email and details.
+2. Press **Invite owner now**. The owner gets a set-password email.
+3. Press **Manage** on the row and set up rooms, prices, UPI ID, policies and a hero photo. The row's checklist shows what's left.
+4. Owner sets a password from the email and signs in at `stayidom.in/login`.
+5. Press **Activate** once the setup fee is paid.
+
+Supabase Auth needs Site URL `https://stayidom.in`, redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`, and a customised "Invite user" email. Details in `HANDOVER.md` §9.
 
 ## Documentation
 
-- [Agent Instructions](AGENTS.md)
-- [Handover Notes (latest — v7)](HANDOVER.md)
+- [AGENTS.md](AGENTS.md) — rules for anyone (or any AI assistant) changing the code
+- [HANDOVER.md](HANDOVER.md) — current state, rules, known issues and what's left
+- [PRD.md](PRD.md) — product requirements and status
+- [docs/PARKED_FEATURES.md](docs/PARKED_FEATURES.md) — channel sync and how to turn it on
+- [supabase/baseline/README.md](supabase/baseline/README.md) — how to rebuild the database
 
 ## License
 

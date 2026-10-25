@@ -1,403 +1,289 @@
-# stayidom.in — Product Requirements Document v1.1
+# stayidom.in — Product Requirements Document v1.2
 
-**Last updated:** May 2026  
-**Author:** stayidom.in Team
-**Status:** Active — Dev branch in progress
+**Last updated:** 25 Oct 2026 (status reconciled with the code at `ce9325f`)
+**Previous:** v1.1 (May 2026)
+**Author:** stayidom.in team
+**Technical detail:** see `HANDOVER.md` (current state) and `AGENTS.md` (rules). This document is about **what** the product must do and **what is done**.
 
----
-
-## 1. Vision & Goals
-
-**Vision**: A white-label, commission-free booking engine for Vattavada homestays — built for India's rural connectivity reality, not city assumptions.
-
-**What this is**: Each property gets their own branded booking website. No marketplace, no commissions, no OYO dependency.
-
-**What this is not** (V1): Not a listing page. Not a marketplace. Not a booking aggregator.
-
-**Success Metrics (V1)**:
-
-- 5+ properties onboarded within 3 months of launch
-- Each property live at `{slug}.stayidom.in` within 10 minutes of setup
-- Guest booking flow completes on 2G (BSNL/Jio weak signal)
-- Zero data leaks between properties (RLS audit passed)
-- Owner can manage bookings entirely from mobile on slow connection
+**Status key:** ✅ done · 🟡 partly done · ⬜ not started · ⏸ built but switched off
 
 ---
 
-## 2. User Personas
+## 1. Vision & goals
 
-### Property Owner (Primary)
+**Vision:** a white-label, commission-free booking engine for homestays — built for India's rural connectivity reality, not city assumptions. Each property gets its own branded booking website. No marketplace, no commissions, no OYO or Booking.com dependency.
 
-- Small homestay in Vattavada, 2–10 rooms
-- Uses WhatsApp daily, comfortable with basic Android
-- Pain: OYO/Booking.com take 15–25% per booking
-- Need: Own booking page, shared via Instagram/WhatsApp, managed from phone
-- Network: Weak Jio or BSNL at property location
+**What this is:** a booking site and owner dashboard per property, on a subdomain.
 
-### Guest (End User)
+**What this is not (V1):** not a listing page, not a marketplace, not an aggregator. Channel sync with other sites is built but parked (§4.6).
 
-- Domestic traveler from Kerala, Karnataka, Tamil Nadu
-- Discovers property via Instagram, WhatsApp forward, or Google search
-- Books before leaving home (while on good network)
-- Arrives at Vattavada with weak/no signal
-- Need: Directions that work offline, booking confirmation on WhatsApp
+**Success metrics (V1):**
 
-### Superadmin (Platform Owner — You)
-
-- Onboards properties manually
-- Monitors all subscriptions and health
-- Single point of support
+| Metric | Status |
+| --- | --- |
+| 5+ properties onboarded within 3 months | 🟡 four properties exist: Bleaf Mud House (paying), Misty Colina and OriginSoil (trial), Mist Valley (demo). Check `/superadmin` for live numbers. |
+| Each property live at `{slug}.stayidom.in` within 10 minutes of setup | 🟡 The superadmin flow exists (add → invite → manage → activate). Not timed on a real onboarding yet. |
+| Guest booking completes on 2G | 🟡 Data loads reduced (v9.3). Not measured on a real 2G device. |
+| Zero data leaks between properties (RLS audit) | 🟡 Security review done 10–11 Oct 2026 and several fixes applied. Open: tracking-link token (§4.1). |
+| Owner manages bookings from mobile on slow connection | 🟡 Mobile layout done. No optimistic updates yet. |
 
 ---
 
-## 3. Network & Performance Constraints
+## 2. User personas
 
-**This is the most important section. Every technical decision must pass this test.**
+**Property owner (primary).** Homestay in Vattavada or similar, 2–10 rooms, uses WhatsApp daily, basic Android. Pain: OYO and Booking.com take 15–25% per booking. Needs: own booking page shared via Instagram and WhatsApp, managed from a phone, weak Jio or BSNL signal.
 
-Vattavada has Jio and BSNL only, with weak signal. Guests travel from cities and arrive with whatever data they had on the road.
+**Guest.** Domestic traveller from Kerala, Karnataka or Tamil Nadu. Finds the property via Instagram, a WhatsApp forward or Google. Books before leaving home. Arrives with weak or no signal. Needs: directions that work offline, a booking confirmation on WhatsApp, to know the cancellation policy before paying.
 
-### Rules for every feature built:
-
-- **Page load budget**: Full guest booking page must load in under 8 seconds on 2G (simulate with Chrome DevTools → Slow 3G)
-- **No heavy dependencies**: No Google Maps JS SDK on guest page (too heavy). Use static map image + Apple/Google Maps deep link instead
-- **Images**: All property/room images served via Supabase Storage with auto-compression. Never raw uploads
-- **Offline directions**: Guest receives a WhatsApp message with a Google Maps deep link (`maps.google.com/?q=lat,lng`) — this link opens native maps app which works with cached/downloaded maps
-- **PWA caching**: Guest booking page is a Progressive Web App — shell, property info, and room list cached after first load via Service Worker
-- **Admin on slow network**: Admin dashboard uses optimistic updates (TanStack Query) — actions feel instant even on 2G, sync happens in background
-- **No video**: No video embeds anywhere in V1
-- **Font loading**: System fonts only on guest page — no Google Fonts import
+**Superadmin (platform owner).** Onboards properties, monitors subscriptions and health, single point of support.
 
 ---
 
-## 4. Functional Requirements
+## 3. Network and performance constraints
 
-### 4.1 Guest Booking Page (`{slug}.stayidom.in`)
+**This is the most important section.** Every feature must pass this test.
 
-**Already built (Dev branch):**
-
-- Property info + rooms loaded from Supabase
-- Booking form → inserts into `bookings` table
-
-**To complete:**
-
-- [ ] Booking confirmation screen with summary (no PDF, just clear UI)
-- [ ] WhatsApp CTA: "Book via WhatsApp" button → opens `wa.me/{owner_whatsapp}?text=Hi, I want to book {room} from {date} to {date}`
-- [ ] Static map image showing property location (Supabase Storage hosted image, not Google Maps JS)
-- [ ] "Get Directions" button → deep link to `https://maps.google.com/?q={lat},{lng}` (opens native Maps app, works offline if guest has downloaded that area)
-- [ ] SEO: `<title>`, `<meta description>`, Open Graph tags per property (for Google discovery)
-- [ ] PWA manifest + Service Worker for shell caching
-
-**WhatsApp booking flow (guest-initiated):**
-
-```
-Guest taps "Book via WhatsApp"
-→ Pre-filled message opens in WhatsApp:
-  "Hi, I'd like to book [Room Name] at [Property Name]
-   Check-in: [date]  Check-out: [date]  Guests: [n]
-   My name: ___  Phone: ___"
-→ Owner receives in WhatsApp, manually confirms
-→ Owner logs booking in dashboard
-```
-
-This is intentional — no payment gateway in V1. Owner collects UPI/cash directly.
+| Rule | Status |
+| --- | --- |
+| Guest page loads in under 8 s on 2G | 🟡 Requests cut from 33 to 14 and vendor code split (v9.3). Not measured on a device. |
+| No heavy dependencies on the guest page (no Maps JS SDK, no analytics SDK) | ✅ Maps are deep links. Landing page is lazy-loaded. |
+| Images via Supabase Storage, compressed, never raw uploads | ✅ `browser-image-compression` on upload; lazy loading for room photos and the map. |
+| Offline directions via a native Maps deep link | ✅ `maps.google.com/?q=lat,lng` and Apple Maps on iOS. |
+| **PWA with a service worker that caches the shell** | ⏸ **Decided against** (v9.3). Static assets have a one-year immutable cache; a service worker would add a second cache layer to the stale-deploy problem. Revisit with measurements. The manifest exists (`/manifest.json`, dynamic per property). |
+| Admin uses optimistic updates | ⬜ No `onMutate` anywhere. Mutations do invalidate queries. |
+| No video embeds | ✅ |
+| System fonts on the guest page, no Google Fonts import | 🟡 The app loads Fraunces, Inter and Noto Sans Malayalam from Google Fonts. Playfair is still loaded by `index.html`. The spec should be updated: the decision is a small web-font set, one request. |
 
 ---
 
-### 4.2 Owner Admin Dashboard (`/admin`)
+## 4. Functional requirements
 
-**Already built:**
+### 4.1 Guest booking page (`{slug}.stayidom.in`)
 
-- Login, auth guard, rooms CRUD, bookings CRUD, calendar, settings
+- ✅ Property info, rooms and photos from Supabase; room cards show real availability.
+- ✅ Booking form with dates, guests and room choice; the price is the same calculator the owner uses, with seasonal rates.
+- ✅ Database re-prices every guest booking and holds it as pending and unpaid.
+- ✅ Confirmation screen with summary and booking reference (`#XXXXXXXX`), no PDF.
+- ✅ "Notify owner" and "Book via WhatsApp" deep links with the booking details pre-filled.
+- ✅ Cancellation policy and house rules shown on the booking form, confirmation, tracking page and printed invoice.
+- ✅ Booking-status (tracking) page: guest enters phone, sees their booking. **Open:** the phone number is the only secret (see below).
+- ✅ Static map image and "Get Directions" (Google and Apple deep links).
+- ✅ SEO: per-property `<title>`, description, Open Graph, JSON-LD (`schema.org/LodgingBusiness`), `robots.txt` and `sitemap.xml` per host (`api/og.ts`, `api/seo.ts`).
+- 🟡 **Prerendering** was planned (vite-plugin-prerender). Not used: link previews come from an Edge Function (`api/og.ts`) instead. Crawlers see the injected tags.
+- ⬜ **Tracking-link token:** replace phone-only lookup with a per-booking random token in the link.
 
-**To complete:**
+**WhatsApp booking flow (guest-initiated):** unchanged. Guest taps "Book via WhatsApp" or submits the form, the owner confirms in WhatsApp and records the booking in the dashboard. No payment gateway. The owner collects UPI or cash directly.
 
-#### WhatsApp — Owner messages guest from dashboard
+### 4.2 Owner admin dashboard (`/admin`)
 
-Each booking row has a WhatsApp icon. Tapping it opens:
+- ✅ Login, auth guard, password reset, six navigation sections (Home, Calendar, Bookings, Money, Rooms & Pricing, Property).
+- ✅ Rooms CRUD with photos, room amenities, base prices and **seasonal rates** (fixed ₹ or ±%, per room or all rooms).
+- ✅ Bookings: list, detail, Edit Stay (with refund and commission warnings), add booking with extra charges, quotes → booking.
+- ✅ Owner calendar: all-rooms view with Full and Blocked; per-room view; block and unblock dates; labels Booked / Pending / Check-out / Blocked / Open.
+- ✅ Payments: mark fully paid, correct collected amount, part-payments, derived paid status, refund due, CSV export.
+- ✅ Agents and commissions: percentage or flat, per-booking or per-group, mark paid, CSV export, delete clears records.
+- ✅ Dashboard: first-run checklist, "needs attention", revenue for the month, upcoming stays.
+- ✅ Settings: branding, owner info, location, UPI and payment methods, password.
+- ✅ Amenities, meals, add-ons and packages, seasons (for add-ons), policies.
+- 🟡 **Dashboard fixes from v1.1:** room names shown ✅; upcoming count excludes cancelled ✅; monthly revenue excludes cancelled ✅; settings cache invalidation ✅.
 
-```
-wa.me/{guest_phone}?text=Dear {guest_name}, your booking at {property_name}
-is confirmed. Check-in: {check_in}, Check-out: {check_out}.
-Room: {room_name}. Any questions, call us at {owner_phone}.
-```
+**WhatsApp from the dashboard:** ✅ reminder modal (`WhatsAppReminderModal`) for booking confirmed, payment reminder and directions, with the owner's numbers and deep links. The day-before reminder template exists (`src/lib/whatsapp.ts`).
 
-Templates for common messages:
+### 4.3 Offline maps and directions
 
-- Booking confirmed
-- Booking reminder (day before)
-- Payment reminder
-- Welcome / directions
+- ✅ Static area image, uploaded by the owner.
+- ✅ "Open in Google Maps" and "Open in Apple Maps" (iOS only) deep links.
+- ✅ Directions message template from the dashboard with the coordinates and landmark text.
+- The design rationale holds: native Maps caches route data, so the deep link needs no JS on the guest's device.
 
-#### Dashboard fixes needed now:
+### 4.4 SEO and discoverability
 
-- [ ] Room name shown instead of UUID (done in current branch)
-- [ ] Upcoming bookings count logic correct (excludes cancelled)
-- [ ] Monthly revenue excludes cancelled bookings
-- [ ] Settings save correctly invalidates cache (done in current branch)
+- ✅ Per-property title, description, `og:image`, `og:title`, canonical, JSON-LD (served in the HTML by `api/og.ts`).
+- ✅ `robots.txt` allows all; `sitemap.xml` per property host.
+- ✅ No central listing page in V1 (each subdomain is its own SEO entity).
+- 🟡 Google indexing depends on crawlers accepting the Edge-served HTML. Check Search Console after launch.
 
----
+### 4.5 Multi-tenant architecture
 
-### 4.3 Offline Maps & Directions
+- ✅ One Supabase project, isolation by `property_id` and RLS.
+- ✅ Subdomain routing (`getSubdomain()`); localhost falls back to the dev env var.
+- ✅ Wildcard domain `*.stayidom.in` on Vercel; no code changes per property.
+- ✅ Superadmin reads any property (`?property=`), owners read only their own.
+- 🟡 Superadmin's email is set in more than one place (HANDOVER §10 item 6). Move it to one place.
 
-**Philosophy**: Do not embed a map. Maps JS SDKs are 500KB+ and fail on 2G. Instead:
+### 4.6 Channel sync with other booking sites (iCal) — parked ⏸
 
-**Guest page:**
+- ✅ Export: each room publishes its occupied nights as an iCal feed (`/api/ical?room=`), with no guest data.
+- ⏸ Import: owners paste Booking.com, Airbnb, Agoda or MakeMyTrip links; nights are blocked. Built and tested, switched off because owners currently take bookings by Instagram and phone.
+- Turn on when owners in Munnar, Alleppey or Varkala also list on other sites. Steps in `docs/PARKED_FEATURES.md`.
 
-- Show a static image of the area (pre-uploaded to Supabase Storage by owner during setup)
-- "Open in Google Maps" button: `https://maps.google.com/?q={lat},{lng}`
-- "Open in Apple Maps" button: `https://maps.apple.com/?ll={lat},{lng}` (shown only on iOS via user-agent)
-- Both links open the native maps app — if the guest downloaded Vattavada offline maps before leaving, directions work with no signal
+### 4.7 Superadmin
 
-**WhatsApp directions message** (owner sends from dashboard):
-
-```
-wa.me/{guest_phone}?text=Here are directions to {property_name}:
-Google Maps: https://maps.google.com/?q={lat},{lng}
-Landmark: {property.landmark_description}
-Call us when you reach Munnar: {owner_phone}
-```
-
-**Why this works on weak signal**: Native Maps apps cache route data. The deep link just passes coordinates — no heavy JS loaded on the guest's device.
-
----
-
-### 4.4 SEO & Discoverability
-
-Goal: Each property page ranks on Google for searches like "homestay vattavada" or "Bleaf Mud House booking".
-
-**Implementation:**
-
-- Server-side meta tags via Vercel Edge Functions (or prerendering at deploy time)
-- Each property page has unique: `<title>`, `<meta description>`, `og:image`, `og:title`
-- `robots.txt` allows all crawlers
-- `sitemap.xml` generated per property
-- Structured data: `schema.org/LodgingBusiness` JSON-LD per property page
-- No central listing page in V1 — each subdomain is its own SEO entity
-
-**Note on Vite SPA and SEO**: Pure SPAs are not crawlable. Solution is prerendering at build time using `vite-plugin-prerender` — generates static HTML for each property's root page that Google can index.
-
----
-
-## 5. Multi-Tenant Architecture
-
-### 5.1 Tenant Model
-
-Single Supabase project, multiple properties isolated by `property_id` via RLS.
-
-```
-properties table
-  id, slug, name, owner_id, branding (JSONB),
-  subscription_status, subscription_end_date,
-  location_lat, location_lng, landmark_description,
-  owner_whatsapp, static_map_image_url
-
-rooms → property_id FK
-bookings → property_id FK
-availability → room_id FK (already isolated via rooms)
-```
-
-### 5.2 Subdomain Routing
-
-```typescript
-// src/lib/property.ts
-export function getSubdomain(): string {
-  const host = window.location.hostname;
-  // bleafmudhouse.stayidom.in → 'bleafmudhouse'
-  // localhost → fallback to env var for dev
-  if (host === "localhost" || host === "127.0.0.1") {
-    return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
-  }
-  return host.split(".")[0];
-}
-```
-
-Vercel: Wildcard domain `*.stayidom.in` → same deployment. No code changes per property.
-
-### 5.3 RLS Policies
-
-```sql
--- Owners only see their property
-CREATE POLICY "owner_isolation" ON rooms
-  FOR ALL USING (
-    property_id IN (
-      SELECT id FROM properties WHERE owner_id = auth.uid()
-    )
-  );
-
--- Public can read active property rooms (guest page)
-CREATE POLICY "public_read_active_rooms" ON rooms
-  FOR SELECT USING (
-    EXISTS (
-      SELECT 1 FROM properties
-      WHERE id = rooms.property_id
-      AND subscription_status IN ('trial', 'active')
-    )
-  );
-
--- Anyone can insert a booking (guest booking form)
-CREATE POLICY "public_insert_booking" ON bookings
-  FOR INSERT WITH CHECK (true);
-```
-
-### 5.4 Superadmin
-
-```typescript
-// In admin.tsx auth guard
-if (user?.email === import.meta.env.VITE_SUPERADMIN_EMAIL) {
-  redirect("/superadmin");
-}
-```
-
-Superadmin dashboard (`/superadmin`):
-
-- List all properties + subscription status
-- One-click: create property + send invite
-- Revenue overview across all tenants
+- ✅ Properties list with search and filter chips (All, Needs action, Trial, Active, Overdue, Suspended).
+- ✅ Add property with subdomain validation (3–30 characters, not reserved, not in use) and owner email validation.
+- ✅ One-click owner invite (`invite-owner` Edge Function) and link for an existing login.
+- ✅ Per-property setup checklist (nine steps) and "needs action" reasons.
+- ✅ Activate; Mark Renewed (adds 30 days to the later of today or the current end date; asks to confirm).
+- ✅ Plan and billing form: tier, monthly fee, setup fee, private notes.
+- ✅ WhatsApp owner messages (dashboard ready, renewal reminder) with correct phone numbers.
+- ✅ Leads tab (landing-page enquiries).
+- ✅ Errors tab: client error log, grouped, with a 30-day purge.
+- ⬜ Revenue overview across tenants beyond the MRR card.
+- ⬜ "Demo / internal" flag to exclude test properties from MRR.
 
 ---
 
-## 6. Subscription & Billing
+## 5. Multi-tenant security model
 
-**Pricing (V1):**
-
-- Trial: 14 days free on onboarding
-- Monthly: ₹499/property
-- Setup: ₹2,999 one-time (collected manually in V1)
-
-**V1 billing flow (manual):**
-
-- Superadmin collects payment via UPI directly
-- Updates `subscription_status` in Supabase manually
-- No payment gateway needed in V1
-
-**V2 billing flow (automated):**
-
-- Razorpay subscription API
-- Webhook updates `subscription_status`
-- Auto-suspend after grace period
+- ✅ RLS on every table (verified in the 10–11 Oct 2026 security review).
+- ✅ `anon` can't read `bookings`; guests use `availability` and phone-lookup RPCs.
+- ✅ Guest bookings are re-priced and forced to pending by the database.
+- ✅ Booking room must belong to its property (trigger).
+- ✅ Owners can't change billing columns; the superadmin email can't own a property.
+- ✅ Public lead inserts are size-limited and rate-limited.
+- ⬜ Security headers in `vercel.json`.
+- ⬜ Tracking-link token (§4.1).
+- ⬜ Pricing or RLS test in CI against the live policies — the CI DB job uses a stub, not the live project.
 
 ---
 
-## 7. WhatsApp Integration Detail
+## 6. Subscription and billing
 
-No WhatsApp Business API needed in V1. Use `wa.me` deep links only — free, instant, no approval needed.
+**Pricing on the landing page (current):**
 
-### Message Templates (hardcoded, owner taps to send)
+| Plan | Rooms | Setup | Monthly |
+| --- | --- | --- | --- |
+| Starter | 1–5 | ₹5,000 | ₹1,000 |
+| Growth | 6–10 | ₹10,000 | ₹1,500 |
+| Pro | 10+ | ₹25,000 | ₹2,000 |
 
-| Trigger             | Message                                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------- |
-| Booking confirmed   | "Dear {name}, your booking at {property} is confirmed. Check-in: {date}. Room: {room}. See you soon!"   |
-| Directions          | "Hi {name}, here's how to reach us: {maps_link}. Call {phone} when you reach Munnar."                   |
-| Payment reminder    | "Hi {name}, friendly reminder — payment of ₹{amount} is pending for your stay on {date}. UPI: {upi_id}" |
-| Day-before reminder | "Hi {name}, looking forward to your arrival tomorrow at {property}! Check-in from {time}."              |
+(v1.1 said ₹499/month and ₹2,999 setup. That is superseded.)
 
-**V2**: WhatsApp Business API (Meta) for actual message sending without guest initiating. Requires Meta Business verification.
+**Trial:** new properties start as `trial`. The v1.1 trial length (14 days) isn't enforced in the app; trial ends when the superadmin activates or leaves it.
 
----
+**Current flow (manual):**
+- ✅ Superadmin collects setup fee and monthly fee by UPI.
+- ✅ Superadmin marks the setup fee paid and activates; renewal date set to 30 days out.
+- ✅ Renewal states: overdue, due soon (under 7 days), active.
 
-## 8. Tech Stack (Locked)
+**Not enforced:**
+- ⬜ Plan tiers. The app doesn't limit features by plan, and the DB tier values (`small`/`large`) don't match the sold plans (Starter/Growth/Pro). See HANDOVER §10 item 15.
+- ⬜ Automatic suspension after a grace period.
 
-| Layer         | Tool                      | Notes                                     |
-| ------------- | ------------------------- | ----------------------------------------- |
-| Framework     | Vite + React + TypeScript | SPA — NOT SSR                             |
-| Routing       | TanStack Router 1.166.7   | Pinned — do not upgrade                   |
-| Styling       | Tailwind CSS v4           | No CSS modules                            |
-| Database      | Supabase (PostgreSQL)     | RLS enforced                              |
-| Auth          | Supabase Auth             | Client-side only                          |
-| Data fetching | TanStack Query v5         | useQuery + useMutation                    |
-| Hosting       | Vercel                    | Static SPA + Edge Functions for meta tags |
-| Maps          | Native deep links only    | No Maps JS SDK                            |
-| WhatsApp      | wa.me deep links          | No API in V1                              |
-| Images        | Supabase Storage          | Auto-compressed                           |
-| SEO           | vite-plugin-prerender     | Static HTML at build time                 |
-
-**Never install**: `@tanstack/react-start`, `@supabase/ssr`, Google Maps JS SDK, any heavy mapping library
+**V2 (automated):** Razorpay subscriptions, webhook updates status, auto-suspend after the grace period. ⬜
 
 ---
 
-## 9. Milestones & Roadmap
+## 7. WhatsApp integration
 
-### Phase 0 — Core Foundation ✅
+No WhatsApp Business API in V1. `wa.me` deep links only: free, instant, no approval.
 
-- [x] Admin login + auth guard
-- [x] Rooms page with real Supabase data
-- [x] Bookings page with real data + room names
-- [x] Calendar with availability
-- [x] Add/edit rooms (drawer)
-- [x] Add booking (modal)
-- [x] Settings save with correct cache invalidation
-- [x] Guest booking form end-to-end test
-- [x] WhatsApp deep links on booking dashboard
-- [x] Remove TanStack devtools button
-- [x] "Book via WhatsApp" button on guest page
+| Trigger | Message | Status |
+| --- | --- | --- |
+| Booking confirmed | "Dear {name}, your booking at {property} is confirmed…" | ✅ |
+| Directions | "Here's how to reach us: {maps link}…" | ✅ |
+| Payment reminder | "payment of ₹{amount} is pending… UPI: {upi_id}" — correctly shows "settled" or "refund due" | ✅ |
+| Day-before reminder | "looking forward to your arrival tomorrow…" | ✅ (`buildDayBeforeText`) |
+| Guest booking request → owner | Deep link with the booking reference | ✅ |
 
-### Phase 1 — Multi-Tenant & Admin Features ✅
+**Rules:**
+- Phone numbers: `+91…` and `0…` forms are normalised to `91…` (`waNumber()` / `src/lib/whatsapp.ts`).
+- Tracking links include the property id; links sent before v9.6 are broken and must be resent.
 
-- [x] Add `property_id` to all tables + RLS migration
-- [x] Dynamic subdomain detection (`getSubdomain()`)
-- [x] Superadmin invite flow (RPC + Edge Function)
-- [x] Superadmin dashboard (`/superadmin`)
-- [x] Wildcard domain support on Vercel
-- [x] Test data isolation (pen test with 2 properties)
-- [x] Pricing, Meals, Amenities, Policies, and Payments admin pages
-- [x] Sentinel key pattern for property config in `shared_amenities`
-- [x] UPI, Bank Transfer, and Cash on Arrival support
-- [x] Advance and part-payment recording with cumulative balance tracking
-- [x] "Notify Owner" via WhatsApp after guest booking request
-
-### Phase 2 — Guest Experience & SEO (Current)
-
-- [ ] Static map image + directions deep links on guest page
-- [ ] WhatsApp booking CTA ("Book via WhatsApp" button)
-- [ ] SEO meta tags + Open Graph per property
-- [ ] `schema.org/LodgingBusiness` structured data
-- [ ] PWA manifest + Service Worker (shell caching)
-- [ ] Performance audit: guest page on simulated 2G
-
-### Phase 3 — WhatsApp Dashboard Messaging (Week 7)
-
-- [ ] WhatsApp message templates in booking row actions
-- [ ] Directions message template (sends lat/lng link)
-- [ ] Payment reminder template
-- [ ] Day-before reminder template
-
-### Phase 4 — Billing & Onboarding (Week 8)
-
-- [ ] Trial → active subscription flow
-- [ ] Manual UPI collection + superadmin status toggle
-- [ ] Property onboarding checklist UI
-- [ ] Pilot: onboard 2 beta properties (Bleaf + 1 more)
-
-### Phase 5 — Central Listing Page (Future, Post-Pilot)
-
-- [ ] `stayidom.in` landing page with "Browse properties"
-- [ ] Property cards with availability preview
-- [ ] Filter by dates, guests, price
-- [ ] Each card links to `{slug}.stayidom.in`
+**V2:** WhatsApp Business API (Meta) for sending without the guest starting the chat. Needs Meta Business verification. ⬜
 
 ---
 
-## 10. Open Questions
+## 8. Tech stack
 
-| #   | Question                                                                | Decision Needed By |
-| --- | ----------------------------------------------------------------------- | ------------------ |
-| 1   | ID proof collection — store in Supabase Storage or email to owner only? | Phase 2            |
-| 2   | Cancellation policy — per property or platform standard?                | Phase 1            |
-| 3   | Language — English only or add Malayalam in V1?                         | Phase 1            |
-| 4   | Superadmin email — hardcoded env var or `is_superadmin` column in DB?   | Phase 1            |
-| 5   | Static map image — owner uploads, or auto-generate from lat/lng?        | Phase 2            |
+| Layer | Tool | Notes |
+| --- | --- | --- |
+| Framework | Vite 7 + React 19 + TypeScript | SPA, not SSR |
+| Routing | TanStack Router 1.166.7 | Pinned |
+| Styling | Tailwind CSS 4 | |
+| Database | Supabase (Postgres, RLS) | Baseline + migrations in the repo |
+| Auth | Supabase Auth | Client-side |
+| Data | TanStack Query 5 | |
+| Hosting | Vercel | Static SPA + Edge Functions in `api/` |
+| Maps | Native deep links only | No Maps JS SDK |
+| WhatsApp | `wa.me` deep links | No API in V1 |
+| Images | Supabase Storage | Compressed on upload |
+| Link previews and SEO | Vercel Edge Functions (`api/og`, `api/seo`) | Replaces the prerender plan |
+| Invites | Supabase Edge Function (Deno) `invite-owner` | |
+| Tests | `npm test`, `npm run check`, CI with migration tests | |
+
+**Never install:** `@tanstack/react-start`, `@supabase/ssr`, a Google Maps JS SDK, any heavy mapping library.
 
 ---
 
-## 11. Constraints & Non-Negotiables
+## 9. Milestones and roadmap
 
-- **No commissions**: Platform earns only via subscription, never per-booking
-- **No marketplace in V1**: No central listing, no compare-and-book
-- **No heavy JS on guest page**: Maps SDK, analytics SDKs, chat widgets — all banned from guest page
-- **RLS is the security model**: No property ever sees another's data. This must be tested before every production deploy
-- **WhatsApp is the primary communication channel**: Email is secondary. Every notification has a WhatsApp path
-- **Mobile-first**: Every UI designed for 375px width first, desktop second
+### Phase 0 — Core foundation ✅
+All items done (admin login and guard, rooms, bookings, calendar, add/edit rooms and bookings, settings, guest booking end to end, WhatsApp links, "Book via WhatsApp").
+
+### Phase 1 — Multi-tenant and admin features ✅
+All items done: `property_id` on every table, dynamic subdomain, superadmin invite and dashboard, wildcard domain, tenant isolation tested, pricing / meals / amenities / policies / payments pages, sentinel config, UPI / bank / cash, part-payments, "Notify owner" after booking.
+
+### Phase 2 — Guest experience and SEO — 🟡 mostly done
+- ✅ Static map image and directions deep links
+- ✅ "Book via WhatsApp" CTA
+- ✅ SEO meta tags, Open Graph, JSON-LD per property
+- ✅ `schema.org/LodgingBusiness` structured data
+- 🟡 PWA manifest ✅; service worker ⏸ deliberately not added (§3)
+- 🟡 Performance audit on simulated 2G: request count and bundle reduced; **a device test is still needed**
+
+### Phase 3 — WhatsApp dashboard messaging — 🟡
+- ✅ Reminder modal with booking-level actions
+- ✅ Payment reminder template
+- ✅ Directions template
+- ✅ Day-before template
+
+### Phase 4 — Billing and onboarding — ✅ mostly done
+- ✅ Trial → active flow in `/superadmin`
+- ✅ Manual UPI collection with superadmin status toggle, renewal tracking
+- ✅ Property onboarding checklist (in the superadmin row)
+- 🟡 Pilot beta properties: Bleaf Mud House (paying) and Misty Colina, OriginSoil, Mist Valley on trial or demo
+
+### Phase 5 — Central listing page — ⬜ Future, post-pilot
+- ⬜ `stayidom.in` "Browse properties" page
+- ⬜ Property cards with availability preview
+- ⬜ Filter by dates, guests, price
+- ⬜ Each card links to `{slug}.stayidom.in`
+- Note: `stayidom.in` currently shows the owner-facing landing page, not a listing.
+
+### Added since v1.1 (not in earlier roadmap)
+- ✅ Seasonal and date-range room rates
+- ✅ Server-side price and pending state for guest bookings
+- ✅ Double-booking exclusion constraint
+- ✅ Money maths in one module; refund due shown
+- ✅ Client error log on `/superadmin`
+- ✅ Admin speed: windowed fetches, pagination, indexes
+- ✅ CI with build, typecheck, tests, migration tests
+- ⏸ Channel sync (iCal import) — built, switched off
 
 ---
 
-_This document should be updated at the start of each phase. Keep it in the repo root as `PRD.md`._
+## 10. Open questions
+
+| # | Question | Status |
+| --- | --- | --- |
+| 1 | ID proof collection: Supabase Storage or email to owner only? | ⬜ Open — no ID-proof feature exists in the code. |
+| 2 | Cancellation policy: per property or platform standard? | ✅ Per property (owner writes it in Policies; shown to guests). |
+| 3 | Language: English only or Malayalam in V1? | 🟡 Landing copy has Malayalam; the app UI is English. Native-speaker review pending. |
+| 4 | Superadmin: env var or `is_superadmin` column? | 🟡 Both today (env var + hard-coded email). Decide: a `superadmins` table. |
+| 5 | Static map image: owner uploads or auto-generate from lat/lng? | ✅ Owner uploads. |
+
+---
+
+## 11. Constraints and non-negotiables
+
+- **No commissions.** The platform earns from subscriptions only, never per booking. ✅
+- **No marketplace in V1.** No central listing, no compare-and-book. ✅
+- **No heavy JS on the guest page.** No Maps SDK, analytics SDK or chat widget. ✅
+- **RLS is the security model.** No property sees another's data. Must be re-tested before each production deploy; the last full review was 10–11 Oct 2026.
+- **WhatsApp is the primary channel.** Every notification has a WhatsApp path. ✅
+- **Mobile first.** Every UI designed for 375 px first, desktop second. Modal and sheet rules in HANDOVER §3.
+
+---
+
+*Update this document at the start of each phase. Keep it in the repo root as `PRD.md`.*
