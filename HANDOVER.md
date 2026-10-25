@@ -35,13 +35,13 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 - `api/manifest.ts` — dynamic web manifest.
 - `api/ical.ts` — public export of a room's occupied nights ("Reserved" only, no guest data).
 - `api/ical-sync.ts` + `api/_lib/ical.ts` — iCal import (owner-triggered; optional cron). Parked, see §8.
-- `src/supabase/functions/invite-owner/index.ts` — Supabase Edge Function (Deno) for superadmin owner invites. It lives under `src/`, not `supabase/functions/`; see §10.
+- `supabase/functions/invite-owner/index.ts` — Supabase Edge Function (Deno) for superadmin owner invites. Moved here from `src/` in Oct 2026.
 - No `createServerFn`, no SSR, no `@supabase/ssr`. Business logic still runs in the browser or in Postgres triggers/RPCs.
 
 **Env vars:**
 - Vercel / local `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PROPERTY_SUBDOMAIN` (dev fallback), `VITE_SUPERADMIN_EMAIL` (used by `src/lib/subdomain.ts`).
 - Edge functions only: `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (optional, for background iCal sync).
-- The superadmin email is **also hard-coded** as `thedelishlicks@gmail.com` in `src/lib/onboarding.ts`, `invite-owner/index.ts` and the database policies/triggers. §10 item 6.
+- The superadmin email is **also hard-coded** as `thedelishlicks@gmail.com` in `src/lib/onboarding.ts`, `supabase/functions/invite-owner/index.ts` and the database policies/triggers. §10 item 6.
 
 **Commands:** `npm run dev` · `npm run build` (= `vite build` + `post-build`) · `npm run typecheck` (run **after** build) · `npm test` · `npm run check` · `npm run lint`.
 
@@ -74,7 +74,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 7. **Never claim a feature the app can't back up** on the landing page or in checklist copy.
 8. **Every modal must stay reachable on a phone/iPad:** card = `flex flex-col max-h-[calc(100dvh-2rem)]`, body = `overflow-y-auto`, footer outside the scrolling part. Use `dvh`, not `vh`.
 9. **Owner Calendar labels come only from `src/lib/calendarState.ts`.**
-10. **Guest-side code must not depend on reading the `bookings` table.** Guests (role `anon`) have no SELECT on it, so the query silently returns nothing. Guests learn what's taken from the public `availability` table or from SECURITY DEFINER RPCs. **Known violation:** `getBlockedDatesForRooms` and `getConflictingDates` in `src/lib/bookingAvailability.ts` also query `bookings`, and guest pages call them. §10 item 1.
+10. **Guest-side code must not read the `bookings` table.** Guests (role `anon`) have no SELECT on it, so the query silently returns nothing. Guests get booked dates from `room_booked_ranges(p_room_ids, p_from, p_to)` (migration `20261025000000_room_booked_range.sql`), which returns only id, room, check-in and check-out, and from the public `availability` table. `getBlockedDatesForRooms` and `getConflictingDates` in `src/lib/bookingAvailability.ts` use the function. Owner-only screens may still read `bookings` directly (e.g. `releaseDatesIfUnblocked`).
 11. **`availability` is a mirror kept in sync by the database,** not by the browser. Trigger `trg_mark_booking_nights` marks nights for every non-cancelled booking. Guests can't write `availability`.
 12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides overpayment. Show `refundDue` when > 0.
 13. **Every guest tracking link carries the property id:** `guestTrackingUrl(origin, phone, propertyId)`.
@@ -88,6 +88,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 21. **iCal sync only deletes rows carrying its own feed's note** (`ical:<feed id>:…`). A failed or non-iCal response is an error, never "calendar is empty". Bookings and manual blocks are never touched.
 22. **Parked features are switched off with flags, not deleted.** `CHANNEL_SYNC_ENABLED` in `src/lib/features.ts` is `false`. Don't remove the code or the `room_ical_feeds` table.
 23. **Sentinel keys** in `shared_amenities`: filter `__` entries before showing tags to guests (§7).
+24. **Stay dates use one picker.** Every stay-date picker uses `RoomAvailabilityCalendar` (availability-aware, same as Add Booking). A plain `<input type="date">` shows no availability, which is why Edit Stay conflicts (§10 item 21).
 
 ---
 
@@ -106,7 +107,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 
 - **Mobile bottom bar:** Home, Calendar, Bookings, Money, More (`BOTTOM_NAV` in `AdminLayout.tsx`).
 - **Retired URLs (redirect, keep `?property=`):** `/admin/pricing` → `/admin/rooms`; `/admin/commissions` → `/admin/agents`.
-- **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking), `/setup` (**unused**, §10), `/test-booking` (**a manual test runner that writes to the live DB**, §10).
+- **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking). `/setup` and `/test-booking` were removed in Oct 2026.
 - **Add a page:** create `src/routes/admin.<name>.tsx`, then add a tab or section in `navConfig.ts`.
 
 ---
@@ -149,7 +150,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 
 ## 7. Data notes
 
-Full schema, triggers, RPCs and RLS: `supabase/baseline/` (snapshot of the live DB on 16 Oct 2026; `README.md` there gives the rebuild order). Migrations since that snapshot are in `supabase/migrations/`. Only `20261020000000_delete_agent_with_commissions.sql` is newer than the baseline. The file `20261020000000 delete agent with commissions` (with spaces) is an identical duplicate and should be deleted (§10).
+Full schema, triggers, RPCs and RLS: `supabase/baseline/` (snapshot of the live DB on 16 Oct 2026; `README.md` there gives the rebuild order). Migrations are in `supabase/migrations/` and are run by hand in the Supabase SQL editor, in filename order. The duplicate spaced copy of `20261020000000_delete_agent_with_commissions.sql` was deleted in Oct 2026.
 
 `properties.shared_amenities` is `text[]` holding real amenity tags **and** `__prefix:` entries:
 
@@ -199,16 +200,16 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 
 Items marked **[verified]** were checked in the code. The build and typecheck could **not** be run in the audit sandbox (npm registry unreachable), so §12 must be run locally.
 
-1. **[verified] Guest paths read `bookings`.** `getBlockedDatesForRooms` / `getConflictingDates` (`src/lib/bookingAvailability.ts`) query `bookings`, and guest-facing `Rooms.tsx`, `Availability.tsx`, `useAvailability.ts`, `useCreateBooking.ts`, `stayAvailability.ts` call them. For `anon` that part returns nothing, silently. Correct behaviour depends only on `availability`. Fix: have guest paths use only `availability` (plus an RPC if needed) and keep the `bookings` read for owner screens.
-2. **[verified] Duplicate migration.** `supabase/migrations/20261020000000 delete agent with commissions` is byte-identical to `…_delete_agent_with_commissions.sql`. Delete the spaced one.
-3. **[verified] Dead code:** `src/hooks/useBookingStatus.ts` has no importers and reads `bookings` directly. Delete it.
-4. **[verified] Test route in production:** `src/routes/test-booking.tsx` runs test bookings against the live database. Remove it, or gate it to `import.meta.env.DEV`.
-5. **[verified] Unused `/setup` route** (`src/routes/setup.tsx`), plus the unused DB functions `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token`. Delete after confirming in the live DB.
+1. **[DONE 25 Oct 2026] Guest paths read `bookings`.** Fixed (see rule 10). `getBlockedDatesForRooms` / `getConflictingDates` (`src/lib/bookingAvailability.ts`) query `bookings`, and guest-facing `Rooms.tsx`, `Availability.tsx`, `useAvailability.ts`, `useCreateBooking.ts`, `stayAvailability.ts` call them. For `anon` that part returns nothing, silently. Correct behaviour depends only on `availability`. Fix: have guest paths use only `availability` (plus an RPC if needed) and keep the `bookings` read for owner screens.
+2. **[DONE 25 Oct 2026] Duplicate migration.** `supabase/migrations/20261020000000 delete agent with commissions` is byte-identical to `…_delete_agent_with_commissions.sql`. Delete the spaced one.
+3. **[DONE 25 Oct 2026] Dead code:** `src/hooks/useBookingStatus.ts` has no importers and reads `bookings` directly. Delete it.
+4. **[DONE 25 Oct 2026] Test route in production:** `src/routes/test-booking.tsx` runs test bookings against the live database. Remove it, or gate it to `import.meta.env.DEV`.
+5. **[PARTLY DONE 25 Oct 2026] Unused `/setup` route** removed. **Still open:** drop the unused DB functions `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token` in the live project, after confirming nothing calls them.
 6. **[verified] Superadmin email in three places:** `VITE_SUPERADMIN_EMAIL` (`subdomain.ts`), hard-coded `thedelishlicks@gmail.com` (`onboarding.ts`, `invite-owner`, DB policies/triggers). They must agree. Put it in one place (e.g. a `superadmins` table) and make the env var match. README's sample value `admin@stayidom.in` does not match.
-7. **[verified] Two lockfiles:** `package-lock.json` and `bun.lockb` are both committed. Pick one (the CI uses `npm ci`, so keep `package-lock.json`) and delete the other.
-8. **[verified] `recharts` still in `package.json`** and unused. Remove with `npm uninstall recharts` so the lockfile stays in sync.
-9. **[verified] Invite function location:** `invite-owner` lives in `src/supabase/functions/`. The Supabase CLI looks in `supabase/functions/`. Move it, or document why it is in `src/`.
-10. **[verified] No security headers** in `vercel.json` (CSP, `X-Frame-Options`, `Referrer-Policy`).
+7. **[DONE 25 Oct 2026] Two lockfiles:** `bun.lockb` deleted; `package-lock.json` is the only lockfile.
+8. **[verified, still open] `recharts` in `package.json`** and unused. Remove with `npm uninstall recharts` so the lockfile stays in sync.
+9. **[DONE 25 Oct 2026] Invite function location:** moved to `supabase/functions/invite-owner/`; the old `src/` copy was deleted.
+10. **[DONE 25 Oct 2026] Security headers** added to `vercel.json` (`nosniff`, referrer policy, `X-Frame-Options: SAMEORIGIN`, permissions policy, HSTS). **No CSP yet** — needs testing against Google Fonts, Supabase and inline styles first.
 11. **Guest tracking link:** the phone number is still the only secret for `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` (v9.6 open item 1). Fix: per-booking random token in the link.
 12. **Public pricing:** the DB now re-prices guest bookings (§3 rule 19). Confirm on the live project that `enforce_guest_booking_terms` is installed (it is in the 16 Oct baseline). Close v9.6 open item 4 after a test booking.
 13. **Landing page on `main` is the old version** (§8). Don't remove the Playfair font until it is replaced.
@@ -219,6 +220,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 18. **A booking's room can't be changed in the UI** (Edit Stay for a room inside a group does not update the group total). No UI path reaches it today.
 19. **No "record refund" button.** Lower "Collected so far" on the Payments page instead.
 20. **Supabase Free tier pauses on inactivity.** The first request can fail. Superadmin can view any property but can't write to owner-scoped tables of one it doesn't own (RLS). Test write flows as the real owner.
+21. **[OPEN, found 25 Oct 2026] Edit Stay date picker doesn't match the app's calendar.** `EditStayModal` in `src/routes/admin.bookings.tsx` uses `<input type="date">` for check-in and check-out, so it shows no availability. Add Booking uses `RoomAvailabilityCalendar`. Switching needs `RoomAvailabilityCalendar` to accept an `excludeBookingId`, and the booking's own nights must not show as blocked. Those nights come from both `bookings` and the `availability` mirror, which doesn't record which booking blocked a night. The database exclusion constraint still stops real overlaps on save.
 
 ---
 
@@ -226,13 +228,13 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 
 **A. Make `main` match this document (cleanup, no new features)**
 1. Run the build, typecheck and tests locally (§12). Fix anything they report.
-2. Items 2, 3, 4, 5, 7, 8 in §10 (delete duplicate migration, dead hook, test route, `/setup` and old functions, one lockfile, `recharts`).
+2. Still open from §10: item 8 (`recharts`) and the DB function drop in item 5.
 3. Commit the migrations and DB objects that are live but missing from `supabase/migrations/`: `lookup_*`, `create_property_with_invite`, `link_property_owner`, booking triggers, base-table policies, `trg_mark_booking_nights`, `sync_availability_on_booking` (the 5 Oct file). The baseline holds the text; the migrations folder must hold the history.
-4. Fix §10 item 1 (guest paths reading `bookings`).
+4. ~~Fix §10 item 1~~ — done (rule 10).
 
 **B. Security**
 5. Tracking link token (§10 item 11).
-6. Security headers in `vercel.json`.
+6. Security headers: done (§10 item 10). CSP still to do.
 7. Superadmin email in one place (§10 item 6).
 8. Confirm the server-side pricing trigger on the live project with one guest test booking (§10 item 12).
 
@@ -241,6 +243,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 10. Decide plan-tier enforcement (§10 item 15).
 11. Turn on channel sync for Munnar / Alleppey / Varkala (`docs/PARKED_FEATURES.md`), with the cron and secrets, once an owner needs it.
 12. Drop `availability.price_override` after `docs/DB_CHECKS.sql` query 2 returns 0.
+13. **Fix the Edit Stay date picker** (§10 item 21), then retest a stay change on the demo property.
 
 **D. Later (from the v8 roadmap)**
 13. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (PRD Phase 5).
