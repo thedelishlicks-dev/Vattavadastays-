@@ -217,11 +217,29 @@ export function isSameDayTurnoverSafe(property: TurnoverPolicyInput | null | und
  * a real conflict at the exact turnover boundary; over-fetching a few
  * harmless extra rows costs nothing.
  */
+/**
+ * A booking being edited. Its own nights must not show as blocked, or the
+ * owner could never keep or extend the dates they already have.
+ *
+ * Its nights are removed from two places: its own row in the bookings
+ * fetch, and its nights in the availability table (the mirror cannot say
+ * which booking blocked a night). A night stays blocked if another booking
+ * still covers it. Limit: a manual block placed on this booking's own nights
+ * is also hidden in edit mode; the database still rejects a real overlap on save.
+ */
+export interface BookingExclusion {
+  bookingId: string;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+}
+
 export async function getBlockedDatesForRooms(
   roomIds: string[],
   rangeStart: string,
   rangeEnd: string,
   turnoverSafe = true,
+  exclude?: BookingExclusion,
 ): Promise<Record<string, Set<string>>> {
   const blocked: Record<string, Set<string>> = {};
   roomIds.forEach((id) => (blocked[id] = new Set()));
@@ -245,11 +263,25 @@ export async function getBlockedDatesForRooms(
     ),
   ]);
 
+  // Nights covered by OTHER bookings. Used below so the excluded booking's
+  // own mirror rows are only ignored where no other booking still holds the night.
+  const coveredByOthers: Record<string, Set<string>> = {};
+  roomIds.forEach((id) => (coveredByOthers[id] = new Set()));
+
   bookings.forEach((b) => {
+    if (exclude && b.id === exclude.bookingId) return;
     const effectiveCheckOut = turnoverSafe ? b.check_out : addOneDay(b.check_out);
-    eachDate(b.check_in, effectiveCheckOut).forEach((d) => blocked[b.room_id]?.add(d));
+    eachDate(b.check_in, effectiveCheckOut).forEach((d) => {
+      blocked[b.room_id]?.add(d);
+      coveredByOthers[b.room_id]?.add(d);
+    });
   });
+
+  const ownNights = new Set(exclude ? eachDate(exclude.checkIn, exclude.checkOut) : []);
   availRows.forEach((row) => {
+    const isOwnNight =
+      !!exclude && row.room_id === exclude.roomId && ownNights.has(row.date) && !coveredByOthers[row.room_id]?.has(row.date);
+    if (isOwnNight) return;
     blocked[row.room_id]?.add(row.date);
   });
 
