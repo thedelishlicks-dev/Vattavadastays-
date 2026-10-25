@@ -4,7 +4,7 @@ import {
   isSameMonth, startOfMonth, startOfWeek, addDays, parseISO,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
-import { getBlockedDatesForRooms } from "@/lib/bookingAvailability";
+import { getBlockedDatesForRooms, type BookingExclusion } from "@/lib/bookingAvailability";
 
 function buildMonthDays(month: Date) {
   const start = startOfWeek(startOfMonth(month), { weekStartsOn: 0 });
@@ -57,9 +57,14 @@ interface RoomAvailabilityCalendarProps {
    * `softBlock`. Used to pick a seasonal-rate period.
    */
   inclusiveEnd?: boolean;
+  /**
+   * Editing an existing booking: its own nights are shown as free, so the
+   * owner can keep or extend the dates it already holds.
+   */
+  exclude?: BookingExclusion;
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any", inclusiveEnd = false }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any", inclusiveEnd = false, exclude }: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
@@ -67,6 +72,7 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
   const gridStart = format(days[0], "yyyy-MM-dd");
   const gridEnd = format(days[days.length - 1], "yyyy-MM-dd");
   const roomKey = [...roomIds].sort().join(",");
+  const excludeKey = exclude ? `${exclude.bookingId}|${exclude.roomId}|${exclude.checkIn}|${exclude.checkOut}` : "";
 
   const [blockedByRoom, setBlockedByRoom] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(false);
@@ -75,13 +81,13 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     let cancelled = false;
     if (roomIds.length === 0) { setBlockedByRoom({}); return; }
     setLoading(true);
-    getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe)
+    getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe, exclude)
       .then((res) => { if (!cancelled) setBlockedByRoom(res); })
       .catch(() => { if (!cancelled) setBlockedByRoom({}); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roomKey, gridStart, gridEnd, turnoverSafe]);
+  }, [roomKey, gridStart, gridEnd, turnoverSafe, excludeKey]);
 
   const isDateBlocked = (dateStr: string) =>
     blockedWhen === "all"
