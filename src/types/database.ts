@@ -73,6 +73,7 @@ export interface Booking {
   guest_name: string;
   guest_phone: string;
   guest_email?: string;
+  tracking_token?: string | null;
   guest_count: number;
   check_in: string;
   check_out: string;
@@ -137,6 +138,7 @@ export interface BookingGroup {
   guest_name: string;
   guest_phone: string;
   guest_email?: string;
+  tracking_token?: string | null;
   check_in: string;
   check_out: string;
   guest_count: number;

@@ -72,7 +72,7 @@ function buildMessage(
         checkIn,
         checkOut,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
       });
 
     case "reminder":
@@ -96,7 +96,7 @@ function buildMessage(
         propertyName: prop,
         upiId: property.upiId ?? undefined,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
       });
     }
 

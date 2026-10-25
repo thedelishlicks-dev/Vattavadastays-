@@ -134,6 +134,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
         phone,
         bookingId: result.bookingId,
         groupRef: result.groupRef,
+        trackingToken: result.trackingToken,
         ownerNotifyLink: link,
         rooms: result.rooms.map((r) => ({ name: r.roomName, total: r.totalAmount })),
         checkIn: selections[0].checkIn,
@@ -405,7 +406,7 @@ function ConfirmationCard({
 }) {
   const [copied, setCopied] = useState(false);
   const ownerName = property?.owner_name ?? "The host";
-  const trackingUrl = guestTrackingUrl(window.location.origin, c.phone, property?.id ?? c.propertyId);
+  const trackingUrl = guestTrackingUrl(window.location.origin, c.trackingToken, property?.id ?? c.propertyId);
   const ref = c.groupRef;
 
   const handleCopyRef = () => {
