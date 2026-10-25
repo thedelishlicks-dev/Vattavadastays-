@@ -19,9 +19,10 @@ import { priceRoomStay } from "@/lib/quoteBuilder";
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
-import { releaseDatesIfUnblocked } from "@/lib/bookingAvailability";
+import { releaseDatesIfUnblocked, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
+import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 import { computeBalance } from "@/lib/balance";
 
@@ -664,7 +665,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
         </div>
       </div>
       {showEditGuest && <EditGuestModal booking={booking} onClose={() => setShowEditGuest(false)} onSaved={() => { setShowEditGuest(false); onPaymentSaved(); }} />}
-      {showEditStay && <EditStayModal booking={booking} rooms={rooms} onClose={() => setShowEditStay(false)} onSaved={() => { setShowEditStay(false); onPaymentSaved(); }} />}
+      {showEditStay && <EditStayModal booking={booking} rooms={rooms} property={property} onClose={() => setShowEditStay(false)} onSaved={() => { setShowEditStay(false); onPaymentSaved(); }} />}
     </>
   );
 }
@@ -702,11 +703,14 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
   );
 }
 
-function EditStayModal({ booking, rooms, onClose, onSaved }: {
+function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
   booking: Booking;
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
+  property: ReturnType<typeof useOwnerProperty>["data"];
   onClose: () => void; onSaved: () => void;
 }) {
+  // Same turnover rule as Add Booking: decides whether a checkout day can also be a check-in.
+  const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
   const [form, setForm] = useState({ room_id: booking.room_id ?? rooms[0]?.id ?? "", check_in: booking.check_in ?? "", check_out: booking.check_out ?? "", guest_count: booking.guest_count as number | string });
   const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient(); const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
@@ -773,7 +777,7 @@ function EditStayModal({ booking, rooms, onClose, onSaved }: {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Stay Details</h2><p className="text-xs text-muted-foreground mt-0.5">Total will be recalculated</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
         <div className="p-5 space-y-3">
           <div><label className={labelCls}>Room</label><select value={form.room_id} onChange={(e) => set("room_id", e.target.value)} className={inputCls}>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included</option>)}</select></div>
-          <div className="grid grid-cols-2 gap-3"><div><label className={labelCls}>Check-in</label><input type="date" value={form.check_in as string} onChange={(e) => set("check_in", e.target.value)} className={inputCls} /></div><div><label className={labelCls}>Check-out</label><input type="date" value={form.check_out as string} onChange={(e) => set("check_out", e.target.value)} className={inputCls} /></div></div>
+          <div className="space-y-2"><label className={labelCls}>Stay dates</label><RoomAvailabilityCalendar roomIds={form.room_id ? [form.room_id as string] : []} checkIn={form.check_in as string} checkOut={form.check_out as string} turnoverSafe={turnoverSafe} exclude={{ bookingId: booking.id, roomId: booking.room_id ?? "", checkIn: booking.check_in, checkOut: booking.check_out }} onChange={(ci, co) => { set("check_in", ci); set("check_out", co); }} /><p className="text-xs text-muted-foreground">Check-in {(form.check_in as string) || "—"} · Check-out {(form.check_out as string) || "—"}</p></div>
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
           {nights > 0 && selectedRoom && (
             <div className="rounded-xl border border-border p-3 space-y-1">
