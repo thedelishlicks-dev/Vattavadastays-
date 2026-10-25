@@ -125,7 +125,7 @@ export function RoomDetail({ room, checkIn, checkOut, propertyAmenities, onClose
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end md:items-center justify-center p-0 md:p-4">
-      <div className="bg-background w-full md:max-w-3xl md:rounded-2xl max-h-[95vh] overflow-y-auto">
+      <div className="bg-background w-full md:max-w-3xl md:rounded-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
         <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b border-border bg-background">
           <div>
             <h3 className="font-display text-xl font-semibold">{room.name}</h3>
