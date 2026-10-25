@@ -2,6 +2,35 @@ import { supabase } from "@/lib/supabase";
 import { fetchAllPages } from "./pagination";
 
 /**
+ * One active (non-cancelled) booking's dates on a room. Comes from the
+ * room_booked_ranges() database function, which returns only these fields —
+ * never guest names, phones, emails or amounts. Guests (role anon) cannot
+ * read the bookings table, so this is the only way guest pages can see
+ * booked dates for the same-day turnover rule.
+ */
+export interface BookedRange {
+  id: string;
+  room_id: string;
+  check_in: string;
+  check_out: string;
+}
+
+/**
+ * Booked ranges for the given rooms overlapping [from, to]. The window is
+ * inclusive on both ends, matching the previous bookings query:
+ * check_out >= from AND check_in <= to.
+ */
+async function fetchBookedRanges(roomIds: string[], from: string, to: string): Promise<BookedRange[]> {
+  const { data, error } = await supabase.rpc("room_booked_ranges", {
+    p_room_ids: roomIds,
+    p_from: from,
+    p_to: to,
+  });
+  if (error) throw error;
+  return (data ?? []) as BookedRange[];
+}
+
+/**
  * Every night a stay occupies a room: check-in date inclusive, check-out
  * date EXCLUSIVE. This is the one and only definition of "occupied nights"
  * used anywhere in the app — every calendar, picker, and validator imports
@@ -201,18 +230,7 @@ export async function getBlockedDatesForRooms(
   // Paged: one request returns at most 1,000 rows and says nothing when it stops there, so a
   // busy property's later dates used to be silently missing (and look free to guests).
   const [bookings, availRows] = await Promise.all([
-    fetchAllPages<{ room_id: string; check_in: string; check_out: string }>((from, to) =>
-      supabase
-        .from("bookings")
-        .select("room_id, check_in, check_out")
-        .in("room_id", roomIds)
-        .neq("status", "cancelled")
-        .gte("check_out", rangeStart)
-        .lte("check_in", rangeEnd)
-        .order("check_in", { ascending: true })
-        .order("room_id", { ascending: true })
-        .range(from, to),
-    ),
+    fetchBookedRanges(roomIds, rangeStart, rangeEnd),
     fetchAllPages<{ room_id: string; date: string }>((from, to) =>
       supabase
         .from("availability")
@@ -314,18 +332,8 @@ export async function getConflictingDates(
   // a previous booking whose checkout lands exactly on our check-in day
   // wasn't fetched at all by a strict .gt() filter). Over-fetching a few
   // harmless extra rows costs nothing.
-  const [{ data: bookings, error: bookingsErr }, { data: availRows, error: availErr }] = await Promise.all([
-    (() => {
-      let q = supabase
-        .from("bookings")
-        .select("check_in, check_out")
-        .eq("room_id", roomId)
-        .neq("status", "cancelled")
-        .lte("check_in", effectiveCheckOut)
-        .gte("check_out", checkIn);
-      if (excludeBookingId) q = q.neq("id", excludeBookingId);
-      return q;
-    })(),
+  const [bookingRows, { data: availRows, error: availErr }] = await Promise.all([
+    fetchBookedRanges([roomId], checkIn, effectiveCheckOut),
     // Manual/explicit blocks within the (possibly widened) window.
     supabase
       .from("availability")
@@ -335,8 +343,9 @@ export async function getConflictingDates(
       .gte("date", checkIn)
       .lt("date", effectiveCheckOut),
   ]);
-  if (bookingsErr) throw bookingsErr;
   if (availErr) throw availErr;
+  // Editing an existing booking: ignore its own current row.
+  const bookings = excludeBookingId ? bookingRows.filter((b) => b.id !== excludeBookingId) : bookingRows;
 
   const blockedNights = new Set<string>();
   // Other bookings' occupied nights are widened through THEIR OWN checkout
