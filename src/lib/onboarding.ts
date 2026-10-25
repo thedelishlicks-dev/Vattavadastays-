@@ -35,16 +35,30 @@ export function renewalState(status: string, endIso: string | null, now: Date): 
 }
 
 /**
- * New end date when the owner renews: +30 days from whichever is LATER of
- * today and the current end date. (Renewing early must not shorten the
- * period they already paid for; renewing late starts from today.)
+ * Date `n` calendar months after `d`, keeping the day of the month and clamping to the end of a
+ * shorter month (31 Jan + 1 month = 28/29 Feb). Plain "+30 days" slides about 5 days earlier
+ * every year against monthly billing.
  */
-export function nextRenewalDate(currentEndIso: string | null, now: Date, days = 30): Date {
+export function addCalendarMonths(d: Date, n: number): Date {
+  const r = new Date(d)
+  const day = r.getDate()
+  r.setDate(1)
+  r.setMonth(r.getMonth() + n)
+  const lastDay = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate()
+  r.setDate(Math.min(day, lastDay))
+  return r
+}
+
+/**
+ * New end date when the owner renews: ONE CALENDAR MONTH from whichever is LATER of today and
+ * the current end date. (Renewing early must not shorten the period they already paid for;
+ * renewing late starts from today.)
+ */
+export function nextRenewalDate(currentEndIso: string | null, now: Date, months = 1): Date {
   const base = currentEndIso && new Date(currentEndIso).getTime() > now.getTime()
     ? new Date(currentEndIso)
     : new Date(now)
-  base.setDate(base.getDate() + days)
-  return base
+  return addCalendarMonths(base, months)
 }
 
 // ─── Setup checklist ────────────────────────────────────────────────────────
