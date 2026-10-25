@@ -1,130 +1,113 @@
-# stayidom.in — Handover v9
+# stayidom.in — Handover v10
 
-**Date:** October 2026
-**Supersedes:** v8 (September 2026). v8 is kept, unmodified, at
-`docs/HANDOVER_v8_ARCHIVE.md` — it still holds the Round 6–8 history, the full
-database schema, trigger list, RPC list, RLS policy table and the superadmin
-onboarding flow. This document does **not** repeat those; it describes the app
-*as it is now* and what changed in the October 2026 UX-simplification work.
+**Date:** 25 Oct 2026
+**Code baseline:** `main` at `ce9325f` (Merge PR #421, `Dev`).
+**Supersedes:** v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**.
 
-> **Update 7 Oct 2026 (v9.1):** see §13 for what was fixed after v9, and the
-> **repo drift warning** there — `main` does not yet contain everything this
-> document describes.
->
-> **Update 11 Oct 2026 (v9.6):** see the **v9.6** section at the end — money maths moved
-> into `src/lib/balance.ts`, a security review of the live database (several fixes applied
-> in Supabase, listed there), and loading / scrolling / link fixes. Read it before touching
-> payments, WhatsApp links or anything in `supabase/`.
->
-> Read order for a new person or a new Claude session:
-> **§1 → §3 (rules) → §4 (admin map) → §5 (one-home table)**, then dip into the rest as needed.
-> Also read `AGENTS.md` (stack rules) before writing code.
+> **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code.
 
 ---
 
 ## 1. What this is
 
-stayidom.in is a commission-free booking and property-management SaaS for
-homestays in Kerala's hills, piloting in **Vattavada** (weak Jio/BSNL signal —
-the connectivity stress test). Repo: `github.com/thedelishlicks-dev/Vattavadastays-`.
+stayidom.in is a commission-free booking and property-management platform for homestays in Kerala's hills, piloted in **Vattavada** (weak Jio/BSNL signal — the connectivity stress test).
 
 | Surface | URL | Who | Code entry |
 |---|---|---|---|
-| Marketing landing page | `stayidom.in` (root domain) | Prospective owners | `src/components/LandingPage.tsx` |
+| Marketing landing page | `stayidom.in` (root) | Prospective owners | `src/components/LandingPage.tsx` |
 | Guest booking page | `{subdomain}.stayidom.in` | Guests | `GuestPage` in `src/routes/index.tsx` |
-| Owner admin | `/admin/*` | Property owners | `src/admin/AdminLayout.tsx` + `src/routes/admin.*.tsx` |
+| Owner admin | `/admin/*` | Property owners | `src/admin/AdminLayout.tsx`, `src/routes/admin.*.tsx` |
 | Superadmin | `/superadmin` | Platform operator | `src/routes/superadmin*.tsx` |
 
-**Business snapshot (from v8, re-check `/superadmin` for live truth):** 4 properties
-— Bleaf Mud House (paying), Misty Colina, OriginSoil (trials), Mist Valley Homestay
-(`demo.stayidom.in`). Plans on the landing page: Starter ₹5,000 setup + ₹1,000/mo
-(1–5 rooms) · Growth ₹10,000 + ₹1,500/mo (6–10) · Pro ₹25,000 + ₹2,000/mo (10+).
-Owners collect money directly (UPI / bank / cash); stayidom never touches payments.
+Owners collect money directly (UPI / bank / cash). stayidom never touches payments.
 
 ---
 
-## 2. Orientation (10 minutes)
+## 2. Orientation
 
-**Stack:** Vite 7 + React 19 + TypeScript + TanStack Router **1.166.7 (pinned)** +
-TanStack Query 5 + Supabase (`supabase-js` 2) + Tailwind CSS 4. Static SPA on
-Vercel (`vercel.json` rewrites everything to `index.html`). **No SSR, no server
-code in the repo** (Edge Functions live in Supabase, outside the repo).
+**Stack:** Vite 7 + React 19 + TypeScript + TanStack Router **1.166.7 (pinned)** + TanStack Query 5 + Supabase (`supabase-js` 2) + Tailwind CSS 4.
 
-**Env vars (Vercel):** `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-`VITE_PROPERTY_SUBDOMAIN` (dev fallback), `VITE_SUPERADMIN_EMAIL`.
+**Hosting:** Vercel. The app is a static SPA, plus **Vercel Edge Functions in `api/`** (see below). `vercel.json` rewrites `/` to `api/og`, `/robots.txt` and `/sitemap.xml` to `api/seo`, and everything else (except `/api/*` and `/assets/*`) to `/_shell.html`. `scripts/post-build.mjs` renames `dist/index.html` to `_shell.html` on purpose — see `docs/POLISH_FIVE.md` §2 before changing it.
 
-**Commands:** `npm run dev` · `npm run build` (= `vite build`) · `npm run lint`.
+**Server-side code in the repo (correction to older docs):**
+- `api/og.ts` — link-preview HTML per property (WhatsApp / Instagram / Google).
+- `api/seo.ts` + `api/_lib/seo.ts` — per-host `robots.txt` and `sitemap.xml`.
+- `api/manifest.ts` — dynamic web manifest.
+- `api/ical.ts` — public export of a room's occupied nights ("Reserved" only, no guest data).
+- `api/ical-sync.ts` + `api/_lib/ical.ts` — iCal import (owner-triggered; optional cron). Parked, see §8.
+- `src/supabase/functions/invite-owner/index.ts` — Supabase Edge Function (Deno) for superadmin owner invites. It lives under `src/`, not `supabase/functions/`; see §10.
+- No `createServerFn`, no SSR, no `@supabase/ssr`. Business logic still runs in the browser or in Postgres triggers/RPCs.
 
-**How changes are made in practice:** Claude chat produces files; the owner pastes
-them into GitHub's web editor (often from an iPad Safari), commits to a branch,
-Vercel builds. That workflow is why several rules in §3 exist. A good change
-ships as: new files first, then edited files, each full-file replace.
+**Env vars:**
+- Vercel / local `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PROPERTY_SUBDOMAIN` (dev fallback), `VITE_SUPERADMIN_EMAIL` (used by `src/lib/subdomain.ts`).
+- Edge functions only: `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (optional, for background iCal sync).
+- The superadmin email is **also hard-coded** as `thedelishlicks@gmail.com` in `src/lib/onboarding.ts`, `invite-owner/index.ts` and the database policies/triggers. §10 item 6.
 
-**Tests:** none automated. Verification = `npm run build` + the manual checklists in
-`PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` (see §12); pure logic has a runnable check: `npx tsx scripts/calendarState.check.ts`.
+**Commands:** `npm run dev` · `npm run build` (= `vite build` + `post-build`) · `npm run typecheck` (run **after** build) · `npm test` · `npm run check` · `npm run lint`.
 
-**`routeTree.gen.ts`:** auto-generated by the TanStack Router Vite plugin on every
-build. The copy committed in the repo is **stale** (it has no `admin.agents` or
-`admin.commissions` entries yet both work in production). Ignore it; never
-hand-edit it; a type-check run *before* a build will report false route errors.
-Run `vite build` first, then `tsc`.
+**Tests and CI:** `.github/workflows/ci.yml` runs on every PR and push to `main`/`Dev`: `npm ci`, build, typecheck, `npm test` (`src/lib/*.test.ts`, `tests/api/*.test.ts`), `npm run check` (`scripts/*.check.ts`), and a throw-away Postgres job that applies the migrations twice and runs `supabase/tests/`. Real-device checks are still manual (§12).
+
+**Generated file:** `src/routeTree.gen.ts` is regenerated by every build. The committed copy is stale. Never hand-edit it. A type-check before a build reports false route errors.
+
+**How changes are made:** Claude chat produces files; the owner pastes them into GitHub's web editor (often on an iPad), commits to a branch, Vercel builds. That is why §3 has authoring rules.
 
 ---
 
 ## 3. Rules — do not violate
 
-**Stack (from AGENTS.md / v8, still true):**
-- Never use `createServerFn`, `@tanstack/react-start`, `@supabase/ssr`; never add `shellComponent`/`HeadContent`/`Scripts` to `__root.tsx`; never install router-devtools; never upgrade `@tanstack/react-router`.
+**Stack**
+- Never use `createServerFn`, `@tanstack/react-start`, `@supabase/ssr`; never add `shellComponent`/`HeadContent`/`Scripts` to `__root.tsx`; never upgrade `@tanstack/react-router`.
 - No Google Maps JS SDK (deep links `maps.google.com/?q=lat,lng` only). No video embeds.
-- Auth is client-side (`supabase.auth` + `onAuthStateChange`). `beforeLoad` is **never** for auth — it is used only to *redirect* old URLs (`admin.index`, `admin.pricing`, `admin.commissions`).
-- Read `?property=` (superadmin "manage property") from `window.location.search`, **not** TanStack `useSearch`. Every in-app navigation inside `/admin` must carry it forward (`AdminLayout` and `SectionTabs` do).
+- Auth is client-side. `beforeLoad` is used only to redirect old URLs, never for auth.
+- Read `?property=` from `window.location.search`, not TanStack `useSearch`. In-app links under `/admin` must carry it forward.
 
-**Authoring (because of the paste-into-GitHub workflow):**
-- **Every JSX `<a …>` opening tag stays on ONE line** — GitHub's web editor corrupts multi-line `<a>` attributes. Put long class strings / handlers in consts above the `return`. (Checked across `LandingPage`, `SectionTabs`, `AdminLayout`.)
+**Authoring (paste-into-GitHub workflow)**
+- Every JSX `<a …>` opening tag stays on **one line**.
 
-**Architecture rules added in October 2026:**
-1. **One thing, one home (§5).** Each piece of data has exactly one place where it is edited. Other screens show it read-only and link to the home. Don't add a second editor.
-2. **All writes to `properties.shared_amenities` go through `src/lib/propertyConfig.ts`** (`updateSharedAmenities` / `fetchSharedAmenities` / `withSentinel`). It re-reads the latest column value before writing so a stale cached copy can't wipe another page's config. Never `update({ shared_amenities: … })` from cached data.
-3. **Room price fields live in one component:** `src/components/RoomPricingFields.tsx` (fields + `parsePricing` validation + preview). Used by the Rooms editor. Don't re-create price inputs elsewhere.
-4. **One booking-creation component:** `src/components/AddBookingModal.tsx` (Dashboard, Bookings, Quotes→convert all use it).
-5. **One price calculator for owner-side stays:** `priceRoomStay()` in `src/lib/quoteBuilder.ts` (weekend multiplier + extra guests). Guest booking (`useCreateBooking.ts`) has its own copy of the same loop — see §10, keep them in sync.
-6. **Navigation is data:** sections/tabs are defined only in `src/admin/navConfig.ts`.
-7. **Never claim a feature the app can't back up** on the landing page or in checklist copy (see §8 and `docs/LANDING_PAGE_NOTES.md`).
-8. **Every modal must stay reachable on a phone/iPad:** card = `flex flex-col max-h-[calc(100dvh-2rem)]`, body = `overflow-y-auto`, footer (Save/Cancel) outside the scrolling part. (`BlockDatesModal` shipped without this and its Save button was unreachable on iPad; `PaymentActionModal` had the same weakness.)
-9. **Owner Calendar labels come only from `src/lib/calendarState.ts`** — don't re-derive Booked/Blocked in the page.
-10. **Guest-side code must NEVER read the `bookings` table** — guests (role `anon`) have no SELECT on it, so a query there silently returns nothing (no error). Guests learn what's taken only from the public `availability` table (via `getBlockedDatesForRooms` / `getConflictingDates` in `lib/bookingAvailability.ts`) or from a SECURITY DEFINER RPC. `Rooms.tsx` broke this rule (room cards never showed "Unavailable") until Oct 2026.
-11. **`availability` is a mirror kept in sync by the database,** not by the browser: trigger `trg_mark_booking_nights` marks the nights of every non-cancelled booking (any source). Guests can't write `availability`; don't rely on client-side upserts for correctness.
-
-**Rules added in v9.6 (11 Oct 2026):**
-12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides **overpayment** (a shortened stay after an advance showed "Fully paid" and the refund was invisible). Show `refundDue` when it is > 0. Tests: `npm test` (`src/lib/balance.test.ts`, runs through `npx tsx`, no extra dependency).
-13. **Every guest tracking link must carry the property id:** `guestTrackingUrl(origin, phone, propertyId)`. Without `&property=` the `/booking-status` page shows "booking link needed". Use `booking.property_id` / `group.property_id`.
-14. **"Paid" is derived, never trusted from `bookings.is_paid`.** The stored flag goes stale when extras, discount or dates change after the last payment. The Payments page now derives it with `computeBalance(...).isPaid`.
-15. **Wait for the first fetch, not just `isLoading`.** While the property is still loading, `useBookings(property?.id ?? "")` is disabled, reports `isLoading = false` and returns `[]`. Pages must also wait for `isFetched` once `property?.id` exists (Dashboard, Bookings, Payments, Calendar do) — otherwise the empty/onboarding view flashes, and the Bookings deep link (`?bookingId=` / `?groupId=`) used to be erased before the list arrived.
-16. **Modals:** use `dvh`, not `vh` (`vh` is taller than a phone's visible screen, so Save slid off-screen). A panel with no height cap must have `max-h-[92dvh] overflow-y-auto overscroll-contain`; a flex-col sheet needs `min-h-0` on its scrolling body. Login/loading screens use `min-h-dvh`.
-17. **Security rules (see v9.6 §Security):** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (DB trigger enforces it); owners must not edit billing columns (DB trigger enforces it).
-18. **Superadmin screen logic lives in `src/lib/onboarding.ts`** (statuses incl. `trial`, renewal state, setup checklist, filters, validation, WhatsApp numbers/messages). Don't re-derive "overdue" or "pending" in the page; add a test when adding a rule.
+**Architecture**
+1. **One thing, one home (§5).** Don't add a second editor for the same data.
+2. **All writes to `properties.shared_amenities` go through `src/lib/propertyConfig.ts`** (`updateSharedAmenities` / `fetchSharedAmenities` / `withSentinel`). Never `update({ shared_amenities })` from cached data.
+3. **Room price fields live in `src/components/RoomPricingFields.tsx`.** Seasonal rates live in `RoomRatesEditor.tsx`. Don't create price inputs elsewhere.
+4. **One booking-creation component:** `src/components/AddBookingModal.tsx`.
+5. **One price calculator:** `priceRoomStay()` in `src/lib/quoteBuilder.ts`. It reads room rates via `src/lib/roomRates.ts` (`pickRate`).
+6. **Navigation is data:** `src/admin/navConfig.ts`.
+7. **Never claim a feature the app can't back up** on the landing page or in checklist copy.
+8. **Every modal must stay reachable on a phone/iPad:** card = `flex flex-col max-h-[calc(100dvh-2rem)]`, body = `overflow-y-auto`, footer outside the scrolling part. Use `dvh`, not `vh`.
+9. **Owner Calendar labels come only from `src/lib/calendarState.ts`.**
+10. **Guest-side code must not depend on reading the `bookings` table.** Guests (role `anon`) have no SELECT on it, so the query silently returns nothing. Guests learn what's taken from the public `availability` table or from SECURITY DEFINER RPCs. **Known violation:** `getBlockedDatesForRooms` and `getConflictingDates` in `src/lib/bookingAvailability.ts` also query `bookings`, and guest pages call them. §10 item 1.
+11. **`availability` is a mirror kept in sync by the database,** not by the browser. Trigger `trg_mark_booking_nights` marks nights for every non-cancelled booking. Guests can't write `availability`.
+12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides overpayment. Show `refundDue` when > 0.
+13. **Every guest tracking link carries the property id:** `guestTrackingUrl(origin, phone, propertyId)`.
+14. **"Paid" is derived, never trusted from `bookings.is_paid`.** Use `computeBalance(...).isPaid`.
+15. **Wait for the first fetch, not just `isLoading`.** Pages must also check `isFetched` once `property?.id` exists.
+16. **Modal sizing:** `dvh`. A panel with no height cap needs `max-h-[92dvh] overflow-y-auto overscroll-contain`; flex-col sheets need `min-h-0` on the scrolling body.
+17. **Security:** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; run `01_audit_queries.sql` (query 4) after any DB change that adds a function; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (trigger); owners must not edit billing columns (trigger).
+18. **Superadmin logic lives in `src/lib/onboarding.ts`** (statuses, renewal, setup checklist, filters, validation, WhatsApp numbers/messages). Add a test when adding a rule.
+19. **Guest bookings are priced by the database.** BEFORE INSERT triggers (`enforce_guest_booking_terms`, `enforce_guest_group_terms`, `sync_guest_group_total`) recompute price with `stay_room_price()` for every insert not made by the property's owner, and force `pending`, unpaid, `source='direct'`, a capped hold. `stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` and `supabase/tests/` check this.
+20. **Room rate rules are identical in two places:** `src/lib/roomRates.ts` `pickRate` and SQL `stay_room_price()`. Overlap order: room-specific beats all-rooms, then later start, then newest created.
+21. **iCal sync only deletes rows carrying its own feed's note** (`ical:<feed id>:…`). A failed or non-iCal response is an error, never "calendar is empty". Bookings and manual blocks are never touched.
+22. **Parked features are switched off with flags, not deleted.** `CHANNEL_SYNC_ENABLED` in `src/lib/features.ts` is `false`. Don't remove the code or the `room_ical_feeds` table.
+23. **Sentinel keys** in `shared_amenities`: filter `__` entries before showing tags to guests (§7).
 
 ---
 
 ## 4. Admin app map
 
-Navigation was reduced from 14 items to **6 sections**. No route files were added;
-sections are a layer over the existing routes (`src/admin/navConfig.ts`). Sections with
-2+ tabs show a tab bar under the header (`src/admin/SectionTabs.tsx`).
+Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a section has 2+ tabs (`SectionTabs.tsx`).
 
 | Section | Group | Tabs → route | Notes |
 |---|---|---|---|
-| **Home** | Daily | Home → `/admin/dashboard` | First-run checklist + quick actions |
-| **Calendar** | Daily | `/admin/calendar` | **All rooms** overview (default when 2+ rooms) + per-room view; **Block dates** button. Labels: see §6 |
-| **Bookings** | Daily | Bookings → `/admin/bookings` · Quotes → `/admin/quotes` | |
-| **Money** | Daily | Payments → `/admin/payments` · Agents & Commissions → `/admin/agents` | |
-| **Rooms & Pricing** | Setup | `/admin/rooms` (single page) | Prices edited inside the room editor |
-| **Property** | Setup | Settings `/admin/settings` · Amenities · Meals · Add-ons · Policies | Settings = branding, owner info, location, **Payment setup**, password |
+| **Home** | Daily | Home → `/admin/dashboard` | First-run checklist, quick actions, WhatsApp reminder picker (last month onward) |
+| **Calendar** | Daily | `/admin/calendar` | All-rooms view (default with 2+ rooms) + per-room; Block dates; "Sync with other sites" button **hidden** (flag off) |
+| **Bookings** | Daily | Bookings `/admin/bookings` · Quotes `/admin/quotes` | |
+| **Money** | Daily | Payments `/admin/payments` · Agents & Commissions `/admin/agents` | Agent delete also clears that agent's commission records (migration `20261020…`) |
+| **Rooms & Pricing** | Setup | `/admin/rooms` | Room editor includes **Seasonal rates** |
+| **Property** | Setup | Settings · Amenities · Meals · Add-ons · Policies | Add-ons holds Seasons (add-on/package pricing) |
 
-- **Mobile bottom bar:** Home, Calendar, Bookings, Money, **More** (opens the full menu incl. Rooms & Pricing, Property). Defined in `AdminLayout.tsx` (`BOTTOM_NAV`).
-- **Retired URLs that still work (redirect, keep `?property=`):** `/admin/pricing` → `/admin/rooms`; `/admin/commissions` → `/admin/agents`.
-- **Add a page:** create `src/routes/admin.<name>.tsx`, then add it as a tab (or a section) in `navConfig.ts`. Nothing else.
-- **Untouched on purpose:** `/admin` index (redirects to dashboard), `/admin/login`, `/superadmin`, `/setup` (deprecated, see §11).
+- **Mobile bottom bar:** Home, Calendar, Bookings, Money, More (`BOTTOM_NAV` in `AdminLayout.tsx`).
+- **Retired URLs (redirect, keep `?property=`):** `/admin/pricing` → `/admin/rooms`; `/admin/commissions` → `/admin/agents`.
+- **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking), `/setup` (**unused**, §10), `/test-booking` (**a manual test runner that writes to the live DB**, §10).
+- **Add a page:** create `src/routes/admin.<name>.tsx`, then add a tab or section in `navConfig.ts`.
 
 ---
 
@@ -132,47 +115,43 @@ sections are a layer over the existing routes (`src/admin/navConfig.ts`). Sectio
 
 | Data / action | Edited in | Notes |
 |---|---|---|
-| Room name, type, bed, max guests, photos, **room amenities** | Rooms & Pricing → room editor | |
-| **Room prices** (base, extra guest, weekend multiplier) | Rooms & Pricing → tap the price block on a room card (opens the editor at *Pricing*) | `RoomPricingFields` |
-| **Seasons** (peak/festival periods) | Property → Add-ons (bottom) | They price **add-ons & packages only**, not room rates |
+| Room name, type, bed, max guests, photos, room amenities | Rooms & Pricing → room editor | |
+| Room base prices (base, extra guest, weekend multiplier) | Rooms & Pricing → tap the price block | `RoomPricingFields` |
+| **Seasonal / date-range rates** (fixed ₹ or ±% of base; per room or all rooms) | Rooms & Pricing → room editor → Seasonal rates | `RoomRatesEditor`, table `room_rates` |
+| **Seasons** (peak/festival periods) | Property → Add-ons | Price **add-ons & packages** only |
 | Add-ons & packages | Property → Add-ons | Power the Quote Builder |
 | Shared amenities (tags) | Property → Amenities | Preserves `__` sentinels |
-| Meals info (informational) | Property → Meals | `__meals:` |
-| Check-in/out times, cancellation text, house rules | Property → Policies | `__cancel:` `__rules:` — **not yet shown to guests (§10)** |
-| **UPI ID + accepted payment methods** | Property → Settings → Payment setup | `PaymentSetupSection`; `__upi:` `__pmethods:` |
-| Branding (logo/hero/colours/font), owner info, location, pending-hold hours | Property → Settings | `__theme:` for theme |
-| Block / unblock dates | `BlockDatesModal` — buttons on **Home** and **Calendar** | Same modal, two entrances |
-| Create a booking | `AddBookingModal` — **Home**, **Bookings**, Quotes→convert | |
-| Record a payment (partial/any) | Bookings → booking → Record payment | |
-| **Mark fully paid / correct collected amount** | Money → Payments (`PaymentActionModal`) | Same rules as above (§6) |
-| Agents (add/edit/remove) and **commission owed / mark paid / CSV** | Money → Agents & Commissions | One card per agent |
+| Meals (informational) | Property → Meals | `__meals:` |
+| Check-in/out, cancellation, house rules | Property → Policies | `__cancel:` `__rules:`. Shown to guests (booking form, confirmation, tracking page, invoice) |
+| UPI ID + payment methods | Property → Settings → Payment setup | `__upi:` `__pmethods:` |
+| Branding, owner info, location, pending-hold hours | Property → Settings | `__theme:` |
+| Block / unblock dates | `BlockDatesModal` on Home and Calendar | |
+| Create a booking | `AddBookingModal` on Home, Bookings, Quotes→convert | Extra charges supported |
+| Record a payment | Bookings → booking → Record payment | |
+| Mark fully paid / correct collected amount | Money → Payments (`PaymentActionModal`) | |
+| Agents, commission owed / paid / CSV | Money → Agents & Commissions | |
 
 ---
 
-## 6. Domain rules worth knowing
+## 6. Domain rules
 
-**Money (bookings and booking groups share these fields):**
-- `advance_amount` = **cumulative amount actually received**. `is_paid` must always agree with it (`advance_amount ≥ gross`).
-- Gross = `total_amount` + extras/charges − discount. Balance = gross − `advance_amount`.
-- **Mark fully paid** (Payments page) records the *remaining balance* as a real payment: `advance_amount += balance`, sets method (+ optional reference), `is_paid = true`, confirms a `pending` booking and clears `hold_expires_at`. For a group it also updates child bookings. This mirrors what the Bookings page does.
-- **Correct collected amount** sets `advance_amount` to the amount truly received and derives `is_paid` from it (replaces the old "Mark unpaid" toggle, which flipped the flag and left `advance_amount` behind — leaving "Paid, ₹0 collected" rows).
-- The Payments "Paid / Outstanding" filter uses `is_paid`; a charge added after full payment can leave a "Paid" row with a balance — the row still offers *Mark fully paid*.
+**Money.** `advance_amount` = cumulative amount received; `is_paid` must agree with it. Gross = `total_amount` + charges − discount. Balance = gross − `advance_amount`. "Mark fully paid" records the remaining balance as a payment. "Correct collected amount" sets `advance_amount` directly. A stay shortened after payment shows **Refund due** (not hidden). Discount and advance are **not** auto-adjusted when a stay changes; the owner edits them by hand.
 
-**Commission:** stored per booking, or once on the `booking_groups` row for multi-room agent bookings (member rows are skipped to avoid double counting). Cancelled bookings never count as owed. "Owed" is all-time unpaid, not per month.
+**Commission.** Stored per booking, or once on the `booking_groups` row for multi-room agent bookings. Cancelled bookings never count as owed. Owed = all-time unpaid. Editing a stay scales a percentage agent's commission by the new/old room rate, unless already paid.
 
-**Pricing:** per night = `base_price`, × `weekend_multiplier` on **Fri and Sat nights**; plus `max(0, guests − max_guests) × extra_guest_price × nights`. There is **no per-date price override** any more (code removed Oct 2026; see §9). Seasons affect add-ons/packages only.
+**Pricing (guest and owner paths alike).** Per night: base price, replaced by any matching **seasonal rate** for that night, then × `weekend_multiplier` on Fri and Sat nights, plus extra-guest charge × nights. Guest bookings are re-priced by the database (§3 rule 19), so a browser can't submit a cheap total. Owner bookings and quote conversions keep the price the owner set. Seasons never change room rates.
 
-**Owner Calendar states (`src/lib/calendarState.ts`, pure + tested):** every room/date is exactly one of **Open · Booked · Pending · Check-out · Blocked**. Inputs: `bookings` (nights = check-in inclusive … check-out exclusive) and `availability` rows with `is_available=false` (written by *both* bookings and manual blocks, so they can't tell the two apart on their own). Rules: a booked night → Booked (Pending if unconfirmed); an unavailable row on a booking's own **check-out day** → Check-out (never "Blocked"); unavailable with no booking behind it → Blocked; otherwise Open. **All rooms** view collapses a date to `N free` / **Full** (every room taken) / **Blocked** (every room closed by the owner). Month window is built from local date parts (never `toISOString()`, which dropped the month's last day in India). If bookings can't be loaded (network, or Superadmin viewing a property it doesn't own — RLS) the page shows a warning banner instead of silently mislabelling dates. Run the logic checks with `npx tsx scripts/calendarState.check.ts`.
+**Owner Calendar states** (`src/lib/calendarState.ts`, pure and tested): every room/date is **Open · Booked · Pending · Check-out · Blocked**. A booked night is Booked (Pending if unconfirmed). An unavailable row on a booking's check-out day is Check-out. Unavailable with no booking behind it is Blocked. All-rooms view shows `N free` / **Full** / **Blocked**. Month window uses local date parts (never `toISOString()`). If bookings can't be loaded, the page shows a warning banner.
 
-**Availability / conflicts:** owner "save booking" is disabled while a conflict exists; guest booking re-checks and errors if the room was taken; manual blocks live in `availability`. There is **no database-level exclusion constraint** — two truly simultaneous bookings could in theory both pass the app check (see §11). Since Oct 2026 every booking insert/date-change also marks its nights in `availability` via trigger `trg_mark_booking_nights` (SECURITY DEFINER, marks only, never frees; SQL in `supabase/migrations/20261005000000_sync_availability_on_booking.sql`). Freeing is done by the existing status trigger, the owner-cancel code (`releaseDatesIfUnblocked`) and the scheduled `expire_stale_pending_bookings()` (pending requests hold their dates for `pending_hold_hours`, default 24).
+**Availability and conflicts.** Booking inserts and date changes mark nights in `availability` via `trg_mark_booking_nights`. Freeing happens on cancellation from any status (`free_nights_on_any_cancel`), on the status trigger, and on the 15-minute job `expire_stale_pending_bookings()` (pending holds last `pending_hold_hours`, default 24). A DB exclusion constraint `bookings_no_overlap` (migration `20261008…`, in the 16 Oct baseline) blocks overlapping active stays; the app maps SQLSTATE 23P01 to "Those dates were just booked for this room." Same-day turnover is allowed.
 
 ---
 
 ## 7. Data notes
 
-Full schema, triggers, RPCs and RLS: **`docs/HANDOVER_v8_ARCHIVE.md`**. No schema change was made in this round.
+Full schema, triggers, RPCs and RLS: `supabase/baseline/` (snapshot of the live DB on 16 Oct 2026; `README.md` there gives the rebuild order). Migrations since that snapshot are in `supabase/migrations/`. Only `20261020000000_delete_agent_with_commissions.sql` is newer than the baseline. The file `20261020000000 delete agent with commissions` (with spaces) is an identical duplicate and should be deleted (§10).
 
-`properties.shared_amenities` is `text[]` holding real amenity tags **and** `__prefix:` config entries. All current prefixes:
+`properties.shared_amenities` is `text[]` holding real amenity tags **and** `__prefix:` entries:
 
 | Prefix | Stores | Written by |
 |---|---|---|
@@ -181,243 +160,102 @@ Full schema, triggers, RPCs and RLS: **`docs/HANDOVER_v8_ARCHIVE.md`**. No schem
 | `__upi:` / `__pmethods:` | UPI ID / JSON array of methods | Settings → Payment setup |
 | `__theme:` | Theme choice | Settings |
 
-Rules: filter `__` entries before showing tags to guests; value = `encodeURIComponent(…)`; **write only via `propertyConfig.ts`** (§3.2). The helper narrows but cannot eliminate a race between two devices saving in the same second.
+Rules: filter `__` entries before showing tags to guests; value = `encodeURIComponent(…)`; write only via `propertyConfig.ts`.
 
-`availability.price_override` — column still exists, **nothing reads or writes it** after Phase 4B. Optional cleanup once you're sure: `alter table availability drop column price_override;` (do not do this before 4B is deployed and `select count(*) from availability where price_override is not null` was 0).
-
----
-
-## 8. Public surfaces
-
-**Routing (`src/routes/index.tsx`):** `?slug=` → guest page for that property; root domains (`stayidom.in`, `www`, `*.vercel.app`, `localhost`) → landing page; any other host → guest page for `getSubdomain()`. The landing page is **lazy-loaded** so guests on a property page never download it (guest route chunk 32 KB → 18 KB gzip).
-
-**Landing page (rewritten Oct 2026):** 9 sections, each answering one owner question; Tailwind (no inline styles); native `<details>` for FAQ/compare table; one goal — start a conversation.
-- All wording is in the `CONTENT` block at the top of `LandingPage.tsx`; layout is below it.
-- **`PLATFORM_WHATSAPP`** (top of the file) is **empty** — set it to digits-with-country-code (e.g. `"919XXXXXXXXX"`) to switch every call-to-action to WhatsApp. While empty, CTAs scroll to the form.
-- **`TESTIMONIAL`** is `null` — fill it only with a real, permitted owner quote; the section hides itself otherwise.
-- Form → `submitLead()` (`src/lib/leads.ts`) → `leads` table (public insert RLS). Errors are shown to the visitor (the old page silently showed "thank you" even when saving failed). Hidden honeypot field filters bots. Leads are read in `/superadmin` → Leads tab.
-- Claims on the page were verified against the code; open decisions are listed in **`docs/LANDING_PAGE_NOTES.md`**.
-- Fonts: headings use `font-display` (Fraunces, already loaded app-wide). `index.html` still loads **Playfair Display** only because the *old* landing used it — now safe to remove that one `<link>` (keep Noto Sans Malayalam).
+`availability.price_override` still **exists** in the baseline. Nothing reads or writes it. Drop it only after `docs/DB_CHECKS.sql` query 2 returns 0.
 
 ---
 
-## 9. Change log — October 2026 UX simplification
+## 8. Public surfaces and parked features
 
-Goal: stop overwhelming new owners with multiple routes to the same edit, without losing any function.
+**Routing (`src/routes/index.tsx`):** `?slug=` → guest page; root domains (`stayidom.in`, `www`, `*.vercel.app`, `localhost`) → landing page (lazy-loaded); any other host → guest page for `getSubdomain()`. `lib/prefetch.ts` must mirror this decision (`guestSlugForThisPage()`).
 
-| Phase | What | Key files |
+**Landing page — status:** the rewritten landing page described in earlier handovers (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL` constants) is **not on `main`**. `main` has the old 973-line inline-styles version. Do not remove the Playfair Display `<link>` in `index.html` until the rewrite lands. The copy on `main` shows an invented example booking with a personal name and a sample Malayalam pricing grid; check before it goes live.
+
+**Parked: channel sync (iCal).** Built and tested (`docs/PARKED_FEATURES.md`). Switched off with `CHANNEL_SYNC_ENABLED = false`. The export `/api/ical?room=` is live and harmless. The import (`/api/ical-sync`), the pop-up, and the background cron are not switched on. The migration's cron snippet is commented out. Turn on only where owners sell on other sites too.
+
+**Service worker: deliberately not added** (v9.3). Static assets are cached for a year (`vercel.json`), and guests need live availability. Revisit only with measured evidence.
+
+---
+
+## 9. Change log since v9.7 (what is now in `main`)
+
+| Area | Change | Where |
 |---|---|---|
-| **1** | One pricing component; payment setup moved out of the Payments report into Settings; **Mark fully paid** + **Correct amount** replace the "Mark paid" toggle; Block dates on Calendar; dead hint removed; `shared_amenities` saves made stale-safe | `RoomPricingFields`, `PaymentSetupSection`, `lib/propertyConfig`, `admin.payments/rooms/pricing/calendar/settings/meals/policies/amenities/dashboard` |
-| **2** | 14 nav items → 6 sections + tab bar + new mobile bar (no route changes) | `admin/navConfig.ts`, `admin/SectionTabs.tsx`, `admin/AdminLayout.tsx` |
-| **3** | Guided first-run checklist (essentials → optional, "Next" step, booking-link footer); Settings jump links; "Home"/"Calendar" titles | `admin.dashboard`, `admin.settings`, `admin.calendar` |
-| **4A** | Rooms & Pricing merged (tap price → editor); Seasons → Add-ons; Agents + Commissions merged into one page; old URLs redirect | `admin.rooms/pricing/addons/agents/commissions`, `navConfig` |
-| **4B** | Removed unused per-date price-override code and 4 extra queries per date change | `useCreateBooking`, `AddBookingModal`, `QuoteBuilder`, `RoomDetail`, `admin.bookings`, `admin.calendar`, `lib/quoteBuilder`, `useAvailabilityRange`, `types/database` |
-| **6** | Guest availability fix: room cards on the guest site now use the availability-aware helper (they read `bookings`, which guests can't, so nothing ever showed Unavailable); DB trigger so guest bookings mark their own nights; All-rooms calendar shows `pending` / `check-out` counts | `Rooms.tsx`, `calendarState`, `admin.calendar`, SQL trigger |
-| **5b** | Calendar rewrite: one clear label per date (Booked / Pending / Check-out / Blocked / Open), **All rooms** view with Full, month-end fix, error banner; **Block dates modal and Payments dialog now scroll** so Save is reachable on iPad | `admin.calendar`, `lib/calendarState`, `BlockDatesModal`, `admin.payments` |
-| **5** | Landing page rewrite + lazy load; this handover; checklist wording fix (policy step → optional, no false "guests see this"); single-line `<a>` compliance fix | `LandingPage`, `routes/index`, `admin.dashboard`, `SectionTabs`, `AdminLayout` |
-
-Per-phase test checklists: `PHASE1_CHANGES.md` … `PHASE5_CHANGES.md` and `docs/CALENDAR_FIX.md` (repo root or `docs/`).
-
----
-
-## 10. Known issues / watch points (verified Oct 2026)
-
-**Product gaps found while auditing claims**
-- ~~Cancellation policy and house rules are not shown to guests.~~ **Fixed v9.1:** `GuestPolicies` shows them on the booking form and the confirmation screen and (v9.2) on the guest tracking page and printed on the invoice.
-- **No service worker.** `public/manifest.json` only enables "Add to Home Screen". There is **no offline mode and no PWA asset caching**, although v8's "Network Reality" listed it as a requirement and the old landing page claimed it.
-- **No optimistic updates** anywhere (`onMutate` absent), despite older docs saying "Admin uses optimistic updates".
-- **No agent-facing link/portal.** Agents can't log in or see availability on their own page; owners enter agent bookings. (Guests/agents can see free dates on the public booking page.)
-- **No "owner verified" badge** exists. CSV export exists for the payments and commission ledgers only (not bookings/guests).
-- **Plan tiers aren't enforced.** The landing page's feature matrix differs by plan, but the app gates nothing; DB `subscription_tier` is `'small' | 'large'` while the page sells starter/growth/pro. Decide: enforce, simplify the matrix, or align the DB.
-
-**Data hygiene (availability table)**
-- Until the Oct 2026 trigger, `useCreateBooking` step 5 upserted `availability` from the guest's browser, which RLS refuses (and the result is ignored), so guest bookings could leave their dates looking free to other guests. Verify on any new environment with the read-only diagnostics in `docs/GUEST_AVAILABILITY_FIX.md`; the policy list in §7 of v8 may not match the live database — always check `pg_policies`.
-- `availability` rows are written by booking inserts and manual blocks alike, and the status-change trigger only frees dates for `confirmed → cancelled`. A **pending** booking that is cancelled or whose hold expires can leave orphan `is_available=false` rows, which the Calendar (correctly, given the data) shows as **Blocked**. To list dates nothing explains: see `docs/CALENDAR_FIX.md` (diagnostic SQL). Consider freeing availability for every cancellation/expiry, not just `confirmed → cancelled`.
-- The trigger function `trg_booking_status_change` and other Round 7/8 DB objects were created in the Supabase SQL editor and are **not in `supabase/migrations/`** (that folder holds only `create_leads` and two Round 8 files whose names contain spaces). Export them into versioned migrations.
-
-**Engineering**
-- ~~24 TypeScript errors~~ **Fixed v9.2: `tsc` now reports 0.** Any new error is real — fix it. (`vite build` still doesn't type-check, so run `tsc` after a build.) ESLint output is mostly Prettier noise.
-- ~~`useCreateBooking.ts` duplicated the price loop.~~ **Fixed v9.1:** it now calls `priceRoomStay()` (`scripts/pricing.check.ts` passes in 4 time zones).
-- ~~`admin.payments` chunk ~111 KB gzip (recharts).~~ **Fixed v9.1:** `MiniBarChart` (no library) → ~7 KB gzip. `components/ui/chart.tsx` was deleted in v9.2. `recharts` is still listed in `package.json` (unused, not bundled); remove it with `npm uninstall recharts` from a terminal so `package-lock.json` stays in sync — do not hand-edit only `package.json`.
-- Entry chunk ≈ 156 KB gzip; first-load JS for a guest ≈ 174 KB gzip + 18 KB CSS (measured Oct 2026).
-- ~~Dead `Lead panel.tsx`~~ and duplicate `src/subdomain.ts` — **deleted v9.1** (verified nothing imported them).
-- `useOwnerProperty` key is `['ownerProperty', user?.id, propertySubdomain]`; invalidations use the 2-element prefix `['ownerProperty', user?.id]` (prefix match works). Don't switch to `exact`.
-- Supabase Free tier pauses on inactivity (first request can fail). Superadmin can *view* any property but can't *write* to owner-scoped tables of one it doesn't own (RLS) — test write flows logged in as the real owner.
+| Rates | Seasonal / date-range room rates, live | `room_rates` migration (20261015000000), `RoomRatesEditor`, `roomRates.ts` |
+| Pricing | Guest bookings priced and forced to pending server-side | migration 20261015000100 (in baseline) |
+| Double-booking | Exclusion constraint live; older duplicate index removed | `bookings_no_overlap` |
+| Errors | Client error log on `/superadmin` → Errors | migration 20261009…, `errorLog.ts` |
+| Admin speed | Windowed fetches, `fetchAllRows()` pagination, indexes | migration 20261010…, `paginate.ts` |
+| Agents | Delete agent clears its commission records in one transaction | migration 20261020… |
+| Link previews | `/` → `api/og`; `robots.txt` / `sitemap.xml` per host; dynamic manifest | `api/*`, `vercel.json`, `post-build.mjs` |
+| iCal | Export live; import built and parked | `api/ical*`, `features.ts` |
+| Superadmin | Invite-owner Edge Function, setup checklist, renewal states, search/filter | `invite-owner`, `onboarding.ts` |
+| CI | GitHub Actions: build, typecheck, tests, checks, DB migration tests | `.github/workflows/ci.yml` |
 
 ---
 
-## 11. Backlog (suggested order)
+## 10. Known issues (found in the 25 Oct 2026 audit)
 
-0. **Run the availability trigger + diagnostics** (`docs/GUEST_AVAILABILITY_FIX.md`) if not done, then retest a guest booking end to end.
-1. **Show cancellation policy + house rules to guests** (booking form + confirmation). Then the checklist's policy step can honestly say "guests see this".
-2. **Landing:** set `PLATFORM_WHATSAPP`; get one real owner quote for `TESTIMONIAL`; decide the plan-matrix question (§10); native-speaker review of the Malayalam copy; remove the unused Playfair font link.
-3. **Phase 4B follow-up:** drop `availability.price_override` column (see §7) — check with `docs/DB_CHECKS.sql` query 2 first.
-4. **DB-level double-booking guard** — migration written and tested in v9.2 (`20261008000000_prevent_double_booking.sql`, exclusion constraint; works on the free tier). **Not yet run**: first run `docs/DB_CHECKS.sql` query 1 and resolve any overlaps; the migration also refuses to run if overlaps exist.
-5. ~~Payment guard~~ — **already enforced** in all three paths (booking form, group form, Payments modal). v9.1 also made the group form show save errors instead of silently closing.
-6. ~~Lighter chart on Payments~~ (done v9.1); consider real PWA caching (service worker) *or* keep claims honest.
-7. v8 cleanups still open: delete the `create-owner` Edge Function in the Supabase dashboard **now** (unused — see v9.6 §Security — and public), then the `/setup` route, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token`; commit the Round 8 SQL migrations to `supabase/migrations/` (the two existing files were renamed v9.1 so the Supabase CLI can see them: spaces → underscores, `.sql` added).
-8. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (all from v8 roadmap).
+Items marked **[verified]** were checked in the code. The build and typecheck could **not** be run in the audit sandbox (npm registry unreachable), so §12 must be run locally.
+
+1. **[verified] Guest paths read `bookings`.** `getBlockedDatesForRooms` / `getConflictingDates` (`src/lib/bookingAvailability.ts`) query `bookings`, and guest-facing `Rooms.tsx`, `Availability.tsx`, `useAvailability.ts`, `useCreateBooking.ts`, `stayAvailability.ts` call them. For `anon` that part returns nothing, silently. Correct behaviour depends only on `availability`. Fix: have guest paths use only `availability` (plus an RPC if needed) and keep the `bookings` read for owner screens.
+2. **[verified] Duplicate migration.** `supabase/migrations/20261020000000 delete agent with commissions` is byte-identical to `…_delete_agent_with_commissions.sql`. Delete the spaced one.
+3. **[verified] Dead code:** `src/hooks/useBookingStatus.ts` has no importers and reads `bookings` directly. Delete it.
+4. **[verified] Test route in production:** `src/routes/test-booking.tsx` runs test bookings against the live database. Remove it, or gate it to `import.meta.env.DEV`.
+5. **[verified] Unused `/setup` route** (`src/routes/setup.tsx`), plus the unused DB functions `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token`. Delete after confirming in the live DB.
+6. **[verified] Superadmin email in three places:** `VITE_SUPERADMIN_EMAIL` (`subdomain.ts`), hard-coded `thedelishlicks@gmail.com` (`onboarding.ts`, `invite-owner`, DB policies/triggers). They must agree. Put it in one place (e.g. a `superadmins` table) and make the env var match. README's sample value `admin@stayidom.in` does not match.
+7. **[verified] Two lockfiles:** `package-lock.json` and `bun.lockb` are both committed. Pick one (the CI uses `npm ci`, so keep `package-lock.json`) and delete the other.
+8. **[verified] `recharts` still in `package.json`** and unused. Remove with `npm uninstall recharts` so the lockfile stays in sync.
+9. **[verified] Invite function location:** `invite-owner` lives in `src/supabase/functions/`. The Supabase CLI looks in `supabase/functions/`. Move it, or document why it is in `src/`.
+10. **[verified] No security headers** in `vercel.json` (CSP, `X-Frame-Options`, `Referrer-Policy`).
+11. **Guest tracking link:** the phone number is still the only secret for `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` (v9.6 open item 1). Fix: per-booking random token in the link.
+12. **Public pricing:** the DB now re-prices guest bookings (§3 rule 19). Confirm on the live project that `enforce_guest_booking_terms` is installed (it is in the 16 Oct baseline). Close v9.6 open item 4 after a test booking.
+13. **Landing page on `main` is the old version** (§8). Don't remove the Playfair font until it is replaced.
+14. **Stale `src/routeTree.gen.ts`.** It is regenerated by the build. Consider not committing it, or add it to CI's check.
+15. **Plan tiers not enforced.** The landing page sells Starter / Growth / Pro (₹5,000 / ₹10,000 / ₹25,000 setup). The DB `subscription_tier` allows `'small' | 'large'` only. The app enforces nothing by tier. Decide: enforce, simplify the matrix, or align the DB.
+16. **No optimistic updates** anywhere (`onMutate` absent), despite PRD §3.
+17. **`/superadmin` still has the slide-in load animation** removed from `/admin` in v9.6 (rule 16).
+18. **A booking's room can't be changed in the UI** (Edit Stay for a room inside a group does not update the group total). No UI path reaches it today.
+19. **No "record refund" button.** Lower "Collected so far" on the Payments page instead.
+20. **Supabase Free tier pauses on inactivity.** The first request can fail. Superadmin can view any property but can't write to owner-scoped tables of one it doesn't own (RLS). Test write flows as the real owner.
+
+---
+
+## 11. What's left (suggested order)
+
+**A. Make `main` match this document (cleanup, no new features)**
+1. Run the build, typecheck and tests locally (§12). Fix anything they report.
+2. Items 2, 3, 4, 5, 7, 8 in §10 (delete duplicate migration, dead hook, test route, `/setup` and old functions, one lockfile, `recharts`).
+3. Commit the migrations and DB objects that are live but missing from `supabase/migrations/`: `lookup_*`, `create_property_with_invite`, `link_property_owner`, booking triggers, base-table policies, `trg_mark_booking_nights`, `sync_availability_on_booking` (the 5 Oct file). The baseline holds the text; the migrations folder must hold the history.
+4. Fix §10 item 1 (guest paths reading `bookings`).
+
+**B. Security**
+5. Tracking link token (§10 item 11).
+6. Security headers in `vercel.json`.
+7. Superadmin email in one place (§10 item 6).
+8. Confirm the server-side pricing trigger on the live project with one guest test booking (§10 item 12).
+
+**C. Product**
+9. Land the landing-page rewrite (`PLATFORM_WHATSAPP`, `TESTIMONIAL`, Malayalam review, remove Playfair). Set `PLATFORM_WHATSAPP` to the real number.
+10. Decide plan-tier enforcement (§10 item 15).
+11. Turn on channel sync for Munnar / Alleppey / Varkala (`docs/PARKED_FEATURES.md`), with the cron and secrets, once an owner needs it.
+12. Drop `availability.price_override` after `docs/DB_CHECKS.sql` query 2 returns 0.
+
+**D. Later (from the v8 roadmap)**
+13. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (PRD Phase 5).
 
 ---
 
 ## 12. How to verify a change
 
-1. `npm run build` must pass (also regenerates `routeTree.gen.ts`).
-2. Type-check *after* the build: `npx tsc --noEmit -p tsconfig.json` — expect **0 errors** (since v9.2).
-3. Walk the relevant `PHASE*_CHANGES.md` checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single + group booking), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property" tab switching, guest booking total equals the estimate.
-4. For landing changes: view at 375 px width, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row appears in `leads`.
+1. `npm ci`, then `npm run build` (must pass; regenerates `routeTree.gen.ts`).
+2. `npm run typecheck` — expect 0 errors. Run it after the build.
+3. `npm test` and `npm run check`.
+4. Walk the relevant checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single and group), seasonal rate on a guest booking (total equals the dialog total), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property", guest booking lands as pending and unpaid.
+5. Landing changes: view at 375 px, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row in `leads`.
+6. Link previews: `https://<property>.stayidom.in/?_ogdebug=1` shows each step.
 
 ---
 
-## 13. v9.1 — 7 Oct 2026
-
-**Fixed**
-- **Stale-deploy "Something went wrong" (found on iPad Safari, `demo.stayidom.in/login`).** Cause: a browser with a cached old `index.html` asks for hashed JS chunks that a new deploy deleted; Vercel's catch-all rewrite then served HTML for the missing `.js`. Now: (a) `vite:preloadError` + the error screen auto-reload once (`src/lib/staleBuild.ts`, max 1 per 30 s); (b) `vercel.json` no longer rewrites `/assets/*` or `/api/*` to `index.html`, so missing assets 404 cleanly. Manual workaround for an affected device: Settings → Safari → Advanced → Website Data → delete the site.
-- **Guests now see cancellation policy + house rules** (`src/lib/policies.ts`, `src/components/GuestPolicies.tsx`; wired into `BookingForm`). Hidden when the owner wrote nothing.
-- **Payments page 111 KB → 7 KB gzip** (`src/components/MiniBarChart.tsx`).
-- **Landing page lazy-loaded** → guest route chunk 33 KB → 19 KB gzip. **Vendor chunk split** (`vite.config.ts`): React / Supabase / TanStack cache separately from app code.
-- **One price calculator:** guest booking uses `priceRoomStay()`.
-- **Group payment errors are shown** (and the form stays open) instead of silently closing.
-- Housekeeping: dead files deleted, migration files renamed, `scripts/pricing.check.ts` added.
-
-**New SQL (not yet run — review first):** `supabase/migrations/20261007000000_free_nights_on_any_cancel.sql` frees a booking's nights when it is cancelled from *any* status (fixes orphan "Blocked" dates from cancelled/expired pending requests). Additive; does not replace `trg_booking_status_change`.
-
-**Repo drift warning.** The `main` branch at 7 Oct 2026 did **not** contain: the rewritten landing page (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL`), `docs/HANDOVER_v8_ARCHIVE.md`, `docs/LANDING_PAGE_NOTES.md`, `docs/GUEST_AVAILABILITY_FIX.md`, `PHASE*_CHANGES.md`, or the migration `20261005000000_sync_availability_on_booking.sql`. §8 and parts of §9 describe files that may only exist on your machine / in earlier chats. Either commit them or treat those sections as not yet shipped. `LandingPage.tsx` on `main` is still the old inline-styled version (953 lines) and still uses Playfair Display, so **do not** remove the Playfair `<link>` yet.
-
-**Verified:** `vite build` passes; `tsc` = same 24 baseline errors, no new ones; `calendarState.check.ts` 34/34; `pricing.check.ts` passes in IST/UTC/New York/Auckland. **Not verified:** a real-device pass (iPad Safari + phone) — please walk the checklist in §12 plus: submit a guest booking with a policy written, and record a payment on a multi-room booking.
-
-### v9.2 — 8 Oct 2026
-
-- **Availability trigger verified live:** cancelling a *pending* booking on demo returned its dates to Open. Remaining unexplained blocked dates (Misty Ridge Room, 12–13 Oct 2026) had no booking behind them — treated as manual blocks.
-- **Type check: 24 errors → 0.** Root causes fixed, not suppressed: `useOwnerProperty` and `useBookingGroups` are now typed; `PropertyRow` gained `owner_id` / `owner_email`; `/login` search param is optional; status narrowing in payment saves.
-- **Policies also shown** on the guest tracking page (`booking-status`) and on the printed invoice.
-- **Friendly database errors** (`src/lib/dbErrors.ts`): Supabase errors are plain objects, so `e instanceof Error` showed only "Save failed". Now used by guest booking, `AddBookingModal` and the owner booking forms; a double-booking conflict (SQLSTATE 23P01) reads "Those dates were just booked for this room."
-- **New SQL, tested on a Postgres engine, NOT yet run on Supabase:** `supabase/migrations/20261008000000_prevent_double_booking.sql` (exclusion constraint; aborts safely if overlaps exist; same-day turnover allowed; cancelled bookings ignored).
-- **`docs/DB_CHECKS.sql`:** five read-only diagnostics (overlaps, `price_override` count, unexplained blocks, booking triggers, owner policy completion).
-- Deleted unused `components/ui/chart.tsx`.
-
-**Order to run the new SQL:** (1) `DB_CHECKS.sql` query 1 → must return no rows; (2) the prevent-double-booking migration; (3) test: send two guest requests for the same room/dates from two devices — the second must show the friendly message.
-
-**Still open (needs a decision or input):** landing page rewrite not on `main`; `sync_availability_on_booking` migration (20261005…) not in the repo — export it from Supabase and commit it; plan-tier enforcement; deleting `/setup`, the `create-owner` function and `get_invite_by_token` (**see v9.6: the function is unused and should be deleted first**); optimistic updates / service worker; agent portal; billing.
-
-### v9.3 — Loading performance
-
-Measured on the build output (guest first load = what a visitor to `demo.stayidom.in` downloads): **33 → 14 requests**, same ~191 KB gzip JS. Real-device timings were **not** measured (no browser in the build environment) — check with Chrome DevTools / Lighthouse on a throttled "Slow 4G" profile.
-
-- **Property data starts loading before the page code does** (`lib/prefetch.ts`, called from `main.tsx`): removes one network round-trip from the guest's first load. Only fires on guest pages (`scripts/prefetch.check.ts`). The decision mirrors `routes/index.tsx` `Index` — **if you change how guest vs landing is detected there, change `guestSlugForThisPage()` too.**
-- **Sensible caching** (`lib/queryClient.ts`): `staleTime` 30 s globally (was 0 → refetch on every mount and every app-switch), 60 s for the property. Mutations still invalidate immediately. Trade-off: an owner who edits settings and jumps straight to their own guest page in the same session can see the old version for up to 60 s.
-- **Fewer requests:** all lucide icons in one `vendor-icons` chunk (was ~18 one-icon files).
-- **Images:** room photos and the map load lazily; the hero image is marked high-priority.
-- **Fonts:** one Google Fonts request instead of two, duplicate preconnects removed.
-
-**Service worker — deliberately NOT added.** Static files already carry 1-year `immutable` cache headers (`vercel.json`), so repeat visits don't re-download code; a service worker would add little there. The slow part on weak signal is waiting for *data*, which a service worker can't fix because guests need live availability. It would also add a second cache layer to the exact stale-deploy problem v9.1 fixed. Revisit only if (a) owners need the admin to open with no signal at all, or (b) real measurements show repeat-visit load as the bottleneck. If added: cache-first for `/assets/*` only, network-first for `index.html`, never cache `/api/*` or Supabase responses.
-
-### v9.4 — Error log
-
-Guests' and owners' crashes/failures are now reported to Supabase and shown on **/superadmin → Errors** (grouped: "×14 same error", newest first; filter by 24 h / 7 d / 30 d; "Hide network errors" is on by default because weak-signal "Failed to fetch" is expected; "Clear all" button).
-
-- **Table:** `client_errors` (`supabase/migrations/20261009000000_client_error_log.sql`). Anyone can INSERT; only the superadmin email can SELECT/DELETE. Self-defending because the public can write to it: size CHECK constraints, a trigger that refuses inserts after 1,000 rows/hour, and `purge_old_client_errors()` (30-day retention — schedule with the optional `cron.schedule` line at the bottom of the migration, or use "Clear all").
-- **What gets reported:** uncaught errors and unhandled promise rejections (`installGlobalErrorLogging()` in `main.tsx`); route crashes (the "Something went wrong" screen); real causes of failed guest bookings (previously hidden behind "Booking failed"); unexpected owner save failures (inside `friendlyDbError`). **Not** reported: stale-deploy chunk errors (they self-heal), double-booking conflicts (expected), ResizeObserver/extension/abort noise, anything while offline.
-- **Privacy:** `src/lib/errorLogCore.ts` strips emails, phone numbers, long tokens/UUIDs and URL query strings before anything leaves the browser; only the URL *path* is kept. Tested in `scripts/errorLog.check.ts`. **Do not add guest names, phone numbers or booking details to `context`.**
-- **Never throws, never blocks:** logging is fire-and-forget; each page load sends at most 10 reports and the same error at most once a minute. If the table doesn't exist yet the insert just fails silently.
-- **Version stamp:** every report carries the deploy's git commit (`__APP_VERSION__`, from Vercel's `VERCEL_GIT_COMMIT_SHA`; "dev" locally) so you can tell which release broke.
-- **No regex lookbehind** in the logger (older iPad Safari throws a parse-time SyntaxError on it) — keep it that way; `errorLog.check.ts` enforces it.
-- To log from new code: `logClientError({ source: "booking" | "admin" | ..., error, context: { step: "..." } })` from `@/lib/errorLog`.
-
-### v9.5 — Admin speed
-
-**Problem found:** `useBookings()` and `useBookingGroups()` downloaded *every booking ever made* (each with all its charges, and each group's rooms a second time) on every admin page, and Supabase silently caps one request at 1,000 rows — so a busy property would eventually lose its oldest bookings from the Payments/Agents totals with no error shown.
-
-**Changes** (no screen's numbers or behaviour change, except the one noted below):
-- **Calendar** downloads only the viewed month: stays overlapping the month (`check_in <= month end AND check_out >= month start` — the `>=` matters because the Calendar names the guest leaving on a check-out day), and no charges. In the random test data one month was ~5% of the history (30 of 600 bookings).
-- **Dashboard** downloads from the start of *last month* onward (every figure on it is "this month", "upcoming" or "today"). "Total bookings" and the "has history" flag now come from a count-only request (`useBookingTotal`), so a property in its off-season doesn't look brand new. Standalone bookings are also excluded by `group_id`, so a room of a group can never be double-counted when only part of the data is loaded.
-- **Payments / Agents** keep **all-time** data (their totals are meant to cover the whole business, and Outstanding must include old unpaid balances), but ask for group rooms as ids only (`slim: true`) — they only used the ids and a count.
-- **Pagination** (`src/lib/paginate.ts`): every unbounded fetch now loops until it has all rows. Normal case (< 1,000 rows) is still exactly one request — the first page also asks for the total count.
-- **Indexes** (`supabase/migrations/20261010000000_admin_speed_indexes.sql`): trimmed to the three that were genuinely missing after checking the live index list — `booking_groups(property_id, check_in)`, `bookings(group_id)`, `booking_charges(group_id)`. Idempotent. **Live data is small (89 bookings, 16 groups on 8 Oct 2026), so today this changes nothing you can feel; it is future-proofing.** Verified the planner uses each on a 22,000-row test DB.
-- **Found in the live DB (queries 6/9/10):** `bookings` has TWO identical GiST exclusion indexes — `bookings_no_overlap` (v9.2) and an older `bookings_no_overlapping_active_stays` — so every booking write maintains both. Run `DB_CHECKS.sql` query 9; if both are `x` constraints with the same definition, drop the older one (statement in the file). The app's friendly "just booked" message keys on SQLSTATE 23P01, so it works whichever constraint fires. Also `idx_availability_room_date` duplicates `availability_pkey` (query 10) and can be dropped.
-- `docs/DB_CHECKS.sql` gained query 6 (existing indexes), 7 (table sizes), 9 (exclusion constraints), 10 (redundant indexes) and 8 (RLS policies that call `auth.uid()` per row — a known Postgres slowdown; **no policy was changed blind**, send the output to get a rewrite).
-- `scripts/adminWindow.check.ts`: windowed Calendar == full-history Calendar for every room-day of 36 months (3,285 cells), dashboard figures equal on 7 different "today" dates, and pagination correctness (59 checks).
-
-**One behaviour change to know about:** the Dashboard's "Send WhatsApp reminder" picker now lists bookings from last month onward, not every booking ever (it is fed by the dashboard's windowed list). Reminders are about upcoming stays, but if owners need to message much older guests, give that modal its own query.
-
-**Rules for new code:** never call `useBookings()` / `useBookingGroups()` unwindowed on a screen that doesn't need all-time data; keep query keys starting with `"bookings"` / `"bookingGroups"` (every mutation invalidates by that prefix); anything that lists unbounded rows must go through `fetchAllRows()`.
-
-**Not done / next:** the Bookings page still loads all-time (it needs group room details and supports deep links to old bookings) — window it by its "Upcoming / By month" scope if it ever feels slow, adding a fetch-by-id for deep links; optimistic updates; RLS `(select auth.uid())` rewrite (needs query 8's output).
-
----
-
-### v9.6 — 11 Oct 2026: money maths, links, loading, and a database security review
-
-**Calculations & WhatsApp (code, in the repo)**
-- New `src/lib/balance.ts` is the single source of truth (rule 12). Replaced hand-rolled formulas in: owner booking card + group card + both payment forms, Payments ledger (balance, status, outstanding), Dashboard revenue, tracking page, invoice, UPI card (25% / 50% / remaining), public booking form's suggested advance, `useBookingStatus.ts`, WhatsApp reminders. `whatsapp.ts` still re-exports `paymentDueAmount`.
-- **Overpaid is now visible:** "Refund due ₹X" on the owner card, group card, tracking page and invoice; the WhatsApp text for a settled/overpaid booking no longer says "Payment of fully paid ✓ is pending… Pay ₹0".
-- The invoice now includes the discount (it used to show subtotal minus advance only).
-- `AddBookingModal` has an **Extra charges** section (saved to `booking_charges`); the 25% advance in its WhatsApp message is on room + extras − discount. "Suggested 25%" in Record payment is on the same net total (it used the room total only).
-- Edit Stay: shows new total / refund before saving, warns if the old discount exceeds the new room total, keeps `is_paid` in sync, and **scales the agent's commission** by new/old room rate for percentage agents (not for fixed agents, not once `commission_paid`).
-- **Links:** the booking card's top WhatsApp button, Payment reminder, group reminder and `WhatsAppReminderModal` now pass `property_id` (rule 13). Links already sent from those buttons are broken and must be resent.
-- Dashboard "Needs attention" links keep `?property=`; the Bookings deep link waits for data (rule 15).
-- Scrolling/centering: rule 16 applied to the login pages, `AddBookingModal`, booking/group detail modals and the Edit Stay / Edit Guest / group-guest-edit modals. `admin.tsx`: removed the slide-in animation on the whole admin shell (it made the page jump on load) and a conflicting animation on the spinner.
-
-**Known limits left on purpose:** discount and advance are not auto-adjusted when a stay is shortened (the modal warns; owner edits by hand). There is no "record refund" button — lower "Collected so far" on the Payments page. Edit Stay for a room *inside a group* doesn't update the group total (no UI path reaches it today). `useBookingStatus.ts` is unused and should be deleted.
-
-**Security — what was reviewed and changed in the LIVE Supabase project (10–11 Oct 2026)**
-Files are in `/security` of the review bundle; they were run in the SQL editor and are **not yet in `supabase/migrations/`** (commit them — see Open items).
-| File | What | Status |
-|---|---|---|
-| `00_URGENT_close_create_owner.sql` | `create_owner_auth_user()` was SECURITY DEFINER, callable by `anon`, and never checked its token: anyone with the public anon key could reset any account's password (incl. superadmin) or take over any property. Execute revoked from public/anon/authenticated (also `consume_invite_token`). | applied |
-| `03_storage_policies.sql` | Hero/room image upload+delete limited to the owner's own `<property_id>/` folder (+ superadmin). Buckets already cap size and type; `maps` bucket is unused. | applied |
-| `07_protect_billing_columns.sql` | Trigger: only the superadmin (or server code with no user) may change `subscription_status/tier/end_date`, `setup_fee_paid`, `is_active` on `properties`. | applied |
-| `05_revoke_unneeded_access.sql` | Revoked `TRUNCATE/TRIGGER/REFERENCES` from anon/authenticated. | applied |
-| `02_leads_flood_guard.sql` | Size limits + 200/hour cap on public `leads` inserts. | applied |
-| `09_booking_room_must_match_property.sql` | Trigger: a booking's room must belong to its property (stops one owner blocking another's room). | applied |
-| `10_keep_superadmin_separate.sql` (step 2) | Trigger: the superadmin login can never be set as a property's owner. | applied |
-Also: superadmin password was reset after the above. Row-level security is ON for every table (verified). Policies on bookings/groups/charges/agents/quotes/properties/rooms/availability/add-ons/packages/seasons/leads/client_errors were read and are owner-scoped; `invite_tokens` is locked to nobody (`false`).
-
-**Onboarding reality check (corrects an earlier note):** the live flow is the one in `AGENTS.md` — Add property → Supabase **Invite user** → owner sets password → **Link Owner** (`link_property_owner`). `/setup`, the `create-owner` Edge Function, `get_invite_by_token`, `create_owner_auth_user` and `consume_invite_token` are **not used**. The Edge Function is a public endpoint with the service key; the old code trusted the email/property in the request, so it should be **deleted** (a hardened replacement exists as `create-owner-edge-function.ts` if it is ever needed again).
-
-**Open items (in priority order)**
-1. **Guest tracking page: the phone number is the only secret.** `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` take property id + phone (the property id is in every link and in public room data) and return the whole booking row minus a deny-list of columns. Fix: a random per-booking token in the link (+ allow-list of columns, + limit what a phone-only lookup returns).
-2. ~~Delete the `create-owner` Edge Function~~ — **done 11 Oct 2026.** Still to do in a code cleanup: remove the `/setup` route and `get_invite_by_token`, and drop `create_owner_auth_user` / `consume_invite_token`.
-3. **Commit the live DB objects to `supabase/migrations/`:** the SQL files above, `lookup_*`, `create_property_with_invite`, `link_property_owner`, the booking triggers and the base-table policies. The repo's `create_leads` migration no longer matches the live policy (live checks the superadmin email in the JWT).
-4. Public booking prices are calculated in the browser and not validated by the insert policy (`total_amount`); move pricing to a server-side function.
-5. Hard-coded superadmin email in many policies/triggers; consider a `superadmins` table. Add security headers in `vercel.json`. `handle_booking_status_change` has no `SET search_path`.
-6. Revisit `SECURITY DEFINER` + public `EXECUTE` whenever a function is added: run `01_audit_queries.sql` query 4 after each DB change.
-
----
-
-### v9.7 — 11–12 Oct 2026: superadmin onboarding & control
-
-**Status (12 Oct 2026): live on the Vercel preview and tested.** `invite-owner` is deployed in Supabase. A real test invite worked end to end: email arrived → link opened `/reset-password` → password set → redirected to the login page; the property showed *linked / trial / setup fee pending* on `/superadmin`.
-
-**Bugs fixed on `/superadmin`**
-- New properties start as **`trial`**, but the screen only knew `pending_setup`: trial properties had **no Activate button** and the "Pending setup" counter read 0. Both names now mean the same stage (`SubStatus` in `src/lib/onboarding.ts`; the card is now "On trial").
-- Renewal showed "in -109 days" for an overdue property and it still counted in MRR. It now says "Overdue by N days" (red) with the date, "due soon" under 7 days, and the MRR card shows the overdue amount.
-- **Mark Renewed** used to set renewal to "30 days from now" even when renewing early (shortening the period paid for). It now adds 30 days to the later of today and the current end date, and asks to confirm.
-- Owner WhatsApp links were broken for numbers stored as `+91 …` (the code always prepended 91 → `91919…`). Use `waNumber()` / `waLink()` from `src/lib/onboarding.ts`.
-- Add property / Invite owner modals use `dvh`; subdomain is validated (3–30 chars, not reserved, not already used) and the owner email is validated and can never be the superadmin address.
-
-**New on `/superadmin`**
-- Search box and filter chips (All / Needs action / Trial / Active / Overdue / Suspended, with counts).
-- Per-property **setup checklist** (9 steps: owner linked, rooms, prices, UPI, policies, hero photo, setup fee, activated, first booking) shown as a progress bar on the row; click it to expand. "Needs action" reasons: owner not linked, renewal overdue / due soon, ready to activate.
-- Expanded row also has activity (rooms, bookings, last booking), copyable guest and owner-login links, ready-made WhatsApp messages (dashboard ready, renewal reminder) and an editable **Plan & billing** form (tier, monthly fee, setup fee, private notes → `billing_notes`).
-- **One-click owner invite:** "Invite owner" (unlinked) / "Re-link" (linked) → **Send invite & link** emails the owner a set-password link and links the account in one step; **Link existing account** keeps the old `link_property_owner` path. After "Add property" there is an **Invite owner now** button. Replacing an existing owner needs a confirm tick.
-- Logic is pure and tested: `src/lib/onboarding.ts` + `onboarding.test.ts` (`npm test` now runs both test files).
-
-**`invite-owner` Edge Function** (`supabase/functions/invite-owner/index.ts`, deployed by hand in the Supabase dashboard, "Verify JWT" ON)
-- Security: the gateway only checks that *some* key was sent (the public anon key passes), so the function itself calls `auth.getUser(jwt)` and refuses everyone except the superadmin email. It never resets an existing account's password, refuses the superadmin email as an owner, and is not a public onboarding endpoint (unlike the deleted `create-owner`).
-- It invites via `auth.admin.inviteUserByEmail` with `redirectTo = https://stayidom.in/reset-password` (that page already accepts an invite session and asks for a new password), or just links if the email already has a confirmed login (no email), and **re-sends the invite** if that login was invited but never accepted (lost/expired email), then sets `properties.owner_id`.
-- **One-time Supabase setup:** (1) deploy the function; (2) Authentication → URL Configuration → Redirect URLs: add `https://stayidom.in/reset-password`; (3) Supabase's built-in email sender allows only a few emails per hour — add your own SMTP (Authentication → SMTP) before inviting several owners; the screen shows a clear message when the limit is hit.
-- **Supabase Auth settings that must stay correct:**
-  - **Site URL = `https://stayidom.in`.** It was left on a property address (`bleafmudhouse.stayidom.in`), which is why the first invite email said "invited to create a user on https://bleafmudhouse.stayidom.in/". The email templates print the Site URL. Not a code bug.
-  - **Redirect URLs** must include `https://stayidom.in/reset-password` (used by the invite) and a wildcard such as `https://*.stayidom.in/**` (the owner Settings → "send reset email" button redirects to each property's own subdomain).
-  - **Email template → "Invite user"**: customised wording (subject "You're invited to stayidom.in", button "Set my password", sign-in at stayidom.in/login). Keep `{{ .ConfirmationURL }}` — it is the link. If the template is ever reset, the default text will reappear.
-  - **SMTP:** the built-in sender is limited to a few emails per hour and adds a "powered by Supabase / opt out" footer. Add your own SMTP (Authentication → SMTP) before inviting several owners.
-- **Test invites in a private window / another browser / another device, never in the browser where you are signed in as superadmin.** A browser holds one session per site, so opening the invite link replaces the superadmin login with the new owner's; the open superadmin tab then shows **"Access Denied"** (`superadmin.tsx` guard for non-superadmin sessions). That is expected, not a bug — sign back in at `/admin/login`. Real owners open the email on their own device, so it never happens to them.
-- Test with a throwaway email you control: invite → email arrives → set password → sign in → owner dashboard opens that property. If the function is not deployed the modal says so and points to the Supabase-dashboard route.
-
-**Known limits:** the new screen was type-checked, built and logic-tested but not visually tested in a browser before this note — look at it on a phone and an iPad. Setup-progress numbers come from one request for rooms and one count request per property (fine for dozens of properties; revisit with hundreds). An owner login attached to two properties will see only one dashboard.
-**Housekeeping after testing:** delete the test property (Supabase → Table Editor → `properties`) and its test login (Authentication → Users). There is no delete button in the UI, and I did not confirm that deleting a property cascades to its rooms/bookings — check those tables afterwards. Demo and test properties (Mist Valley "demo", Bleaf Mud House) still count toward MRR / "Needs action" if they are active or ready to activate; a "demo / internal" flag that excludes them is a possible follow-up (set a property's monthly fee to 0 and add a note in the meantime). The `/superadmin` page shell still has the slide-in load animation and `min-h-screen` that were removed from `/admin` in v9.6 (rule 16); apply the same fix if it jumps on load.
-
----
-
-*Supabase project, Edge Function base URL and the v8 notes on onboarding, RLS and RPC grants are in `docs/HANDOVER_v8_ARCHIVE.md`.*
+*Audit method (25 Oct 2026):* repo cloned at `ce9325f`; every doc claim in v9.7, AGENTS.md, README.md and PRD.md was checked against the code, `vercel.json`, the migrations and the 16 Oct baseline. Build and typecheck were not run (npm registry unreachable from the audit sandbox).
