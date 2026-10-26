@@ -1,4 +1,4 @@
-import { Phone, MapPin, MessageCircle, Leaf, ClipboardList } from "lucide-react";
+import { Phone, MapPin, MessageCircle, Leaf } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { telLink } from "@/lib/whatsapp";
 
@@ -103,14 +103,6 @@ export function Footer({ subdomain }: { subdomain: string }) {
                 </a>
               )}
 
-              {/* Track booking — always visible */}
-              <a
-                href={property?.id ? `/booking-status?property=${encodeURIComponent(property.id)}` : "/booking-status"}
-                className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
-              >
-                <ClipboardList className="h-4 w-4" />
-                Track your booking
-              </a>
             </div>
           </div>
         </div>
