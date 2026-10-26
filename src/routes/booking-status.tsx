@@ -27,6 +27,8 @@ export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
   validateSearch: (search: Record<string, unknown>) => ({
     phone: (search.phone as string) ?? "",
+    // Secret tracking token (?t=). Current links carry this instead of a phone number.
+    t: (search.t as string) ?? "",
     // Present on every link generated after this fix (see guestTrackingUrl
     // in lib/whatsapp.ts). Absent on old links sent before this existed —
     // those fall back to the previous cross-property lookup so they don't
@@ -97,10 +99,10 @@ interface BookingStatusEntry {
 }
 
 function BookingStatusPage() {
-  const { phone: prefillPhone, property: propertyIdFilter } = useSearch({ from: "/booking-status" });
+  const { phone: prefillPhone, property: propertyIdFilter, t: trackingToken } = useSearch({ from: "/booking-status" });
 
-  const [phone, setPhone] = useState(prefillPhone ?? "");
-  const [formError, setFormError] = useState("");
+  // Legacy ?phone= links only. Current links carry ?t=<token> instead.
+  const phone = prefillPhone ?? "";
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedBookingIdx, setSelectedBookingIdx] = useState(0);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -122,45 +124,50 @@ function BookingStatusPage() {
   });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["booking-status-lookup", phone, propertyIdFilter],
+    queryKey: ["booking-status-lookup", trackingToken, phone, propertyIdFilter],
     queryFn: async (): Promise<BookingStatusEntry[]> => {
-      const digits = phone.replace(/\D/g, "");
-      const last10 = digits.slice(-10);
-      if (last10.length < 10) throw new Error("Enter a valid 10-digit phone number.");
+      let bookingsRaw: any[] | null = null;
+      let groupsRaw: any[] | null = null;
 
-      // Both lookups go through SECURITY DEFINER functions, not direct
-      // table reads — this table used to have a wide-open anon-read
-      // policy (`using (true)`) so this page could work without a login,
-      // which meant anyone could read every booking, not just their own.
-      // The functions filter by phone + property internally and only ever
-      // return matching rows; see the migration named
-      // fix_public_booking_lookup for the full context.
-      //
-      // Every current entry point (WhatsApp tracking links, the property's
-      // own "Track Booking" nav link) always includes propertyIdFilter. If
-      // it's missing, `enabled: !!propertyIdFilter` below means this query
-      // never even runs — see the dedicated "missing property" screen
-      // instead of a lookup, so no phone number is ever searched across
-      // every property on the platform.
-      const { data: bookingsRaw, error: bookingsErr } = (await supabase.rpc(
-        "lookup_bookings_by_phone",
-        { p_phone: last10, p_property_id: propertyIdFilter },
-      )) as { data: any[] | null; error: { message: string } | null };
+      if (trackingToken) {
+        // Current links (?t=<token>). The token is unguessable, so it is the
+        // only lookup a guest needs. An empty result means a wrong or retired
+        // token. Group tokens return the group row and all of its rooms.
+        const { data: tokenResult, error: tokenErr } = (await supabase.rpc(
+          "lookup_booking_by_token",
+          { p_token: trackingToken },
+        )) as { data: { bookings: any[]; groups: any[] } | null; error: { message: string } | null };
+        if (tokenErr) throw new Error("Could not fetch your booking. Please try again.");
+        bookingsRaw = tokenResult?.bookings ?? [];
+        groupsRaw = tokenResult?.groups ?? [];
+        if (bookingsRaw.length === 0 && groupsRaw.length === 0) {
+          throw new Error("This booking link is no longer valid. Please contact the property.");
+        }
+      } else {
+        // LEGACY ?phone= links sent before tracking tokens existed. Kept for
+        // the 30-day transition only; then the phone functions are revoked
+        // (see the note at the bottom of 20261025020000_tracking_token.sql).
+        const digits = phone.replace(/\D/g, "");
+        const last10 = digits.slice(-10);
+        if (last10.length < 10) throw new Error("Enter a valid 10-digit phone number.");
 
-      if (bookingsErr) throw new Error("Could not fetch bookings. Please try again.");
+        const { data: legacyBookings, error: bookingsErr } = (await supabase.rpc(
+          "lookup_bookings_by_phone",
+          { p_phone: last10, p_property_id: propertyIdFilter },
+        )) as { data: any[] | null; error: { message: string } | null };
+        if (bookingsErr) throw new Error("Could not fetch bookings. Please try again.");
 
-      // Also fetch any group booking rows matching this phone — these hold
-      // the pooled total/discount/advance for multi-room bookings, which
-      // individual `bookings` rows do NOT carry.
-      const { data: groupsRaw, error: groupsErr } = (await supabase.rpc(
-        "lookup_booking_groups_by_phone",
-        { p_phone: last10, p_property_id: propertyIdFilter },
-      )) as { data: any[] | null; error: { message: string } | null };
+        const { data: legacyGroups, error: groupsErr } = (await supabase.rpc(
+          "lookup_booking_groups_by_phone",
+          { p_phone: last10, p_property_id: propertyIdFilter },
+        )) as { data: any[] | null; error: { message: string } | null };
+        if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
 
-      if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
-
-      if ((!bookingsRaw || bookingsRaw.length === 0) && (!groupsRaw || groupsRaw.length === 0)) {
-        throw new Error("No bookings found for this phone number at this property.");
+        bookingsRaw = legacyBookings;
+        groupsRaw = legacyGroups;
+        if ((!bookingsRaw || bookingsRaw.length === 0) && (!groupsRaw || groupsRaw.length === 0)) {
+          throw new Error("No bookings found for this phone number at this property.");
+        }
       }
 
       const groupsById = new Map((groupsRaw ?? []).map((g) => [g.id, g]));
@@ -257,24 +264,12 @@ function BookingStatusPage() {
   });
 
   useEffect(() => {
-    if (prefillPhone) {
+    if (prefillPhone || trackingToken) {
       setHasSearched(true);
       refetch();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleLookup = () => {
-    setFormError("");
-    if (!phone.trim() || phone.replace(/\D/g, "").length < 10) {
-      setFormError("Enter a valid 10-digit phone number");
-      return;
-    }
-    setSelectedBookingIdx(0);
-    setShowInvoice(false);
-    setHasSearched(true);
-    refetch();
-  };
 
   const selected = data?.[selectedBookingIdx];
   const isCancelled = selected?.booking.status === "cancelled";
@@ -320,43 +315,16 @@ function BookingStatusPage() {
           <h1 className="font-display text-2xl font-semibold">
             {linkProperty ? `Track your booking at ${linkProperty.name}` : "Track your booking"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Enter your phone number to check your booking status.
-          </p>
         </div>
 
-        {/* Lookup form */}
-        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Phone number
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              placeholder="+91 98765 43210"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use the same number you used when booking.
+        {!trackingToken && !prefillPhone && (
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <p className="text-sm text-muted-foreground">
+              Open the tracking link sent to you on WhatsApp, or use the "Track booking status"
+              button on your booking confirmation, to see your booking.
             </p>
           </div>
-          {formError && <p className="text-xs text-destructive">{formError}</p>}
-          <button
-            onClick={handleLookup}
-            disabled={isLoading}
-            className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-            {isLoading ? "Looking up…" : "Track booking"}
-          </button>
-        </div>
+        )}
 
         {/* Error */}
         {hasSearched && error && !isLoading && (

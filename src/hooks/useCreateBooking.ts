@@ -6,6 +6,7 @@ import { fetchRoomRates } from "@/hooks/useRoomRates";
 import { EXTRA_GUEST_ALLOWANCE } from "@/lib/guestCount";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
+import { newTrackingToken } from "@/lib/trackingToken";
 
 /**
  * A random UUID for rows the browser creates itself. crypto.randomUUID() is
@@ -69,6 +70,8 @@ export interface CreateBookingResult {
   totalAmount: number;
   rooms: RoomBookingResult[];
   nights: number;
+  /** Secret tracking-link token, shown to the guest in their link. */
+  trackingToken: string;
 }
 
 export function useCreateBooking() {
@@ -202,6 +205,9 @@ export function useCreateBooking() {
       // owner-side AddBookingModal, so an abandoned guest booking doesn't
       // block these dates forever either. See pendingHoldExpiry() docs.
       const holdExpiresAt = pendingHoldExpiry(input.propertyPendingHoldHours ?? undefined);
+      // One token per submission, shared by the group row and every room row,
+      // so one link opens the whole stay.
+      const trackingToken = newTrackingToken();
 
       // IMPORTANT — anonymous guests may INSERT bookings but have no SELECT on
       // `bookings` / `booking_groups` (HANDOVER rule 10). A PostgREST insert that
@@ -219,6 +225,7 @@ export function useCreateBooking() {
           .from("booking_groups")
           .insert({
             id: groupId,
+            tracking_token: trackingToken,
             property_id: input.propertyId,
             group_reference: groupRef,
             guest_name: input.guestName,
@@ -246,6 +253,7 @@ export function useCreateBooking() {
         const pricing = roomPrices[idx];
         return {
           id: newId(),
+          tracking_token: trackingToken,
           property_id: input.propertyId,
           room_id: ri.roomId,
           guest_name: input.guestName,
@@ -309,6 +317,7 @@ export function useCreateBooking() {
       return {
         bookingId: firstBookingId,
         groupRef: displayRef,
+        trackingToken,
         totalAmount: grandTotal,
         rooms: roomResults,
         nights,

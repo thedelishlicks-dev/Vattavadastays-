@@ -11,6 +11,7 @@ import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar"
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
+import { newTrackingToken } from "@/lib/trackingToken";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
@@ -280,12 +281,14 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       // "confirmed" bookings never expire.
       const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry(property.pending_hold_hours ?? undefined) : null;
       let createdBookingId = "";
+      const trackingToken = newTrackingToken();
       let createdGroupId = "";
 
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
         const { data: inserted, error: err } = await supabase.from("bookings").insert({
           property_id: propertyId, room_id: rt.room.id,
+          tracking_token: trackingToken,
           guest_name: form.guest_name, guest_phone: form.guest_phone,
           guest_email: form.guest_email || null, guest_count: rt.guests,
           check_in: form.check_in, check_out: form.check_out,
@@ -314,6 +317,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           .from("booking_groups")
           .insert({
             property_id: propertyId,
+            tracking_token: trackingToken,
             group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
             guest_name: form.guest_name, guest_phone: form.guest_phone,
             guest_email: form.guest_email || null, guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : sumGuests(guestSplit),
@@ -338,7 +342,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           check_in: form.check_in, check_out: form.check_out,
           room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
-          status: form.status, is_paid: false, group_id: groupData.id,
+          status: form.status, is_paid: false, group_id: groupData.id, tracking_token: trackingToken,
           source: form.source,
           agent_id: isAgentBooking ? form.agent_id : null,
           commission_amount: null,
@@ -388,7 +392,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       const guestPhoneDigits = form.guest_phone.replace(/\D/g, "");
       const ownerPhone = property.owner_phone ?? property.owner_whatsapp ?? "";
       if (guestPhoneDigits.length >= 10 && property.name) {
-        const trackingUrl = guestTrackingUrl(window.location.origin, form.guest_phone, propertyId);
+        const trackingUrl = guestTrackingUrl(window.location.origin, trackingToken, propertyId);
         const roomName = selectedRooms.map((r) => r.name).join(", ");
         const waLink =
           form.status === "confirmed"
