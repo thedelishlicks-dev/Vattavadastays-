@@ -13,6 +13,8 @@ interface Booking {
   id: string;
   guest_name: string;
   guest_phone: string;
+  /** Secret tracking-link token; the WhatsApp link is built from it. */
+  tracking_token?: string | null;
   check_in: string;
   check_out: string;
   total_amount: number;
