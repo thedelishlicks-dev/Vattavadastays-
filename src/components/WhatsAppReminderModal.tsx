@@ -13,6 +13,8 @@ interface Booking {
   id: string;
   guest_name: string;
   guest_phone: string;
+  /** Secret tracking-link token; the WhatsApp link is built from it. */
+  tracking_token?: string | null;
   check_in: string;
   check_out: string;
   total_amount: number;
@@ -72,7 +74,7 @@ function buildMessage(
         checkIn,
         checkOut,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
       });
 
     case "reminder":
@@ -96,7 +98,7 @@ function buildMessage(
         propertyName: prop,
         upiId: property.upiId ?? undefined,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.guest_phone, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
       });
     }
 

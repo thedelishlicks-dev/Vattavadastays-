@@ -29,9 +29,11 @@ function link(phone: string, text: string): string {
  * only for backward compatibility with old links already sent before this
  * param existed; those still work, just without the scoping/branding.
  */
-export function guestTrackingUrl(origin: string, guestPhone: string, propertyId?: string): string {
-  const propertyParam = propertyId ? `&property=${encodeURIComponent(propertyId)}` : "";
-  return `${origin}/booking-status?phone=${encodeURIComponent(guestPhone)}${propertyParam}`;
+export function guestTrackingUrl(origin: string, trackingToken: string | null | undefined, propertyId?: string): string {
+  const params: string[] = [];
+  if (trackingToken) params.push(`t=${encodeURIComponent(trackingToken)}`);
+  if (propertyId) params.push(`property=${encodeURIComponent(propertyId)}`);
+  return `${origin}/booking-status${params.length ? "?" + params.join("&") : ""}`;
 }
 
 /** Guest taps "Book via WhatsApp" on the guest page */

@@ -21,6 +21,8 @@ export interface Confirmation {
   phone: string;
   bookingId: string;
   groupRef: string | null;
+  /** Missing on confirmations saved before tracking tokens existed. */
+  trackingToken?: string | null;
   ownerNotifyLink: string | null;
   rooms: { name: string; total: number }[];
   checkIn: string;
