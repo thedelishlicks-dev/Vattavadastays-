@@ -24,7 +24,7 @@
 | 5+ properties onboarded within 3 months | 🟡 four properties exist: Bleaf Mud House (paying), Misty Colina and OriginSoil (trial), Mist Valley (demo). Check `/superadmin` for live numbers. |
 | Each property live at `{slug}.stayidom.in` within 10 minutes of setup | 🟡 The superadmin flow exists (add → invite → manage → activate). Not timed on a real onboarding yet. |
 | Guest booking completes on 2G | 🟡 Data loads reduced (v9.3). Not measured on a real 2G device. |
-| Zero data leaks between properties (RLS audit) | 🟡 Security review done 10–11 Oct 2026 and several fixes applied. Open: tracking-link token (§4.1). |
+| Zero data leaks between properties (RLS audit) | 🟡 Security review done 10–11 Oct 2026 and several fixes applied. Tracking-link token done 26 Oct 2026; legacy phone lookups to be revoked after 30 days (§4.1). |
 | Owner manages bookings from mobile on slow connection | 🟡 Mobile layout done. No optimistic updates yet. |
 
 ---
@@ -66,11 +66,11 @@
 - ✅ Confirmation screen with summary and booking reference (`#XXXXXXXX`), no PDF.
 - ✅ "Notify owner" and "Book via WhatsApp" deep links with the booking details pre-filled.
 - ✅ Cancellation policy and house rules shown on the booking form, confirmation, tracking page and printed invoice.
-- ✅ Booking-status (tracking) page: guest enters phone, sees their booking. **Open:** the phone number is the only secret (see below).
+- ✅ Booking-status (tracking) page: guest opens the link from the confirmation card or WhatsApp. The link carries a secret token; there is no phone search. Legacy `?phone=` links work until the 30-day window closes.
 - ✅ Static map image and "Get Directions" (Google and Apple deep links).
 - ✅ SEO: per-property `<title>`, description, Open Graph, JSON-LD (`schema.org/LodgingBusiness`), `robots.txt` and `sitemap.xml` per host (`api/og.ts`, `api/seo.ts`).
 - 🟡 **Prerendering** was planned (vite-plugin-prerender). Not used: link previews come from an Edge Function (`api/og.ts`) instead. Crawlers see the injected tags.
-- ⬜ **Tracking-link token:** replace phone-only lookup with a per-booking random token in the link.
+- ✅ **Tracking-link token:** random token per booking/group in the link (26 Oct 2026). ⬜ Revoke legacy phone lookups after 30 days.
 
 **WhatsApp booking flow (guest-initiated):** unchanged. Guest taps "Book via WhatsApp" or submits the form, the owner confirms in WhatsApp and records the booking in the dashboard. No payment gateway. The owner collects UPI or cash directly.
 
@@ -142,7 +142,7 @@
 - ✅ Owners can't change billing columns; the superadmin email can't own a property.
 - ✅ Public lead inserts are size-limited and rate-limited.
 - ⬜ Security headers in `vercel.json`.
-- ⬜ Tracking-link token (§4.1).
+- ✅ Tracking-link token (§4.1). ⬜ Revoke legacy phone lookups (30 days).
 - ⬜ Pricing or RLS test in CI against the live policies — the CI DB job uses a stub, not the live project.
 
 ---
@@ -188,7 +188,7 @@ No WhatsApp Business API in V1. `wa.me` deep links only: free, instant, no appro
 
 **Rules:**
 - Phone numbers: `+91…` and `0…` forms are normalised to `91…` (`waNumber()` / `src/lib/whatsapp.ts`).
-- Tracking links include the property id; links sent before v9.6 are broken and must be resent.
+- Tracking links carry a token and the property id. Links with a phone number (sent before 26 Oct 2026) keep working for 30 days, then the owner must resend them.
 
 **V2:** WhatsApp Business API (Meta) for sending without the guest starting the chat. Needs Meta Business verification. ⬜
 

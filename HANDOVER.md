@@ -77,7 +77,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 10. **Guest-side code must not read the `bookings` table.** Guests (role `anon`) have no SELECT on it, so the query silently returns nothing. Guests get booked dates from `room_booked_ranges(p_room_ids, p_from, p_to)` (migration `20261025000000_room_booked_range.sql`), which returns only id, room, check-in and check-out, and from the public `availability` table. `getBlockedDatesForRooms` and `getConflictingDates` in `src/lib/bookingAvailability.ts` use the function. Owner-only screens may still read `bookings` directly (e.g. `releaseDatesIfUnblocked`).
 11. **`availability` is a mirror kept in sync by the database,** not by the browser. Trigger `trg_mark_booking_nights` marks nights for every non-cancelled booking. Guests can't write `availability`.
 12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides overpayment. Show `refundDue` when > 0.
-13. **Every guest tracking link carries the property id:** `guestTrackingUrl(origin, phone, propertyId)`.
+13. **Every guest tracking link carries a secret token and the property id:** `guestTrackingUrl(origin, trackingToken, propertyId)` builds `/booking-status?t=<token>&property=<id>`. The browser generates the token for each booking submission (`src/lib/trackingToken.ts`), and every room in a group shares the group's token. Never build a link from a phone number.
 14. **"Paid" is derived, never trusted from `bookings.is_paid`.** Use `computeBalance(...).isPaid`.
 15. **Wait for the first fetch, not just `isLoading`.** Pages must also check `isFetched` once `property?.id` exists.
 16. **Modal sizing:** `dvh`. A panel with no height cap needs `max-h-[92dvh] overflow-y-auto overscroll-contain`; flex-col sheets need `min-h-0` on the scrolling body.
@@ -107,7 +107,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 
 - **Mobile bottom bar:** Home, Calendar, Bookings, Money, More (`BOTTOM_NAV` in `AdminLayout.tsx`).
 - **Retired URLs (redirect, keep `?property=`):** `/admin/pricing` → `/admin/rooms`; `/admin/commissions` → `/admin/agents`.
-- **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking). `/setup` and `/test-booking` were removed in Oct 2026.
+- **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking: token links, plus legacy `?phone=` links until the 30-day revoke). `/setup` and `/test-booking` were removed in Oct 2026.
 - **Add a page:** create `src/routes/admin.<name>.tsx`, then add a tab or section in `navConfig.ts`.
 
 ---
@@ -207,10 +207,10 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 5. **[PARTLY DONE 25 Oct 2026] Unused `/setup` route** removed. **Still open:** drop the unused DB functions `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token` in the live project, after confirming nothing calls them.
 6. **[verified] Superadmin email in three places:** `VITE_SUPERADMIN_EMAIL` (`subdomain.ts`), hard-coded `thedelishlicks@gmail.com` (`onboarding.ts`, `invite-owner`, DB policies/triggers). They must agree. Put it in one place (e.g. a `superadmins` table) and make the env var match. README's sample value `admin@stayidom.in` does not match.
 7. **[DONE 25 Oct 2026] Two lockfiles:** `bun.lockb` deleted; `package-lock.json` is the only lockfile.
-8. **[verified, still open] `recharts` in `package.json`** and unused. Remove with `npm uninstall recharts` so the lockfile stays in sync.
+8. **`recharts` in `package.json`: not removed, not bundled.** Unused by the app and not in the build. Removing it needs `npm uninstall recharts`, which the current workflow can't run; leave it until a terminal is available.
 9. **[DONE 25 Oct 2026] Invite function location:** moved to `supabase/functions/invite-owner/`; the old `src/` copy was deleted.
 10. **[DONE 25 Oct 2026] Security headers** added to `vercel.json` (`nosniff`, referrer policy, `X-Frame-Options: SAMEORIGIN`, permissions policy, HSTS). **No CSP yet** — needs testing against Google Fonts, Supabase and inline styles first.
-11. **Guest tracking link:** the phone number is still the only secret for `lookup_bookings_by_phone` / `lookup_booking_groups_by_phone` (v9.6 open item 1). Fix: per-booking random token in the link.
+11. **[done, 26 Oct 2026] Guest tracking link:** random token per booking/group (`tracking_token`; migrations `20261025020000_tracking_token.sql` and `20261025030000_tracking_token_group_members.sql`). `lookup_booking_by_token` is the guest lookup. Phone lookups remain only for legacy `?phone=` links until the revoke (see §11).
 12. **Public pricing:** the DB now re-prices guest bookings (§3 rule 19). Confirm on the live project that `enforce_guest_booking_terms` is installed (it is in the 16 Oct baseline). Close v9.6 open item 4 after a test booking.
 13. **Landing page on `main` is the old version** (§8). Don't remove the Playfair font until it is replaced.
 14. **Stale `src/routeTree.gen.ts`.** It is regenerated by the build. Consider not committing it, or add it to CI's check.
@@ -228,12 +228,12 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 
 **A. Make `main` match this document (cleanup, no new features)**
 1. Run the build, typecheck and tests locally (§12). Fix anything they report.
-2. Still open from §10: item 8 (`recharts`) and the DB function drop in item 5.
+2. Still open from §10: item 8 (`recharts`: not removed, not bundled). Item 5 is done: DB functions dropped, `/setup` removed.
 3. Commit the migrations and DB objects that are live but missing from `supabase/migrations/`: `lookup_*`, `create_property_with_invite`, `link_property_owner`, booking triggers, base-table policies, `trg_mark_booking_nights`, `sync_availability_on_booking` (the 5 Oct file). The baseline holds the text; the migrations folder must hold the history.
 4. ~~Fix §10 item 1~~ — done (rule 10).
 
 **B. Security**
-5. Tracking link token (§10 item 11).
+5. Revoke the phone lookups (`lookup_bookings_by_phone`, `lookup_booking_groups_by_phone`) and remove the legacy `?phone=` branch from `booking-status.tsx` after the 30-day window (about late November 2026).
 6. Security headers: done (§10 item 10). CSP still to do.
 7. Superadmin email in one place (§10 item 6).
 8. Confirm the server-side pricing trigger on the live project with one guest test booking (§10 item 12).
