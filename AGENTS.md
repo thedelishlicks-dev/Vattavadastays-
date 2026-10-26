@@ -298,7 +298,7 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - **Never** hand-roll `total + extras − discount − advance` or `Math.max(0, …)`. Overpayment must show as **Refund due**.
 - **Methods:** "UPI", "Bank Transfer", "Cash on Arrival".
 - **UPI flow:** guest taps Pay → `upi://` deep link → pays in their app → sends screenshot to owner on WhatsApp.
-- **Tracking links** must include the property id: `guestTrackingUrl(origin, phone, propertyId)`.
+- **Tracking links** carry a secret token and the property id: `guestTrackingUrl(origin, trackingToken, propertyId)`. Never build one from a phone number. Legacy `?phone=` links work only until the 30-day revoke.
 - **Notifications:** guests notify the owner via WhatsApp deep link after booking. Owners send reminders via WhatsApp deep links from booking details.
 
 ---
@@ -330,8 +330,8 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - [x] CI: build, typecheck, unit tests, behaviour checks, DB migration tests
 - [x] Guest paths read booked dates via `room_booked_ranges()`, not `bookings`
 - [x] Cleanup: duplicate migration, dead hook, test route, `/setup`, lockfile, invite function location
-- [ ] Cleanup: `recharts`, old DB functions
-- [ ] Tracking-link token (replace phone-only lookup)
+- [x] Cleanup: old DB functions (`recharts`: not removed, not bundled)
+- [x] Tracking-link token (replace phone-only lookup). Revoke legacy phone lookups after 30 days.
 - [x] Security headers in `vercel.json` (no CSP yet)
 - [ ] Landing page rewrite on `main`
 - [ ] Edit Stay date picker matches the app calendar (HANDOVER §10 item 21)
