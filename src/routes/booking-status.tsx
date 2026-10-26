@@ -101,8 +101,8 @@ interface BookingStatusEntry {
 function BookingStatusPage() {
   const { phone: prefillPhone, property: propertyIdFilter, t: trackingToken } = useSearch({ from: "/booking-status" });
 
-  const [phone, setPhone] = useState(prefillPhone ?? "");
-  const [formError, setFormError] = useState("");
+  // Legacy ?phone= links only. Current links carry ?t=<token> instead.
+  const phone = prefillPhone ?? "";
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedBookingIdx, setSelectedBookingIdx] = useState(0);
   const [showInvoice, setShowInvoice] = useState(false);
@@ -271,18 +271,6 @@ function BookingStatusPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLookup = () => {
-    setFormError("");
-    if (!phone.trim() || phone.replace(/\D/g, "").length < 10) {
-      setFormError("Enter a valid 10-digit phone number");
-      return;
-    }
-    setSelectedBookingIdx(0);
-    setShowInvoice(false);
-    setHasSearched(true);
-    refetch();
-  };
-
   const selected = data?.[selectedBookingIdx];
   const isCancelled = selected?.booking.status === "cancelled";
   const currentStep = selected ? getStepIndex(selected.booking.status) : -1;
@@ -327,43 +315,16 @@ function BookingStatusPage() {
           <h1 className="font-display text-2xl font-semibold">
             {linkProperty ? `Track your booking at ${linkProperty.name}` : "Track your booking"}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Enter your phone number to check your booking status.
-          </p>
         </div>
 
-        {/* Lookup form */}
-        <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-muted-foreground mb-1">
-              Phone number
-            </label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleLookup()}
-              placeholder="+91 98765 43210"
-              className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use the same number you used when booking.
+        {!trackingToken && !prefillPhone && (
+          <div className="bg-card border border-border rounded-2xl p-5">
+            <p className="text-sm text-muted-foreground">
+              Open the tracking link sent to you on WhatsApp, or use the "Track booking status"
+              button on your booking confirmation, to see your booking.
             </p>
           </div>
-          {formError && <p className="text-xs text-destructive">{formError}</p>}
-          <button
-            onClick={handleLookup}
-            disabled={isLoading}
-            className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4" />
-            )}
-            {isLoading ? "Looking up…" : "Track booking"}
-          </button>
-        </div>
+        )}
 
         {/* Error */}
         {hasSearched && error && !isLoading && (
