@@ -188,7 +188,10 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
           <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
         </div>
 
-        {confirmation && (
+        {/* Full "Request sent" card: for the booking just made, or after a reload
+            when no rooms are selected. A different selection gets the compact
+            strip instead, so an old request never looks like a new one. */}
+        {confirmation && (!hasSelection || justBooked) && (
           <ConfirmationCard
             confirmation={confirmation}
             property={property}
@@ -196,6 +199,10 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
             onDismiss={dismissConfirmation}
             showDismissLabel={justBooked ? "Book another stay" : "Dismiss"}
           />
+        )}
+
+        {confirmation && hasSelection && !justBooked && (
+          <RecentBookingStrip confirmation={confirmation} onDismiss={dismissConfirmation} />
         )}
 
         {!hasSelection && !confirmation && (
@@ -391,6 +398,33 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
  * "Request sent!" — drawn ONLY from the saved snapshot (never from the current room
  * selection), so changing dates or reloading the page cannot alter or lose it.
  */
+/** Compact reminder of the guest's most recent booking, shown above a new selection. */
+function RecentBookingStrip({ confirmation: c, onDismiss }: {
+  confirmation: Confirmation;
+  onDismiss: () => void;
+}) {
+  const ref = c.groupRef ?? `#${c.bookingId.slice(0, 8).toUpperCase()}`;
+  const trackingUrl = guestTrackingUrl(window.location.origin, c.trackingToken, c.propertyId);
+  return (
+    <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+      <div className="min-w-0">
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">Your recent booking</div>
+        <div className="font-medium">
+          <span className="font-mono">{ref}</span> · {c.checkIn} → {c.checkOut}
+        </div>
+      </div>
+      <div className="flex items-center gap-3">
+        <a href={trackingUrl} className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline">
+          <ExternalLink className="h-3.5 w-3.5" /> Track
+        </a>
+        <button type="button" onClick={onDismiss} className="text-xs text-muted-foreground underline hover:text-foreground">
+          Dismiss
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ConfirmationCard({
   confirmation: c,
   property,
