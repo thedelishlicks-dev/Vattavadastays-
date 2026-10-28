@@ -80,6 +80,17 @@ export function advanceAmount(netTotal: number): number {
 }
 
 /**
+ * Is the money received enough to CONFIRM a pending booking? Yes once the total
+ * received reaches the 25% advance on the net total. A token ₹1 payment (or a
+ * part payment below the advance) records the money but leaves the booking
+ * pending; the owner can still confirm by hand. Nothing received never confirms.
+ */
+export function meetsConfirmationAdvance(netTotal: number, advanceTotal: number): boolean {
+  const received = Math.max(0, num(advanceTotal));
+  return received > 0 && received >= advanceAmount(netTotal);
+}
+
+/**
  * What to ask the guest to pay next: 25% advance if nothing is paid yet,
  * otherwise whatever is left. Never negative.
  */
