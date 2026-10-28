@@ -17,18 +17,34 @@ import { setBookingStatus, cancelBooking, setGroupStatus, cancelGroup, setGroupD
 import { useQueryClient } from "@tanstack/react-query";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { useRoomRates } from "@/hooks/useRoomRates";
-import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl } from "@/lib/whatsapp";
+import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl, clean } from "@/lib/whatsapp";
+import { SendConfirmationPrompt, type ConfirmationPromptData } from "@/components/SendConfirmationPrompt";
 import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
-import { computeBalance } from "@/lib/balance";
+import { computeBalance, meetsConfirmationAdvance, advanceAmount } from "@/lib/balance";
 
 export const Route = createFileRoute("/admin/bookings")({
   component: BookingsAdmin,
 });
+
+type OwnerProperty = ReturnType<typeof useOwnerProperty>["data"];
+
+/** The wa.me link that sends a single booking's confirmation (with the tracking link) to the guest. */
+function bookingConfirmHref(booking: Booking, roomName: string, property: OwnerProperty): string | null {
+  if (!property || !booking.guest_phone) return null;
+  return confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property.name, roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) });
+}
+
+/** Same for a multi-room group: one message listing every room, with the group's tracking link. */
+function groupConfirmHref(group: BookingGroup, roomNameMap: Record<string, string>, property: OwnerProperty): string | null {
+  if (!property || !group.guest_phone) return null;
+  const names = (group.bookings ?? []).map((b) => roomNameMap[b.room_id] ?? "Room");
+  return confirmationLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property.name, roomName: names.length > 0 ? names.join(", ") : "your rooms", roomLabel: names.length > 1 ? "Rooms" : "Room", checkIn: group.check_in, checkOut: group.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, group.tracking_token, group.property_id) });
+}
 
 const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
@@ -316,12 +332,14 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
 
 type GroupModalTab = "overview" | "charges" | "invoice";
 
-function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefresh }: {
+function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefresh, onConfirmed }: {
   group: BookingGroup;
   roomNameMap: Record<string, string>;
   property: ReturnType<typeof useOwnerProperty>["data"];
   onClose: () => void;
   onRefresh: () => void;
+  /** Called once the group has been saved as confirmed, so the page can offer to send the confirmation. */
+  onConfirmed: (group: BookingGroup) => void;
 }) {
   const [tab, setTab] = useState<GroupModalTab>("overview");
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -351,6 +369,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
       queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onRefresh();
+      if (status === "confirmed" && group.status === "pending") onConfirmed(group);
     } catch (e) {
       setActionError(saveFailMessage(e));
     } finally {
@@ -361,7 +380,10 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const handleSavePayment = async (amount: number, method: string, ref: string) => {
     const newAdvance = advance + amount;
     const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
-    const newStatus: string = group.status === "pending" ? "confirmed" : group.status;
+    // A pending group is confirmed by money only once the received total reaches the 25% advance;
+    // a smaller part payment is recorded but the group stays pending until the owner confirms it.
+    const confirmsNow = group.status === "pending" && meetsConfirmationAdvance(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal, newAdvance);
+    const newStatus: string = confirmsNow ? "confirmed" : group.status;
     const holdUpdate = newStatus !== "pending" ? { hold_expires_at: null } : {};
     // Errors are thrown so GroupPaymentForm can show them and stay open —
     // previously a failed save silently closed the form as if it had worked.
@@ -374,6 +396,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     onRefresh(); setShowPaymentForm(false);
+    if (confirmsNow) onConfirmed(group);
   };
 
   const handleSaveDiscount = async (amount: number, reason: string) => {
@@ -427,7 +450,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
               {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
               <button onClick={() => setShowEditGroupGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
               {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
-              {group.guest_phone && <a href={`https://wa.me/${group.guest_phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>}
+              {group.guest_phone && <a href={group.status === "confirmed" ? (groupConfirmHref(group, roomNameMap, property) ?? `https://wa.me/${clean(group.guest_phone)}`) : `https://wa.me/${clean(group.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {group.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>}
             </div>
             {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
           </div>
@@ -527,6 +550,13 @@ function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: Book
   );
 }
 
+/** One line in a payment form telling the owner whether this payment will confirm a pending booking. */
+function ConfirmHint({ confirms, needed }: { confirms: boolean; needed: number }) {
+  return confirms
+    ? <p className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-800">✅ This payment confirms the booking — you'll be asked to send the guest their confirmation.</p>
+    : <p className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">Below the ₹{needed.toLocaleString("en-IN")} advance (25%) — this is recorded as a part payment and the booking stays pending until you confirm it.</p>;
+}
+
 function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; chargesTotal: number; onSaved: (amount: number, method: string, ref: string) => Promise<void>; onCancel: () => void }) {
   const [amount, setAmount] = useState(""); const [method, setMethod] = useState(group.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
   const newPayment = parseFloat(amount) || 0; const grandTotal = Number(group.total_amount) + chargesTotal; const maxAllowed = Math.max(0, grandTotal - discount - advance); const newAdvance = advance + newPayment; const bal = Math.max(0, grandTotal - discount - newAdvance);
@@ -541,6 +571,7 @@ function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onC
       <div><label className={labelCls}>Amount received (₹) *</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
       <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvance.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
+      {group.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal, newAdvance)} needed={advanceAmount(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal)} />}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
     </div>
@@ -607,7 +638,7 @@ type ModalTab = "overview" | "charges" | "invoice";
 function BookingDetailModal({ booking, roomName, rooms, property, onClose, onStatusChange, onPaymentSaved }: {
   booking: Booking; roomName: string;
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
-  property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onStatusChange: (id: string, status: string) => Promise<void>; onPaymentSaved: () => void;
+  property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onStatusChange: (id: string, status: string) => Promise<void>; onPaymentSaved: (confirmed?: boolean) => void;
 }) {
   const [tab, setTab] = useState<ModalTab>("overview"); const [updating, setUpdating] = useState(false); const [showEditGuest, setShowEditGuest] = useState(false); const [showEditStay, setShowEditStay] = useState(false);
   const { data: charges = [] } = useBookingCharges(booking.id); const { mutateAsync: deleteCharge } = useDeleteCharge();
@@ -635,7 +666,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
               <button onClick={() => setShowEditGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
               {canEditStay && <button onClick={() => setShowEditStay(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Stay</button>}
               <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>
-              <a href={confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> WhatsApp</a>
+              <a href={booking.status === "confirmed" ? (bookingConfirmHref(booking, roomName, property) ?? `https://wa.me/${clean(booking.guest_phone)}`) : `https://wa.me/${clean(booking.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {booking.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>
               {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
             </div>
             {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
@@ -821,7 +852,7 @@ function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booki
 }
 
 function OverviewTab({ booking, roomName, property, advance, discount, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: {
-  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: () => void; ownerPhone: string; upiId?: string;
+  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: (confirmed?: boolean) => void; ownerPhone: string; upiId?: string;
 }) {
   const [showPaymentForm, setShowPaymentForm] = useState(false); const [showDiscountForm, setShowDiscountForm] = useState(false);
   const { refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
@@ -846,7 +877,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
       {showDiscountForm && <DiscountForm booking={booking} discount={discount} onSaved={() => { setShowDiscountForm(false); onPaymentSaved(); }} onCancel={() => setShowDiscountForm(false)} />}
       {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
       {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">{refundDue > 0 ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust` : "Fully paid ✓"}</div>}
-      {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={() => { setShowPaymentForm(false); onPaymentSaved(); }} onCancel={() => setShowPaymentForm(false)} />}
+      {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={(confirmed) => { setShowPaymentForm(false); onPaymentSaved(confirmed); }} onCancel={() => setShowPaymentForm(false)} />}
       <Section title="Send to guest">
         <div className="space-y-2">
           <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), chargesTotal, discount, advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) })} label="💰 Payment reminder" />
@@ -888,7 +919,7 @@ function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { b
   );
 }
 
-function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, onCancel }: { booking: Booking; advance: number; discount: number; chargesTotal: number; onSaved: () => void; onCancel: () => void }) {
+function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, onCancel }: { booking: Booking; advance: number; discount: number; chargesTotal: number; onSaved: (confirmed: boolean) => void; onCancel: () => void }) {
   const suggested = Math.round(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal * 0.25);
   const [amount, setAmount] = useState(""); const [method, setMethod] = useState(booking.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
   const queryClient = useQueryClient(); const grandTotal = Number(booking.total_amount) + chargesTotal; const newPayment = parseFloat(amount) || 0; const newAdvanceTotal = advance + newPayment; const maxAllowed = Math.max(0, grandTotal - discount - advance); const bal = Math.max(0, grandTotal - discount - newAdvanceTotal);
@@ -896,8 +927,11 @@ function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, 
     if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
     if (newPayment > maxAllowed) { setError(maxAllowed <= 0 ? "Already fully paid" : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
     setSaving(true); setError("");
-    const newStatus: string = booking.status === "pending" ? "confirmed" : booking.status;
-    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: newStatus, ...(newStatus !== "pending" ? { hold_expires_at: null } : {}) }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
+    // Money confirms a pending booking only once the total received reaches the 25% advance; a smaller
+    // part payment is recorded and the booking stays pending until the owner confirms it.
+    const confirmsNow = booking.status === "pending" && meetsConfirmationAdvance(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal, newAdvanceTotal);
+    const newStatus: string = confirmsNow ? "confirmed" : booking.status;
+    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: newStatus, ...(newStatus !== "pending" ? { hold_expires_at: null } : {}) }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(confirmsNow); }
     catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
@@ -911,6 +945,7 @@ function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, 
       <div><label className={labelCls}>{advance > 0 ? "New payment (₹) *" : "Amount received (₹) *"}</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
       <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvanceTotal.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
+      {booking.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal, newAdvanceTotal)} needed={suggested} />}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
     </div>
@@ -942,6 +977,8 @@ function BookingsAdmin() {
   const [showAdd, setShowAdd] = useState(false);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
   const [activeGroup, setActiveGroup] = useState<BookingGroup | null>(null);
+  // "Booking confirmed — send the guest their confirmation" prompt (see SendConfirmationPrompt).
+  const [confirmPrompt, setConfirmPrompt] = useState<ConfirmationPromptData | null>(null);
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("all");
   const [q, setQ] = useState("");
   const [hideCancelled, setHideCancelled] = useState(true);
@@ -1060,21 +1097,29 @@ function BookingsAdmin() {
 
   const updateStatus = async (id: string, newStatus: string) => {
     // Throws if the save failed (network error, expired login, no row updated). The
-    // dialog shows the message; nothing below runs, so the guest is never sent
+    // dialog shows the message; nothing below runs, so the guest is never offered
     // "your booking is confirmed" for a booking that is still pending.
     const updates = await setBookingStatus(supabase, id, newStatus);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
-    if (newStatus === "confirmed" && property) {
+    if (newStatus === "confirmed") {
       const booking = bookings.find((b) => b.id === id);
-      if (booking) {
-        const waUrl = confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property.name, roomName: roomNameMap[booking.room_id] ?? "your room", checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) });
-        const a = document.createElement("a"); a.href = waUrl; a.target = "_blank"; a.rel = "noreferrer"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      }
+      if (booking) promptSendConfirmation(bookingConfirmHref(booking, roomNameMap[booking.room_id] ?? "your room", property), booking.guest_name);
     }
   };
 
+  // Offers the owner a one-tap "send confirmation on WhatsApp" button. A real tap works on every
+  // phone; opening WhatsApp by code after a save is blocked by many mobile browsers.
+  const promptSendConfirmation = (href: string | null, guestName: string) => {
+    if (href) setConfirmPrompt({ guestName, href });
+  };
+
   const handleCancelAndClose = () => { handleRefresh(); setActiveBooking(null); };
+  // A payment was saved from the single-booking dialog. If it confirmed the booking, offer the confirmation message.
+  const handlePaymentSaved = (confirmed?: boolean) => {
+    if (confirmed && activeBooking) promptSendConfirmation(bookingConfirmHref(activeBooking, roomNameMap[activeBooking.room_id] ?? "your room", property), activeBooking.guest_name);
+    handleCancelAndClose();
+  };
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
@@ -1170,8 +1215,9 @@ function BookingsAdmin() {
       )}
 
       {showAdd && property && <AddBookingModal propertyId={property.id} property={property} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
-      {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handleCancelAndClose} />}
-      {activeGroup && <GroupBookingDetailModal group={activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} />}
+      {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handlePaymentSaved} />}
+      {activeGroup && <GroupBookingDetailModal group={groups.find((g) => g.id === activeGroup.id) ?? activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} onConfirmed={(g) => promptSendConfirmation(groupConfirmHref(g, roomNameMap, property), g.guest_name)} />}
+      {confirmPrompt && <SendConfirmationPrompt data={confirmPrompt} onDismiss={() => setConfirmPrompt(null)} />}
     </div>
   );
 }
