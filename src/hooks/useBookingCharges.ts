@@ -32,6 +32,33 @@ export const useAddCharge = () => {
   });
 };
 
+/**
+ * Add several charge rows to ONE booking or ONE group in a single insert, so a catalog item that
+ * spans a season change is added whole or not at all. Refreshes the charges lists and the booking
+ * lists (their cards show the extras total).
+ */
+export const useAddChargeRows = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      target: { booking_id: string } | { group_id: string };
+      rows: { description: string; qty: number; unit_price: number }[];
+    }) => {
+      if (input.rows.length === 0) return;
+      const { error } = await supabase
+        .from("booking_charges")
+        .insert(input.rows.map((r) => ({ ...input.target, ...r })));
+      if (error) throw error;
+    },
+    onSuccess: (_data, variables) => {
+      if ("booking_id" in variables.target) queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.target.booking_id], exact: false });
+      if ("group_id" in variables.target) queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.target.group_id], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
+    },
+  });
+};
+
 export const useDeleteCharge = () => {
   const queryClient = useQueryClient();
   return useMutation({
