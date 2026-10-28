@@ -165,7 +165,8 @@ function PaymentActionModal({
   item: LedgerItem;
   mode: "full" | "correct";
   onClose: () => void;
-  onDone: () => void;
+  /** `confirmed` is true when this payment moved a pending booking to confirmed. */
+  onDone: (confirmed: boolean) => void;
 }) {
   const gross = grossTotal(item);
   const balance = balanceOf(item);
@@ -212,7 +213,7 @@ function PaymentActionModal({
         const { error: childErr } = await supabase.from("bookings").update(childPatch).eq("group_id", item.id);
         if (childErr) throw childErr;
       }
-      onDone();
+      onDone(mode === "full" && item.status === "pending");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Save failed");
     } finally {
@@ -310,6 +311,8 @@ function AdminPayments() {
 
   const navigate = useNavigate();
   const [payModal, setPayModal] = useState<{ item: LedgerItem; mode: "full" | "correct" } | null>(null);
+  // Set when "Mark fully paid" confirmed a pending booking, so the owner is reminded to send the guest their confirmation.
+  const [justConfirmed, setJustConfirmed] = useState<{ id: string; kind: "booking" | "group"; guest: string } | null>(null);
 
   const [filterTab, setFilterTab] = useState<FilterTab>("outstanding");
   const [search, setSearch] = useState("");
@@ -588,6 +591,16 @@ function AdminPayments() {
           Track collections and outstanding balances across all bookings.
         </p>
       </div>
+
+      {justConfirmed && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          <span>✅ {justConfirmed.guest}'s booking is now confirmed. Send them the confirmation and tracking link.</span>
+          <span className="flex items-center gap-3">
+            <a href={`/admin/bookings?${justConfirmed.kind === "group" ? "groupId" : "bookingId"}=${encodeURIComponent(justConfirmed.id)}${new URLSearchParams(window.location.search).get("property") ? `&property=${encodeURIComponent(new URLSearchParams(window.location.search).get("property") ?? "")}` : ""}`} className="rounded-full bg-green-700 px-4 py-1.5 text-xs font-medium text-white hover:opacity-90">Open booking</a>
+            <button type="button" onClick={() => setJustConfirmed(null)} className="text-xs underline">Dismiss</button>
+          </span>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -961,8 +974,9 @@ function AdminPayments() {
           item={payModal.item}
           mode={payModal.mode}
           onClose={() => setPayModal(null)}
-          onDone={() => {
+          onDone={(confirmed) => {
             refreshAfterPayment();
+            if (confirmed) setJustConfirmed({ id: payModal.item.id, kind: payModal.item.kind, guest: payModal.item.guest_name });
             setPayModal(null);
           }}
         />

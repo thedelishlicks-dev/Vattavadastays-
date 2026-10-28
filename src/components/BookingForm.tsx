@@ -1,7 +1,9 @@
 import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
+import { Check, Clock, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
+import { useGuestBookingStatus } from "@/hooks/useGuestBookingStatus";
+import { guestStatusView, type GuestStatusTone } from "@/lib/guestBookingStatus";
 import { useProperty } from "@/hooks/useProperty";
 import { bookingInquiryLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
@@ -394,9 +396,19 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   );
 }
 
+// How each status looks on the card: the round icon, and the status pill under the heading.
+const TONE_STYLES: Record<GuestStatusTone, { icon: string; pill: string }> = {
+  pending: { icon: "bg-amber-500 text-white", pill: "bg-amber-50 border-amber-200 text-amber-800" },
+  confirmed: { icon: "bg-primary text-primary-foreground", pill: "bg-green-50 border-green-200 text-green-800" },
+  cancelled: { icon: "bg-red-600 text-white", pill: "bg-red-50 border-red-200 text-red-700" },
+  done: { icon: "bg-primary text-primary-foreground", pill: "bg-muted border-border text-muted-foreground" },
+};
+
 /**
- * "Request sent!" — drawn ONLY from the saved snapshot (never from the current room
- * selection), so changing dates or reloading the page cannot alter or lose it.
+ * "Request sent!" — the stay details are drawn ONLY from the saved snapshot (never from the
+ * current room selection), so changing dates or reloading the page cannot alter or lose them.
+ * The STATUS line is live: it reads the booking's current status through its tracking token,
+ * so it says "Awaiting owner confirmation" until the owner confirms, then "Confirmed".
  */
 /** Compact reminder of the guest's most recent booking, shown above a new selection. */
 function RecentBookingStrip({ confirmation: c, onDismiss }: {
@@ -405,6 +417,8 @@ function RecentBookingStrip({ confirmation: c, onDismiss }: {
 }) {
   const ref = c.groupRef ?? `#${c.bookingId.slice(0, 8).toUpperCase()}`;
   const trackingUrl = guestTrackingUrl(window.location.origin, c.trackingToken, c.propertyId);
+  const { data: liveStatus } = useGuestBookingStatus(c.trackingToken);
+  const view = guestStatusView(liveStatus, "The host", c.payment);
   return (
     <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
       <div className="min-w-0">
@@ -412,6 +426,7 @@ function RecentBookingStrip({ confirmation: c, onDismiss }: {
         <div className="font-medium">
           <span className="font-mono">{ref}</span> · {c.checkIn} → {c.checkOut}
         </div>
+        <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${TONE_STYLES[view.tone].pill}`}>{view.badge}</span>
       </div>
       <div className="flex items-center gap-3">
         <a href={trackingUrl} className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline">
@@ -442,6 +457,12 @@ function ConfirmationCard({
   const ownerName = property?.owner_name ?? "The host";
   const trackingUrl = guestTrackingUrl(window.location.origin, c.trackingToken, property?.id ?? c.propertyId);
   const ref = c.groupRef;
+  // Live status of the booking (see useGuestBookingStatus). Until it loads, or if it can't be read,
+  // the card reads "awaiting owner confirmation".
+  const { data: liveStatus } = useGuestBookingStatus(c.trackingToken);
+  const view = guestStatusView(liveStatus, ownerName, c.payment);
+  const isPending = view.tone === "pending";
+  const toneStyle = TONE_STYLES[view.tone];
 
   const handleCopyRef = () => {
     if (!ref) return;
@@ -454,13 +475,12 @@ function ConfirmationCard({
   return (
     <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)] space-y-5">
       <div className="text-center">
-        <div className="mx-auto h-14 w-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-3">
-          <Check className="h-6 w-6" />
+        <div className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center mb-3 ${toneStyle.icon}`}>
+          {view.tone === "pending" ? <Clock className="h-6 w-6" /> : view.tone === "cancelled" ? <X className="h-6 w-6" /> : <Check className="h-6 w-6" />}
         </div>
-        <h3 className="font-display text-xl font-semibold">Request sent!</h3>
-        <p className="mt-1 text-sm text-muted-foreground max-w-xs mx-auto">
-          {ownerName} will confirm your booking shortly.
-        </p>
+        <h3 className="font-display text-xl font-semibold">{view.heading}</h3>
+        <span role="status" className={`mt-2 inline-block rounded-full border px-3 py-1 text-xs font-medium ${toneStyle.pill}`}>Status: {view.badge}</span>
+        <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">{view.message}</p>
       </div>
 
       {/* Booking reference */}
@@ -485,10 +505,10 @@ function ConfirmationCard({
       )}
 
       {/* WhatsApp CTA */}
-      {c.ownerNotifyLink && (
+      {c.ownerNotifyLink && isPending && (
         <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
           <p className="text-xs text-muted-foreground text-center">
-            Tap below to notify {property?.owner_name ?? "the host"} on WhatsApp so they confirm faster.
+            Your request is saved, but the host is only told once you send it. Tap below and press Send in WhatsApp so {property?.owner_name ?? "the host"} can confirm faster.
           </p>
           <a
             href={c.ownerNotifyLink}
@@ -541,7 +561,7 @@ function ConfirmationCard({
       </div>
 
       {/* UPI payment — only when the host has a UPI ID; otherwise tell the guest what happens next */}
-      {c.payment === "UPI" && upiId && (
+      {c.payment === "UPI" && upiId && isPending && (
         <UPIPaymentSection
           upiId={upiId}
           payeeName={property?.owner_name ?? property?.name ?? ""}
@@ -556,7 +576,7 @@ function ConfirmationCard({
           bookingId={c.bookingId}
         />
       )}
-      {c.payment === "UPI" && !upiId && (
+      {c.payment === "UPI" && !upiId && isPending && (
         <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
           {ownerName} will share payment details with you on WhatsApp or by phone.
         </div>

@@ -12,6 +12,7 @@ import {
   advanceAmount,
   fractionOf,
   paymentDueAmount,
+  meetsConfirmationAdvance,
 } from "./balance";
 
 // ── chargesSum ───────────────────────────────────────────────────────────────
@@ -134,4 +135,28 @@ test("paymentDueAmount: 25% when nothing paid, otherwise the remaining balance",
 
 test("paymentDueAmount is never negative when overpaid", () => {
   assert.equal(paymentDueAmount(950, 1507), 0);
+});
+
+// ── when does money received confirm a pending booking? ─────────────────────
+test("meetsConfirmationAdvance: the 25% advance (or more) confirms", () => {
+  assert.equal(meetsConfirmationAdvance(2950, 738), true); // exactly the advance
+  assert.equal(meetsConfirmationAdvance(2950, 1000), true);
+  assert.equal(meetsConfirmationAdvance(2950, 2950), true); // paid in full
+});
+
+test("meetsConfirmationAdvance: a token or short payment does not confirm", () => {
+  assert.equal(meetsConfirmationAdvance(2950, 1), false);
+  assert.equal(meetsConfirmationAdvance(2950, 737), false); // one rupee short of 738
+});
+
+test("meetsConfirmationAdvance: nothing received never confirms, even on a ₹0 total", () => {
+  assert.equal(meetsConfirmationAdvance(2950, 0), false);
+  assert.equal(meetsConfirmationAdvance(0, 0), false);
+  assert.equal(meetsConfirmationAdvance(2950, -50), false);
+});
+
+test("meetsConfirmationAdvance uses the net total (extras in, discount out)", () => {
+  const { netTotal } = computeBalance({ roomTotal: 2500, chargesTotal: 450 });
+  assert.equal(meetsConfirmationAdvance(netTotal, 625), false); // 25% of the room alone is not enough
+  assert.equal(meetsConfirmationAdvance(netTotal, 738), true);
 });
