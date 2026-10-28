@@ -70,6 +70,8 @@ export interface ConfirmationTextInput {
   guestName: string;
   propertyName: string;
   roomName: string;
+  /** "Room" (default) or "Rooms" for a multi-room group, where roomName is the joined list. */
+  roomLabel?: "Room" | "Rooms";
   checkIn: string;
   checkOut: string;
   ownerPhone: string;
@@ -88,6 +90,7 @@ export function buildConfirmationText({
   guestName,
   propertyName,
   roomName,
+  roomLabel = "Room",
   checkIn,
   checkOut,
   ownerPhone,
@@ -95,7 +98,7 @@ export function buildConfirmationText({
 }: ConfirmationTextInput): string {
   return (
     `Dear ${guestName}, your booking at ${propertyName} is confirmed! ✅\n\n` +
-    `Room: ${roomName}\n` +
+    `${roomLabel}: ${roomName}\n` +
     `Check-in: ${checkIn}\n` +
     `Check-out: ${checkOut}\n\n` +
     (trackingUrl
@@ -140,7 +143,7 @@ export function buildDirectionsText({
     `Hi ${guestName}, here's how to reach ${propertyName}:\n\n` +
     `📍 Google Maps: ${mapsUrl}\n` +
     (landmark ? `Landmark: ${landmark}\n` : "") +
-    `\nCall us when you reach Munnar: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+    `\nCall us when you're close to the property: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
   );
 }
 
