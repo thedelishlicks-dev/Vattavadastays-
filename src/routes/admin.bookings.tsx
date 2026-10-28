@@ -10,8 +10,10 @@ import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import {
   useBookingCharges, useAddCharge, useDeleteCharge,
-  useGroupCharges, useAddGroupCharge, useDeleteGroupCharge,
+  useGroupCharges, useAddGroupCharge, useDeleteGroupCharge, useAddChargeRows,
 } from "@/hooks/useBookingCharges";
+import { useCatalogItems } from "@/hooks/useCatalogItems";
+import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
 import { supabase } from "@/lib/supabase";
 import { setBookingStatus, cancelBooking, setGroupStatus, cancelGroup, setGroupDiscount, saveFailMessage } from "@/lib/bookingActions";
 import { useQueryClient } from "@tanstack/react-query";
@@ -131,16 +133,23 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ChargesList({
-  charges, chargesTotal, onDelete, groupId, bookingId,
+  charges, chargesTotal, onDelete, groupId, bookingId, propertyId, checkIn, checkOut, guests,
 }: {
   charges: BookingCharge[];
   chargesTotal: number;
   onDelete: (id: string) => void;
   groupId?: string;
   bookingId?: string;
+  /** Used to offer the property's own add-ons and packages, priced for this stay. */
+  propertyId: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
 }) {
   const groupChargeMutation = useAddGroupCharge();
   const singleChargeMutation = useAddCharge();
+  const addRows = useAddChargeRows();
+  const { hasCatalog, isLoading: catalogLoading } = useCatalogItems(propertyId);
   const adding = groupId ? groupChargeMutation.isPending : singleChargeMutation.isPending;
   const [desc, setDesc] = useState("");
   const [qty, setQty] = useState("1");
@@ -167,6 +176,16 @@ function ChargesList({
 
   return (
     <div className="space-y-4">
+      {/* The property's own catalog (same prices as the Quote Builder). The fixed list below is only
+          a fallback for properties that have not set up any add-ons or packages yet. */}
+      <CatalogExtrasPicker
+        propertyId={propertyId}
+        checkIn={checkIn}
+        checkOut={checkOut}
+        guests={guests}
+        onAdd={(rows) => addRows.mutateAsync({ target: groupId ? { group_id: groupId } : { booking_id: bookingId ?? "" }, rows })}
+      />
+      {!hasCatalog && !catalogLoading && (
       <div>
         <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
         <div className="flex flex-wrap gap-1.5">
@@ -177,7 +196,9 @@ function ChargesList({
           ))}
         </div>
       </div>
+      )}
       <div className="rounded-xl border border-border p-3 space-y-2">
+        <p className="text-xs font-medium text-muted-foreground">Or add your own charge</p>
         <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
         <div className="flex gap-2">
           <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
@@ -508,7 +529,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                   <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
                 </div>
                 {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-                <ChargesList charges={charges} chargesTotal={chargesTotal} groupId={group.id} onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })} />
+                <ChargesList charges={charges} chargesTotal={chargesTotal} groupId={group.id} propertyId={group.property_id} checkIn={group.check_in} checkOut={group.check_out} guests={Number(group.guest_count) || 1} onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })} />
               </div>
             )}
             {tab === "invoice" && (
@@ -688,7 +709,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
                   <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
                 </div>
                 {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-                <ChargesList charges={charges} chargesTotal={chargesTotal} bookingId={booking.id} onDelete={(id) => deleteCharge({ id, bookingId: booking.id })} />
+                <ChargesList charges={charges} chargesTotal={chargesTotal} bookingId={booking.id} propertyId={booking.property_id} checkIn={booking.check_in} checkOut={booking.check_out} guests={Number(booking.guest_count) || 1} onDelete={(id) => deleteCharge({ id, bookingId: booking.id })} />
               </div>
             )}
             {tab === "invoice" && <div className="p-5"><BookingInvoice booking={booking} roomName={roomName} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} /></div>}

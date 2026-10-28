@@ -12,6 +12,7 @@ import { useRoomRates } from "@/hooks/useRoomRates";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { newTrackingToken } from "@/lib/trackingToken";
+import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
 import { extractUPIId } from "@/utils/upi";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
@@ -714,6 +715,15 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           {nights > 0 && selectedRooms.length > 0 && (
             <div className="space-y-2">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Extra charges <span className="normal-case font-normal">(optional)</span></p>
+              {/* Add-ons and packages from Property → Add-ons, priced for these dates and guests. Each one is
+                  added as ordinary editable rows below, so totals, the 25% advance and saving work as before. */}
+              <CatalogExtrasPicker
+                propertyId={propertyId}
+                checkIn={form.check_in}
+                checkOut={form.check_out}
+                guests={guestCount}
+                onAdd={(rows) => setManualExtras((xs) => [...xs, ...rows.map((r) => ({ description: r.description, qty: String(r.qty), unit_price: String(r.unit_price) }))])}
+              />
               {manualExtras.map((x, i) => (
                 <div key={i} className="grid grid-cols-[1fr_56px_80px_28px] gap-2 items-center">
                   <input value={x.description} onChange={(e) => updateExtra(i, "description", e.target.value)} className={inputCls} placeholder="e.g. Extra blanket" />
