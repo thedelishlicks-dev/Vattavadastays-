@@ -1,10 +1,11 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo } from "react";
+import { format } from "date-fns";
 import { createFileRoute } from "@tanstack/react-router";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Availability } from "@/components/Availability";
 import { Rooms } from "@/components/Rooms";
-import { RoomDetail, type BookingDetails } from "@/components/RoomDetail";
+import { CartBar } from "@/components/CartBar";
 import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
@@ -12,7 +13,11 @@ import { MapSection } from "@/components/MapSection";
 import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
 import { useProperty } from "@/hooks/useProperty";
+import { useRoomRates } from "@/hooks/useRoomRates";
+import { useUnavailableRoomIds } from "@/hooks/useUnavailableRoomIds";
 import { getSubdomain } from "@/lib/subdomain";
+import { allocateGuests, suggestRooms, extraGuestsIn, isFullyPlaced, partySize, type Party } from "@/lib/partyAllocation";
+import { buildBookingDetails, type BookingDetails } from "@/lib/roomSelection";
 import type { Room } from "@/types/database";
 
 // Lazy: guests on a property page never download the marketing landing page.
@@ -61,42 +66,81 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   const [checkIn, setCheckIn] = useState<Date | null>(null);
   const [checkOut, setCheckOut] = useState<Date | null>(null);
-  const [openRoom, setOpenRoom] = useState<Room | null>(null);
+  // Everyone who is coming (step 1). Rooms are chosen in step 2 and the guests are shared out
+  // over them automatically; `pinned` holds rooms whose guests the guest set by hand.
+  const [party, setParty] = useState<Party>({ adults: 2, children: 0 });
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pinned, setPinned] = useState<Record<string, Party>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+  const [justBooked, setJustBooked] = useState(false);
 
-  // Multi-room cart: list of confirmed room selections
-  const [selections, setSelections] = useState<BookingDetails[]>([]);
+  const { data: rates } = useRoomRates(property?.id);
+  const checkInStr = checkIn ? format(checkIn, "yyyy-MM-dd") : null;
+  const checkOutStr = checkOut ? format(checkOut, "yyyy-MM-dd") : null;
+  const hasDates = !!checkIn && !!checkOut;
+  const { unavailable, settled } = useUnavailableRoomIds(property, checkInStr, checkOutStr);
 
-  const handleRoomConfirm = (details: BookingDetails) => {
-    setSelections((prev) => {
-      // Replace if same room is already in cart, otherwise append
-      const exists = prev.findIndex((s) => s.room.id === details.room.id);
-      if (exists >= 0) {
-        const next = [...prev];
-        next[exists] = details;
-        return next;
-      }
-      return [...prev, details];
+  const activeRooms = useMemo<Room[]>(() => (property?.rooms ?? []).filter((r: Room) => r.is_active), [property]);
+  // With dates chosen only the free rooms are offered.
+  const visibleRooms = useMemo(() => (hasDates ? activeRooms.filter((r) => !unavailable.has(r.id)) : activeRooms), [activeRooms, unavailable, hasDates]);
+  const selectedRooms = useMemo(() => selectedIds.map((id) => activeRooms.find((r) => r.id === id)).filter((r): r is Room => !!r), [selectedIds, activeRooms]);
+
+  const allocation = useMemo(() => allocateGuests(selectedRooms, party, pinned), [selectedRooms, party, pinned]);
+  const selections = useMemo<BookingDetails[]>(
+    () => (checkIn && checkOut ? selectedRooms.map((r) => buildBookingDetails(r, allocation.byRoom[r.id], checkIn, checkOut, rates)) : []),
+    [selectedRooms, allocation, checkIn, checkOut, rates],
+  );
+  const suggestion = useMemo(() => (hasDates && settled ? suggestRooms(visibleRooms, party) : []), [hasDates, settled, visibleRooms, party]);
+
+  const guests = partySize(party);
+  const unplaced = allocation.unplacedAdults + allocation.unplacedChildren;
+  const selectedFit = selectedRooms.length > 0 && isFullyPlaced(allocation) && extraGuestsIn(selectedRooms, allocation) === 0;
+  const problem =
+    selectedRooms.length === 0 ? null
+    : allocation.roomsWithoutAdult.length > 0 ? "Each room needs at least one adult."
+    : unplaced > 0 ? `${unplaced} guest${unplaced > 1 ? "s" : ""} still need${unplaced > 1 ? "" : "s"} a room.`
+    : null;
+  const grandTotal = selections.reduce((sum, s) => sum + s.total, 0);
+  const placedGuests = selections.reduce((sum, s) => sum + s.adults + s.children, 0);
+
+  // A date change keeps the chosen rooms and re-prices them; only rooms that are no longer free
+  // are dropped (once the answer for the new dates is in), and the guest is told.
+  useEffect(() => {
+    if (!hasDates || !settled) return;
+    const gone = selectedRooms.filter((r) => unavailable.has(r.id));
+    if (gone.length === 0) return;
+    setSelectedIds((prev) => prev.filter((id) => !unavailable.has(id)));
+    setNotice(`${gone.map((r) => r.name).join(", ")} ${gone.length > 1 ? "are" : "is"} not free for these dates and ${gone.length > 1 ? "were" : "was"} removed.`);
+  }, [hasDates, settled, unavailable, selectedRooms]);
+
+  const handlePartyChange = (p: Party) => {
+    setParty(p);
+    setPinned({});
+  };
+  const handleToggleRoom = (room: Room) => {
+    setNotice(null);
+    setSelectedIds((prev) => (prev.includes(room.id) ? prev.filter((id) => id !== room.id) : [...prev, room.id]));
+    setPinned((prev) => {
+      if (!prev[room.id]) return prev;
+      const next = { ...prev };
+      delete next[room.id];
+      return next;
     });
-    setOpenRoom(null);
-    // Scroll to booking form after a tick
-    setTimeout(() => {
-      document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
-    }, 50);
   };
-
   const handleRemoveRoom = (roomId: string) => {
-    setSelections((prev) => prev.filter((s) => s.room.id !== roomId));
+    setSelectedIds((prev) => prev.filter((id) => id !== roomId));
+    setPinned((prev) => {
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
+    });
   };
-
-  // When dates change, clear the cart — room prices may differ
-  const handleSetCheckIn = (d: Date | null) => {
-    setCheckIn(d);
-    setSelections([]);
+  const handleUseSuggestion = () => {
+    setNotice(null);
+    setSelectedIds(suggestion);
+    setPinned({});
   };
-  const handleSetCheckOut = (d: Date | null) => {
-    setCheckOut(d);
-    setSelections([]);
-  };
+  const goToForm = () => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
 
   if (isLoading) {
     return (
@@ -177,18 +221,38 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         <Availability
           checkIn={checkIn}
           checkOut={checkOut}
-          setCheckIn={handleSetCheckIn}
-          setCheckOut={handleSetCheckOut}
+          setCheckIn={setCheckIn}
+          setCheckOut={setCheckOut}
+          party={party}
+          onPartyChange={handlePartyChange}
         />
         <Rooms
-          onSelect={setOpenRoom}
+          rooms={visibleRooms}
+          hiddenCount={activeRooms.length - visibleRooms.length}
+          settled={settled}
           checkIn={checkIn}
           checkOut={checkOut}
-          selectedRoomIds={selections.map((s) => s.room.id)}
+          guests={guests}
+          selectedRoomIds={selectedIds}
+          onToggle={handleToggleRoom}
+          rates={rates}
+          propertyAmenities={property?.shared_amenities}
+          suggestion={suggestion}
+          suggestionNeeded={!selectedFit}
+          noRoomsForGroup={suggestion.length === 0 && visibleRooms.length > 0}
+          onUseSuggestion={handleUseSuggestion}
+          notice={notice}
+          onDismissNotice={() => setNotice(null)}
         />
         <BookingForm
           selections={selections}
           onRemoveRoom={handleRemoveRoom}
+          party={party}
+          onAdjustRoom={(roomId, p) => setPinned((prev) => ({ ...prev, [roomId]: p }))}
+          hasManualSplit={Object.keys(pinned).length > 0}
+          onResetSplit={() => setPinned({})}
+          problem={problem}
+          onJustBookedChange={setJustBooked}
           subdomain={subdomain}
         />
         <About property={property} />
@@ -196,15 +260,13 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         <MapSection subdomain={subdomain} />
       </main>
       <Footer subdomain={subdomain} />
-      {openRoom && (
-        <RoomDetail
-          key={openRoom.id}
-          room={openRoom}
-          checkIn={checkIn}
-          checkOut={checkOut}
-          propertyAmenities={property?.shared_amenities}
-          onClose={() => setOpenRoom(null)}
-          onConfirm={handleRoomConfirm}
+      {!justBooked && (
+        <CartBar
+          rooms={selections.length}
+          guestsText={`${placedGuests} of ${guests} guest${guests > 1 ? "s" : ""} placed`}
+          warning={problem}
+          total={grandTotal}
+          onContinue={goToForm}
         />
       )}
     </div>
