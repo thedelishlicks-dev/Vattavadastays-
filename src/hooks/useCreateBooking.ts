@@ -132,7 +132,7 @@ export function useCreateBooking() {
       // max_guests is the number of guests INCLUDED in the base price, not
       // a hard cap — guests can exceed it up to EXTRA_GUEST_ALLOWANCE more,
       // charged at extra_guest_price per night. This must match the ceiling
-      // used by the adults stepper in RoomDetail.tsx (room.max_guests + 4).
+      // used by the guest steppers (see lib/guestCount.ts: room.max_guests + 4).
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId);
         if (!room) throw new Error("One or more selected rooms are no longer available.");
