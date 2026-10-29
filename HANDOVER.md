@@ -1,8 +1,8 @@
-# stayidom.in — Handover v10
+# stayidom.in — Handover v10.1
 
-**Date:** 25 Oct 2026
-**Code baseline:** `main` at `ce9325f` (Merge PR #421, `Dev`).
-**Supersedes:** v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**.
+**Date:** 29 Oct 2026
+**Code baseline:** `main` at `8fc8359` (Merge PR #441, `Dev`). `Dev` (capital D) is ahead with PR #442; branch `fix/booking-retry-ids` is waiting to merge into `Dev` (§9). Merge `Dev` → `main` only after the preview is tested.
+**Supersedes:** v10 (25 Oct 2026), which superseded v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**.
 
 > **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code.
 
@@ -89,7 +89,10 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 22. **Parked features are switched off with flags, not deleted.** `CHANNEL_SYNC_ENABLED` in `src/lib/features.ts` is `false`. Don't remove the code or the `room_ical_feeds` table.
 23. **Sentinel keys** in `shared_amenities`: filter `__` entries before showing tags to guests (§7).
 24. **Stay dates use one picker.** Every stay-date picker uses `RoomAvailabilityCalendar` (availability-aware, same as Add Booking). A plain `<input type="date">` shows no availability, which is why Edit Stay conflicts (§10 item 21).
-
+25. **Guests see their booking through the token, never the table.** `useGuestBookingStatus` polls `lookup_booking_by_token` every 60 s; `src/lib/guestBookingStatus.ts` turns the result into the card text. The confirmation snapshot in `localStorage` (`stayidom:last-booking`, 24 h, `bookingConfirmation.ts`) is only a fallback for the first view. A new booking shows **"Request sent — to be confirmed by the owner"** until the owner confirms.
+26. **Every `wa.me` / `tel:` link builds its number with `waDigits()` from `src/lib/phone.ts`.** Never `phone.replace(/\D/g, "")`: a number saved as `98765 43210` becomes `wa.me/9876543210`, which opens no chat. Settings saves owner numbers as `+91 XXXXXXXXXX` when they are valid Indian mobiles.
+27. **A guest booking keeps the same ids and token across retries.** `src/lib/bookingSubmission.ts` holds them for an unchanged request; on a retry `useCreateBooking` looks the token up first and, if the booking was already saved (reply lost on weak signal), goes on to the confirmation instead of inserting again. Don't generate ids inside `mutationFn` any more.
+28. **Confirming by money uses `meetsConfirmationAdvance()`** (`balance.ts`, `ADVANCE_FRACTION` = 0.25 of the net total). Recording a payment on a *pending* booking confirms it only once the cumulative advance reaches that. A smaller part payment stays pending; the owner can still confirm by hand.
 ---
 
 ## 4. Admin app map
@@ -128,7 +131,9 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 | Branding, owner info, location, pending-hold hours | Property → Settings | `__theme:` |
 | Block / unblock dates | `BlockDatesModal` on Home and Calendar | |
 | Create a booking | `AddBookingModal` on Home, Bookings, Quotes→convert | Extra charges supported |
-| Record a payment | Bookings → booking → Record payment | |
+| Extras on a booking (free-text or **from the add-on / package catalog**) | `AddBookingModal` and the booking's Extras tab | `CatalogExtrasPicker`, `catalogExtras.ts`. Same prices as the Quote Builder (`priceLine`); stored as `booking_charges` rows; a **snapshot** at the dates and guest count when added (does not reprice if the stay changes) |
+| Record a payment | Bookings → booking → Record payment | Confirms a pending booking at ≥ 25 % (rule 28) |
+| Tell the guest a booking is confirmed | Pop-up after any confirm (`SendConfirmationPrompt`) | Opens a `wa.me` link the owner taps to send; guest tracking link inside |
 | Mark fully paid / correct collected amount | Money → Payments (`PaymentActionModal`) | |
 | Agents, commission owed / paid / CSV | Money → Agents & Commissions | |
 
@@ -145,6 +150,10 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 **Owner Calendar states** (`src/lib/calendarState.ts`, pure and tested): every room/date is **Open · Booked · Pending · Check-out · Blocked**. A booked night is Booked (Pending if unconfirmed). An unavailable row on a booking's check-out day is Check-out. Unavailable with no booking behind it is Blocked. All-rooms view shows `N free` / **Full** / **Blocked**. Month window uses local date parts (never `toISOString()`). If bookings can't be loaded, the page shows a warning banner.
 
 **Availability and conflicts.** Booking inserts and date changes mark nights in `availability` via `trg_mark_booking_nights`. Freeing happens on cancellation from any status (`free_nights_on_any_cancel`), on the status trigger, and on the 15-minute job `expire_stale_pending_bookings()` (pending holds last `pending_hold_hours`, default 24). A DB exclusion constraint `bookings_no_overlap` (migration `20261008…`, in the 16 Oct baseline) blocks overlapping active stays; the app maps SQLSTATE 23P01 to "Those dates were just booked for this room." Same-day turnover is allowed.
+
+---
+
+**Guest booking journey (as built, 29 Oct 2026).** Guest submits → booking is `pending` with a 24 h hold (`pending_hold_hours`) → the owner's WhatsApp opens with the request (a `wa.me` link, not an API: the guest must tap Send) → the guest card says "Request sent" and follows the status live → the owner confirms (or records ≥ 25 %) → the owner is prompted to send the confirmation on WhatsApp → the card turns "Confirmed". The cron cancels unconfirmed holds silently and frees the dates.
 
 ---
 
@@ -192,6 +201,11 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Link previews | `/` → `api/og`; `robots.txt` / `sitemap.xml` per host; dynamic manifest | `api/*`, `vercel.json`, `post-build.mjs` |
 | iCal | Export live; import built and parked | `api/ical*`, `features.ts` |
 | Superadmin | Invite-owner Edge Function, setup checklist, renewal states, search/filter | `invite-owner`, `onboarding.ts` |
+| Guest status | Live "Request sent → Confirmed" card via token lookup | PR #439: `guestBookingStatus.ts`, `useGuestBookingStatus.ts`, `BookingForm.tsx`, `booking-status.tsx` |
+| Owner confirm | WhatsApp send prompt on every confirm path; 25 % advance gate; Munnar/room-label fix in messages | PR #439: `SendConfirmationPrompt.tsx`, `balance.ts`, `whatsapp.ts`, `admin.bookings.tsx`, `admin.payments.tsx` |
+| Extras | Pick catalog add-ons / packages as booking extras | PR #440: `CatalogExtrasPicker.tsx`, `catalogExtras.ts`, `useCatalogItems.ts`, `useAddChargeRows` |
+| Phone links | `waDigits()` for every WhatsApp / call link; owner numbers normalised on save | PR #442 (in `Dev`) |
+| Retry safety | Stable ids / token on a retried guest booking | `fix/booking-retry-ids` (pending merge into `Dev`): `bookingSubmission.ts`, `useCreateBooking.ts` |
 | CI | GitHub Actions: build, typecheck, tests, checks, DB migration tests | `.github/workflows/ci.yml` |
 
 ---
@@ -224,6 +238,17 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 
 ---
 
+**Guest / owner flow audit, 29 Oct 2026** (code read; build and live DB not run):
+22. **[DONE, PR #442] WhatsApp / call links broke for numbers saved without `91`** (rule 26).
+23. **[DONE on branch `fix/booking-retry-ids`, merge pending] Retry after a lost reply** collided with the guest's own pending booking and the guest never got the token (rule 27). Needs the manual weak-signal test in §12.
+24. **[OPEN, known risk] A guest who pays by UPI but isn't recorded by the owner within the hold window** has the booking cancelled silently by the 15-minute job. Consider an owner alert before expiry, or a longer hold once a payment screenshot is sent.
+25. **[OPEN, low] Guest form starts with adults = the room's `max_guests`,** so `guest_count` and per-person extras default high unless the guest lowers it.
+26. **[WON'T FIX for now] `eachDate()` (`bookingAvailability.ts`) repeats a date in daylight-saving timezones** (checked: Europe/London, 29 Mar 2026). No effect in India (no DST); use `setUTCDate` if guests outside India are ever supported.
+27. **[OPEN, minor]** a stale `blocked-dates` query key; `getDateState` mutates its argument.
+28. **[NOT AUDITED]** the owner dashboard, calendar, Block dates, invoice and WhatsApp reminder screens were not read in this audit. The cancel, status-change and record-payment paths were, and report failures instead of closing silently.
+
+---
+
 ## 11. What's left (suggested order)
 
 **A. Make `main` match this document (cleanup, no new features)**
@@ -233,7 +258,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 4. ~~Fix §10 item 1~~ — done (rule 10).
 
 **B. Security**
-5. Revoke the phone lookups (`lookup_bookings_by_phone`, `lookup_booking_groups_by_phone`) and remove the legacy `?phone=` branch from `booking-status.tsx` after the 30-day window (about late November 2026).
+5. Revoke the phone lookups (`lookup_bookings_by_phone`, `lookup_booking_groups_by_phone`) and remove the legacy `?phone=` branch from `booking-status.tsx`. The SQL is ready in `docs/REVOKE_PHONE_LOOKUPS.sql` — **do not run it before 25 Nov 2026** (old links in guests' hands stop working).
 6. Security headers: done (§10 item 10). CSP still to do.
 7. Superadmin email in one place (§10 item 6).
 8. Confirm the server-side pricing trigger on the live project with one guest test booking (§10 item 12).
@@ -243,6 +268,8 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 10. Decide plan-tier enforcement (§10 item 15).
 11. Turn on channel sync for Munnar / Alleppey / Varkala (`docs/PARKED_FEATURES.md`), with the cron and secrets, once an owner needs it.
 12. Drop `availability.price_override` after `docs/DB_CHECKS.sql` query 2 returns 0.
+14. **Owner alerts that don't depend on the guest tapping Send** (the owner's WhatsApp message is a `wa.me` link; if the guest closes it, the owner isn't told). Options: an in-app "new request" badge, or WhatsApp Business API later.
+15. Landing page: remove or prove the "seconds" claim (rule 7).
 13. **Fix the Edit Stay date picker** (§10 item 21), then retest a stay change on the demo property.
 
 **D. Later (from the v8 roadmap)**
@@ -260,5 +287,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 6. Link previews: `https://<property>.stayidom.in/?_ogdebug=1` shows each step.
 
 ---
+
+*Branches and merging:* the integration branch is `Dev` (capital D). Work on a branch, merge into `Dev`, test on the Vercel preview in a **private tab** (a signed-in owner can read rows a guest can't), then merge `Dev` into `main`.
 
 *Audit method (25 Oct 2026):* repo cloned at `ce9325f`; every doc claim in v9.7, AGENTS.md, README.md and PRD.md was checked against the code, `vercel.json`, the migrations and the 16 Oct baseline. Build and typecheck were not run (npm registry unreachable from the audit sandbox).
