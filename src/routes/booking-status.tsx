@@ -22,6 +22,7 @@ import { BookingInvoice } from "@/components/BookingInvoice";
 import { GuestPolicies } from "@/components/GuestPolicies";
 import type { BookingCharge } from "@/types/database";
 import { computeBalance } from "@/lib/balance";
+import { waDigits } from "@/lib/phone";
 
 export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
@@ -698,7 +699,7 @@ function ContactProperty({
   const upiId = extractUPIId(property.shared_amenities);
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
-  const waLink = whatsapp ? `https://wa.me/${whatsapp.replace(/\D/g, "")}` : null;
+  const waLink = whatsapp ? `https://wa.me/${waDigits(whatsapp)}` : null;
   const mapsLink =
     property.location_lat && property.location_lng
       ? `https://maps.google.com/?q=${property.location_lat},${property.location_lng}`
@@ -735,7 +736,7 @@ function ContactProperty({
         <div className="flex flex-col gap-2">
           {phone && (
             <a
-              href={`tel:+${phone.replace(/\D/g, "")}`}
+              href={`tel:+${waDigits(phone)}`}
               className="flex items-center gap-3 rounded-full border border-border px-4 py-2.5 text-sm font-medium hover:bg-muted transition-colors"
             >
               <Phone className="h-4 w-4" /> Call {property.owner_name ?? "host"}

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Check, Copy, MessageCircle, Printer } from "lucide-react";
 import type { BookingCharge } from "@/types/database";
 import { extractPolicies } from "@/lib/policies";
+import { waDigits } from "@/lib/phone";
 
 interface InvoiceProps {
   booking: {
@@ -130,7 +131,7 @@ export function BookingInvoice({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const guestWaLink = `https://wa.me/${booking.guest_phone.replace(/\D/g, "")}?text=${encodeURIComponent(invoiceText)}`;
+  const guestWaLink = `https://wa.me/${waDigits(booking.guest_phone)}?text=${encodeURIComponent(invoiceText)}`;
 
   return (
     <div className="space-y-4">

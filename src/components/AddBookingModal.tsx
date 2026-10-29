@@ -1,5 +1,5 @@
 import { splitGuests, sumGuests } from "@/lib/guestSplit";
-import { formatIndianPhoneInput, isValidIndianMobile } from "@/lib/phone";
+import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag, Plus } from "lucide-react";
@@ -390,7 +390,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       // the owner used to send by hand. Skipped if there's no usable guest
       // phone number, or the property has no owner contact number to send
       // the message "from" (needed for the confirmed-booking template).
-      const guestPhoneDigits = form.guest_phone.replace(/\D/g, "");
+      const guestPhoneDigits = waDigits(form.guest_phone);
       const ownerPhone = property.owner_phone ?? property.owner_whatsapp ?? "";
       if (guestPhoneDigits.length >= 10 && property.name) {
         const trackingUrl = guestTrackingUrl(window.location.origin, trackingToken, propertyId);
