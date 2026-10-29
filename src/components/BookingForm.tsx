@@ -1,6 +1,9 @@
 import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Clock, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus } from "lucide-react";
+import { Check, Clock, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus, Minus } from "lucide-react";
+import { format } from "date-fns";
+import { stepperLimits } from "@/lib/guestCount";
+import type { Party } from "@/lib/partyAllocation";
 import { useCreateBooking } from "@/hooks/useCreateBooking";
 import { useGuestBookingStatus } from "@/hooks/useGuestBookingStatus";
 import { guestStatusView, type GuestStatusTone } from "@/lib/guestBookingStatus";
@@ -9,7 +12,7 @@ import { bookingInquiryLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { extractUPIId } from "@/utils/upi";
 import { GuestPolicies } from "@/components/GuestPolicies";
 import { UPIPaymentSection } from "@/components/UPIPaymentSection";
-import type { BookingDetails } from "@/components/RoomDetail";
+import type { BookingDetails } from "@/lib/roomSelection";
 import { guestPaymentOptions, paymentNote, type GuestPayment } from "@/lib/guestPayment";
 import {
   browserStore, clearConfirmation, loadConfirmation, saveConfirmation, selectionKey,
@@ -22,13 +25,24 @@ type Property = NonNullable<ReturnType<typeof useProperty>["data"]>;
 type Props = {
   selections: BookingDetails[];
   onRemoveRoom: (roomId: string) => void;
+  /** Everyone who is coming, as chosen in step 1. */
+  party: Party;
+  /** Guest set a room's guests by hand. */
+  onAdjustRoom: (roomId: string, p: Party) => void;
+  /** True once any room was set by hand (shows "Reset to automatic split"). */
+  hasManualSplit: boolean;
+  onResetSplit: () => void;
+  /** Why the booking can't be sent yet (guests without a room, a room with no adult), or null. */
+  problem: string | null;
+  onJustBookedChange?: (justBooked: boolean) => void;
   subdomain: string;
 };
 
 const inputCls =
   "focus-glow w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none";
 
-export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
+export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, hasManualSplit, onResetSplit, problem, onJustBookedChange, subdomain }: Props) {
+  const [editingGuests, setEditingGuests] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+91 ");
   const [email, setEmail] = useState("");
@@ -71,6 +85,14 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   // The form is replaced by the confirmation only for the selection that was just booked.
   const justBooked = !!confirmation && hasSelection && confirmation.selectionKey === currentKey;
 
+  useEffect(() => { onJustBookedChange?.(justBooked); }, [justBooked]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const placedAdults = selections.reduce((n, s) => n + s.adults, 0);
+  const placedChildren = selections.reduce((n, s) => n + (s.children ?? 0), 0);
+  const stayLine = hasSelection
+    ? `${format(new Date(`${selections[0].checkIn}T00:00:00`), "EEE d MMM")} → ${format(new Date(`${selections[0].checkOut}T00:00:00`), "EEE d MMM")}`
+    : "";
+
   const dismissConfirmation = () => {
     clearConfirmation(store);
     setConfirmation(null);
@@ -79,7 +101,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!hasSelection) return;
+    if (!hasSelection || problem) return;
 
     if (!isValidIndianMobile(phone)) {
       setError("Please enter a valid 10-digit Indian mobile number.");
@@ -187,7 +209,7 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
             Step 3
           </span>
-          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Confirm your booking</h2>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Your details</h2>
         </div>
 
         {/* Full "Request sent" card: for the booking just made, or after a reload
@@ -215,69 +237,77 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
 
         {hasSelection && !justBooked && (
           <div className={["bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]", confirmation ? "mt-8" : ""].join(" ")}>
-            {/* ── Room cart summary ── */}
+            {/* ── Booking summary ── */}
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 space-y-3">
-              <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
-                {selections.length === 1 ? "Your room" : `Your rooms (${selections.length})`}
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-medium">{stayLine}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {totalNights} night{totalNights > 1 ? "s" : ""} · {totalGuests} guest{totalGuests > 1 ? "s" : ""}
+                  </div>
+                </div>
+                <a href="#availability" className="shrink-0 text-xs text-primary underline underline-offset-2">Change</a>
               </div>
 
-              {selections.map((s) => (
-                <div key={s.room.id} className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{s.room.name}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {s.nights} night{s.nights > 1 ? "s" : ""} · {s.adults} adults
-                      {s.children ? ` · ${s.children} children` : ""}
+              <div className="border-t border-primary/20 pt-3 space-y-3">
+                {selections.map((s) => {
+                  const lim = stepperLimits(s.room.max_guests, s.adults, s.children ?? 0);
+                  const maxAdults = Math.min(lim.maxAdults, s.adults + Math.max(0, party.adults - placedAdults));
+                  const maxChildren = Math.min(lim.maxChildren, (s.children ?? 0) + Math.max(0, party.children - placedChildren));
+                  return (
+                    <div key={s.room.id} className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-sm truncate">{s.room.name}</div>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {s.adults} adult{s.adults > 1 ? "s" : ""}
+                            {s.children ? ` · ${s.children} child${s.children > 1 ? "ren" : ""}` : ""}
+                            {s.extraGuestCharge > 0 ? ` · extra guests ₹${s.extraGuestCharge.toLocaleString("en-IN")}` : ""}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-semibold text-primary">₹{s.total.toLocaleString("en-IN")}</span>
+                          <button type="button" onClick={() => onRemoveRoom(s.room.id)} className="h-7 w-7 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors" aria-label={`Remove ${s.room.name}`}>
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      {editingGuests && (
+                        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-background/70 px-3 py-2">
+                          <MiniStepper label="Adults" value={s.adults} min={1} max={maxAdults} onChange={(n) => onAdjustRoom(s.room.id, { adults: n, children: s.children ?? 0 })} />
+                          <MiniStepper label="Children" value={s.children ?? 0} min={0} max={maxChildren} onChange={(n) => onAdjustRoom(s.room.id, { adults: s.adults, children: n })} />
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-sm font-semibold text-primary">
-                      ₹{s.total.toLocaleString("en-IN")}
-                    </span>
-                                          <button
-                        type="button"
-                        onClick={() => onRemoveRoom(s.room.id)}
-                        className="h-6 w-6 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors"
-                        aria-label={`Remove ${s.room.name}`}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
+              </div>
 
-              {/* Grand total */}
-              {selections.length > 1 && (
-                <div className="pt-2 border-t border-primary/20 flex justify-between items-center">
-                  <span className="text-sm font-medium">Total ({totalGuests} guests)</span>
-                  <span className="font-display text-xl font-semibold text-primary">
-                    ₹{grandTotal.toLocaleString("en-IN")}
-                  </span>
+              <div className="flex items-center justify-between text-xs">
+                <a href="#rooms" className="text-primary underline underline-offset-2">Change rooms</a>
+                <div className="flex items-center gap-3">
+                  {editingGuests && hasManualSplit && (
+                    <button type="button" onClick={onResetSplit} className="text-muted-foreground underline underline-offset-2">Reset to automatic split</button>
+                  )}
+                  {selections.length > 1 || editingGuests ? (
+                    <button type="button" onClick={() => setEditingGuests(!editingGuests)} className="text-primary underline underline-offset-2">
+                      {editingGuests ? "Done" : "Adjust guests per room"}
+                    </button>
+                  ) : null}
                 </div>
-              )}
+              </div>
 
-              {selections.length === 1 && (
-                <div className="font-display text-xl font-semibold text-primary pt-1">
-                  ₹{grandTotal.toLocaleString("en-IN")}
-                </div>
-              )}
+              <div className="pt-2 border-t border-primary/20 flex justify-between items-center">
+                <span className="text-sm font-medium">Total</span>
+                <span className="font-display text-xl font-semibold text-primary">₹{grandTotal.toLocaleString("en-IN")}</span>
+              </div>
 
               {payment === "UPI" && (
                 <div className="text-xs text-muted-foreground">
-                  Suggested advance (25%): ₹
-                  {Math.round(grandTotal * 0.25).toLocaleString("en-IN")}
+                  Suggested advance (25%): ₹{Math.round(grandTotal * 0.25).toLocaleString("en-IN")}
                 </div>
               )}
             </div>
-
-            {/* Add another room CTA — shown pre-submission */}
-                          <a
-                href="#rooms"
-                className="flex items-center justify-center gap-2 w-full mb-5 rounded-xl border border-dashed border-primary/40 py-2.5 text-xs font-medium text-primary hover:bg-primary-light/30 transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add another room
-              </a>
 
             {/* ── BOOKING FORM ── */}
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -377,9 +407,15 @@ export function BookingForm({ selections, onRemoveRoom, subdomain }: Props) {
                   </div>
                 )}
 
+                {problem && (
+                  <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    {problem} <a href="#rooms" className="underline underline-offset-2">Change rooms</a>
+                  </div>
+                )}
+
                 <button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || !!problem}
                   className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100"
                 >
                   {isPending
@@ -682,4 +718,19 @@ function buildOwnerNotifyLink({
 
   // Shared number rules (lib/phone.ts): handles 10 digits, +91…, 91… and a leading 0.
   return `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(text)}`;
+}
+
+function MiniStepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-14 text-muted-foreground">{label}</span>
+      <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Fewer ${label.toLowerCase()}`} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+        <Minus className="h-3 w-3" />
+      </button>
+      <span className="w-4 text-center font-medium">{value}</span>
+      <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`More ${label.toLowerCase()}`} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+        <Plus className="h-3 w-3" />
+      </button>
+    </div>
+  );
 }
