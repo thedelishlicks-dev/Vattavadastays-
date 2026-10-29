@@ -8,6 +8,7 @@ import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRoun
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { PaymentSetupSection } from '@/components/PaymentSetupSection'
 import { fetchSharedAmenities } from '@/lib/propertyConfig'
+import { formatIndianPhoneInput, isValidIndianMobile } from '@/lib/phone'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
 
 const JUMP_LINKS = [
@@ -337,6 +338,11 @@ function AdminSettings() {
       payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
       payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
       payload.pending_hold_hours = updates.pending_hold_hours ? Math.round(Number(updates.pending_hold_hours)) : 24
+      // Store owner numbers the same way every time, so WhatsApp / call links never depend on how they were typed.
+      for (const k of ['owner_phone', 'owner_whatsapp'] as const) {
+        const v = String(payload[k] ?? '').trim()
+        payload[k] = v === '' ? '' : isValidIndianMobile(v) ? formatIndianPhoneInput(v) : v
+      }
       payload.theme = theme
       payload.heading_font = font
       // Re-read the latest column so we never overwrite sentinels saved elsewhere (UPI, policies, meals…)

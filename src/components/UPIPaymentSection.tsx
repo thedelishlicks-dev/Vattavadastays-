@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from 'lucide-react'
 import { buildUPILink } from '@/utils/upi'
+import { waDigits } from '@/lib/phone'
 
 interface UPIPaymentSectionProps {
   upiId: string
@@ -65,7 +66,7 @@ export function UPIPaymentSection({
     [selectedAmount, propertyName, guestName, roomName, checkIn, shortId]
   )
 
-  const whatsappLink = `https://wa.me/${ownerWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(whatsappMessage)}`
+  const whatsappLink = `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(whatsappMessage)}`
 
   const handleCopyUPI = () => {
     navigator.clipboard.writeText(upiId)

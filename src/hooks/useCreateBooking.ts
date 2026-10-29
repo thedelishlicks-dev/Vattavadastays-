@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
@@ -7,6 +8,7 @@ import { EXTRA_GUEST_ALLOWANCE } from "@/lib/guestCount";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 import { newTrackingToken } from "@/lib/trackingToken";
+import { reuseOrCreateSubmission, storedStateFromLookup, type Submission } from "@/lib/bookingSubmission";
 
 /**
  * A random UUID for rows the browser creates itself. crypto.randomUUID() is
@@ -76,9 +78,28 @@ export interface CreateBookingResult {
 
 export function useCreateBooking() {
   const queryClient = useQueryClient();
+  // The ids / token of the last submission, kept so tapping "Request booking" again after a lost reply
+  // re-uses them (see lib/bookingSubmission.ts). Cleared once a booking is saved.
+  const lastSubmission = useRef<Submission | null>(null);
 
   return useMutation({
     mutationFn: async (input: CreateBookingInput): Promise<CreateBookingResult> => {
+      const { submission, isRetry } = reuseOrCreateSubmission(lastSubmission.current, input, {
+        newId,
+        newToken: newTrackingToken,
+        newGroupRef: () => "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
+      });
+      lastSubmission.current = submission;
+
+      // A retry: the first attempt may have reached the server even though its reply was lost. Ask by
+      // the secret token (the only read a guest has). If it is there, do not re-check availability
+      // (the dates now hold this very booking) or insert it again — carry on to the confirmation.
+      let stored = { groupSaved: false, bookingsSaved: false };
+      if (isRetry) {
+        const { data, error } = await supabase.rpc("lookup_booking_by_token", { p_token: submission.trackingToken });
+        if (!error) stored = storedStateFromLookup(data);
+      }
+
       const checkIn = new Date(input.checkIn);
       const checkOut = new Date(input.checkOut);
       const nights = Math.round((checkOut.getTime() - checkIn.getTime()) / 86400000);
@@ -146,9 +167,11 @@ export function useCreateBooking() {
         check_in_time: input.propertyCheckInTime ?? null,
         check_out_time: input.propertyCheckOutTime ?? null,
       };
-      const conflictsByRoom = await Promise.all(
-        input.rooms.map((ri) => getConflictingDates(ri.roomId, input.checkIn, input.checkOut, turnoverProperty))
-      );
+      const conflictsByRoom = stored.bookingsSaved
+        ? input.rooms.map(() => [] as string[])
+        : await Promise.all(
+            input.rooms.map((ri) => getConflictingDates(ri.roomId, input.checkIn, input.checkOut, turnoverProperty))
+          );
       for (let i = 0; i < input.rooms.length; i++) {
         const room = roomDetails.find((r) => r.id === input.rooms[i].roomId)!;
         if (conflictsByRoom[i].length > 0) {
@@ -207,7 +230,7 @@ export function useCreateBooking() {
       const holdExpiresAt = pendingHoldExpiry(input.propertyPendingHoldHours ?? undefined);
       // One token per submission, shared by the group row and every room row,
       // so one link opens the whole stay.
-      const trackingToken = newTrackingToken();
+      const trackingToken = submission.trackingToken;
 
       // IMPORTANT — anonymous guests may INSERT bookings but have no SELECT on
       // `bookings` / `booking_groups` (HANDOVER rule 10). A PostgREST insert that
@@ -218,10 +241,10 @@ export function useCreateBooking() {
       // why this went unnoticed — always test the guest page in a private tab.)
       let displayRef: string | null = null;
       if (input.rooms.length > 1) {
-        groupId = newId();
-        const groupRef = "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        groupId = submission.groupId;
+        const groupRef = submission.groupRef ?? "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
         displayRef = groupRef;
-        const { error: groupErr } = await supabase
+        const { error: groupErr } = stored.groupSaved ? { error: null } : await supabase
           .from("booking_groups")
           .insert({
             id: groupId,
@@ -252,7 +275,7 @@ export function useCreateBooking() {
       const bookingInserts = input.rooms.map((ri, idx) => {
         const pricing = roomPrices[idx];
         return {
-          id: newId(),
+          id: submission.bookingIds[idx],
           tracking_token: trackingToken,
           property_id: input.propertyId,
           room_id: ri.roomId,
@@ -273,9 +296,9 @@ export function useCreateBooking() {
         };
       });
 
-      const { error: bookingErr } = await supabase
-        .from("bookings")
-        .insert(bookingInserts);
+      const { error: bookingErr } = stored.bookingsSaved
+        ? { error: null }
+        : await supabase.from("bookings").insert(bookingInserts);
 
       if (bookingErr) {
         // Roll back the group row if booking insert failed, so we don't leave
@@ -313,6 +336,8 @@ export function useCreateBooking() {
           extraGuestCharge: pricing.extraGuestCharge,
         };
       });
+
+      lastSubmission.current = null; // saved: the next request is a new booking
 
       return {
         bookingId: firstBookingId,

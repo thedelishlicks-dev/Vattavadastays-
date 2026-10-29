@@ -1,5 +1,6 @@
 import { MapPin, Navigation, Apple, Mountain, MessageSquare } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
+import { waDigits } from "@/lib/phone";
 
 interface MapSectionProps {
   subdomain: string;
@@ -22,7 +23,7 @@ export function MapSection({ subdomain }: MapSectionProps) {
     `Directions to ${propertyName}:`,
     mapsLink ? `Google Maps: ${mapsLink}` : "",
     landmark ? `Landmark: ${landmark}` : "",
-    ownerPhone ? `Call ${ownerName}: +${ownerPhone.replace(/\D/g, "")}` : "",
+    ownerPhone ? `Call ${ownerName}: +${waDigits(ownerPhone)}` : "",
     "See you soon!",
   ].filter(Boolean).join("\n");
 
