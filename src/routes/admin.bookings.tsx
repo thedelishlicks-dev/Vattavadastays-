@@ -1036,7 +1036,11 @@ function BookingsAdmin() {
       if (g) setActiveGroup(g);
     } else if (bookingId) {
       const b = bookings.find((b) => b.id === bookingId);
-      if (b) setActiveBooking(b);
+      // A booking that belongs to a multi-room group opens its group card
+      // (e.g. a quote converted to a multi-room booking links by first booking id).
+      const parent = b?.group_id ? groups.find((g) => g.id === b.group_id) : undefined;
+      if (parent) setActiveGroup(parent);
+      else if (b) setActiveBooking(b);
     }
 
     // Clear the param so refreshing or navigating back doesn't reopen it.
