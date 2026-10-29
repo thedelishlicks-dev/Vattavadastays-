@@ -14,7 +14,8 @@ import {
   startOfWeek,
   addDays,
 } from "date-fns";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Plus } from "lucide-react";
+import type { Party } from "@/lib/partyAllocation";
 import { useProperty } from "@/hooks/useProperty";
 import { useQuery } from "@tanstack/react-query";
 import { getSubdomain } from "@/lib/subdomain";
@@ -39,12 +40,14 @@ type Props = {
   checkOut: Date | null;
   setCheckIn: (d: Date | null) => void;
   setCheckOut: (d: Date | null) => void;
+  party: Party;
+  onPartyChange: (p: Party) => void;
 };
 
 /** How far ahead guests can book. The data below is loaded for exactly this window, so the calendar must not go past it. */
 const BOOKING_HORIZON_MONTHS = 12;
 
-export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Props) {
+export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party, onPartyChange }: Props) {
   const [month, setMonth] = useState(new Date());
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = new Date();
@@ -189,7 +192,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
             Step 1
           </span>
-          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Pick your dates</h2>
+          <h2 className="mt-3 text-3xl md:text-4xl font-semibold">Pick your dates and guests</h2>
         </div>
 
         <div className="grid lg:grid-cols-5 gap-6">
@@ -332,15 +335,14 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </div>
             </div>
 
-            <div className="mt-5 rounded-xl bg-primary-light/60 border border-border p-4 text-sm">
-              <div className="font-medium text-foreground">
-                {nights ? `${nights} night${nights > 1 ? "s" : ""} selected` : "No dates selected"}
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {nights
-                  ? "Continue below to choose your rooms."
-                  : "Select check-in and check-out dates to see available rooms."}
-              </p>
+            <div className="mt-5 rounded-xl border border-border p-4 space-y-3">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Guests</div>
+              <GuestStepper label="Adults" value={party.adults} min={1} max={20} onChange={(n) => onPartyChange({ ...party, adults: n })} />
+              <GuestStepper label="Children" value={party.children} min={0} max={10} onChange={(n) => onPartyChange({ ...party, children: n })} />
+            </div>
+
+            <div className="mt-4 text-sm font-medium text-foreground">
+              {nights ? `${nights} night${nights > 1 ? "s" : ""} · ${party.adults + party.children} guest${party.adults + party.children > 1 ? "s" : ""}` : "Select your check-in and check-out dates"}
             </div>
 
             {noRoomFree && (
@@ -350,21 +352,31 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut }: Pro
               </div>
             )}
 
-            {totalRooms > 1 && (
-              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-xs text-amber-800">
-                <span className="font-medium">Travelling as a group?</span> You can book multiple rooms — just add each one below.
-              </div>
+            {nights > 0 && !noRoomFree ? (
+              <a href="#rooms" className="mt-4 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">See available rooms</a>
+            ) : (
+              <button type="button" disabled className="mt-4 block w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground opacity-40">See available rooms</button>
             )}
-
-            <a
-              href="#rooms"
-              className="mt-5 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Browse rooms
-            </a>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function GuestStepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-sm">{label}</span>
+      <div className="flex items-center gap-2">
+        <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Fewer ${label.toLowerCase()}`} className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+          <Minus className="h-3.5 w-3.5" />
+        </button>
+        <span className="w-6 text-center text-sm font-medium">{value}</span>
+        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`More ${label.toLowerCase()}`} className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
   );
 }
