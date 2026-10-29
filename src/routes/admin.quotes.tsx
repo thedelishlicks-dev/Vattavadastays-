@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { CalendarCheck, MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -169,9 +169,12 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                   </button>
                 )}
                 {q.converted_booking_id && (
-                  <Link to="/admin/bookings" className="inline-flex items-center gap-1.5 rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50">
+                  <a
+                    href={`/admin/bookings?${(() => { const prop = new URLSearchParams(window.location.search).get("property"); return prop ? `property=${encodeURIComponent(prop)}&` : ""; })()}bookingId=${encodeURIComponent(q.converted_booking_id)}`}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50"
+                  >
                     <CalendarCheck className="h-3.5 w-3.5" /> View in Bookings
-                  </Link>
+                  </a>
                 )}
                 {!q.converted_booking_id && q.status !== "accepted" && (
                   <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "accepted" })} className="rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50">
