@@ -66,6 +66,11 @@ export function bookingInquiryLink({
   return link(ownerWhatsapp, text);
 }
 
+/** Guest taps "Ask about this" on a package or add-on (information only: the owner adds it to the stay). */
+export function catalogInquiryLink({ ownerWhatsapp, propertyName, itemName }: { ownerWhatsapp: string; propertyName: string; itemName: string }): string {
+  return link(ownerWhatsapp, `Hi, I'm interested in "${itemName}" at ${propertyName}. Can you tell me more and add it to my stay?`);
+}
+
 export interface ConfirmationTextInput {
   guestName: string;
   propertyName: string;
