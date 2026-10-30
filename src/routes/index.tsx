@@ -9,6 +9,7 @@ import { CartBar } from "@/components/CartBar";
 import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
+import { Packages } from "@/components/Packages";
 import { MapSection } from "@/components/MapSection";
 import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
@@ -257,6 +258,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         />
         <About property={property} />
         <Amenities property={property} />
+        <Packages property={property} />
         <MapSection subdomain={subdomain} />
       </main>
       <Footer subdomain={subdomain} />
