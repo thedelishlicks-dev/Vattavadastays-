@@ -12,7 +12,7 @@ PSQL="psql -v ON_ERROR_STOP=1 -q"
 $PSQL -d postgres -c "drop database if exists $DB" -c "create database $DB"
 $PSQL -d "$DB" -f supabase/tests/stub.sql
 
-MIGRATIONS="supabase/migrations/20261015000000_room_rates.sql supabase/migrations/20261015000100_server_side_booking_price.sql supabase/migrations/20261015000200_room_ical_feeds.sql supabase/migrations/20261020000000_delete_agent_with_commissions.sql"
+MIGRATIONS="supabase/migrations/20261015000000_room_rates.sql supabase/migrations/20261015000100_server_side_booking_price.sql supabase/migrations/20261015000200_room_ical_feeds.sql supabase/migrations/20261020000000_delete_agent_with_commissions.sql supabase/migrations/20261029000000_public_read_catalog.sql"
 for pass in 1 2; do
   for f in $MIGRATIONS; do $PSQL -d "$DB" -f "$f" 2>&1 | grep -v NOTICE || true; done
   echo "migrations applied (pass $pass)"

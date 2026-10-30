@@ -66,6 +66,29 @@ export function bookingInquiryLink({
   return link(ownerWhatsapp, text);
 }
 
+export interface CatalogEnquiryInput {
+  propertyName: string;
+  /** One line per item the guest ticked, e.g. "Honeymoon package (₹4,000 per group)". */
+  items: string[];
+  /** Filled in when the guest has already chosen dates (and maybe rooms) on the page. */
+  stay?: { checkIn: string; checkOut: string; guests: number; rooms: string[] };
+}
+
+/** One WhatsApp message for everything the guest ticked in Packages and add-ons (information only). */
+export function buildCatalogEnquiryText({ propertyName, items, stay }: CatalogEnquiryInput): string {
+  const lines = [`Hi, I'm interested in these at ${propertyName}:`, ...items.map((i) => `• ${i}`)];
+  if (stay) {
+    lines.push("", `Stay: ${stay.checkIn} to ${stay.checkOut}, ${stay.guests} guest${stay.guests > 1 ? "s" : ""}`);
+    if (stay.rooms.length > 0) lines.push(`Rooms: ${stay.rooms.join(", ")}`);
+  }
+  lines.push("", "Please tell me the details and add them to my stay.");
+  return lines.join("\n");
+}
+
+export function catalogEnquiryLink(ownerWhatsapp: string, input: CatalogEnquiryInput): string {
+  return link(ownerWhatsapp, buildCatalogEnquiryText(input));
+}
+
 export interface ConfirmationTextInput {
   guestName: string;
   propertyName: string;

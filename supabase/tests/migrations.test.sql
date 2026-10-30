@@ -182,4 +182,45 @@ do $$ begin
   end;
 end $$;
 
+-- 9. add-ons / packages: guests read only ACTIVE items of a live property, nobody but the owner writes -----
+-- (property a1 is owned by b1, a2 by b2; both are trial/active in the stub. Inserts below run as superuser.)
+reset role;
+insert into properties (id, owner_id, subscription_status) values ('00000000-0000-0000-0000-0000000000a9', '00000000-0000-0000-0000-0000000000b9', 'expired') on conflict do nothing;
+insert into addons (property_id, name, is_active) values
+  ('00000000-0000-0000-0000-0000000000a1', 'Live active', true),
+  ('00000000-0000-0000-0000-0000000000a1', 'Live hidden', false),
+  ('00000000-0000-0000-0000-0000000000a9', 'Expired property', true);
+insert into packages (property_id, name, is_active) values
+  ('00000000-0000-0000-0000-0000000000a1', 'Live package', true),
+  ('00000000-0000-0000-0000-0000000000a1', 'Hidden package', false),
+  ('00000000-0000-0000-0000-0000000000a9', 'Expired package', true);
+do $$ declare n int; begin
+  perform set_config('request.jwt.claim.role', 'anon', true); perform set_config('request.jwt.claim.sub', '', true);
+  set local role anon;
+  select count(*) into n from addons;   perform t_assert(n = 1, 'anon sees only the active add-on of a live property');
+  select count(*) into n from packages; perform t_assert(n = 1, 'anon sees only the active package of a live property');
+  begin
+    insert into addons (property_id, name) values ('00000000-0000-0000-0000-0000000000a1', 'anon write');
+    raise exception 'TEST_NO_ERROR anon addon insert';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  begin
+    update packages set name = 'hacked';
+    get diagnostics n = row_count;
+    perform t_assert(n = 0, 'anon cannot update packages');
+  end;
+  reset role;
+end $$;
+do $$ declare n int; begin
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  select count(*) into n from addons where property_id = '00000000-0000-0000-0000-0000000000a1';
+  perform t_assert(n = 2, 'owner still sees their active and hidden add-ons');
+  insert into addons (property_id, name) values ('00000000-0000-0000-0000-0000000000a1', 'Owner can write');
+  begin
+    insert into addons (property_id, name) values ('00000000-0000-0000-0000-0000000000a2', 'other owners property');
+    raise exception 'TEST_NO_ERROR cross-owner addon insert';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  reset role;
+end $$;
+
 \echo 'ALL DATABASE TESTS PASSED'
