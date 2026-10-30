@@ -25,6 +25,18 @@ create table public.booking_groups (id uuid primary key default gen_random_uuid(
   status text, is_paid boolean default false, source text default 'direct', agent_id uuid, commission_amount numeric, commission_paid boolean default false,
   commission_paid_date date, hold_expires_at timestamptz);
 
+create table public.addons (id uuid primary key default gen_random_uuid(), property_id uuid references public.properties, name text not null, is_active boolean not null default true);
+create table public.packages (id uuid primary key default gen_random_uuid(), property_id uuid references public.properties, name text not null, is_active boolean not null default true);
+alter table public.addons enable row level security;
+alter table public.packages enable row level security;
+-- the owner policies exactly as in supabase/baseline/3_rls_policies.sql
+create policy owners_manage_addons on public.addons for all to public
+  using (property_id in (select id from public.properties where owner_id = auth.uid()))
+  with check (property_id in (select id from public.properties where owner_id = auth.uid()));
+create policy owners_manage_packages on public.packages for all to public
+  using (property_id in (select id from public.properties where owner_id = auth.uid()))
+  with check (property_id in (select id from public.properties where owner_id = auth.uid()));
+
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant execute on function auth.uid(), auth.role() to anon, authenticated, service_role;
