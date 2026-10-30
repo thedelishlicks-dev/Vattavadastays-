@@ -258,7 +258,11 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         />
         <About property={property} />
         <Amenities property={property} />
-        <Packages property={property} />
+        <Packages
+          property={property}
+          stay={checkIn && checkOut ? { checkIn: format(checkIn, "d MMM yyyy"), checkOut: format(checkOut, "d MMM yyyy"), guests, rooms: selectedRooms.map((r) => r.name) } : undefined}
+          liftForCartBar={selections.length > 0 && !justBooked}
+        />
         <MapSection subdomain={subdomain} />
       </main>
       <Footer subdomain={subdomain} />
