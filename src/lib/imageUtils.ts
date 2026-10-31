@@ -25,6 +25,8 @@
  *   About     ≤ 150 KB   (half-column)
  *   Logo      ≤  15 KB   (40 px circle)
  *   Static map ≤ 100 KB  (no JS SDK)
+ *   Gallery   ≤ 140 KB   (opens only when a guest taps a photo)
+ *   Gallery thumbnail ≤ 30 KB (the grid; this is what loads first)
  */
 
 import imageCompression from "browser-image-compression";
@@ -33,7 +35,7 @@ import imageCompression from "browser-image-compression";
 // Types
 // ---------------------------------------------------------------------------
 
-export type ImagePreset = "room" | "hero" | "about" | "logo" | "staticMap";
+export type ImagePreset = "room" | "hero" | "about" | "logo" | "staticMap" | "gallery" | "galleryThumb";
 
 export interface CompressResult {
   file: File;
@@ -90,6 +92,18 @@ const PRESET_OPTIONS: Record<
   staticMap: {
     maxSizeMB: 0.10,         // 100 KB
     maxWidthOrHeight: 900,
+    initialQuality: 0.70,
+    useWebWorker: true,
+  },
+  gallery: {
+    maxSizeMB: 0.14,         // 140 KB
+    maxWidthOrHeight: 1200,
+    initialQuality: 0.72,
+    useWebWorker: true,
+  },
+  galleryThumb: {
+    maxSizeMB: 0.03,         // 30 KB
+    maxWidthOrHeight: 480,
     initialQuality: 0.70,
     useWebWorker: true,
   },
