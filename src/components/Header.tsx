@@ -3,12 +3,12 @@ import { Menu, X } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { getSubdomain } from "@/lib/subdomain";
 
-const links = [
+const baseLinks = [
+  { href: "#about", label: "About" },
+  { href: "#amenities", label: "Amenities" },
   { href: "#availability", label: "Dates" },
   { href: "#rooms", label: "Rooms" },
   { href: "#booking", label: "Book" },
-  { href: "#about", label: "About" },
-  { href: "#amenities", label: "Amenities" },
   { href: "#contact", label: "Contact" },
 ];
 
@@ -17,6 +17,8 @@ export function Header() {
   const subdomain = getSubdomain();
   const { data: property } = useProperty(subdomain);
 
+  const hasGallery = (property?.gallery_images?.length ?? 0) > 0;
+  const links = hasGallery ? [...baseLinks.slice(0, 2), { href: "#gallery", label: "Gallery" }, ...baseLinks.slice(2)] : baseLinks;
   const logoUrl = property?.logo_url ?? null;
   const propertyName = property?.name ?? "Loading...";
   const propertyNameMl = property?.name_ml ?? null;
