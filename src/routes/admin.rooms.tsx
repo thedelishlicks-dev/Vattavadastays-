@@ -29,6 +29,7 @@ type RoomForm = {
   room_type: string
   bed_type: string
   max_guests: string
+  max_occupancy: string
   room_amenities: string[]
   is_active: boolean
 }
@@ -38,6 +39,7 @@ const emptyForm = (): RoomForm => ({
   room_type: 'deluxe',
   bed_type: 'king',
   max_guests: '2',
+  max_occupancy: '',
   room_amenities: [],
   is_active: true,
 })
@@ -162,7 +164,7 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
   }, [focusPricing])
   const [form, setForm] = useState<RoomForm>(
     room
-      ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), room_amenities: room.room_amenities ?? [], is_active: room.is_active }
+      ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), max_occupancy: room.max_occupancy != null ? String(room.max_occupancy) : '', room_amenities: room.room_amenities ?? [], is_active: room.is_active }
       : emptyForm()
   )
   // Price fields come from the shared RoomPricingFields component (same one the Pricing page uses).
@@ -186,12 +188,21 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
     if (!form.name.trim()) { setError('Room name is required'); return }
     const maxGuests = parseInt(form.max_guests)
     if (isNaN(maxGuests) || maxGuests < 1) { setError('Max guests must be at least 1'); return }
+    const occupancy = form.max_occupancy.trim() === '' ? null : parseInt(form.max_occupancy)
+    if (occupancy !== null && (isNaN(occupancy) || occupancy < maxGuests || occupancy > 30)) {
+      setError(`Most guests allowed must be between ${maxGuests} (the guests included in the price) and 30, or left empty`)
+      return
+    }
     const parsedPricing = parsePricing(pricing)
     if (!parsedPricing.ok) { setError(parsedPricing.error); return }
     setSaving(true)
     setError('')
     try {
-      const payload = { ...form, max_guests: maxGuests, ...parsedPricing.values }
+      const payload: Record<string, unknown> = { ...form, max_guests: maxGuests, ...parsedPricing.values }
+      // Sent only when it has a value or the room already has the column, so saving a room keeps working
+      // on a database that has not had the 20261101 migration yet.
+      if (occupancy !== null || (room && 'max_occupancy' in room)) payload.max_occupancy = occupancy
+      else delete payload.max_occupancy
       if (room) {
         const { error: err } = await supabase.from('rooms').update(payload).eq('id', room.id)
         if (err) throw err
@@ -241,9 +252,18 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Max guests</label>
-            <input type="number" min={1} max={20} value={form.max_guests} onChange={(e) => set('max_guests', e.target.value)} className={inputCls} />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Guests included in the price</label>
+              <input type="number" min={1} max={20} value={form.max_guests} onChange={(e) => set('max_guests', e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Most guests allowed</label>
+              <input type="number" min={1} max={30} value={form.max_occupancy} onChange={(e) => set('max_occupancy', e.target.value)} placeholder={`${(parseInt(form.max_guests) || 0) + 4}`} className={inputCls} />
+            </div>
+            <p className="col-span-2 -mt-1 text-xs text-muted-foreground">
+              Guests above the included number pay the extra-guest price. "Most guests allowed" is the most the room can hold with extra beds; guests can never book more. Leave empty to allow {(parseInt(form.max_guests) || 0) + 4}.
+            </p>
           </div>
 
           <div ref={pricingRef} className="scroll-mt-4">
@@ -434,7 +454,7 @@ function AdminRooms() {
                     <span>Bed: <span className="text-foreground font-medium capitalize">{room.bed_type}</span></span>
                   </div>
                   <div className="flex gap-4">
-                    <span>Max: <span className="text-foreground font-medium">{room.max_guests} guests</span></span>
+                    <span>Includes <span className="text-foreground font-medium">{room.max_guests} guests</span>{room.max_occupancy ? <> · up to <span className="text-foreground font-medium">{room.max_occupancy}</span></> : null}</span>
                   </div>
                 </div>
 

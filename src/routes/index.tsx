@@ -18,7 +18,7 @@ import { useProperty } from "@/hooks/useProperty";
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { useUnavailableRoomIds } from "@/hooks/useUnavailableRoomIds";
 import { getSubdomain } from "@/lib/subdomain";
-import { allocateGuests, suggestRooms, extraGuestsIn, isFullyPlaced, partySize, type Party } from "@/lib/partyAllocation";
+import { allocateGuests, suggestOptions, isFullyPlaced, partySize, type Party } from "@/lib/partyAllocation";
 import { buildBookingDetails, type BookingDetails } from "@/lib/roomSelection";
 import type { Room } from "@/types/database";
 
@@ -92,11 +92,17 @@ function GuestPage({ subdomain }: { subdomain: string }) {
     () => (checkIn && checkOut ? selectedRooms.map((r) => buildBookingDetails(r, allocation.byRoom[r.id], checkIn, checkOut, rates)) : []),
     [selectedRooms, allocation, checkIn, checkOut, rates],
   );
-  const suggestion = useMemo(() => (hasDates && settled ? suggestRooms(visibleRooms, party) : []), [hasDates, settled, visibleRooms, party]);
+  // Options for a group, priced for real (room prices for these dates, weekend and season included, plus extra guests).
+  const options = useMemo(() => {
+    if (!checkIn || !checkOut || !settled) return { bestValue: null, moreSpace: null };
+    const byId = new Map(visibleRooms.map((r) => [r.id, r]));
+    return suggestOptions(visibleRooms, party, (r, g) => buildBookingDetails(byId.get(r.id) as Room, { adults: g, children: 0 }, checkIn, checkOut, rates).total);
+  }, [checkIn, checkOut, settled, visibleRooms, party, rates]);
 
   const guests = partySize(party);
+  // The group only needs a choice when no single room covers everyone inside its included guests.
+  const groupNeedsChoice = visibleRooms.length > 0 && guests > Math.max(0, ...visibleRooms.map((r) => r.max_guests));
   const unplaced = allocation.unplacedAdults + allocation.unplacedChildren;
-  const selectedFit = selectedRooms.length > 0 && isFullyPlaced(allocation) && extraGuestsIn(selectedRooms, allocation) === 0;
   const problem =
     selectedRooms.length === 0 ? null
     : allocation.roomsWithoutAdult.length > 0 ? "Each room needs at least one adult."
@@ -137,9 +143,9 @@ function GuestPage({ subdomain }: { subdomain: string }) {
       return next;
     });
   };
-  const handleUseSuggestion = () => {
+  const handleUseOption = (ids: string[]) => {
     setNotice(null);
-    setSelectedIds(suggestion);
+    setSelectedIds(ids);
     setPinned({});
   };
   const goToForm = () => document.getElementById("booking")?.scrollIntoView({ behavior: "smooth" });
@@ -242,10 +248,9 @@ function GuestPage({ subdomain }: { subdomain: string }) {
           onToggle={handleToggleRoom}
           rates={rates}
           propertyAmenities={property?.shared_amenities}
-          suggestion={suggestion}
-          suggestionNeeded={!selectedFit}
-          noRoomsForGroup={suggestion.length === 0 && visibleRooms.length > 0}
-          onUseSuggestion={handleUseSuggestion}
+          options={groupNeedsChoice ? options : { bestValue: null, moreSpace: null }}
+          noRoomsForGroup={visibleRooms.length > 0 && !options.bestValue}
+          onUseOption={handleUseOption}
           notice={notice}
           onDismissNotice={() => setNotice(null)}
         />

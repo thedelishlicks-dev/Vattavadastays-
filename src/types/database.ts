@@ -51,6 +51,8 @@ export interface Room {
   name_ml?: string;
   room_type: string;
   max_guests: number;
+  /** Most guests the room can take, extra beds included. null/absent = included guests + 4. */
+  max_occupancy?: number | null;
   bed_type: string;
   base_price: number;
   extra_guest_price: number;

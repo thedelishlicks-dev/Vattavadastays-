@@ -5,6 +5,7 @@ import { PhotoViewer } from '@/components/PhotoViewer'
 import type { Room } from '@/types/database'
 import type { RoomRate } from '@/lib/roomRates'
 import { roomStayPrice } from '@/lib/roomSelection'
+import type { RoomOptions, RoomOption } from '@/lib/partyAllocation'
 import { parseMealsConfig, hasMealInfo } from '@/lib/meals'
 
 interface RoomsProps {
@@ -21,11 +22,11 @@ interface RoomsProps {
   onToggle: (room: Room) => void
   rates?: readonly RoomRate[]
   propertyAmenities?: string[] | null
-  /** Room ids that together fit the whole group (empty when the group needs just one room or can't be housed). */
-  suggestion: string[]
-  suggestionNeeded: boolean
+  /** How to house a group no single room covers: the cheapest way, and a roomier way if there is one. */
+  options: RoomOptions
+  /** True when the free rooms cannot take this many guests at all. */
   noRoomsForGroup: boolean
-  onUseSuggestion: () => void
+  onUseOption: (roomIds: string[]) => void
   notice: string | null
   onDismissNotice: () => void
 }
@@ -57,10 +58,16 @@ export function Rooms(p: RoomsProps) {
         </div>
       )}
 
-      {hasDates && p.settled && p.suggestionNeeded && p.suggestion.length > 1 && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-light/40 px-4 py-3 text-sm">
-          <span><span className="font-medium">{p.guests} guests need {p.suggestion.length} rooms.</span> We can pick them for you.</span>
-          <button type="button" onClick={p.onUseSuggestion} className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90">Use suggested rooms</button>
+      {hasDates && p.settled && p.options.bestValue && (
+        <div className="mb-6 rounded-2xl border border-primary/30 bg-primary-light/40 p-4">
+          <div className="text-sm font-medium">Options for your group of {p.guests}</div>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <OptionCard tag="Best value" option={p.options.bestValue} rooms={p.rooms} selectedIds={p.selectedRoomIds} onUse={p.onUseOption} />
+            {p.options.moreSpace && (
+              <OptionCard tag="More space" option={p.options.moreSpace} rooms={p.rooms} selectedIds={p.selectedRoomIds} onUse={p.onUseOption} extraCost={p.options.moreSpace.total - p.options.bestValue.total} />
+            )}
+          </div>
+          <p className="mt-3 text-xs text-stone-500">Totals are for your whole stay and include extra-guest charges.</p>
         </div>
       )}
 
@@ -214,6 +221,37 @@ function RoomCard({ room, checkIn, checkOut, rates, propertyAmenities, isSelecte
             )}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function OptionCard({ tag, option, rooms, selectedIds, onUse, extraCost }: {
+  tag: string
+  option: RoomOption
+  rooms: Room[]
+  selectedIds: string[]
+  onUse: (ids: string[]) => void
+  /** More space only: how much more than the best value. */
+  extraCost?: number
+}) {
+  const names = option.ids.map((id) => rooms.find((r) => r.id === id)?.name ?? 'Room')
+  const chosen = option.ids.length === selectedIds.length && option.ids.every((id) => selectedIds.includes(id))
+  return (
+    <div className={['flex flex-col rounded-xl border bg-white p-4', chosen ? 'border-primary ring-2 ring-primary/20' : 'border-stone-200'].join(' ')}>
+      <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">{tag}</span>
+      <div className="mt-1 font-semibold text-stone-900">{names.join(' + ')}</div>
+      <div className="mt-0.5 text-xs text-stone-500">
+        {option.extraGuests > 0 ? `${option.extraGuests} extra guest${option.extraGuests > 1 ? 's' : ''} at the extra-guest rate` : 'No extra-guest charges'}
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div>
+          <div className="font-semibold text-stone-900">₹{option.total.toLocaleString('en-IN')}</div>
+          {extraCost !== undefined && extraCost > 0 && <div className="text-xs text-stone-500">+₹{extraCost.toLocaleString('en-IN')} more</div>}
+        </div>
+        <button type="button" onClick={() => onUse(option.ids)} disabled={chosen} className={chosen ? 'inline-flex items-center gap-1 rounded-full bg-primary/10 px-4 py-2 text-xs font-medium text-primary' : 'rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:opacity-90'}>
+          {chosen ? <><Check className="h-3.5 w-3.5" />Selected</> : 'Use this'}
+        </button>
       </div>
     </div>
   )

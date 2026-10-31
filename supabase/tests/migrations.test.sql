@@ -260,4 +260,71 @@ do $$ declare rid uuid; begin
   update rooms set images = null where id = rid;
 end $$;
 
+-- 12. guest limit per room (rooms.max_occupancy) ----------------------------------------------
+-- Room C1 includes 2 guests, so with no limit set a guest booking may hold 2 + 4 = 6.
+reset role;
+update rooms set max_occupancy = null where id = :'C1';
+do $$ declare ok boolean; begin
+  perform set_config('request.jwt.claim.role', 'anon', true); perform set_config('request.jwt.claim.sub', '', true);
+  set local role anon;
+  insert into bookings (property_id, room_id, guest_name, guest_phone, guest_count, check_in, check_out, total_amount)
+  values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Cap six', '999', 6, '2027-06-01', '2027-06-02', 1);
+  reset role;
+  begin
+    set local role anon;
+    insert into bookings (property_id, room_id, guest_name, guest_phone, guest_count, check_in, check_out, total_amount)
+    values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Cap seven', '999', 7, '2027-06-03', '2027-06-04', 1);
+    reset role;
+    raise exception 'TEST_NO_ERROR 7 guests with no limit set';
+  exception when others then
+    reset role;
+    if sqlerrm like 'TEST_NO_ERROR%' then raise; end if;
+    perform t_assert(sqlerrm like 'too many guests%', 'seven guests are refused with a clear message when no limit is set (default 2 + 4)');
+  end;
+end $$;
+select t_assert((select count(*) = 1 from bookings where guest_name = 'Cap six'), 'six guests (the old default limit) are still accepted');
+select t_assert((select count(*) = 0 from bookings where guest_name = 'Cap seven'), 'the refused booking was not saved');
+
+-- The owner sets a limit of 3: four guests are refused, three are accepted.
+reset role;
+update rooms set max_occupancy = 3 where id = :'C1';
+do $$ begin
+  perform set_config('request.jwt.claim.role', 'anon', true); perform set_config('request.jwt.claim.sub', '', true);
+  begin
+    set local role anon;
+    insert into bookings (property_id, room_id, guest_name, guest_phone, guest_count, check_in, check_out, total_amount)
+    values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Over limit', '999', 4, '2027-06-05', '2027-06-06', 1);
+    reset role;
+    raise exception 'TEST_NO_ERROR 4 guests over a limit of 3';
+  exception when others then
+    reset role;
+    if sqlerrm like 'TEST_NO_ERROR%' then raise; end if;
+    perform t_assert(sqlerrm like 'too many guests for this room (maximum 3)%', 'four guests are refused when the owner limit is 3');
+  end;
+  set local role anon;
+  insert into bookings (property_id, room_id, guest_name, guest_phone, guest_count, check_in, check_out, total_amount)
+  values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'At limit', '999', 3, '2027-06-07', '2027-06-08', 1);
+  reset role;
+end $$;
+select t_assert((select count(*) = 1 from bookings where guest_name = 'At limit'), 'three guests are accepted at a limit of 3');
+
+-- The limit cannot be set below the included guests or above 30.
+do $$ begin
+  begin update rooms set max_occupancy = 1 where id = '00000000-0000-0000-0000-0000000000c1'; raise exception 'TEST_NO_ERROR below included';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  begin update rooms set max_occupancy = 31 where id = '00000000-0000-0000-0000-0000000000c1'; raise exception 'TEST_NO_ERROR above 30';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+end $$;
+
+-- The owner keeps full control: their own bookings are not held to the guest limit.
+do $$ begin
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  insert into bookings (property_id, room_id, guest_name, guest_count, check_in, check_out, total_amount, status)
+  values ('00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000c1', 'Owner large party', 9, '2027-06-10', '2027-06-11', 100, 'confirmed');
+  reset role;
+end $$;
+select t_assert((select count(*) = 1 from bookings where guest_name = 'Owner large party'), 'an owner can still enter a larger party');
+update rooms set max_occupancy = null where id = :'C1';
+
 \echo 'ALL DATABASE TESTS PASSED'

@@ -49,3 +49,15 @@ test("clampParty repairs a stale selection (e.g. after switching rooms)", () => 
   assert.deepEqual(clampParty(2, 2, 1), { adults: 2, children: 1 });   // already valid: unchanged
   assert.deepEqual(clampParty(4, 3, 3), { adults: 3, children: 3 });   // larger room, valid
 });
+
+test("the owner's own limit replaces included + allowance; blank keeps the old rule", () => {
+  assert.equal(maxGuestsFor(4, 6), 6);
+  assert.equal(maxGuestsFor(4, null), 4 + EXTRA_GUEST_ALLOWANCE);
+  assert.equal(maxGuestsFor(4, undefined), 4 + EXTRA_GUEST_ALLOWANCE);
+  assert.equal(maxGuestsFor(4, 3), 4 + EXTRA_GUEST_ALLOWANCE); // a limit below the included guests is ignored
+});
+
+test("steppers and clamping follow the owner's limit", () => {
+  assert.deepEqual(stepperLimits(2, 2, 0, 3), { maxAdults: 3, maxChildren: 1 });
+  assert.deepEqual(clampParty(2, 5, 2, 3), { adults: 3, children: 0 });
+});
