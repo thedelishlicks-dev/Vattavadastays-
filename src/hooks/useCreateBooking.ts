@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { getConflictingDates, pendingHoldExpiry } from "@/lib/bookingAvailability";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { fetchRoomRates } from "@/hooks/useRoomRates";
-import { EXTRA_GUEST_ALLOWANCE } from "@/lib/guestCount";
+import { maxGuestsFor } from "@/lib/guestCount";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 import { newTrackingToken } from "@/lib/trackingToken";
@@ -119,7 +119,9 @@ export function useCreateBooking() {
       // ── Step 1: Load all rooms' details in one query ──
       const { data: roomDetails, error: roomsErr } = await supabase
         .from("rooms")
-        .select("id, name, base_price, extra_guest_price, weekend_multiplier, max_guests")
+        // "*" on purpose: it includes max_occupancy once the 20261101 migration is applied and
+        // still works before it (the room then falls back to max_guests + 4).
+        .select("*")
         .in("id", roomIds)
         .eq("is_active", true);
 
@@ -130,13 +132,15 @@ export function useCreateBooking() {
 
       // Validate guest counts per room.
       // max_guests is the number of guests INCLUDED in the base price, not
-      // a hard cap — guests can exceed it up to EXTRA_GUEST_ALLOWANCE more,
+      // a hard cap — guests can exceed it up to the room's own limit
+      // (rooms.max_occupancy, or max_guests + 4 when the owner set none),
       // charged at extra_guest_price per night. This must match the ceiling
-      // used by the guest steppers (see lib/guestCount.ts: room.max_guests + 4).
+      // used by the guest steppers (lib/guestCount.ts maxGuestsFor) and the
+      // database check when the booking is saved.
       for (const ri of input.rooms) {
         const room = roomDetails.find((r) => r.id === ri.roomId);
         if (!room) throw new Error("One or more selected rooms are no longer available.");
-        const absoluteCap = room.max_guests + EXTRA_GUEST_ALLOWANCE;
+        const absoluteCap = maxGuestsFor(room.max_guests, room.max_occupancy);
         if (ri.guestCount > absoluteCap) {
           throw new Error(`"${room.name}" can host a maximum of ${absoluteCap} guests (including extras).`);
         }
