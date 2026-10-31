@@ -31,6 +31,10 @@ export type Property = {
   landmark_description: string | null
   static_map_image_url: string | null
   shared_amenities: string[] | null
+  /** Full-size gallery photo URLs in display order; thumbnails sit beside them (lib/gallery.ts). */
+  gallery_images: string[] | null
+  /** Instagram handle only, e.g. "hillview". */
+  instagram_handle: string | null
   rooms: import('@/types/database').Room[]
 }
 
