@@ -10,6 +10,7 @@ import { BookingForm } from "@/components/BookingForm";
 import { About } from "@/components/About";
 import { Amenities } from "@/components/Amenities";
 import { Packages } from "@/components/Packages";
+import { Gallery } from "@/components/Gallery";
 import { MapSection } from "@/components/MapSection";
 import { SeoTags } from "@/components/SeoTags";
 import { Footer } from "@/components/Footer";
@@ -219,6 +220,9 @@ function GuestPage({ subdomain }: { subdomain: string }) {
       <Header />
       <main>
         <Hero />
+        <About property={property} />
+        <Amenities property={property} />
+        <Gallery property={property} />
         <Availability
           checkIn={checkIn}
           checkOut={checkOut}
@@ -256,8 +260,6 @@ function GuestPage({ subdomain }: { subdomain: string }) {
           onJustBookedChange={setJustBooked}
           subdomain={subdomain}
         />
-        <About property={property} />
-        <Amenities property={property} />
         <Packages
           property={property}
           stay={checkIn && checkOut ? { checkIn: format(checkIn, "d MMM yyyy"), checkOut: format(checkOut, "d MMM yyyy"), guests, rooms: selectedRooms.map((r) => r.name) } : undefined}

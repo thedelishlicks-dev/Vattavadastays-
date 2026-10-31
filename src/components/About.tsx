@@ -1,4 +1,4 @@
-import { Users, BedDouble, Bath } from "lucide-react";
+import { Users, BedDouble, UtensilsCrossed } from "lucide-react";
 import type { Property } from "@/hooks/useProperty";
 import { parseMealsConfig } from "@/lib/meals";
 
@@ -18,18 +18,21 @@ export function About({ property }: AboutProps) {
         ? "Available"
         : "—";
 
+  // Only facts we actually have: no "—" or "Your host" placeholders.
   const stats = [
-    { icon: BedDouble, label: "Rooms", value: roomCount > 0 ? String(roomCount) : "—" },
-    { icon: Users, label: "Host", value: property.owner_name ?? "Your host" },
-    { icon: Bath, label: "Meals", value: mealsLabel },
-  ];
+    roomCount > 0 ? { icon: BedDouble, label: "Rooms", value: String(roomCount) } : null,
+    property.owner_name ? { icon: Users, label: "Host", value: property.owner_name } : null,
+    mealsLabel !== "—" ? { icon: UtensilsCrossed, label: "Meals", value: mealsLabel } : null,
+  ].filter((x): x is { icon: typeof Users; label: string; value: string } => x !== null);
 
-  const aboutImage = property.about_image ?? property.hero_image ?? "/assets/cottage.jpg";
-  const ownerInitial = property.owner_name?.charAt(0).toUpperCase() ?? "H";
+  const aboutImage = property.about_image ?? property.hero_image ?? null;
+  const ownerInitial = property.owner_name?.charAt(0).toUpperCase() ?? "";
+  const area = property.area?.trim() || null;
 
   return (
     <section id="about" className="py-20 md:py-28 bg-background">
-      <div className="mx-auto max-w-6xl px-4 md:px-8 grid md:grid-cols-2 gap-12 items-center">
+      <div className={aboutImage ? "mx-auto max-w-6xl px-4 md:px-8 grid md:grid-cols-2 gap-12 items-center" : "mx-auto max-w-3xl px-4 md:px-8"}>
+        {aboutImage && (
         <div className="relative">
           <img
             src={aboutImage}
@@ -39,6 +42,7 @@ export function About({ property }: AboutProps) {
             loading="lazy"
             className="rounded-2xl shadow-[var(--shadow-elevated)] w-full"
           />
+          {property.owner_name && (
           <div className="absolute -bottom-6 -right-4 md:-right-6 bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-soft)] max-w-[220px]">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display text-lg font-semibold">
@@ -50,7 +54,9 @@ export function About({ property }: AboutProps) {
               </div>
             </div>
           </div>
+          )}
         </div>
+        )}
 
         <div>
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">
@@ -65,9 +71,10 @@ export function About({ property }: AboutProps) {
             </div>
           )}
           <p className="mt-5 text-muted-foreground leading-relaxed">
-            {property.description ?? `Welcome to ${property.name}, a beautiful stay in ${property.area ?? "Vattavada"}.`}
+            {property.description ?? `Welcome to ${property.name}${area ? `, a stay in ${area}` : ""}.`}
           </p>
 
+          {stats.length > 0 && (
           <div className="mt-8 grid grid-cols-3 gap-3">
             {stats.map(({ icon: Icon, label, value }) => (
               <div
@@ -82,6 +89,7 @@ export function About({ property }: AboutProps) {
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
     </section>

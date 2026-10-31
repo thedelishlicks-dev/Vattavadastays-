@@ -223,4 +223,27 @@ do $$ declare n int; begin
   reset role;
 end $$;
 
+-- 10. gallery photos and Instagram handle on properties -------------------------------------
+reset role;
+select t_assert((select gallery_images = '{}' and instagram_handle is null from properties where id = '00000000-0000-0000-0000-0000000000a1'), 'existing properties start with an empty gallery and no handle');
+do $$ begin
+  update properties set gallery_images = array['u1','u2'], instagram_handle = 'hill.view_1' where id = '00000000-0000-0000-0000-0000000000a1';
+  perform t_assert((select cardinality(gallery_images) = 2 and instagram_handle = 'hill.view_1' from properties where id = '00000000-0000-0000-0000-0000000000a1'), 'photos and a valid handle can be saved');
+  begin
+    update properties set gallery_images = (select array_agg('u' || g) from generate_series(1, 13) g) where id = '00000000-0000-0000-0000-0000000000a1';
+    raise exception 'TEST_NO_ERROR 13 photos';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  update properties set gallery_images = (select array_agg('u' || g) from generate_series(1, 12) g) where id = '00000000-0000-0000-0000-0000000000a1';
+  perform t_assert((select cardinality(gallery_images) = 12 from properties where id = '00000000-0000-0000-0000-0000000000a1'), '12 photos is allowed');
+  begin
+    update properties set instagram_handle = 'not a handle!' where id = '00000000-0000-0000-0000-0000000000a1';
+    raise exception 'TEST_NO_ERROR bad handle';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  begin
+    update properties set instagram_handle = '@hillview' where id = '00000000-0000-0000-0000-0000000000a1';
+    raise exception 'TEST_NO_ERROR handle with @';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  update properties set instagram_handle = null where id = '00000000-0000-0000-0000-0000000000a1';
+end $$;
+
 \echo 'ALL DATABASE TESTS PASSED'

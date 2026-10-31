@@ -11,6 +11,8 @@ export interface Property {
   location_lat?: number;
   location_lng?: number;
   shared_amenities: string[];
+  gallery_images?: string[] | null;
+  instagram_handle?: string | null;
   hero_tagline?: string;
   description?: string;
   description_ml?: string;
