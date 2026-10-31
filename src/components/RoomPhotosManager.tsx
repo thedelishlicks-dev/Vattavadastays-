@@ -112,6 +112,7 @@ export function RoomPhotosManager({ roomId, propertyId, photos, onChanged }: Pro
               </div>
             ))}
           </div>
+          {photos.length === 1 && <p className="text-xs text-muted-foreground">Add 2 or 3 more photos: guests can swipe through them on the room card.</p>}
           <button type="button" disabled={busy || room <= 0} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-2 text-sm font-medium text-primary hover:bg-primary-light disabled:opacity-40">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             {busy ? progress : room <= 0 ? "Room is full" : "Add photos"}
