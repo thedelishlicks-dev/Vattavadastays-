@@ -6,8 +6,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
 import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
 import type { Room } from '@/types/database'
-import { validateAndCompress, compressionSummary } from '@/lib/imageUtils'
 import { RoomRatesEditor } from '@/components/RoomRatesEditor'
+import { RoomPhotosManager } from '@/components/RoomPhotosManager'
 import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
 
 export const Route = createFileRoute('/admin/rooms')({
@@ -151,86 +151,6 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
 }
 
 // ---------------------------------------------------------------------------
-// Room image upload
-// ---------------------------------------------------------------------------
-
-function RoomImageUpload({ room, propertyId, onUploaded }: { room: Room; propertyId: string; onUploaded: () => void }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-  const [progress, setProgress] = useState<string>('')
-  const [error, setError] = useState('')
-  const currentImage = room.images?.[0] ?? null
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    setError('')
-    setProgress('Checking file…')
-    try {
-      setProgress('Compressing…')
-      const result = await validateAndCompress(file, 'room')
-      const { file: compressed } = result
-      setProgress(compressionSummary(result))
-      const path = `${propertyId}/${room.id}-${Date.now()}.webp`
-      const { error: uploadError } = await supabase.storage.from('room-images').upload(path, compressed, { upsert: true, contentType: 'image/webp' })
-      if (uploadError) throw uploadError
-      const { data: urlData } = supabase.storage.from('room-images').getPublicUrl(path)
-      const { error: dbError } = await supabase.from('rooms').update({ images: [urlData.publicUrl] }).eq('id', room.id)
-      if (dbError) throw dbError
-      onUploaded()
-      setProgress('')
-    } catch (err: unknown) {
-      setError(typeof err === 'string' ? err : (err as Error).message ?? 'Upload failed')
-      setProgress('')
-    } finally {
-      setUploading(false)
-      if (inputRef.current) inputRef.current.value = ''
-    }
-  }
-
-  const handleRemove = async () => {
-    await supabase.from('rooms').update({ images: [] }).eq('id', room.id)
-    onUploaded()
-  }
-
-  return (
-    <div className="space-y-2">
-      <p className={labelCls}>Room Image</p>
-      {currentImage ? (
-        <div className="relative rounded-lg overflow-hidden">
-          <img src={currentImage} alt={room.name} className="w-full h-36 object-cover" />
-          <button type="button" onClick={handleRemove} className="absolute top-2 right-2 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80">
-            <X className="h-3.5 w-3.5" />
-          </button>
-          <button type="button" onClick={() => inputRef.current?.click()} className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-black/60 text-white text-xs px-2.5 py-1 hover:bg-black/80">
-            <Upload className="h-3 w-3" /> Replace
-          </button>
-        </div>
-      ) : (
-        <div onClick={() => !uploading && inputRef.current?.click()} className="border-2 border-dashed border-border rounded-lg h-36 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors">
-          {uploading ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              <p className="text-xs text-muted-foreground text-center px-4">{progress}</p>
-            </>
-          ) : (
-            <>
-              <ImageOff className="h-5 w-5 text-muted-foreground" />
-              <p className="text-xs text-muted-foreground">Tap to upload photo</p>
-              <p className="text-[10px] text-muted-foreground/60">JPG / PNG / WebP · max 10 MB</p>
-            </>
-          )}
-        </div>
-      )}
-      {uploading && currentImage && <p className="text-xs text-muted-foreground">{progress}</p>}
-      <input ref={inputRef} type="file" accept="image/jpeg,image/png,image/webp,image/heic" className="hidden" onChange={handleUpload} />
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Room drawer (add / edit)
 // ---------------------------------------------------------------------------
 
@@ -299,7 +219,7 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {room && <RoomImageUpload room={room} propertyId={propertyId} onUploaded={onSaved} />}
+          {room && <RoomPhotosManager roomId={room.id} propertyId={propertyId} photos={room.images ?? []} onChanged={onSaved} />}
 
           <div>
             <label className={labelCls}>Room name *</label>
