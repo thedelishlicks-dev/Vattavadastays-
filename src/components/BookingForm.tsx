@@ -251,7 +251,7 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
 
               <div className="border-t border-primary/20 pt-3 space-y-3">
                 {selections.map((s) => {
-                  const lim = stepperLimits(s.room.max_guests, s.adults, s.children ?? 0);
+                  const lim = stepperLimits(s.room.max_guests, s.adults, s.children ?? 0, s.room.max_occupancy);
                   const maxAdults = Math.min(lim.maxAdults, s.adults + Math.max(0, party.adults - placedAdults));
                   const maxChildren = Math.min(lim.maxChildren, (s.children ?? 0) + Math.max(0, party.children - placedChildren));
                   return (
