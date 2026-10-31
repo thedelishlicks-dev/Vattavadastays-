@@ -7,6 +7,7 @@
 // sits next to the photo with "-t" added before ".webp", so only the full URL is stored.
 
 export const MAX_GALLERY_PHOTOS = 12;
+export const MAX_ROOM_PHOTOS = 6;
 
 export function thumbUrl(fullUrl: string): string {
   return fullUrl.replace(/\.webp(\?.*)?$/i, "-t.webp$1");
