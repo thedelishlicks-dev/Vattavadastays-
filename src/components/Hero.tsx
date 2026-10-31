@@ -1,31 +1,30 @@
 import { useProperty } from "@/hooks/useProperty";
+import { useNow } from "@/hooks/useNow";
+import { useLiveWeather } from "@/hooks/useLiveWeather";
 import { getSubdomain } from "@/lib/subdomain";
-
-function getTodayLabel(): string {
-  return new Date().toLocaleDateString("en-IN", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
+import { formatLiveDate, formatLiveTime, formatRange, symbolLabel } from "@/lib/liveInfo";
 
 export function Hero() {
   const subdomain = getSubdomain();
   const { data: property } = useProperty(subdomain);
 
   const heroImage = property?.hero_image ?? null;
-  const today = getTodayLabel();
+  const now = useNow();
+  const { data: weather } = useLiveWeather(property?.location_lat, property?.location_lng);
+  const wx = weather ? symbolLabel(weather.symbol) : null;
 
   const propertyName = property?.name ?? "Loading...";
   const propertyNameMl = property?.name_ml ?? null;
-  const area = property?.area ?? "Vattavada";
+  const area = property?.area?.trim() || null;
+  const place = [area, "Kerala"].filter(Boolean).join(" · ");
   const roomCount = property?.rooms?.length ?? 0;
   const logoUrl = property?.logo_url ?? null;
 
   const tagline = property?.hero_tagline
     ? property.hero_tagline
-    : `${roomCount}-room stay in ${area}`;
+    : roomCount > 0
+      ? `${roomCount}-room stay${area ? ` in ${area}` : ""}`
+      : "";
 
   return (
     <section id="top" className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
@@ -62,7 +61,7 @@ export function Hero() {
           ) : (
             <div className="flex items-center gap-3 flex-wrap justify-center">
               <span className="inline-flex items-center rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs uppercase tracking-[0.2em] backdrop-blur-sm">
-                {area} · Kerala
+                {place}
               </span>
             </div>
           )}
@@ -76,28 +75,28 @@ export function Hero() {
                 {propertyNameMl}
               </div>
             )}
-            <p className="mx-auto max-w-xl text-base md:text-lg text-white/90 font-medium tracking-wide drop-shadow-md">
-              {tagline}
-            </p>
+            {tagline && (
+              <p className="mx-auto max-w-xl text-base md:text-lg text-white/90 font-medium tracking-wide drop-shadow-md">
+                {tagline}
+              </p>
+            )}
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-4 mt-4">
-          <a
-            href="#availability"
-            className="inline-flex items-center justify-center rounded-full bg-primary px-10 py-4 text-sm md:text-base font-semibold text-primary-foreground shadow-2xl hover:scale-[1.05] active:scale-95 transition-all duration-300"
-          >
-            Check Availability
-          </a>
+          <a href="#availability" className="inline-flex items-center justify-center rounded-full bg-primary px-10 py-4 text-sm md:text-base font-semibold text-primary-foreground shadow-2xl hover:scale-[1.05] active:scale-95 transition-all duration-300">Check Availability</a>
 
           <div className="flex flex-col items-center gap-3 animate-in fade-in duration-1000 delay-500">
-            <div className="text-[10px] uppercase tracking-[0.3em] font-medium text-white/70">
-              {area} · Kerala
-            </div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-4 py-1.5 text-xs backdrop-blur-md">
-              <span>{today}</span>
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-4 py-1.5 text-xs backdrop-blur-md" title={area ? `Local time in ${area}` : "Local time"}>
+              <span>{formatLiveDate(now)}</span>
               <span className="opacity-40">|</span>
-              <span>🌡 12–18°C</span>
+              <span>{formatLiveTime(now)}</span>
+              {weather && (
+                <>
+                  <span className="opacity-40">|</span>
+                  <span title="Forecast for the next 24 hours">{wx?.emoji} {formatRange(weather.min, weather.max)}</span>
+                </>
+              )}
             </span>
           </div>
         </div>
