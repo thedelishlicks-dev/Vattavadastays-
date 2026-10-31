@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { PaymentSetupSection } from '@/components/PaymentSetupSection'
+import { GalleryManager, InstagramField } from '@/components/GalleryManager'
 import { fetchSharedAmenities } from '@/lib/propertyConfig'
 import { formatIndianPhoneInput, isValidIndianMobile } from '@/lib/phone'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
@@ -331,6 +332,21 @@ function AdminSettings() {
     setForm((f) => ({ ...f, [column]: url ?? '' }))
   }
 
+  const persistGallery = async (urls: string[]) => {
+    if (!property?.id) return
+    const { error } = await supabase.from('properties').update({ gallery_images: urls }).eq('id', property.id)
+    if (error) throw error
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+  }
+  const persistInstagram = async (handle: string | null) => {
+    if (!property?.id) return
+    const { error } = await supabase.from('properties').update({ instagram_handle: handle }).eq('id', property.id)
+    if (error) throw error
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+  }
+
   const mutation = useMutation({
     mutationFn: async ({ updates, theme, font }: { updates: typeof form, theme: ThemeName, font: string }) => {
       if (!property?.id) throw new Error('No property loaded')
@@ -425,6 +441,10 @@ function AdminSettings() {
 
         {/* ── About image ── */}
         <ImageUploadField label="About Section Image" hint="Shown beside your property description. Landscape photo works best." bucket="hero-images" pathPrefix={property.id} stem="about" preset="about" currentUrl={form.about_image || null} onUploaded={(url) => persistImage('about_image', url)} onRemoved={() => persistImage('about_image', null)} />
+
+        {/* ── Gallery + Instagram (saved straight away, not with the Save button below) ── */}
+        <GalleryManager propertyId={property.id} photos={property.gallery_images ?? []} onChange={persistGallery} />
+        <InstagramField value={property.instagram_handle ?? null} onSave={persistInstagram} />
 
         {/* ── Static map ── */}
         <ImageUploadField label="Static Map Image" hint="A screenshot of your property location on Google Maps. Used instead of a map embed — loads in under 1 second on 2G." bucket="hero-images" pathPrefix={property.id} stem="map" preset="staticMap" currentUrl={form.static_map_image_url || null} onUploaded={(url) => persistImage('static_map_image_url', url)} onRemoved={() => persistImage('static_map_image_url', null)} />
