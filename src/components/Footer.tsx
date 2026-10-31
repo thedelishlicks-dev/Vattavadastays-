@@ -1,6 +1,8 @@
-import { Phone, MapPin, MessageCircle, Leaf } from "lucide-react";
+import { Phone, MapPin, MessageCircle, Leaf, Instagram } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { telLink } from "@/lib/whatsapp";
+import { instagramUrl } from "@/lib/gallery";
+import { useLiveWeather } from "@/hooks/useLiveWeather";
 
 export function Footer({ subdomain }: { subdomain: string }) {
   const { data: property } = useProperty(subdomain);
@@ -15,7 +17,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
   const mapsUrl =
     lat && lng
       ? `https://maps.google.com/?q=${lat},${lng}`
-      : "https://maps.google.com/?q=Upper+Vattavada+Munnar";
+      : `https://maps.google.com/?q=${encodeURIComponent([property?.name, property?.area, "Kerala"].filter(Boolean).join(" "))}`;
 
   function cleanDigits(p: string): string {
     const d = p.replace(/\D/g, "");
@@ -24,6 +26,8 @@ export function Footer({ subdomain }: { subdomain: string }) {
     return d;
   }
 
+  const igLink = instagramUrl(property?.instagram_handle);
+  const { data: weather } = useLiveWeather(property?.location_lat, property?.location_lng);
   const waLink = whatsapp ? `https://wa.me/${cleanDigits(whatsapp)}` : null;
 
   return (
@@ -102,6 +106,12 @@ export function Footer({ subdomain }: { subdomain: string }) {
                   WhatsApp
                 </a>
               )}
+              {igLink && (
+                <a href={igLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors">
+                  <Instagram className="h-4 w-4" />
+                  @{property?.instagram_handle?.replace(/^@/, "")}
+                </a>
+              )}
 
             </div>
           </div>
@@ -113,6 +123,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
               © {new Date().getFullYear()} {propertyName}. All rights reserved.
             </span>
             {ownerName && <span>Hosted by {ownerName}</span>}
+            {weather && <a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline underline-offset-2">Weather data from MET Norway</a>}
           </div>
           <span className="font-medium text-primary">Powered by stayidom.in</span>
         </div>
