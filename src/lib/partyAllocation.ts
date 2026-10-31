@@ -7,7 +7,8 @@
 //   - every guest, adults and children, counts;
 //   - a room's price covers `max_guests` ("included") guests; each guest above that pays
 //     extra_guest_price per night;
-//   - a room takes at most included + EXTRA_GUEST_ALLOWANCE guests, at most MAX_CHILDREN children;
+//   - a room takes at most its max_occupancy guests (included + EXTRA_GUEST_ALLOWANCE if the owner
+//     set none), at most MAX_CHILDREN children;
 //   - every room needs at least one adult.
 
 import { MAX_CHILDREN, maxGuestsFor } from "./guestCount";
@@ -17,6 +18,8 @@ export type Party = { adults: number; children: number };
 export type AllocRoom = {
   id: string;
   max_guests: number;
+  /** The owner's limit including extra beds; null/undefined = included + the standard allowance. */
+  max_occupancy?: number | null;
   base_price?: number;
   extra_guest_price?: number | null;
 };
@@ -32,7 +35,7 @@ export type Allocation = {
 
 export const partySize = (p: Party): number => p.adults + p.children;
 
-const roomCap = (r: AllocRoom) => maxGuestsFor(r.max_guests);
+const roomCap = (r: AllocRoom) => maxGuestsFor(r.max_guests, r.max_occupancy);
 const extraPrice = (r: AllocRoom) => Number(r.extra_guest_price ?? 0);
 
 /**
@@ -99,46 +102,66 @@ export function extraGuestsIn(rooms: AllocRoom[], a: Allocation): number {
 export const isFullyPlaced = (a: Allocation): boolean =>
   a.unplacedAdults === 0 && a.unplacedChildren === 0 && a.roomsWithoutAdult.length === 0;
 
-/**
- * The rooms to offer a group: the fewest rooms that hold everyone inside the included numbers
- * (cheapest set first). If no set does, the set with the fewest extra-guest charges, then the
- * fewest rooms, then the lowest price.
- * Returns [] when even all the rooms cannot take the party.
- */
-export function suggestRooms(rooms: AllocRoom[], party: Party): string[] {
-  const total = partySize(party);
-  if (total === 0 || rooms.length === 0) return [];
-  // Subsets are tried by brute force; a homestay has a handful of rooms. Keep the
-  // cheapest 14 so a very large property cannot blow this up.
-  const pool = [...rooms].sort((a, b) => (a.base_price ?? 0) - (b.base_price ?? 0)).slice(0, 14);
-  const n = pool.length;
+/** One way to house the whole group, with what it really costs for the stay. */
+export type RoomOption = {
+  ids: string[];
+  /** Real total for the stay: room prices for the dates (weekend and season included) plus extra-guest charges. */
+  total: number;
+  extraGuests: number;
+};
 
-  let best: { key: [number, number, number, number]; ids: string[] } | null = null;
+export type RoomOptions = {
+  /** The cheapest way to house everyone. */
+  bestValue: RoomOption | null;
+  /** The cheapest way that puts fewer guests on extra-guest charges (more rooms / roomier), if there is one. */
+  moreSpace: RoomOption | null;
+};
+
+/**
+ * The options to offer a group. `priceOf(room, guestsInRoom)` must return what that room costs for the
+ * stay with that many guests in it (room price for the dates plus its extra-guest charge).
+ *
+ * Every set of rooms that can hold everyone (a room needs an adult, nobody over a room's limit) is priced
+ * for real. "Best value" is the cheapest; "More space" is the cheapest one with fewer extra guests than
+ * Best value. Returns nulls when nobody can be housed, or when Best value already has no extra guests.
+ */
+export function suggestOptions(rooms: AllocRoom[], party: Party, priceOf: (room: AllocRoom, guests: number) => number): RoomOptions {
+  const none: RoomOptions = { bestValue: null, moreSpace: null };
+  const total = partySize(party);
+  if (total === 0 || rooms.length === 0) return none;
+
+  // All sets are tried; a homestay has a handful of rooms. Keep the 12 cheapest so a huge property can't blow this up.
+  const pool = [...rooms].sort((a, b) => (a.base_price ?? 0) - (b.base_price ?? 0)).slice(0, 12);
+  const n = pool.length;
+  const memo = new Map<string, number>();
+  const price = (r: AllocRoom, g: number) => {
+    const k = `${r.id}:${g}`;
+    let v = memo.get(k);
+    if (v === undefined) memo.set(k, (v = priceOf(r, g)));
+    return v;
+  };
+
+  const feasible: (RoomOption & { rooms: number })[] = [];
   for (let mask = 1; mask < 1 << n; mask++) {
     const set: AllocRoom[] = [];
     for (let i = 0; i < n; i++) if (mask & (1 << i)) set.push(pool[i]);
     if (set.length > party.adults) continue; // each room needs an adult
-    if (set.reduce((s, r) => s + roomCap(r), 0) < total) continue;
+    if (set.reduce((sum, r) => sum + roomCap(r), 0) < total) continue;
     const a = allocateGuests(set, party);
     if (!isFullyPlaced(a)) continue;
-    const extras = extraGuestsIn(set, a);
-    const cost = set.reduce((s, r) => s + (r.base_price ?? 0), 0) +
-      set.reduce((s, r) => s + Math.max(0, partySize(a.byRoom[r.id]) - r.max_guests) * extraPrice(r), 0);
-    const key: [number, number, number, number] = [extras > 0 ? 1 : 0, extras, set.length, cost];
-    if (!best || cmp(key, best.key) < 0) best = { key, ids: set.map((r) => r.id) };
+    feasible.push({
+      ids: set.map((r) => r.id),
+      total: set.reduce((sum, r) => sum + price(r, partySize(a.byRoom[r.id])), 0),
+      extraGuests: extraGuestsIn(set, a),
+      rooms: set.length,
+    });
   }
-  return best ? best.ids : [];
-}
+  if (feasible.length === 0) return none;
 
-function cmp(a: number[], b: number[]): number {
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] - b[i];
-  return 0;
-}
-
-/** How many rooms the group needs without extra-guest charges (0 if it cannot be done). */
-export function roomsNeededWithinIncluded(rooms: AllocRoom[], party: Party): number {
-  const ids = suggestRooms(rooms, party);
-  if (ids.length === 0) return 0;
-  const set = rooms.filter((r) => ids.includes(r.id));
-  return extraGuestsIn(set, allocateGuests(set, party)) === 0 ? ids.length : 0;
+  const strip = ({ ids, total, extraGuests }: RoomOption & { rooms: number }): RoomOption => ({ ids, total, extraGuests });
+  // Cheapest first; on a tie fewer rooms, then fewer extra guests.
+  const byValue = (x: (typeof feasible)[number], y: (typeof feasible)[number]) => x.total - y.total || x.rooms - y.rooms || x.extraGuests - y.extraGuests;
+  const best = [...feasible].sort(byValue)[0];
+  const roomier = feasible.filter((o) => o.extraGuests < best.extraGuests).sort(byValue)[0];
+  return { bestValue: strip(best), moreSpace: roomier ? strip(roomier) : null };
 }
