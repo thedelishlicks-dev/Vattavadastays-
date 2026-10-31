@@ -7,7 +7,7 @@ const NOW = new Date("2026-10-30T10:30:00Z");
 
 test("low and high of the next 24 hours, with the symbol for now", () => {
   const ts = [
-    hour("2026-10-30T10:00:00Z", 17.4, "partlycloudy_day"),b
+    hour("2026-10-30T10:00:00Z", 17.4, "partlycloudy_day"),
     hour("2026-10-30T14:00:00Z", 19.2, "rain"),
     hour("2026-10-30T22:00:00Z", 11.6),
     hour("2026-10-31T09:00:00Z", 16.0),
