@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { BedDouble, Users, Check, X, ChevronDown, Coffee, UtensilsCrossed, Truck, Loader2 } from 'lucide-react'
+import { BedDouble, Users, Check, X, ChevronDown, Coffee, UtensilsCrossed, Truck, Loader2, Images } from 'lucide-react'
+import { PhotoViewer } from '@/components/PhotoViewer'
 import type { Room } from '@/types/database'
 import type { RoomRate } from '@/lib/roomRates'
 import { roomStayPrice } from '@/lib/roomSelection'
@@ -105,19 +106,27 @@ function RoomCard({ room, checkIn, checkOut, rates, propertyAmenities, isSelecte
   onToggle: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [viewer, setViewer] = useState(false)
+  const photos = room.images ?? []
   const stay = roomStayPrice(room, checkIn, checkOut, rates)
   const meals = parseMealsConfig(propertyAmenities)
 
   return (
     <div className={['rounded-2xl border bg-white overflow-hidden', isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-stone-200'].join(' ')}>
-      {room.images?.[0] && (
+      {photos[0] && (
         <div className="relative">
-          <img src={room.images[0]} alt={room.name} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
+          <button type="button" onClick={() => setViewer(true)} aria-label={`See ${photos.length > 1 ? `all ${photos.length} photos` : 'the photo'} of ${room.name}`} className="block w-full">
+            <img src={photos[0]} alt={room.name} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
+          </button>
           {isSelected && (
             <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"><Check className="h-3 w-3" />Added</span>
           )}
+          {photos.length > 1 && (
+            <button type="button" onClick={() => setViewer(true)} className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-black/75"><Images className="h-3.5 w-3.5" />{photos.length} photos</button>
+          )}
         </div>
       )}
+      {viewer && <PhotoViewer photos={photos} start={0} onClose={() => setViewer(false)} />}
       <div className="p-4 space-y-3">
         <div>
           <h3 className="font-semibold text-stone-900">{room.name}</h3>
