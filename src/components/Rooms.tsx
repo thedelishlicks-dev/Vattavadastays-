@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { format } from 'date-fns'
-import { BedDouble, Users, Check, X, ChevronDown, Coffee, UtensilsCrossed, Truck, Loader2, Images } from 'lucide-react'
+import { BedDouble, Users, Check, X, ChevronDown, Coffee, UtensilsCrossed, Truck, Loader2, Images, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PhotoViewer } from '@/components/PhotoViewer'
 import type { Room } from '@/types/database'
 import type { RoomRate } from '@/lib/roomRates'
@@ -107,26 +107,51 @@ function RoomCard({ room, checkIn, checkOut, rates, propertyAmenities, isSelecte
 }) {
   const [open, setOpen] = useState(false)
   const [viewer, setViewer] = useState(false)
+  const [idx, setIdx] = useState(0)
+  const touchX = useRef<number | null>(null)
   const photos = room.images ?? []
+  const n = photos.length
+  // Move to another photo of this room; the next one is fetched only once the guest starts browsing.
+  const go = (d: number) => {
+    const next = (idx + d + n) % n
+    setIdx(next)
+    if (n > 2) new Image().src = photos[(next + d + n) % n]
+  }
   const stay = roomStayPrice(room, checkIn, checkOut, rates)
   const meals = parseMealsConfig(propertyAmenities)
 
   return (
     <div className={['rounded-2xl border bg-white overflow-hidden', isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-stone-200'].join(' ')}>
       {photos[0] && (
-        <div className="relative">
-          <button type="button" onClick={() => setViewer(true)} aria-label={`See ${photos.length > 1 ? `all ${photos.length} photos` : 'the photo'} of ${room.name}`} className="block w-full">
-            <img src={photos[0]} alt={room.name} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
+        <div
+          className="relative"
+          onTouchStart={(e) => { touchX.current = e.touches[0].clientX }}
+          onTouchEnd={(e) => {
+            if (touchX.current === null || n < 2) return
+            const dx = e.changedTouches[0].clientX - touchX.current
+            touchX.current = null
+            if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1)
+          }}
+        >
+          <button type="button" onClick={() => setViewer(true)} aria-label={`Open ${n > 1 ? `photo ${idx + 1} of ${n}` : 'the photo'} of ${room.name} full screen`} className="block w-full">
+            <img src={photos[idx]} alt={room.name} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
           </button>
           {isSelected && (
             <span className="absolute top-2 right-2 flex items-center gap-1 rounded-full bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground"><Check className="h-3 w-3" />Added</span>
           )}
-          {photos.length > 1 && (
-            <button type="button" onClick={() => setViewer(true)} className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-black/75"><Images className="h-3.5 w-3.5" />{photos.length} photos</button>
+          {n > 1 && (
+            <>
+              <button type="button" onClick={() => setViewer(true)} className="absolute top-2 left-2 inline-flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white hover:bg-black/75"><Images className="h-3.5 w-3.5" />{idx + 1} / {n}</button>
+              <button type="button" onClick={() => go(-1)} aria-label="Previous photo" className="absolute left-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65"><ChevronLeft className="h-5 w-5" /></button>
+              <button type="button" onClick={() => go(1)} aria-label="Next photo" className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-black/45 text-white flex items-center justify-center hover:bg-black/65"><ChevronRight className="h-5 w-5" /></button>
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5" aria-hidden="true">
+                {photos.map((_, k) => <span key={k} className={['h-1.5 rounded-full transition-all', k === idx ? 'w-4 bg-white' : 'w-1.5 bg-white/60'].join(' ')} />)}
+              </div>
+            </>
           )}
         </div>
       )}
-      {viewer && <PhotoViewer photos={photos} start={0} onClose={() => setViewer(false)} />}
+      {viewer && <PhotoViewer photos={photos} start={idx} onClose={() => setViewer(false)} />}
       <div className="p-4 space-y-3">
         <div>
           <h3 className="font-semibold text-stone-900">{room.name}</h3>
