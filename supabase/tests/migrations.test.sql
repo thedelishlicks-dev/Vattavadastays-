@@ -246,4 +246,18 @@ do $$ begin
   update properties set instagram_handle = null where id = '00000000-0000-0000-0000-0000000000a1';
 end $$;
 
+-- 11. room photos: up to 8 stored, more refused ------------------------------------------------
+reset role;
+do $$ declare rid uuid; begin
+  select id into rid from rooms limit 1;
+  update rooms set images = array['a','b','c','d','e','f','g','h'] where id = rid;
+  perform t_assert((select cardinality(images) = 8 from rooms where id = rid), '8 room photos are allowed');
+  begin
+    update rooms set images = array['a','b','c','d','e','f','g','h','i'] where id = rid;
+    raise exception 'TEST_NO_ERROR 9 room photos';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  update rooms set images = '{}' where id = rid;
+  update rooms set images = null where id = rid;
+end $$;
+
 \echo 'ALL DATABASE TESTS PASSED'
