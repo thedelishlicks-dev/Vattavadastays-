@@ -38,7 +38,7 @@ export function Packages({ property, stay, liftForCartBar }: {
   const sendLink = canEnquire && items.length > 0 ? catalogEnquiryLink(property.owner_whatsapp as string, { propertyName: property.name, items, stay }) : null;
 
   return (
-    <section id="packages" className="py-20 md:py-28 bg-background">
+    <section id="packages" className="py-20 md:py-28 bg-primary-light/40">
       <div className="mx-auto max-w-6xl px-4 md:px-8">
         <div className="text-center max-w-2xl mx-auto">
           <span className="text-xs uppercase tracking-[0.25em] text-primary font-medium">Make it special</span>
