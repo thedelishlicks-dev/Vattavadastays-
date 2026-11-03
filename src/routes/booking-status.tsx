@@ -1,3 +1,4 @@
+import { directionsUrl, hasCoordinates } from "@/lib/location";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -700,10 +701,9 @@ function ContactProperty({
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${waDigits(whatsapp)}` : null;
-  const mapsLink =
-    property.location_lat && property.location_lng
-      ? `https://maps.google.com/?q=${property.location_lat},${property.location_lng}`
-      : null;
+  const mapsLink = hasCoordinates(property.location_lat, property.location_lng)
+    ? directionsUrl({ lat: property.location_lat, lng: property.location_lng })
+    : null;
 
   return (
     <div className="space-y-4">
