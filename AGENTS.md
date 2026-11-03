@@ -109,7 +109,7 @@ RLS enforces all security. Owners only see their own data because `auth.uid()` i
 ## File structure (current)
 
 ```
-api/                    ← Vercel Edge Functions: og, seo, manifest, ical, ical-sync (+ api/_lib/)
+api/                    ← Vercel Edge Functions: og, seo, manifest, ical, ical-sync, weather (+ api/_lib/)
 src/
   lib/
     supabase.ts         ← single supabase client instance
@@ -118,6 +118,10 @@ src/
     roomRates.ts        ← seasonal-rate rules (pickRate); mirrors SQL stay_room_price()
     calendarState.ts    ← owner Calendar labels (pure, tested)
     onboarding.ts       ← superadmin statuses, checklist, WhatsApp helpers
+    guestCount.ts       ← maxGuestsFor(): the one guest limit per room (owner's max_occupancy or included + 4)
+    partyAllocation.ts  ← shares guests over rooms; suggestOptions() = Best value / More space
+    roomSelection.ts    ← BookingDetails + buildBookingDetails() for the guest page
+    gallery.ts, location.ts, liveInfo.ts, guestCatalog.ts ← gallery/Instagram, map-link pair rule, hero date/time/weather, packages text
     propertyConfig.ts   ← the ONLY writer of shared_amenities
     bookingAvailability.ts, paginate.ts, errorLog*.ts, dbErrors.ts, features.ts, …
   hooks/                ← TanStack Query hooks (useBookings, useCreateBooking, useRoomRates, …)
@@ -130,7 +134,7 @@ supabase/
   tests/                ← migration + RLS tests run by CI
 scripts/                ← *.check.ts behaviour checks, typecheck.sh, run-checks.sh
 tests/api/              ← tests for api/ handlers
-docs/                   ← PARKED_FEATURES, POLISH_FIVE, CALENDAR_FIX, DB_CHECKS.sql
+docs/                   ← GUEST_PAGE (guest page + flow), PARKED_FEATURES, POLISH_FIVE, CALENDAR_FIX, DB_CHECKS.sql
 ```
 
 ---
@@ -206,7 +210,7 @@ VITE_SUPERADMIN_EMAIL=          # must match the superadmin email in HANDOVER §
 
 Set in Vercel project settings. Never hardcode. Never commit `.env` files (`.env.example` is the template).
 
-Edge-only secrets (never in the browser): `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`.
+Edge-only secrets (never in the browser): `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`. Edge-only setting: `WEATHER_USER_AGENT` (optional contact for MET Norway).
 
 ---
 
@@ -245,11 +249,15 @@ No RPC. Direct client calls in sequence:
 3. Price the stay with `priceRoomStay()` (`src/lib/quoteBuilder.ts`) — the same calculator as the owner side.
 4. Insert the booking (and group, if multi-room) as `pending`.
 5. Insert is re-checked by the database:
-   - `enforce_guest_booking_terms` (BEFORE INSERT) recomputes price with `stay_room_price()`, forces `pending`, unpaid, `source='direct'`, a capped hold (default 24 h).
+   - `enforce_guest_booking_terms` (BEFORE INSERT) recomputes price with `stay_room_price()`, forces `pending`, unpaid, `source='direct'`, a capped hold (default 24 h), and refuses more guests than the room's limit (`rooms.max_occupancy`, or `max_guests + 4`).
    - `bookings_no_overlap` rejects overlapping active stays (SQLSTATE 23P01 → "Those dates were just booked for this room.").
 6. The mirror `availability` rows are written by `trg_mark_booking_nights` (not by the browser).
 
 `stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` covers this.
+
+### Guest page flow
+
+The page the guest uses to build a booking (dates + guests → rooms → details) is described in `docs/GUEST_PAGE.md`. Rooms are chosen by id; the guests in each room and the prices are derived (`partyAllocation.ts`, `roomSelection.ts`), never stored separately. Group options are priced from real stay totals, not base prices.
 
 ### Owner booking
 
@@ -311,6 +319,7 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - For any DB change: write a migration under `supabase/migrations/`, make it idempotent, and add a query to `docs/DB_CHECKS.sql` if it changes what the app reads.
 - Never add a second editor for data that already has a home (HANDOVER §5).
 - Never claim a feature on the landing page or in checklists that the app can't back up.
+- Guest-page rules: HANDOVER §3 rules 29–34 (guest limit, allocation, light photos, map pair, weather, packages). No video or reel embeds.
 - Stay dates: always use `RoomAvailabilityCalendar` (the Add Booking picker). Never a plain `<input type="date">` for stay dates (HANDOVER rule 24).
 
 ---
@@ -333,6 +342,7 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - [x] Cleanup: old DB functions (`recharts`: not removed, not bundled)
 - [x] Tracking-link token (replace phone-only lookup). Revoke legacy phone lookups after 30 days.
 - [x] Security headers in `vercel.json` (no CSP yet)
+- [x] Guest page (3 Nov 2026): three-step flow with automatic room options, per-room guest limit, photo gallery and Instagram link, several photos per room, packages shown with a WhatsApp enquiry, live date/time/temperature, directions fix. See HANDOVER §9 and `docs/GUEST_PAGE.md`
 - [ ] Landing page rewrite on `main`
 - [ ] Edit Stay date picker matches the app calendar (HANDOVER §10 item 21)
 - [ ] Plan-tier enforcement decision

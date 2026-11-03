@@ -7,6 +7,7 @@ Built for patchy rural connectivity. The pilot is in **Vattavada**, a mountain v
 ## Key features
 
 - **Guest booking site.** Mobile-first, lightweight. Seasonal and weekend pricing, server-checked price, booking reference (`#XXXXXXXX`) shown on confirmation and sent to the owner on WhatsApp.
+- **Guest page details first.** Property story, amenities, photo gallery with an Instagram link and live date, time and temperature range, then three booking steps; groups get automatic room options with real prices. Packages and add-ons are shown with a WhatsApp enquiry. See [docs/GUEST_PAGE.md](docs/GUEST_PAGE.md).
 - **Owner dashboard (`/admin`).** Rooms and seasonal rates, bookings, owner calendar (all-rooms and per-room), block dates, quotes, payments (part-payments, refund due), agents and commissions, settings, payment setup (UPI), policies, meals, add-ons.
 - **Superadmin (`/superadmin`).** Add properties, invite owners by email, setup checklist, renewal and billing notes, client error log, leads.
 - **WhatsApp, no API needed.** Deep links for booking notices, payment and directions reminders, and payment screenshots.
@@ -49,6 +50,8 @@ VITE_SUPERADMIN_EMAIL=your_superadmin_email
 ```
 
 Open `http://localhost:5173`. To test a property locally, add `?slug=bleafmudhouse`.
+
+Optional (Vercel only): `WEATHER_USER_AGENT`, the contact sent to MET Norway for the live temperature (see HANDOVER rule 33). No key is needed.
 
 ### Checks
 
@@ -104,6 +107,7 @@ Supabase Auth needs Site URL `https://stayidom.in`, redirect URLs `https://stayi
 
 - [AGENTS.md](AGENTS.md) — rules for anyone (or any AI assistant) changing the code
 - [HANDOVER.md](HANDOVER.md) — current state, rules, known issues and what's left
+- [docs/GUEST_PAGE.md](docs/GUEST_PAGE.md) — how the guest page and booking flow work, migrations to run, how to test
 - [PRD.md](PRD.md) — product requirements and status
 - [docs/PARKED_FEATURES.md](docs/PARKED_FEATURES.md) — channel sync and how to turn it on
 - [supabase/baseline/README.md](supabase/baseline/README.md) — how to rebuild the database

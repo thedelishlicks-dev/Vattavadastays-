@@ -1,7 +1,7 @@
-# stayidom.in — Product Requirements Document v1.2
+# stayidom.in — Product Requirements Document v1.3
 
-**Last updated:** 25 Oct 2026 (status reconciled with the code at `ce9325f`)
-**Previous:** v1.1 (May 2026)
+**Last updated:** 3 Nov 2026 (guest page section updated; the rest was reconciled with the code at `ce9325f` on 25 Oct 2026)
+**Previous:** v1.2 (25 Oct 2026), v1.1 (May 2026)
 **Author:** stayidom.in team
 **Technical detail:** see `HANDOVER.md` (current state) and `AGENTS.md` (rules). This document is about **what** the product must do and **what is done**.
 
@@ -67,7 +67,13 @@
 - ✅ "Notify owner" and "Book via WhatsApp" deep links with the booking details pre-filled.
 - ✅ Cancellation policy and house rules shown on the booking form, confirmation, tracking page and printed invoice.
 - ✅ Booking-status (tracking) page: guest opens the link from the confirmation card or WhatsApp. The link carries a secret token; there is no phone search. Legacy `?phone=` links work until the 30-day window closes.
-- ✅ Static map image and "Get Directions" (Google and Apple deep links).
+- ✅ Static map image and "Get Directions" (Google and Apple deep links). Map links need both latitude and longitude; the SMS directions message always carries a working link.
+- ✅ **Details and photos first** (3 Nov 2026): About, Amenities, a photo gallery (up to 12, light thumbnails) with an Instagram follow button, then the booking steps. Reels and other embeds are deliberately not used (weak-signal rule).
+- ✅ **Booking in three steps** (3 Nov 2026): dates and guests, rooms (one Add button, running total), details. Guests are shared across rooms automatically; a group no single room covers sees Best value and More space with real totals.
+- ✅ **Owner-set guest limit per room** ("Most guests allowed"), enforced in the app and by the database.
+- ✅ **Several photos per room** with swipe and a full-screen viewer.
+- ✅ **Live date, time and today's temperature range** in the hero (MET Norway forecast, credited in the footer).
+- ✅ **Packages and add-ons shown to guests** for information, with one combined WhatsApp enquiry. ⬜ Guests choosing and paying for them online is not built.
 - ✅ SEO: per-property `<title>`, description, Open Graph, JSON-LD (`schema.org/LodgingBusiness`), `robots.txt` and `sitemap.xml` per host (`api/og.ts`, `api/seo.ts`).
 - 🟡 **Prerendering** was planned (vite-plugin-prerender). Not used: link previews come from an Edge Function (`api/og.ts`) instead. Crawlers see the injected tags.
 - ✅ **Tracking-link token:** random token per booking/group in the link (26 Oct 2026). ⬜ Revoke legacy phone lookups after 30 days.
@@ -259,6 +265,8 @@ All items done: `property_id` on every table, dynamic subdomain, superadmin invi
 - ✅ Client error log on `/superadmin`
 - ✅ Admin speed: windowed fetches, pagination, indexes
 - ✅ CI with build, typecheck, tests, migration tests
+- ✅ Guest page rebuilt details-first with a three-step booking flow, gallery and Instagram link, room photos, per-room guest limit, packages enquiry, live hero info (3 Nov 2026)
+- ⬜ Owner onboarding checklist for the guest page (photos, Instagram, location) — next suggested step
 - ⏸ Channel sync (iCal import) — built, switched off
 
 ---

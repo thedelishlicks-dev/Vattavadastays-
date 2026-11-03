@@ -1,10 +1,10 @@
-# stayidom.in — Handover v10.1
+# stayidom.in — Handover v10.2
 
-**Date:** 29 Oct 2026
-**Code baseline:** `main` at `8fc8359` (Merge PR #441, `Dev`). `Dev` (capital D) is ahead with PR #442; branch `fix/booking-retry-ids` is waiting to merge into `Dev` (§9). Merge `Dev` → `main` only after the preview is tested.
-**Supersedes:** v10 (25 Oct 2026), which superseded v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**.
+**Date:** 3 Nov 2026
+**Code baseline:** `main` at `b65460e` (Merge PR #456, `Dev`). Merge `Dev` → `main` only after the preview is tested.
+**Supersedes:** v10.1 (29 Oct 2026), v10 (25 Oct 2026) and v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**. The guest page has its own reference: **`docs/GUEST_PAGE.md`**.
 
-> **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code.
+> **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code. Working on the guest page? Read `docs/GUEST_PAGE.md` too.
 
 ---
 
@@ -35,12 +35,13 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 - `api/manifest.ts` — dynamic web manifest.
 - `api/ical.ts` — public export of a room's occupied nights ("Reserved" only, no guest data).
 - `api/ical-sync.ts` + `api/_lib/ical.ts` — iCal import (owner-triggered; optional cron). Parked, see §8.
+- `api/weather.ts` + `api/_lib/forecast.ts` — today's temperature range for the guest hero (MET Norway; rule 33).
 - `supabase/functions/invite-owner/index.ts` — Supabase Edge Function (Deno) for superadmin owner invites. Moved here from `src/` in Oct 2026.
 - No `createServerFn`, no SSR, no `@supabase/ssr`. Business logic still runs in the browser or in Postgres triggers/RPCs.
 
 **Env vars:**
 - Vercel / local `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PROPERTY_SUBDOMAIN` (dev fallback), `VITE_SUPERADMIN_EMAIL` (used by `src/lib/subdomain.ts`).
-- Edge functions only: `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (optional, for background iCal sync).
+- Edge functions only: `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (optional, for background iCal sync), `WEATHER_USER_AGENT` (optional; the contact sent to MET Norway, rule 33).
 - The superadmin email is **also hard-coded** as `thedelishlicks@gmail.com` in `src/lib/onboarding.ts`, `supabase/functions/invite-owner/index.ts` and the database policies/triggers. §10 item 6.
 
 **Commands:** `npm run dev` · `npm run build` (= `vite build` + `post-build`) · `npm run typecheck` (run **after** build) · `npm test` · `npm run check` · `npm run lint`.
@@ -83,7 +84,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 16. **Modal sizing:** `dvh`. A panel with no height cap needs `max-h-[92dvh] overflow-y-auto overscroll-contain`; flex-col sheets need `min-h-0` on the scrolling body.
 17. **Security:** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; run `01_audit_queries.sql` (query 4) after any DB change that adds a function; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (trigger); owners must not edit billing columns (trigger).
 18. **Superadmin logic lives in `src/lib/onboarding.ts`** (statuses, renewal, setup checklist, filters, validation, WhatsApp numbers/messages). Add a test when adding a rule.
-19. **Guest bookings are priced by the database.** BEFORE INSERT triggers (`enforce_guest_booking_terms`, `enforce_guest_group_terms`, `sync_guest_group_total`) recompute price with `stay_room_price()` for every insert not made by the property's owner, and force `pending`, unpaid, `source='direct'`, a capped hold. `stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` and `supabase/tests/` check this.
+19. **Guest bookings are priced by the database.** BEFORE INSERT triggers (`enforce_guest_booking_terms`, `enforce_guest_group_terms`, `sync_guest_group_total`) recompute price with `stay_room_price()` for every insert not made by the property's owner, and force `pending`, unpaid, `source='direct'`, a capped hold. Since migration `20261101000000` the same trigger also refuses a guest booking above the room's guest limit (rule 29). `stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` and `supabase/tests/` check this.
 20. **Room rate rules are identical in two places:** `src/lib/roomRates.ts` `pickRate` and SQL `stay_room_price()`. Overlap order: room-specific beats all-rooms, then later start, then newest created.
 21. **iCal sync only deletes rows carrying its own feed's note** (`ical:<feed id>:…`). A failed or non-iCal response is an error, never "calendar is empty". Bookings and manual blocks are never touched.
 22. **Parked features are switched off with flags, not deleted.** `CHANNEL_SYNC_ENABLED` in `src/lib/features.ts` is `false`. Don't remove the code or the `room_ical_feeds` table.
@@ -93,6 +94,12 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 26. **Every `wa.me` / `tel:` link builds its number with `waDigits()` from `src/lib/phone.ts`.** Never `phone.replace(/\D/g, "")`: a number saved as `98765 43210` becomes `wa.me/9876543210`, which opens no chat. Settings saves owner numbers as `+91 XXXXXXXXXX` when they are valid Indian mobiles.
 27. **A guest booking keeps the same ids and token across retries.** `src/lib/bookingSubmission.ts` holds them for an unchanged request; on a retry `useCreateBooking` looks the token up first and, if the booking was already saved (reply lost on weak signal), goes on to the confirmation instead of inserting again. Don't generate ids inside `mutationFn` any more.
 28. **Confirming by money uses `meetsConfirmationAdvance()`** (`balance.ts`, `ADVANCE_FRACTION` = 0.25 of the net total). Recording a payment on a *pending* booking confirms it only once the cumulative advance reaches that. A smaller part payment stays pending; the owner can still confirm by hand.
+29. **One guest limit per room.** `maxGuestsFor(included, maxOccupancy)` in `src/lib/guestCount.ts` is the only definition: the owner's `rooms.max_occupancy`, or `max_guests + 4` when empty. `max_guests` is the guests *included* in the nightly price, not a cap. The steppers, `partyAllocation.ts`, `useCreateBooking` and the database check in `enforce_guest_booking_terms` all use it; change them together. Owner-created bookings are exempt.
+30. **Group booking logic lives in `src/lib/partyAllocation.ts`** (pure, tested): `allocateGuests` shares guests over the chosen rooms (an adult in each room, included places first, then the cheapest extra guest; rooms set by hand are pinned) and `suggestOptions` prices every feasible set of rooms for real (Best value / More space). On the guest page the booking lines are *derived* from `selectedIds` + `party` + `pinned` (`GuestPage`); `BookingDetails` and `buildBookingDetails` live in `src/lib/roomSelection.ts`. Never price options from `base_price`, and never keep a second copy of the chosen rooms in state.
+31. **Guest photos stay light.** Property gallery: up to 12 photos, each a ≤ 140 KB photo plus a ≤ 30 KB thumbnail stored beside it as `…-t.webp` (`thumbUrl()`, `src/lib/gallery.ts`); the grid loads thumbnails lazily (the large first tile uses its full photo), the other full photos only when opened. Room photos: up to 6 per room (800 px, no thumbnail); the card loads only the first. One shared viewer, `PhotoViewer.tsx`. Instagram is a link-out button (`properties.instagram_handle`, `normalizeInstagram` / `instagramUrl`). **No reels or other embeds** (see Stack rules).
+32. **A map location is a pair.** Every maps link and the Settings check go through `src/lib/location.ts` (`hasCoordinates`, `directionsUrl`, `validateCoordinates`). One coordinate alone is never used or saved; the directions SMS falls back to a Google Maps search for the name and area. Never write `lat && lng` (0 is a valid value).
+33. **Weather only through `/api/weather`.** MET Norway Locationforecast: free, CC BY 4.0, commercial use allowed **with credit**, so the footer shows "Weather data from MET Norway" whenever a temperature is shown. The server route sets the identifying User-Agent, rounds coordinates, caches for an hour; the browser never calls the provider. Don't swap in a service that is non-commercial only (the free Open-Meteo tier was rejected for this). Date and time are shown in India time (`liveInfo.ts`).
+34. **Packages and add-ons are information only for guests.** Active items are readable by guests (policies `addons_public_read`, `packages_public_read`) and listed in `Packages.tsx`; the guest ticks items and sends one WhatsApp enquiry (`catalogEnquiryLink`). Nothing is booked or charged online; the owner adds the extras (`CatalogExtrasPicker`).
 ---
 
 ## 4. Admin app map
@@ -119,7 +126,8 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 
 | Data / action | Edited in | Notes |
 |---|---|---|
-| Room name, type, bed, max guests, photos, room amenities | Rooms & Pricing → room editor | |
+| Room name, type, bed, guests included, **most guests allowed**, room amenities | Rooms & Pricing → room editor | Most guests allowed = `rooms.max_occupancy` (rule 29) |
+| **Room photos** (up to 6; first = card photo) | Rooms & Pricing → room editor | `RoomPhotosManager`; saved as each photo uploads |
 | Room base prices (base, extra guest, weekend multiplier) | Rooms & Pricing → tap the price block | `RoomPricingFields` |
 | **Seasonal / date-range rates** (fixed ₹ or ±% of base; per room or all rooms) | Rooms & Pricing → room editor → Seasonal rates | `RoomRatesEditor`, table `room_rates` |
 | **Seasons** (peak/festival periods) | Property → Add-ons | Price **add-ons & packages** only |
@@ -136,6 +144,8 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 | Tell the guest a booking is confirmed | Pop-up after any confirm (`SendConfirmationPrompt`) | Opens a `wa.me` link the owner taps to send; guest tracking link inside |
 | Mark fully paid / correct collected amount | Money → Payments (`PaymentActionModal`) | |
 | Agents, commission owed / paid / CSV | Money → Agents & Commissions | |
+| **Property gallery** (up to 12) and **Instagram handle** | Property → Settings → Photos | `GalleryManager`, `InstagramField`; saved at once, not with the Save button |
+| Location (latitude + longitude) | Property → Settings → Location | Both or neither (rule 32) |
 
 ---
 
@@ -155,6 +165,8 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 
 **Guest booking journey (as built, 29 Oct 2026).** Guest submits → booking is `pending` with a 24 h hold (`pending_hold_hours`) → the owner's WhatsApp opens with the request (a `wa.me` link, not an API: the guest must tap Send) → the guest card says "Request sent" and follows the status live → the owner confirms (or records ≥ 25 %) → the owner is prompted to send the confirmation on WhatsApp → the card turns "Confirmed". The cron cancels unconfirmed holds silently and frees the dates.
 
+**Guest booking flow on the page (as built, 3 Nov 2026).** Three steps after the property details and photos: (1) dates and guests, (2) rooms (only the free ones, one Add button each, a bottom bar with the running total and "x of y guests placed"), (3) details and send. Guests state the party first and the rooms are filled automatically; a group no single room covers sees **Best value** and **More space** with real totals. Changing dates keeps the chosen rooms and re-prices them. Full description: `docs/GUEST_PAGE.md`.
+
 ---
 
 ## 7. Data notes
@@ -172,6 +184,15 @@ Full schema, triggers, RPCs and RLS: `supabase/baseline/` (snapshot of the live 
 
 Rules: filter `__` entries before showing tags to guests; value = `encodeURIComponent(…)`; write only via `propertyConfig.ts`.
 
+**Columns and policies added since the 16 Oct baseline** (migrations are run by hand; the repo can't tell which are applied; check queries are in `docs/GUEST_PAGE.md` §9):
+
+| Migration | Adds |
+|---|---|
+| `20261029000000_public_read_catalog.sql` | Guests can read **active** add-ons and packages of a live property (`addons_public_read`, `packages_public_read`) |
+| `20261030000000_property_gallery_instagram.sql` | `properties.gallery_images text[]` (max 12), `properties.instagram_handle` (handle only) |
+| `20261031000000_room_photos_limit.sql` | `rooms.images` at most 8 photos |
+| `20261101000000_room_max_occupancy.sql` | `rooms.max_occupancy` (null = `max_guests + 4`) and the guest-limit check in `enforce_guest_booking_terms` |
+
 `availability.price_override` still **exists** in the baseline. Nothing reads or writes it. Drop it only after `docs/DB_CHECKS.sql` query 2 returns 0.
 
 ---
@@ -179,6 +200,8 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 ## 8. Public surfaces and parked features
 
 **Routing (`src/routes/index.tsx`):** `?slug=` → guest page; root domains (`stayidom.in`, `www`, `*.vercel.app`, `localhost`) → landing page (lazy-loaded); any other host → guest page for `getSubdomain()`. `lib/prefetch.ts` must mirror this decision (`guestSlugForThisPage()`).
+
+**Guest page (3 Nov 2026):** order is Hero → About → Amenities → Gallery → Dates and guests → Rooms → Your details → Packages → Map → Footer (`docs/GUEST_PAGE.md`). Sections with nothing to show are hidden. Reels / video embeds were considered and **not** built: they add third-party scripts and layout shifts on weak connections. If owners ask, the lightest option is a tap-to-load thumbnail; that needs a decision because it changes the no-embeds rule.
 
 **Landing page — status:** the rewritten landing page described in earlier handovers (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL` constants) is **not on `main`**. `main` has the old 973-line inline-styles version. Do not remove the Playfair Display `<link>` in `index.html` until the rewrite lands. The copy on `main` shows an invented example booking with a personal name and a sample Malayalam pricing grid; check before it goes live.
 
@@ -207,6 +230,15 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Phone links | `waDigits()` for every WhatsApp / call link; owner numbers normalised on save | PR #442 (in `Dev`) |
 | Retry safety | Stable ids / token on a retried guest booking | `fix/booking-retry-ids` (pending merge into `Dev`): `bookingSubmission.ts`, `useCreateBooking.ts` |
 | CI | GitHub Actions: build, typecheck, tests, checks, DB migration tests | `.github/workflows/ci.yml` |
+| Guest flow | Three steps: dates + guests, rooms (one Add button, running bar), details. Guests shared over rooms automatically; date change keeps rooms | `index.tsx` (`GuestPage`), `Availability`, `Rooms`, `CartBar`, `BookingForm`, `partyAllocation.ts`, `roomSelection.ts`, `useUnavailableRoomIds.ts`. `RoomDetail.tsx` removed |
+| Group options | Best value / More space, priced with the real stay total | `suggestOptions` in `partyAllocation.ts`, `Rooms.tsx` |
+| Guest limit | Owner-set "Most guests allowed" per room; the database refuses guest bookings above it | migration 20261101…, `guestCount.ts`, `admin.rooms.tsx`, `useCreateBooking.ts` |
+| Packages | Active packages and add-ons on the guest page; tick and send one WhatsApp enquiry | migration 20261029…, `Packages.tsx`, `usePublicCatalog.ts`, `guestCatalog.ts`, `whatsapp.ts` |
+| Hero | Live date, time (India) and today's temperature range; placeholder text removed (default "Vattavada", fake 12–18 °C, "Your host", broken fallback image) | `Hero.tsx`, `About.tsx`, `liveInfo.ts`, `api/weather.ts`, `api/_lib/forecast.ts`, `useNow.ts`, `useLiveWeather.ts` |
+| Gallery | Property gallery with thumbnails, Instagram button, owner manager | migration 20261030…, `Gallery.tsx`, `PhotoViewer.tsx`, `GalleryManager.tsx`, `gallery.ts`, `imageUtils.ts` |
+| Room photos | Several photos per room; swipe, arrows, dots and a full-screen viewer on the card | migration 20261031…, `RoomPhotosManager.tsx`, `Rooms.tsx` |
+| Page order | Details and photos first, then the booking steps | `index.tsx`, `Header.tsx` |
+| Directions | Map links need both coordinates; the SMS always has a working link; Settings checks the pair | `location.ts`, `MapSection.tsx`, `Footer.tsx`, `admin.settings.tsx`, `booking-status.tsx` |
 
 ---
 
@@ -242,10 +274,19 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 22. **[DONE, PR #442] WhatsApp / call links broke for numbers saved without `91`** (rule 26).
 23. **[DONE on branch `fix/booking-retry-ids`, merge pending] Retry after a lost reply** collided with the guest's own pending booking and the guest never got the token (rule 27). Needs the manual weak-signal test in §12.
 24. **[OPEN, known risk] A guest who pays by UPI but isn't recorded by the owner within the hold window** has the booking cancelled silently by the 15-minute job. Consider an owner alert before expiry, or a longer hold once a payment screenshot is sent.
-25. **[OPEN, low] Guest form starts with adults = the room's `max_guests`,** so `guest_count` and per-person extras default high unless the guest lowers it.
+25. **[DONE 3 Nov 2026] Guest form started with adults = the room's `max_guests`.** The guest now states the party first (default 2 adults) and rooms are filled from it (rule 30).
 26. **[WON'T FIX for now] `eachDate()` (`bookingAvailability.ts`) repeats a date in daylight-saving timezones** (checked: Europe/London, 29 Mar 2026). No effect in India (no DST); use `setUTCDate` if guests outside India are ever supported.
 27. **[OPEN, minor]** a stale `blocked-dates` query key; `getDateState` mutates its argument.
 28. **[NOT AUDITED]** the owner dashboard, calendar, Block dates, invoice and WhatsApp reminder screens were not read in this audit. The cancel, status-change and record-payment paths were, and report failures instead of closing silently.
+
+**Guest page work, 3 Nov 2026** (build, type-check, unit tests and the throw-away Postgres tests were run; checked by the owner on Vercel previews, not yet on a range of real phones):
+29. **[BY DESIGN] Packages and add-ons are information only** for guests; they can't pick or pay for them online (rule 34). Letting guests select them needs server-side pricing (rule 19) and is a larger change.
+30. **[OPEN] Owner-side `AddBookingModal` does not apply `max_occupancy`.** Owners can enter a larger party than the room limit; this is intended, but it is not shown to them.
+31. **[OPEN, minor] Room photos have no thumbnails;** the card loads the 800 px first photo. The property gallery does (rule 31).
+32. **[OPEN] The temperature is a forecast for a ~1 km point, not a measurement,** and needs the property's location pair. MET Norway asks for a contact in the User-Agent; the default names `stayidom.in`. Set `WEATHER_USER_AGENT` to an email if you want to be reachable.
+33. **[OPEN] Properties saved before 3 Nov 2026 may have only one coordinate.** The guest page copes (rule 32), but the owner should fix it; list them with the query in `docs/GUEST_PAGE.md` §9. No database rule requires both, because an old one-coordinate row would then make unrelated updates to that property fail.
+34. **[UNVERIFIED] The SMS Directions link uses `sms:?body=`.** `sms:?&body=` is reported to work on both iPhone and Android; not tested here. Check on an iPhone.
+35. **[OPEN] The owner onboarding checklist does not ask for the new content** (hero photo, 3+ gallery photos, Instagram handle, location pair, "Most guests allowed" per room). A site without photos looks like a template; this is the next suggested step (§11 item 16).
 
 ---
 
@@ -271,6 +312,9 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 14. **Owner alerts that don't depend on the guest tapping Send** (the owner's WhatsApp message is a `wa.me` link; if the guest closes it, the owner isn't told). Options: an in-app "new request" badge, or WhatsApp Business API later.
 15. Landing page: remove or prove the "seconds" claim (rule 7).
 13. **Fix the Edit Stay date picker** (§10 item 21), then retest a stay change on the demo property.
+16. **Owner onboarding checklist for the guest page** (§10 item 35): ask for a hero photo, 3+ gallery photos, an Instagram handle, a location pair and "Most guests allowed" per room, with a preview of what guests see.
+17. Thumbnails for room photos (§10 item 31).
+18. Tap-to-load Instagram reel (§8) only if owners ask; it revisits the no-embeds rule.
 
 **D. Later (from the v8 roadmap)**
 13. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (PRD Phase 5).
@@ -285,6 +329,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 4. Walk the relevant checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single and group), seasonal rate on a guest booking (total equals the dialog total), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property", guest booking lands as pending and unpaid.
 5. Landing changes: view at 375 px, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row in `leads`.
 6. Link previews: `https://<property>.stayidom.in/?_ogdebug=1` shows each step.
+7. Guest page changes: follow `docs/GUEST_PAGE.md` §10 (throttled phone, a group of 6, the guest limit, `/api/weather`, the directions SMS, the packages enquiry) in a private tab.
 
 ---
 
