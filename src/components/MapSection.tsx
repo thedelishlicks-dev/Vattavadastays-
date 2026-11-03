@@ -1,6 +1,7 @@
 import { MapPin, Navigation, Apple, Mountain, MessageSquare } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { waDigits } from "@/lib/phone";
+import { appleMapsUrl as buildAppleMapsUrl, directionsUrl, hasCoordinates } from "@/lib/location";
 
 interface MapSectionProps {
   subdomain: string;
@@ -16,12 +17,15 @@ export function MapSection({ subdomain }: MapSectionProps) {
   const ownerName = property?.owner_name ?? "the host";
   const ownerPhone = property?.owner_phone ?? "";
 
-  const mapsLink = lat && lng ? `https://maps.google.com/?q=${lat},${lng}` : "";
-  const appleMapsUrl = lat && lng ? `https://maps.apple.com/?ll=${lat},${lng}&q=${encodeURIComponent(propertyName)}` : null;
+  // Both numbers or nothing: one coordinate alone is useless. The SMS always carries a working link
+  // (the exact spot, or a search for the property's name and area).
+  const hasCoords = hasCoordinates(lat, lng);
+  const mapsLink = directionsUrl({ lat, lng, name: property?.name, area: property?.area });
+  const appleMapsUrl = buildAppleMapsUrl({ lat, lng, name: propertyName });
 
   const smsMessage = [
     `Directions to ${propertyName}:`,
-    mapsLink ? `Google Maps: ${mapsLink}` : "",
+    `Google Maps: ${mapsLink}`,
     landmark ? `Landmark: ${landmark}` : "",
     ownerPhone ? `Call ${ownerName}: +${waDigits(ownerPhone)}` : "",
     "See you soon!",
@@ -29,7 +33,7 @@ export function MapSection({ subdomain }: MapSectionProps) {
 
   const smsUrl = `sms:?body=${encodeURIComponent(smsMessage)}`;
 
-  if (!lat && !lng && !staticMapUrl && !landmark) return null;
+  if (!hasCoords && !staticMapUrl && !landmark) return null;
 
   return (
     <section id="location" className="py-16 md:py-20 bg-muted/30">
@@ -49,20 +53,20 @@ export function MapSection({ subdomain }: MapSectionProps) {
           {staticMapUrl ? (
             <div className="relative rounded-2xl overflow-hidden border border-border">
               <img src={staticMapUrl} alt={`Map showing location of ${propertyName}`} loading="lazy" decoding="async" className="w-full h-48 md:h-64 object-cover" />
-              {lat && lng && (
+              {hasCoords && (
                 <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur text-stone-900 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors">
                   <Navigation className="h-3.5 w-3.5" /> Open in Maps
                 </a>
               )}
             </div>
-          ) : lat && lng ? (
+          ) : hasCoords ? (
             <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors">
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Mountain className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <div className="text-sm font-medium text-foreground">Coordinates</div>
-                <div className="text-xs text-muted-foreground font-mono">{lat.toFixed(4)}°N, {lng.toFixed(4)}°E</div>
+                <div className="text-xs text-muted-foreground font-mono">{Number(lat).toFixed(4)}°N, {Number(lng).toFixed(4)}°E</div>
               </div>
               <Navigation className="ml-auto h-4 w-4 text-muted-foreground shrink-0" />
             </a>
