@@ -8,6 +8,7 @@ import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRoun
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { PaymentSetupSection } from '@/components/PaymentSetupSection'
 import { GalleryManager, InstagramField } from '@/components/GalleryManager'
+import { splitCoordinatePair, validateCoordinates } from '@/lib/location'
 import { fetchSharedAmenities } from '@/lib/propertyConfig'
 import { formatIndianPhoneInput, isValidIndianMobile } from '@/lib/phone'
 import { THEMES, parseTheme, encodeTheme, type ThemeName, FONTS, parseFont } from '@/lib/theme'
@@ -351,8 +352,11 @@ function AdminSettings() {
     mutationFn: async ({ updates, theme, font }: { updates: typeof form, theme: ThemeName, font: string }) => {
       if (!property?.id) throw new Error('No property loaded')
       const payload: Record<string, unknown> = { ...updates }
-      payload.location_lat = updates.location_lat ? parseFloat(updates.location_lat) : null
-      payload.location_lng = updates.location_lng ? parseFloat(updates.location_lng) : null
+      // Latitude and longitude go together: both valid numbers, or both empty. One alone can't give directions.
+      const coords = validateCoordinates(updates.location_lat, updates.location_lng)
+      if (!coords.ok) throw new Error(coords.error)
+      payload.location_lat = coords.lat
+      payload.location_lng = coords.lng
       payload.pending_hold_hours = updates.pending_hold_hours ? Math.round(Number(updates.pending_hold_hours)) : 24
       // Store owner numbers the same way every time, so WhatsApp / call links never depend on how they were typed.
       for (const k of ['owner_phone', 'owner_whatsapp'] as const) {
@@ -373,7 +377,14 @@ function AdminSettings() {
   })
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+    const { name, value } = e.target
+    // "10.0889, 77.0595" copied from Google Maps and pasted into Latitude fills both boxes.
+    const pair = name === 'location_lat' ? splitCoordinatePair(value) : null
+    if (pair) {
+      setForm((prev) => ({ ...prev, location_lat: pair.lat, location_lng: pair.lng }))
+      return
+    }
+    setForm((prev) => ({ ...prev, [name]: value }))
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -574,6 +585,7 @@ function AdminSettings() {
               <label className={labelCls}>Longitude</label>
               <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.15" className={inputCls} />
             </div>
+            <p className="col-span-2 -mt-2 text-xs text-stone-500">Enter both, or leave both empty. In Google Maps, press and hold the spot and copy the numbers; you can paste "10.0889, 77.0595" into Latitude and both boxes fill in.</p>
           </div>
           <div>
             <label className={labelCls}>Landmark Description</label>
@@ -638,7 +650,7 @@ function AdminSettings() {
           )}
 
           {mutation.isError && (
-            <span className="text-sm text-destructive">Save failed — please try again.</span>
+            <span className="text-sm text-destructive">{mutation.error instanceof Error && mutation.error.message ? mutation.error.message : 'Save failed — please try again.'}</span>
           )}
         </div>
       </form>
