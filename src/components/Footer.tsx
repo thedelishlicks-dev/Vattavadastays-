@@ -2,6 +2,7 @@ import { Phone, MapPin, MessageCircle, Leaf, Instagram } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { telLink } from "@/lib/whatsapp";
 import { instagramUrl } from "@/lib/gallery";
+import { directionsUrl } from "@/lib/location";
 import { useLiveWeather } from "@/hooks/useLiveWeather";
 
 export function Footer({ subdomain }: { subdomain: string }) {
@@ -14,10 +15,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
   const propertyName = property?.name ?? "stayidom.in";
   const ownerName = property?.owner_name ?? "the host";
 
-  const mapsUrl =
-    lat && lng
-      ? `https://maps.google.com/?q=${lat},${lng}`
-      : `https://maps.google.com/?q=${encodeURIComponent([property?.name, property?.area, "Kerala"].filter(Boolean).join(" "))}`;
+  const mapsUrl = directionsUrl({ lat, lng, name: property?.name, area: property?.area });
 
   function cleanDigits(p: string): string {
     const d = p.replace(/\D/g, "");
