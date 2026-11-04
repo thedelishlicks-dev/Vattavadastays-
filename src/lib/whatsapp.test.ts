@@ -1,42 +1,353 @@
 /**
- * Tests for the WhatsApp message text in whatsapp.ts.
- *
- * Run: npx tsx --test src/lib/whatsapp.test.ts
+ * WhatsApp deep link helpers — wa.me only, no API needed.
+ * All links open the guest's native WhatsApp app.
+ * Indian numbers only — always prefixes 91.
  */
-import { test } from "node:test";
-import assert from "node:assert/strict";
-import { buildConfirmationText, buildDirectionsText, confirmationLink } from "./whatsapp";
 
-const base = {
-  guestName: "Asha",
-  propertyName: "Hill View",
-  roomName: "Deluxe",
-  checkIn: "2026-12-01",
-  checkOut: "2026-12-03",
-  ownerPhone: "+91 94975 58860",
-  trackingUrl: "https://x.stayidom.in/booking-status?t=abc&property=p1",
-};
+import { computeBalance } from "@/lib/balance";
+import { waDigits } from "@/lib/phone";
+import { googleMapsPinUrl } from "@/lib/location";
 
-test("confirmation text says Room for one room and Rooms for a group", () => {
-  assert.match(buildConfirmationText(base), /Room: Deluxe/);
-  const group = buildConfirmationText({ ...base, roomName: "Deluxe, Suite", roomLabel: "Rooms" });
-  assert.match(group, /Rooms: Deluxe, Suite/);
-});
+export function clean(phone: string): string {
+  // Shared rules (lib/phone.ts): 10 digits, +91, 91…, 0091… and a leading 0 all
+  // become 91XXXXXXXXXX. A leading 0 used to produce a dead wa.me link.
+  return waDigits(phone);
+}
 
-test("confirmation text carries the tracking link and the owner's number", () => {
-  const t = buildConfirmationText(base);
-  assert.ok(t.includes(base.trackingUrl));
-  assert.ok(t.includes("+91 9497558860"));
-});
+function link(phone: string, text: string): string {
+  return `https://wa.me/${clean(phone)}?text=${encodeURIComponent(text)}`;
+}
 
-test("confirmation link opens the guest's chat with the text pre-filled", () => {
-  const url = confirmationLink({ ...base, guestPhone: "9876543210" });
-  assert.ok(url.startsWith("https://wa.me/919876543210?text="));
-  assert.ok(decodeURIComponent(url).includes("is confirmed"));
-});
+/**
+ * Builds the guest-facing booking tracking URL — status, invoice, and
+ * payment in one place. Pass window.location.origin as `origin`.
+ *
+ * Pass `propertyId` whenever it's available (i.e. every current call
+ * site) so the tracking page can scope its lookup to just this property
+ * and show its name in the header — otherwise a guest who has ever booked
+ * at more than one property under the same phone number sees every
+ * property's bookings mixed together with no way to tell them apart. Omit
+ * only for backward compatibility with old links already sent before this
+ * param existed; those still work, just without the scoping/branding.
+ */
+export function guestTrackingUrl(origin: string, trackingToken: string | null | undefined, propertyId?: string): string {
+  const params: string[] = [];
+  if (trackingToken) params.push(`t=${encodeURIComponent(trackingToken)}`);
+  if (propertyId) params.push(`property=${encodeURIComponent(propertyId)}`);
+  return `${origin}/booking-status${params.length ? "?" + params.join("&") : ""}`;
+}
 
-test("directions text does not name a town (the platform serves all of Kerala)", () => {
-  const t = buildDirectionsText({ guestName: "Asha", propertyName: "Backwater Stay", lat: 9.5, lng: 76.3, ownerPhone: "9497558860" });
-  assert.ok(!/munnar/i.test(t));
-  assert.ok(t.includes("https://maps.google.com/?q=9.5,76.3"));
-});
+/** Guest taps "Book via WhatsApp" on the guest page */
+export function bookingInquiryLink({
+  ownerWhatsapp,
+  propertyName,
+  roomName,
+  checkIn,
+  checkOut,
+  guests,
+  guestName,
+  guestPhone,
+}: {
+  ownerWhatsapp: string;
+  propertyName: string;
+  roomName: string;
+  checkIn: string;
+  checkOut: string;
+  guests: number;
+  guestName?: string;
+  guestPhone?: string;
+}): string {
+  const text =
+    `Hi, I'd like to book ${roomName} at ${propertyName}.\n` +
+    `Check-in: ${checkIn}\n` +
+    `Check-out: ${checkOut}\n` +
+    `Guests: ${guests}\n\n` +
+    `My name: ${guestName ?? ""}\n` +
+    `Phone: ${guestPhone ?? ""}`;
+  return link(ownerWhatsapp, text);
+}
+
+export interface CatalogEnquiryInput {
+  propertyName: string;
+  /** One line per item the guest ticked, e.g. "Honeymoon package (₹4,000 per group)". */
+  items: string[];
+  /** Filled in when the guest has already chosen dates (and maybe rooms) on the page. */
+  stay?: { checkIn: string; checkOut: string; guests: number; rooms: string[] };
+}
+
+/** One WhatsApp message for everything the guest ticked in Packages and add-ons (information only). */
+export function buildCatalogEnquiryText({ propertyName, items, stay }: CatalogEnquiryInput): string {
+  const lines = [`Hi, I'm interested in these at ${propertyName}:`, ...items.map((i) => `• ${i}`)];
+  if (stay) {
+    lines.push("", `Stay: ${stay.checkIn} to ${stay.checkOut}, ${stay.guests} guest${stay.guests > 1 ? "s" : ""}`);
+    if (stay.rooms.length > 0) lines.push(`Rooms: ${stay.rooms.join(", ")}`);
+  }
+  lines.push("", "Please tell me the details and add them to my stay.");
+  return lines.join("\n");
+}
+
+export function catalogEnquiryLink(ownerWhatsapp: string, input: CatalogEnquiryInput): string {
+  return link(ownerWhatsapp, buildCatalogEnquiryText(input));
+}
+
+export interface ConfirmationTextInput {
+  guestName: string;
+  propertyName: string;
+  roomName: string;
+  /** "Room" (default) or "Rooms" for a multi-room group, where roomName is the joined list. */
+  roomLabel?: "Room" | "Rooms";
+  checkIn: string;
+  checkOut: string;
+  ownerPhone: string;
+  /** Optional link to the guest's booking-status page (status, invoice, payment) */
+  trackingUrl?: string;
+}
+
+/**
+ * Builds the booking-confirmation message text. Every screen that sends a
+ * confirmation (bookings list, booking detail, dashboard quick-action
+ * modal) must call this — never hand-roll the copy again, or the preview
+ * silently drifts from what guests actually receive (e.g. missing the
+ * tracking link).
+ */
+export function buildConfirmationText({
+  guestName,
+  propertyName,
+  roomName,
+  roomLabel = "Room",
+  checkIn,
+  checkOut,
+  ownerPhone,
+  trackingUrl,
+}: ConfirmationTextInput): string {
+  return (
+    `Dear ${guestName}, your booking at ${propertyName} is confirmed! ✅\n\n` +
+    `${roomLabel}: ${roomName}\n` +
+    `Check-in: ${checkIn}\n` +
+    `Check-out: ${checkOut}\n\n` +
+    (trackingUrl
+      ? `📋 View your booking status, invoice & make payments anytime here:\n${trackingUrl}\n\n`
+      : "") +
+    `Any questions, call us: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
+}
+
+/** Owner sends booking confirmation to guest */
+export function confirmationLink({
+  guestPhone,
+  ...rest
+}: ConfirmationTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildConfirmationText(rest));
+}
+
+export interface DirectionsTextInput {
+  guestName: string;
+  propertyName: string;
+  lat: number;
+  lng: number;
+  ownerPhone: string;
+  landmark?: string;
+}
+
+/**
+ * Builds the directions message text. Shared by every "Directions" send
+ * button — needs a real lat/lng, so callers should only offer this
+ * template when the property actually has coordinates set.
+ */
+export function buildDirectionsText({
+  guestName,
+  propertyName,
+  lat,
+  lng,
+  ownerPhone,
+  landmark,
+}: DirectionsTextInput): string {
+  const mapsUrl = googleMapsPinUrl(lat, lng);
+  return (
+    `Hi ${guestName}, here's how to reach ${propertyName}:\n\n` +
+    `📍 Google Maps: ${mapsUrl}\n` +
+    (landmark ? `Landmark: ${landmark}\n` : "") +
+    `\nCall us when you're close to the property: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
+}
+
+/** Owner sends directions to guest */
+export function directionsLink({
+  guestPhone,
+  ...rest
+}: DirectionsTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildDirectionsText(rest));
+}
+
+/**
+ * Shape shared by every payment-reminder call site. Keeping this as one
+ * type (instead of each caller inlining its own fields) is what stops the
+ * message text, amount math, and links from drifting apart again.
+ */
+export interface PaymentReminderInput {
+  guestName: string;
+  /** Room/stay charge only. Extra charges go in chargesTotal below. */
+  totalAmount: number;
+  /** Sum of all "extra charges" tab entries (qty × unit_price). Defaults to 0. */
+  chargesTotal?: number;
+  /** Discount applied to the booking. Defaults to 0. */
+  discount?: number;
+  advancePaid: number;
+  checkIn: string;
+  propertyName: string;
+  /** UPI VPA only — e.g. "name@bank". NEVER pass a phone number here. */
+  upiId?: string;
+  ownerPhone?: string;
+  /** Link to the guest's booking-status page (status, invoice, payment). */
+  trackingUrl: string;
+}
+
+/**
+ * Single source of truth for the payment-reminder amount logic. This MUST
+ * be computed the same way as the tracking page / admin balance:
+ *   grandTotal = totalAmount + chargesTotal - discount
+ * - If no advance recorded yet (advancePaid = 0), suggest a 25% advance
+ *   on the grand total (so extra charges aren't quietly excluded).
+ * - If an advance is already recorded, ask for the remaining balance.
+ * - If fully paid, callers should not show this reminder at all — this
+ *   function still degrades gracefully if it's called anyway.
+ */
+export function paymentDueAmount(grandTotal: number, advancePaid: number): number {
+  if (advancePaid === 0) return Math.round(grandTotal * 0.25);
+  return Math.max(0, grandTotal - advancePaid);
+}
+
+/**
+ * Builds the payment-reminder message text. Every screen that sends a
+ * payment reminder (bookings list, booking detail, dashboard modal) must
+ * call this — never hand-roll the copy or the amount math again.
+ *
+ * The tracking link is the ONE thing we ask the guest to tap: it hosts a
+ * "Pay via UPI" button that deep-links straight into GPay/PhonePe/Paytm
+ * with the amount pre-filled. The raw UPI ID is offered only as a labelled
+ * fallback for guests who'd rather paste it manually — never presented as
+ * a second, separate action, to avoid the "which one do I use?" confusion.
+ *
+ * NOTE: the fallback UPI ID must be a real UPI VPA. Never substitute the
+ * owner's phone number — a bare phone number is not guaranteed to be a
+ * valid payment handle and can silently misroute the payment.
+ *
+ * NOTE: totalAmount is the room charge ONLY. Extra charges (food, late
+ * checkout, damages, etc. entered in the "Extra charges" tab) must be
+ * passed in chargesTotal, and any discount in discount — otherwise the
+ * balance shown here will silently under-count what's actually owed,
+ * same as the balance shown on the tracking page and admin dashboard.
+ */
+export function buildPaymentReminderText({
+  guestName,
+  totalAmount,
+  chargesTotal = 0,
+  discount = 0,
+  advancePaid,
+  checkIn,
+  propertyName,
+  upiId,
+  ownerPhone,
+  trackingUrl,
+}: PaymentReminderInput): string {
+  const { netTotal: grandTotal, balance, refundDue } = computeBalance({
+    roomTotal: totalAmount, chargesTotal, discount, advance: advancePaid,
+  });
+  const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+
+  const breakdownLine = chargesTotal > 0 || discount > 0
+    ? `(Room: ${inr(totalAmount)}` +
+      (chargesTotal > 0 ? ` + Extra charges: ${inr(chargesTotal)}` : "") +
+      (discount > 0 ? ` − Discount: ${inr(discount)}` : "") +
+      `)\n`
+    : "";
+
+  const helpLine = ownerPhone
+    ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
+    : "Call us if you need help.";
+
+  // Nothing to collect → never send a "payment pending / Pay ₹0" message.
+  // (Previously this produced "Payment of fully paid ✓ is pending…".)
+  if (balance === 0) {
+    const body = refundDue > 0
+      ? `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) has been updated.\n\n` +
+        `Revised total: ${inr(grandTotal)}\n${breakdownLine}` +
+        `Advance paid: ${inr(advancePaid)}\n` +
+        `You've paid ${inr(refundDue)} more than the revised total — we'll refund or adjust this with you. No further payment is needed.\n\n`
+      : `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) is fully paid ✓\n\n` +
+        `Total: ${inr(grandTotal)}\n${breakdownLine}\n`;
+    return body + `📋 Booking details & invoice:\n${trackingUrl}\n\n` + helpLine;
+  }
+
+  const due = paymentDueAmount(grandTotal, advancePaid);
+  let amountLine: string;
+  let contextLine: string;
+
+  if (advancePaid === 0) {
+    amountLine  = `${inr(due)} (25% advance to confirm your booking)`;
+    contextLine = `Total booking amount: ${inr(grandTotal)}\n${breakdownLine}`;
+  } else {
+    amountLine  = `${inr(due)} (remaining balance)`;
+    contextLine = `Advance paid: ${inr(advancePaid)} · Total: ${inr(grandTotal)}\n${breakdownLine}`;
+  }
+
+  const payBlock = `👉 Pay ${inr(due)} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
+
+  const upiFallback = upiId
+    ? (
+        `Prefer to pay directly in your UPI app instead of the link above? Use this UPI ID:\n` +
+        `${upiId}\n\n`
+      )
+    : "";
+
+  return (
+    `Hi ${guestName}, friendly reminder 🙏\n\n` +
+    `Payment of ${amountLine} is pending for your stay at ${propertyName} on ${checkIn}.\n` +
+    `${contextLine}\n` +
+    payBlock +
+    upiFallback +
+    helpLine
+  );
+}
+
+/** Owner sends payment reminder to guest — returns a ready-to-open wa.me link. */
+export function paymentReminderLink(
+  input: PaymentReminderInput & { guestPhone: string }
+): string {
+  const { guestPhone, ...rest } = input;
+  return link(guestPhone, buildPaymentReminderText(rest));
+}
+
+export interface DayBeforeReminderTextInput {
+  guestName: string;
+  propertyName: string;
+  checkInTime: string;
+  ownerPhone: string;
+}
+
+/** Builds the day-before reminder message text. */
+export function buildDayBeforeReminderText({
+  guestName,
+  propertyName,
+  checkInTime,
+  ownerPhone,
+}: DayBeforeReminderTextInput): string {
+  return (
+    `Hi ${guestName}, looking forward to your arrival tomorrow at ${propertyName}! 🌿\n\n` +
+    `Check-in from ${checkInTime}.\n` +
+    `Call us when you're on the way: +91 ${ownerPhone.replace(/\D/g, "").slice(-10)}`
+  );
+}
+
+/** Owner sends day-before reminder to guest */
+export function dayBeforeReminderLink({
+  guestPhone,
+  ...rest
+}: DayBeforeReminderTextInput & { guestPhone: string }): string {
+  return link(guestPhone, buildDayBeforeReminderText(rest));
+}
+
+/** Returns a clean tel: href for Indian numbers — always +91 */
+export function telLink(phone: string): string {
+  return `tel:+${clean(phone)}`;
+}
