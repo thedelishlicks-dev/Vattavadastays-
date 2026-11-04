@@ -568,7 +568,7 @@ function AdminSettings() {
               className={inputCls}
             />
             <p className="text-xs text-stone-500 mt-1">
-              When you add a booking and leave it "Pending" (e.g. a guest enquiry awaiting advance payment), the room stays blocked for this many hours. If the booking isn't confirmed by then, it's automatically cancelled and the dates are freed up again. Default is 24 hours.
+              Applies to every pending booking: requests guests send from your booking page, and bookings you add yourself and leave as "Pending". The room stays blocked for this many hours. If you haven't confirmed it or recorded the advance payment by then, it is cancelled automatically and the dates are freed up again, with no message to you or the guest. Your Home page shows the time left on each request. Default is 24 hours.
             </p>
           </div>
         </div>
@@ -657,4 +657,3 @@ function AdminSettings() {
     </div>
   )
 }
- 
