@@ -20,13 +20,23 @@ export function hasCoordinates(lat: Coord, lng: Coord): boolean {
 }
 
 /**
+ * Google Maps link for an exact spot. Google's documented link format, with the comma between the two
+ * numbers written as %2C. A raw comma ends the link in many messaging apps (the Android SMS app, for one),
+ * so only the first number was tapped and the second was cut off. Never put a raw "lat,lng" in a link
+ * that goes into message text.
+ */
+export function googleMapsPinUrl(lat: number | string, lng: number | string): string {
+  return `https://www.google.com/maps/search/?api=1&query=${lat}%2C${lng}`;
+}
+
+/**
  * Google Maps link for the property: its exact spot when both coordinates are set, otherwise a search for
  * its name and area, so a directions message always carries a working link.
  */
 export function directionsUrl(p: { lat: Coord; lng: Coord; name?: string | null; area?: string | null }): string {
-  if (hasCoordinates(p.lat, p.lng)) return `https://maps.google.com/?q=${num(p.lat)},${num(p.lng)}`;
+  if (hasCoordinates(p.lat, p.lng)) return googleMapsPinUrl(num(p.lat) as number, num(p.lng) as number);
   const place = [p.name, p.area, "Kerala"].filter(Boolean).join(" ");
-  return `https://maps.google.com/?q=${encodeURIComponent(place)}`;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
 }
 
 /** Apple Maps link, or null without both coordinates (a name search there is too unreliable). */

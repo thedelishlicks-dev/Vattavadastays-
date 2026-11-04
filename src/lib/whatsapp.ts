@@ -6,6 +6,7 @@
 
 import { computeBalance } from "@/lib/balance";
 import { waDigits } from "@/lib/phone";
+import { googleMapsPinUrl } from "@/lib/location";
 
 export function clean(phone: string): string {
   // Shared rules (lib/phone.ts): 10 digits, +91, 91…, 0091… and a leading 0 all
@@ -161,7 +162,7 @@ export function buildDirectionsText({
   ownerPhone,
   landmark,
 }: DirectionsTextInput): string {
-  const mapsUrl = `https://maps.google.com/?q=${lat},${lng}`;
+  const mapsUrl = googleMapsPinUrl(lat, lng);
   return (
     `Hi ${guestName}, here's how to reach ${propertyName}:\n\n` +
     `📍 Google Maps: ${mapsUrl}\n` +

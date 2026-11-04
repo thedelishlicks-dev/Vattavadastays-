@@ -61,7 +61,7 @@ State lives in `GuestPage`: `checkIn`, `checkOut`, `party` (adults, children), `
 
 A map location is a **pair**: latitude and longitude. `src/lib/location.ts` is the only place that builds maps links.
 
-- Both numbers set: links go to the exact spot.
+- Both numbers set: links go to the exact spot, as `https://www.google.com/maps/search/?api=1&query=<lat>%2C<lng>`. The comma is written `%2C` on purpose: with a raw comma the Android SMS app made only the first number part of the link and cut off the second (found 4 Nov 2026). The same link is used in the owner's WhatsApp directions message.
 - One or none: the "Open in Maps" cards are hidden, and the SMS Directions message carries a Google Maps **search** for the property's name and area, so it always has a working link.
 - Settings refuses to save one coordinate without the other, checks the numbers and range, and fills both boxes when "10.0889, 77.0595" is pasted into Latitude.
 
