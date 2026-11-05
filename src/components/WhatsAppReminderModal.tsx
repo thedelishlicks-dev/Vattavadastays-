@@ -1,3 +1,4 @@
+import { directionsShortLink } from "@/lib/location";
 import { useMemo, useState } from "react";
 import { X, Send } from "lucide-react";
 import {
@@ -41,6 +42,8 @@ interface Props {
     location_lat?: number | null;
     location_lng?: number | null;
     landmark_description?: string | null;
+    /** Used for the short directions link in the message (the server picks pin or Google listing). */
+    subdomain?: string | null;
   };
   onClose: () => void;
 }
@@ -116,6 +119,7 @@ function buildMessage(
         lng: property.location_lng,
         ownerPhone: phone,
         landmark: property.landmark_description ?? undefined,
+        link: property.subdomain ? directionsShortLink(property.subdomain) : undefined,
       });
   }
 }
