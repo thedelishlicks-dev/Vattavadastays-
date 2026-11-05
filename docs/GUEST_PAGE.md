@@ -61,8 +61,11 @@ State lives in `GuestPage`: `checkIn`, `checkOut`, `party` (adults, children), `
 
 A map location is a **pair**: latitude and longitude. `src/lib/location.ts` is the only place that builds maps links.
 
-- Both numbers set: links go to the exact spot, as `https://www.google.com/maps/search/?api=1&query=<lat>%2C<lng>`. The comma is written `%2C` on purpose: with a raw comma the Android SMS app made only the first number part of the link and cut off the second (found 4 Nov 2026). The same link is used in the owner's WhatsApp directions message.
-- One or none: the "Open in Maps" cards are hidden, and the SMS Directions message carries a Google Maps **search** for the property's name and area, so it always has a working link.
+- **What the link does:** Google's directions link with the property as the destination and **no starting point**, so the route starts where the guest is standing (Google asks for location permission).
+- **Destination:** the pin (both coordinates) by default. If the owner ticks **"My property is listed on Google Maps"** (Settings → Location), the destination is the property's name and area, so Google opens its listing. With no usable pin it always uses the name and area, so a link always works.
+- **Two kinds of link:** buttons ("Open in Google Maps", footer) open Google directly (`directionsUrl`). Text messages (the SMS Directions button, the owner's WhatsApp directions message, the guest's booking page) carry the **short link** `https://<property>.stayidom.in/api/directions` (`directionsShortLink`), which redirects to the same Google link on the server (`api/directions.ts`, which reads the owner's setting live). The short link exists because the Google link needs an `&`, and a Xiaomi SMS app ends the whole message at the first `&` (found 5 Nov 2026); an Android SMS app also ends a link at a comma (4 Nov). The short link has none of `& , # % space`.
+- **SMS text** goes through `smsLink()` (`src/lib/sms.ts`), which also cleans `&` and `#` from the property name and landmark.
+- One or none coordinates: the "Open in Maps" cards are hidden; the directions link still works by name and area.
 - Settings refuses to save one coordinate without the other, checks the numbers and range, and fills both boxes when "10.0889, 77.0595" is pasted into Latitude.
 
 ## 8. Packages and add-ons (information only)
@@ -77,6 +80,7 @@ Active add-ons and packages are readable by guests (policies `addons_public_read
 | `20261030000000_property_gallery_instagram.sql` | `properties.gallery_images` (max 12), `properties.instagram_handle` |
 | `20261031000000_room_photos_limit.sql` | `rooms.images` at most 8 |
 | `20261101000000_room_max_occupancy.sql` | `rooms.max_occupancy` and the guest-limit check in `enforce_guest_booking_terms` |
+| `20261104000000_directions_by_name.sql` | `properties.directions_by_name` (default false = use the pin) |
 
 All are safe to run twice. The repo cannot tell which have been applied to the live database; check with:
 
@@ -88,6 +92,9 @@ where table_name = 'properties' and column_name in ('gallery_images', 'instagram
 -- room limit column (expect 1 row) and the trigger check (expect true)
 select column_name from information_schema.columns where table_name = 'rooms' and column_name = 'max_occupancy';
 select pg_get_functiondef('public.enforce_guest_booking_terms'::regproc) like '%max_occupancy%' as limit_check_installed;
+
+-- directions option (expect 1 row)
+select column_name from information_schema.columns where table_name = 'properties' and column_name = 'directions_by_name';
 
 -- guest read of add-ons and packages (expect 2 rows)
 select tablename, policyname from pg_policies where policyname in ('addons_public_read', 'packages_public_read');
@@ -104,6 +111,6 @@ Code is safe to deploy before the migrations: the gallery, Instagram button, pac
 2. **Group of 6** with a 4-guest and a 2-guest room: the options box shows real totals; each "Use this" fills the bar; the booking can be sent.
 3. **Limit:** set "Most guests allowed" to 5 on a room; the guest steppers stop at 5 and a hand-made insert above it is refused.
 4. **Weather:** open `/api/weather?lat=<lat>&lng=<lng>` on the preview. Expect `"available":true` with `min` and `max`; the hero shows the range and the footer shows the credit.
-5. **Directions:** with both coordinates the SMS has the exact link; clear one in Settings (it refuses to save), and on an old row the SMS carries the search link.
+5. **Directions:** tap SMS Directions on a phone: the whole link is blue, and nothing is cut off after it (Landmark, Call and See you soon! all arrive). Tapping the link opens Google Maps with a route from your location to the property. In Settings → Location tap **Test directions link** before and after ticking "listed on Google Maps" and check each lands on the right place. Try a property whose name contains `&`.
 6. **Packages:** tick two items, tap **Send enquiry**: one WhatsApp message lists both and the dates.
 7. Test as a guest in a private tab (a signed-in owner can read rows a guest can't).
