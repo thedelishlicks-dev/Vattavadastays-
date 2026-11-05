@@ -36,6 +36,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 - `api/ical.ts` — public export of a room's occupied nights ("Reserved" only, no guest data).
 - `api/ical-sync.ts` + `api/_lib/ical.ts` — iCal import (owner-triggered; optional cron). Parked, see §8.
 - `api/weather.ts` + `api/_lib/forecast.ts` — today's temperature range for the guest hero (MET Norway; rule 33).
+- `api/directions.ts` + `api/_lib/directions.ts` — short link that redirects to Google directions from the guest's location (rule 32).
 - `supabase/functions/invite-owner/index.ts` — Supabase Edge Function (Deno) for superadmin owner invites. Moved here from `src/` in Oct 2026.
 - No `createServerFn`, no SSR, no `@supabase/ssr`. Business logic still runs in the browser or in Postgres triggers/RPCs.
 
@@ -58,7 +59,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 
 **Stack**
 - Never use `createServerFn`, `@tanstack/react-start`, `@supabase/ssr`; never add `shellComponent`/`HeadContent`/`Scripts` to `__root.tsx`; never upgrade `@tanstack/react-router`.
-- No Google Maps JS SDK (deep links only, built by `src/lib/location.ts`: `https://www.google.com/maps/search/?api=1&query=<lat>%2C<lng>`). No video embeds.
+- No Google Maps JS SDK (deep links only, built by `src/lib/location.ts`; see rule 32). No video embeds.
 - Auth is client-side. `beforeLoad` is used only to redirect old URLs, never for auth.
 - Read `?property=` from `window.location.search`, not TanStack `useSearch`. In-app links under `/admin` must carry it forward.
 
@@ -97,7 +98,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 29. **One guest limit per room.** `maxGuestsFor(included, maxOccupancy)` in `src/lib/guestCount.ts` is the only definition: the owner's `rooms.max_occupancy`, or `max_guests + 4` when empty. `max_guests` is the guests *included* in the nightly price, not a cap. The steppers, `partyAllocation.ts`, `useCreateBooking` and the database check in `enforce_guest_booking_terms` all use it; change them together. Owner-created bookings are exempt.
 30. **Group booking logic lives in `src/lib/partyAllocation.ts`** (pure, tested): `allocateGuests` shares guests over the chosen rooms (an adult in each room, included places first, then the cheapest extra guest; rooms set by hand are pinned) and `suggestOptions` prices every feasible set of rooms for real (Best value / More space). On the guest page the booking lines are *derived* from `selectedIds` + `party` + `pinned` (`GuestPage`); `BookingDetails` and `buildBookingDetails` live in `src/lib/roomSelection.ts`. Never price options from `base_price`, and never keep a second copy of the chosen rooms in state.
 31. **Guest photos stay light.** Property gallery: up to 12 photos, each a ≤ 140 KB photo plus a ≤ 30 KB thumbnail stored beside it as `…-t.webp` (`thumbUrl()`, `src/lib/gallery.ts`); the grid loads thumbnails lazily (the large first tile uses its full photo), the other full photos only when opened. Room photos: up to 6 per room (800 px, no thumbnail); the card loads only the first. One shared viewer, `PhotoViewer.tsx`. Instagram is a link-out button (`properties.instagram_handle`, `normalizeInstagram` / `instagramUrl`). **No reels or other embeds** (see Stack rules).
-32. **A map location is a pair.** Every maps link and the Settings check go through `src/lib/location.ts` (`hasCoordinates`, `directionsUrl`, `validateCoordinates`). One coordinate alone is never used or saved; the directions SMS falls back to a Google Maps search for the name and area. Never write `lat && lng` (0 is a valid value). **Never put a raw `lat,lng` in a link that goes into message text:** the Android SMS app ends the link at the comma, so the second number is cut off. Use `googleMapsPinUrl()` (the comma is written `%2C`).
+32. **A map location is a pair.** Every maps link and the Settings check go through `src/lib/location.ts` (`hasCoordinates`, `directionsUrl`, `validateCoordinates`). One coordinate alone is never used or saved; the directions SMS falls back to a Google Maps search for the name and area. Never write `lat && lng` (0 is a valid value). **Links that go into message text (SMS, WhatsApp) must be the short link** `directionsShortLink()` → `/api/directions`, which has no `&`, comma, `#`, `%` or space: the Android SMS app ends a link at a comma, and a Xiaomi SMS app ends the whole message at the first `&` (found 4–5 Nov 2026). The server route redirects to Google's directions link with **no `origin`**, so the route starts where the guest stands. Buttons (hrefs) use `directionsUrl()` directly. `api/_lib/directions.ts` and `src/lib/location.ts` build the same link; `tests/api/directions.test.ts` keeps them identical. SMS text goes through `smsLink()` (`src/lib/sms.ts`), which cleans `&` and `#` from the body.
 33. **Weather only through `/api/weather`.** MET Norway Locationforecast: free, CC BY 4.0, commercial use allowed **with credit**, so the footer shows "Weather data from MET Norway" whenever a temperature is shown. The server route sets the identifying User-Agent, rounds coordinates, caches for an hour; the browser never calls the provider. Don't swap in a service that is non-commercial only (the free Open-Meteo tier was rejected for this). Date and time are shown in India time (`liveInfo.ts`).
 34. **Packages and add-ons are information only for guests.** Active items are readable by guests (policies `addons_public_read`, `packages_public_read`) and listed in `Packages.tsx`; the guest ticks items and sends one WhatsApp enquiry (`catalogEnquiryLink`). Nothing is booked or charged online; the owner adds the extras (`CatalogExtrasPicker`).
 ---
@@ -146,6 +147,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 | Agents, commission owed / paid / CSV | Money → Agents & Commissions | |
 | **Property gallery** (up to 12) and **Instagram handle** | Property → Settings → Photos | `GalleryManager`, `InstagramField`; saved at once, not with the Save button |
 | Location (latitude + longitude) | Property → Settings → Location | Both or neither (rule 32) |
+| "My property is listed on Google Maps" + **Test directions link** | Property → Settings → Location | `properties.directions_by_name`; saved at once. Off = route to the pin; on = Google finds the listing by name and area |
 
 ---
 
@@ -192,6 +194,7 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | `20261030000000_property_gallery_instagram.sql` | `properties.gallery_images text[]` (max 12), `properties.instagram_handle` (handle only) |
 | `20261031000000_room_photos_limit.sql` | `rooms.images` at most 8 photos |
 | `20261101000000_room_max_occupancy.sql` | `rooms.max_occupancy` (null = `max_guests + 4`) and the guest-limit check in `enforce_guest_booking_terms` |
+| `20261104000000_directions_by_name.sql` | `properties.directions_by_name boolean default false` |
 
 `availability.price_override` still **exists** in the baseline. Nothing reads or writes it. Drop it only after `docs/DB_CHECKS.sql` query 2 returns 0.
 
@@ -238,7 +241,7 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Gallery | Property gallery with thumbnails, Instagram button, owner manager | migration 20261030…, `Gallery.tsx`, `PhotoViewer.tsx`, `GalleryManager.tsx`, `gallery.ts`, `imageUtils.ts` |
 | Room photos | Several photos per room; swipe, arrows, dots and a full-screen viewer on the card | migration 20261031…, `RoomPhotosManager.tsx`, `Rooms.tsx` |
 | Page order | Details and photos first, then the booking steps | `index.tsx`, `Header.tsx` |
-| Directions | Map links need both coordinates; the SMS always has a working link; Settings checks the pair | `location.ts`, `MapSection.tsx`, `Footer.tsx`, `admin.settings.tsx`, `booking-status.tsx` |
+| Directions | Map links need both coordinates; Settings checks the pair. Directions open a **route from where the guest stands**; messages carry a short link (`/api/directions`), SMS text is cleaned of `&` and `#`; owner option to send guests to their Google listing, with a Test link | `location.ts`, `sms.ts`, `api/directions.ts`, `api/_lib/directions.ts`, `MapSection.tsx`, `Footer.tsx`, `booking-status.tsx`, `WhatsAppReminderModal.tsx`, `admin.settings.tsx`, migration 20261104… |
 
 ---
 
@@ -285,7 +288,9 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 31. **[OPEN, minor] Room photos have no thumbnails;** the card loads the 800 px first photo. The property gallery does (rule 31).
 32. **[OPEN] The temperature is a forecast for a ~1 km point, not a measurement,** and needs the property's location pair. MET Norway asks for a contact in the User-Agent; the default names `stayidom.in`. Set `WEATHER_USER_AGENT` to an email if you want to be reachable.
 33. **[OPEN] Properties saved before 3 Nov 2026 may have only one coordinate.** The guest page copes (rule 32), but the owner should fix it; list them with the query in `docs/GUEST_PAGE.md` §9. No database rule requires both, because an old one-coordinate row would then make unrelated updates to that property fail.
-34. **[UNVERIFIED] The SMS Directions link uses `sms:?body=`.** `sms:?&body=` is reported to work on both iPhone and Android; not tested here. Check on an iPhone.
+34. **[UNVERIFIED] The SMS Directions link uses `sms:?body=`.** `sms:?&body=` is reported to work on both iPhone and Android; not tested here. Check on an iPhone. (The `&` cut-off seen on a Xiaomi phone is fixed: rule 32.)
+36. **[UNVERIFIED] "Listed on Google Maps" finds the listing by name and area,** which depends on Google matching the name. If a guest lands on the wrong place, the owner switches the option off (the route then ends at the pin). A Google Place ID would be exact but is too technical for owners to find. Check the Test link for every property that turns it on.
+37. **[UNVERIFIED] The route starts from the guest's location** because the link has no `origin`; Google asks the guest for location permission, and without it asks them to choose a start. Tried on an Android phone's SMS app only.
 35. **[OPEN] The owner onboarding checklist does not ask for the new content** (hero photo, 3+ gallery photos, Instagram handle, location pair, "Most guests allowed" per room). A site without photos looks like a template; this is the next suggested step (§11 item 16).
 
 ---
