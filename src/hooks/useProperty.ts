@@ -35,6 +35,8 @@ export type Property = {
   gallery_images: string[] | null
   /** Instagram handle only, e.g. "hillview". */
   instagram_handle: string | null
+  /** Owner says the property is listed on Google Maps: directions find it by name instead of the pin. */
+  directions_by_name: boolean | null
   rooms: import('@/types/database').Room[]
 }
 
