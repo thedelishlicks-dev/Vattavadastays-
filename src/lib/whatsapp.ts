@@ -6,7 +6,7 @@
 
 import { computeBalance } from "@/lib/balance";
 import { waDigits } from "@/lib/phone";
-import { googleMapsPinUrl } from "@/lib/location";
+import { directionsUrl } from "@/lib/location";
 
 export function clean(phone: string): string {
   // Shared rules (lib/phone.ts): 10 digits, +91, 91…, 0091… and a leading 0 all
@@ -147,6 +147,8 @@ export interface DirectionsTextInput {
   lng: number;
   ownerPhone: string;
   landmark?: string;
+  /** The short directions link to put in the message (directionsShortLink). Falls back to the full Google link. */
+  link?: string;
 }
 
 /**
@@ -161,8 +163,9 @@ export function buildDirectionsText({
   lng,
   ownerPhone,
   landmark,
+  link: shortLink,
 }: DirectionsTextInput): string {
-  const mapsUrl = googleMapsPinUrl(lat, lng);
+  const mapsUrl = shortLink ?? directionsUrl({ lat, lng, name: propertyName });
   return (
     `Hi ${guestName}, here's how to reach ${propertyName}:\n\n` +
     `📍 Google Maps: ${mapsUrl}\n` +
