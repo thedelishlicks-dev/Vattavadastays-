@@ -13,6 +13,7 @@ export interface Property {
   shared_amenities: string[];
   gallery_images?: string[] | null;
   instagram_handle?: string | null;
+  directions_by_name?: boolean | null;
   hero_tagline?: string;
   description?: string;
   description_ml?: string;
