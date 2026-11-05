@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appleMapsUrl, directionsUrl, googleMapsPinUrl, hasCoordinates, splitCoordinatePair, validateCoordinates } from "./location";
+import { appleMapsUrl, directionsShortLink, directionsUrl, hasCoordinates, splitCoordinatePair, validateCoordinates } from "./location";
 
 test("coordinates count only as a pair of real numbers", () => {
   assert.equal(hasCoordinates(10.12, 77.15), true);
@@ -14,13 +14,28 @@ test("coordinates count only as a pair of real numbers", () => {
   assert.equal(hasCoordinates(95, 77), false);
 });
 
-test("directions link: exact spot with both numbers, name search with one or none", () => {
-  assert.equal(directionsUrl({ lat: 10.12, lng: 77.15, name: "Hill View", area: "Vattavada" }), "https://www.google.com/maps/search/?api=1&query=10.12%2C77.15");
+test("directions link: route to the pin, or to the name and area when there is no pin or the owner chose the listing", () => {
+  assert.equal(directionsUrl({ lat: 10.12, lng: 77.15, name: "Hill View", area: "Vattavada" }), "https://www.google.com/maps/dir/?api=1&destination=10.12%2C77.15&travelmode=driving");
   const one = directionsUrl({ lat: 10.12, lng: null, name: "Hill View", area: "Vattavada" });
-  assert.equal(one, "https://www.google.com/maps/search/?api=1&query=Hill%20View%20Vattavada%20Kerala");
-  assert.equal(directionsUrl({ lat: null, lng: null, name: "Hill View" }), "https://www.google.com/maps/search/?api=1&query=Hill%20View%20Kerala");
-  assert.ok(!directionsUrl({ lat: 10.12, lng: undefined, name: "X" }).includes("null"));
+  assert.equal(one, "https://www.google.com/maps/dir/?api=1&destination=Hill%20View%2C%20Vattavada%2C%20Kerala&travelmode=driving");
+  assert.equal(directionsUrl({ lat: null, lng: null, name: "Hill View" }), "https://www.google.com/maps/dir/?api=1&destination=Hill%20View%2C%20Kerala&travelmode=driving");
+  assert.equal(directionsUrl({ lat: 10.12, lng: 77.15, name: "Hill View", area: "Vattavada", byName: true }), "https://www.google.com/maps/dir/?api=1&destination=Hill%20View%2C%20Vattavada%2C%20Kerala&travelmode=driving");
   assert.ok(!directionsUrl({ lat: 10.12, lng: undefined, name: "X" }).includes("undefined"));
+  assert.ok(!directionsUrl({ lat: 10.12, lng: undefined, name: "X" }).includes("null"));
+});
+
+test("no starting point is given, so Google starts the route where the person stands", () => {
+  assert.ok(!/[?&]origin=/.test(directionsUrl({ lat: 10.12, lng: 77.15, name: "X" })));
+});
+
+test("the link that goes into message text is short and has no & , # % or space", () => {
+  // The Android SMS app ended a link at a comma; a Xiaomi SMS app ended the WHOLE message at the first &.
+  const live = directionsShortLink("mistvalley", { hostname: "mistvalley.stayidom.in", origin: "https://mistvalley.stayidom.in" });
+  assert.equal(live, "https://mistvalley.stayidom.in/api/directions");
+  assert.equal(directionsShortLink("mistvalley"), "https://mistvalley.stayidom.in/api/directions");
+  const preview = directionsShortLink("mistvalley", { hostname: "app-git-dev.vercel.app", origin: "https://app-git-dev.vercel.app" });
+  assert.equal(preview, "https://app-git-dev.vercel.app/api/directions?p=mistvalley");
+  for (const l of [live, preview]) assert.ok(!/[&,#%\s]/.test(l), l);
 });
 
 test("Apple Maps needs both numbers", () => {
@@ -48,15 +63,4 @@ test("settings: both or neither", () => {
   assert.equal(validateCoordinates("abc", "77").ok, false);
   assert.equal(validateCoordinates("91", "77").ok, false);
   assert.equal(validateCoordinates("10", "181").ok, false);
-});
-
-test("a link going into message text has no raw comma, so no messaging app can cut it after the first number", () => {
-  // The Android SMS app ended the link at the comma: "...?q=10.2167" was blue, ",77.2" was plain text.
-  const url = directionsUrl({ lat: 10.2167, lng: 77.2, name: "Mist Valley Homestay" });
-  assert.equal(url, "https://www.google.com/maps/search/?api=1&query=10.2167%2C77.2");
-  assert.ok(!url.includes(","));
-  assert.ok(!/\s/.test(url));
-  assert.ok(!googleMapsPinUrl(9.5, 76.3).includes(","));
-  // Even the name fallback has no comma or space, whatever the property is called.
-  assert.ok(!/[,\s]/.test(directionsUrl({ lat: null, lng: null, name: "Mist Valley, Homestay", area: "Vattavada" })));
 });
