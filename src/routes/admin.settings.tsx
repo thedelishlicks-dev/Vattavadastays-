@@ -282,6 +282,9 @@ function AdminSettings() {
   const { user } = useAuth()
   const { data: property, isLoading } = useOwnerProperty()
   const [linkCopied, setLinkCopied] = useState(false)
+  // "Listed on Google Maps" is saved the moment it is switched (like the gallery), not with the Save button.
+  const [byNameLocal, setByNameLocal] = useState<boolean | null>(null)
+  const [byNameError, setByNameError] = useState('')
 
   const [form, setForm] = useState({
     name: '',
@@ -344,6 +347,21 @@ function AdminSettings() {
     if (!property?.id) return
     const { error } = await supabase.from('properties').update({ instagram_handle: handle }).eq('id', property.id)
     if (error) throw error
+    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
+    queryClient.invalidateQueries({ queryKey: ['property'] })
+  }
+
+  const directionsByName = byNameLocal ?? property?.directions_by_name ?? false
+  const persistDirectionsByName = async (value: boolean) => {
+    if (!property?.id) return
+    setByNameLocal(value)
+    setByNameError('')
+    const { error } = await supabase.from('properties').update({ directions_by_name: value }).eq('id', property.id)
+    if (error) {
+      setByNameLocal(null)
+      setByNameError('Could not save this setting. Ask your admin to run the latest database update.')
+      return
+    }
     queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
     queryClient.invalidateQueries({ queryKey: ['property'] })
   }
@@ -568,7 +586,7 @@ function AdminSettings() {
               className={inputCls}
             />
             <p className="text-xs text-stone-500 mt-1">
-              Applies to every pending booking: requests guests send from your booking page, and bookings you add yourself and leave as "Pending". The room stays blocked for this many hours. If you haven't confirmed it or recorded the advance payment by then, it is cancelled automatically and the dates are freed up again, with no message to you or the guest. Your Home page shows the time left on each request. Default is 24 hours.
+              When you add a booking and leave it "Pending" (e.g. a guest enquiry awaiting advance payment), the room stays blocked for this many hours. If the booking isn't confirmed by then, it's automatically cancelled and the dates are freed up again. Default is 24 hours.
             </p>
           </div>
         </div>
@@ -584,6 +602,17 @@ function AdminSettings() {
             <div>
               <label className={labelCls}>Longitude</label>
               <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.15" className={inputCls} />
+            </div>
+            <div className="col-span-2 rounded-lg border border-border p-3 space-y-2">
+              <label className="flex items-start gap-2 text-sm text-stone-800">
+                <input type="checkbox" checked={directionsByName} onChange={(e) => persistDirectionsByName(e.target.checked)} className="mt-0.5" />
+                <span>My property is listed on Google Maps. Send guests to my listing.</span>
+              </label>
+              <p className="text-xs text-stone-500">
+                Guests who tap Directions get a route from where they are. Off: the route ends at your pin (latitude and longitude above). On: Google finds your listing by its name and area, so guests see its photos and reviews. Tap Test to check it lands on the right place; if not, switch this off.
+              </p>
+              <a href={`/api/directions?p=${property.subdomain}`} target="_blank" rel="noreferrer" className="inline-block text-xs font-medium text-primary underline underline-offset-2">Test directions link</a>
+              {byNameError && <p role="alert" className="text-xs text-red-600">{byNameError}</p>}
             </div>
             <p className="col-span-2 -mt-2 text-xs text-stone-500">Enter both, or leave both empty. In Google Maps, press and hold the spot and copy the numbers; you can paste "10.0889, 77.0595" into Latitude and both boxes fill in.</p>
           </div>
@@ -657,3 +686,4 @@ function AdminSettings() {
     </div>
   )
 }
+ 
