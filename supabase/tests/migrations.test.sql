@@ -327,4 +327,11 @@ end $$;
 select t_assert((select count(*) = 1 from bookings where guest_name = 'Owner large party'), 'an owner can still enter a larger party');
 update rooms set max_occupancy = null where id = :'C1';
 
+-- 13. directions_by_name: off by default for every existing property -------------------------------
+reset role;
+select t_assert((select directions_by_name = false from properties where id = '00000000-0000-0000-0000-0000000000a1'), 'existing properties keep using their pin (directions_by_name defaults to false)');
+update properties set directions_by_name = true where id = '00000000-0000-0000-0000-0000000000a1';
+select t_assert((select directions_by_name from properties where id = '00000000-0000-0000-0000-0000000000a1'), 'the owner setting can be switched on');
+update properties set directions_by_name = false where id = '00000000-0000-0000-0000-0000000000a1';
+
 \echo 'ALL DATABASE TESTS PASSED'

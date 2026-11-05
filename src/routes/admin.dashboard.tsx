@@ -22,7 +22,6 @@ import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
 import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
-import { useNow } from "@/hooks/useNow";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
@@ -263,24 +262,7 @@ type AttentionRow = {
   checkIn: string;
   checkOut: string;
   isGroup: boolean;
-  /** Pending requests only: when the hold runs out and the booking is cancelled. */
-  holdExpiresAt?: string | null;
 };
-
-/** Time left on a pending hold, as short text. Red ("urgent") under 3 hours. */
-function holdLeftLabel(iso: string | null | undefined, now: Date): { text: string; urgent: boolean } | null {
-  if (!iso) return null;
-  const ms = new Date(iso).getTime() - now.getTime();
-  if (Number.isNaN(ms)) return null;
-  // The cancel job runs every few minutes, so a hold can briefly read "ended"
-  // before the booking disappears. Say so plainly instead of showing a negative time.
-  if (ms <= 0) return { text: "hold ended, confirm now", urgent: true };
-  const totalMin = Math.floor(ms / 60_000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  const text = h >= 24 ? `${Math.floor(h / 24)} d ${h % 24} h left` : h >= 1 ? `${h} h ${m} min left` : `${Math.max(m, 1)} min left`;
-  return { text, urgent: ms < 3 * 60 * 60 * 1000 };
-}
 
 function useAttentionRows(
   bookings: ReturnType<typeof useBookings>["data"] = [],
@@ -304,7 +286,6 @@ function useAttentionRows(
           checkIn: b.check_in,
           checkOut: b.check_out,
           isGroup: false,
-          holdExpiresAt: b.hold_expires_at ?? null,
         })),
       ...groups
         .filter((g) => g.status === "pending" && g.check_in >= today)
@@ -315,18 +296,8 @@ function useAttentionRows(
           checkIn: g.check_in,
           checkOut: g.check_out,
           isGroup: true,
-          holdExpiresAt: g.hold_expires_at ?? null,
         })),
     ];
-
-    // Soonest-expiring hold first: that is the one that will be lost first.
-    // Requests with no hold time keep their order, after the timed ones.
-    pending.sort((a, b) => {
-      if (a.holdExpiresAt && b.holdExpiresAt) return a.holdExpiresAt < b.holdExpiresAt ? -1 : a.holdExpiresAt > b.holdExpiresAt ? 1 : 0;
-      if (a.holdExpiresAt) return -1;
-      if (b.holdExpiresAt) return 1;
-      return 0;
-    });
 
     const checkinsToday: AttentionRow[] = [
       ...bookings
@@ -357,7 +328,7 @@ function useAttentionRows(
   }, [bookings, groups, today]);
 }
 
-function AttentionSection({ rows, now }: { rows: AttentionRow[]; now: Date }) {
+function AttentionSection({ rows }: { rows: AttentionRow[] }) {
   if (rows.length === 0) return null;
 
   return (
@@ -397,16 +368,6 @@ function AttentionSection({ rows, now }: { rows: AttentionRow[]; now: Date }) {
                 </div>
                 <div className="text-xs text-muted-foreground">
                   {row.checkIn} → {row.checkOut}
-                  {(() => {
-                    if (!isPending) return null;
-                    const left = holdLeftLabel(row.holdExpiresAt, now);
-                    if (!left) return null;
-                    return (
-                      <span className={left.urgent ? "ml-2 font-semibold text-red-600" : "ml-2 font-medium text-amber-700"}>
-                        · {left.text}
-                      </span>
-                    );
-                  })()}
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -572,8 +533,6 @@ function DashboardPage() {
   // Standalone bookings only: the rooms of a multi-room booking are represented by
   // the group row, so listing them too showed one booking three times.
   const attentionRows = useAttentionRows(standaloneBookings, groups, today);
-  // Refreshes every minute so the "time left" on pending requests stays current.
-  const now = useNow(60_000);
 
   // One row per BOOKING: a multi-room booking is a single group row ("2 rooms"), not
   // one row per room — its discount and extras live on the group, so per-room rows
@@ -648,7 +607,7 @@ function DashboardPage() {
 
       <OnboardingChecklist property={property as Property | undefined} />
 
-      <AttentionSection rows={attentionRows} now={now} />
+      <AttentionSection rows={attentionRows} />
 
       <div className="bg-card border border-border rounded-xl p-4 shadow-[var(--shadow-neu-flat)]">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
@@ -724,6 +683,7 @@ function DashboardPage() {
             location_lat: property.location_lat ?? null,
             location_lng: property.location_lng ?? null,
             landmark_description: property.landmark_description ?? null,
+            subdomain: property.subdomain ?? null,
           }}
           onClose={() => setModal(null)}
         />

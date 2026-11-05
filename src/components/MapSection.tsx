@@ -1,7 +1,8 @@
 import { MapPin, Navigation, Apple, Mountain, MessageSquare } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { waDigits } from "@/lib/phone";
-import { appleMapsUrl as buildAppleMapsUrl, directionsUrl, hasCoordinates } from "@/lib/location";
+import { appleMapsUrl as buildAppleMapsUrl, directionsShortLink, directionsUrl, hasCoordinates } from "@/lib/location";
+import { smsLink } from "@/lib/sms";
 
 interface MapSectionProps {
   subdomain: string;
@@ -20,18 +21,21 @@ export function MapSection({ subdomain }: MapSectionProps) {
   // Both numbers or nothing: one coordinate alone is useless. The SMS always carries a working link
   // (the exact spot, or a search for the property's name and area).
   const hasCoords = hasCoordinates(lat, lng);
-  const mapsLink = directionsUrl({ lat, lng, name: property?.name, area: property?.area });
+  // Buttons open Google Maps directly. The SMS carries the short link instead: it has no "&" or comma, which
+  // some SMS apps cut the message (or the link) at. The short link redirects to the same directions.
+  const mapsLink = directionsUrl({ lat, lng, name: property?.name, area: property?.area, byName: property?.directions_by_name });
+  const shortLink = directionsShortLink(subdomain, window.location);
   const appleMapsUrl = buildAppleMapsUrl({ lat, lng, name: propertyName });
 
   const smsMessage = [
     `Directions to ${propertyName}:`,
-    `Google Maps: ${mapsLink}`,
+    `Google Maps: ${shortLink}`,
     landmark ? `Landmark: ${landmark}` : "",
     ownerPhone ? `Call ${ownerName}: +${waDigits(ownerPhone)}` : "",
     "See you soon!",
   ].filter(Boolean).join("\n");
 
-  const smsUrl = `sms:?body=${encodeURIComponent(smsMessage)}`;
+  const smsUrl = smsLink(smsMessage);
 
   if (!hasCoords && !staticMapUrl && !landmark) return null;
 

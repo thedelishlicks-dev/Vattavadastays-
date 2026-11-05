@@ -15,7 +15,7 @@ export function Footer({ subdomain }: { subdomain: string }) {
   const propertyName = property?.name ?? "stayidom.in";
   const ownerName = property?.owner_name ?? "the host";
 
-  const mapsUrl = directionsUrl({ lat, lng, name: property?.name, area: property?.area });
+  const mapsUrl = directionsUrl({ lat, lng, name: property?.name, area: property?.area, byName: property?.directions_by_name });
 
   function cleanDigits(p: string): string {
     const d = p.replace(/\D/g, "");

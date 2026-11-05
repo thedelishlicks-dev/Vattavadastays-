@@ -38,6 +38,8 @@ test("confirmation link opens the guest's chat with the text pre-filled", () => 
 test("directions text does not name a town (the platform serves all of Kerala)", () => {
   const t = buildDirectionsText({ guestName: "Asha", propertyName: "Backwater Stay", lat: 9.5, lng: 76.3, ownerPhone: "9497558860" });
   assert.ok(!/munnar/i.test(t));
-  assert.ok(t.includes("https://www.google.com/maps/search/?api=1&query=9.5%2C76.3"));
-  assert.ok(!/maps[^\s]*,/.test(t), "the maps link must not contain a raw comma");
+  assert.ok(t.includes("https://www.google.com/maps/dir/?api=1&destination=9.5%2C76.3&travelmode=driving"));
+  const withLink = buildDirectionsText({ guestName: "Asha", propertyName: "Backwater Stay", lat: 9.5, lng: 76.3, ownerPhone: "9497558860", link: "https://backwater.stayidom.in/api/directions" });
+  assert.ok(withLink.includes("https://backwater.stayidom.in/api/directions"));
+  assert.ok(!withLink.includes("destination="));
 });
