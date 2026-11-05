@@ -1,4 +1,4 @@
-import { directionsUrl, hasCoordinates } from "@/lib/location";
+import { directionsShortLink, hasCoordinates } from "@/lib/location";
 import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -634,7 +634,7 @@ function ContactPropertyWithInvoice({
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities",
+          "name, subdomain, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities",
         )
         .eq("id", propertyId)
         .single();
@@ -685,7 +685,7 @@ function ContactProperty({
       const { data, error } = await supabase
         .from("properties")
         .select(
-          "name, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities, check_in_time, check_out_time",
+          "name, subdomain, area, owner_name, owner_phone, owner_whatsapp, location_lat, location_lng, shared_amenities, check_in_time, check_out_time",
         )
         .eq("id", propertyId)
         .single();
@@ -701,9 +701,8 @@ function ContactProperty({
   const phone = property.owner_phone ?? "";
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${waDigits(whatsapp)}` : null;
-  const mapsLink = hasCoordinates(property.location_lat, property.location_lng)
-    ? directionsUrl({ lat: property.location_lat, lng: property.location_lng })
-    : null;
+  // The short link: the server picks the pin or the owner's Google listing (api/directions.ts).
+  const mapsLink = hasCoordinates(property.location_lat, property.location_lng) ? directionsShortLink(property.subdomain) : null;
 
   return (
     <div className="space-y-4">
