@@ -19,24 +19,29 @@ export function hasCoordinates(lat: Coord, lng: Coord): boolean {
   return a !== null && b !== null && Math.abs(a) <= 90 && Math.abs(b) <= 180;
 }
 
+export type DirectionsTarget = { lat: Coord; lng: Coord; name?: string | null; area?: string | null; byName?: boolean | null };
+
 /**
- * Google Maps link for an exact spot. Google's documented link format, with the comma between the two
- * numbers written as %2C. A raw comma ends the link in many messaging apps (the Android SMS app, for one),
- * so only the first number was tapped and the second was cut off. Never put a raw "lat,lng" in a link
- * that goes into message text.
+ * Google's directions link, used by the buttons. No `origin`, so Google starts the route from where the
+ * person is standing. The destination is the property's pin, or, when the owner has switched it on
+ * (properties.directions_by_name) or there is no pin, its name and area so Google finds the listing.
+ * The server route api/directions.ts builds the same link (api/_lib/directions.ts).
  */
-export function googleMapsPinUrl(lat: number | string, lng: number | string): string {
-  return `https://www.google.com/maps/search/?api=1&query=${lat}%2C${lng}`;
+export function directionsUrl(p: DirectionsTarget): string {
+  const byName = Boolean(p.byName) || !hasCoordinates(p.lat, p.lng);
+  const destination = byName ? [p.name, p.area, "Kerala"].filter(Boolean).join(", ") : `${num(p.lat)},${num(p.lng)}`;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=driving`;
 }
 
 /**
- * Google Maps link for the property: its exact spot when both coordinates are set, otherwise a search for
- * its name and area, so a directions message always carries a working link.
+ * The link that goes INTO message text (SMS, WhatsApp): short, and with no "&", no comma and no
+ * space, because some SMS apps end the whole message at the first "&" and others end a link at a comma.
+ * It redirects to directionsUrl() on the server (api/directions.ts).
+ * On the live site the property's own address is enough; previews and localhost need ?p=<subdomain>.
  */
-export function directionsUrl(p: { lat: Coord; lng: Coord; name?: string | null; area?: string | null }): string {
-  if (hasCoordinates(p.lat, p.lng)) return googleMapsPinUrl(num(p.lat) as number, num(p.lng) as number);
-  const place = [p.name, p.area, "Kerala"].filter(Boolean).join(" ");
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place)}`;
+export function directionsShortLink(subdomain: string, here?: { hostname: string; origin: string }): string {
+  if (!here || here.hostname.endsWith(".stayidom.in")) return `https://${subdomain}.stayidom.in/api/directions`;
+  return `${here.origin}/api/directions?p=${encodeURIComponent(subdomain)}`;
 }
 
 /** Apple Maps link, or null without both coordinates (a name search there is too unreliable). */
