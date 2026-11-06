@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
-import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail } from 'lucide-react'
+import { Loader2, Save, CheckCircle, Upload, X, Check, Smartphone, Copy, KeyRound, Mail, HelpCircle } from 'lucide-react'
 import { validateAndCompress, compressionSummary, type ImagePreset } from '@/lib/imageUtils'
 import { PaymentSetupSection } from '@/components/PaymentSetupSection'
 import { GalleryManager, InstagramField } from '@/components/GalleryManager'
@@ -575,7 +575,17 @@ function AdminSettings() {
             page, along with your cancellation policy and house rules.
           </p>
           <div>
-            <label className={labelCls}>Pending booking hold (hours)</label>
+            <label className={labelCls}>
+              Pending booking hold (hours){" "}
+              <a
+                href="/help#setup-settings"
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-0.5 text-primary hover:underline align-middle"
+              >
+                <HelpCircle className="h-3.5 w-3.5" /> How it works
+              </a>
+            </label>
             <input
               type="number"
               name="pending_hold_hours"
@@ -586,7 +596,7 @@ function AdminSettings() {
               className={inputCls}
             />
             <p className="text-xs text-stone-500 mt-1">
-              When you add a booking and leave it "Pending" (e.g. a guest enquiry awaiting advance payment), the room stays blocked for this many hours. If the booking isn't confirmed by then, it's automatically cancelled and the dates are freed up again. Default is 24 hours.
+              Applies to every pending booking: requests guests send from your booking page, and bookings you add yourself and leave as "Pending". The room stays blocked for this many hours. If you haven't confirmed it or recorded the advance payment by then, it is cancelled automatically and the dates are freed up again, with no message to you or the guest. Default is 24 hours.
             </p>
           </div>
         </div>
@@ -686,4 +696,3 @@ function AdminSettings() {
     </div>
   )
 }
- 

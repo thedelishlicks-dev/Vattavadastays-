@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
-import { LogOut, Menu, X } from "lucide-react";
+import { HelpCircle, LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { supabase } from "@/lib/supabase";
@@ -129,6 +129,14 @@ export function AdminLayout() {
           ))}
         </nav>
         <div className="p-3 border-t border-border space-y-0.5">
+          <a
+            href="/help"
+            target="_blank"
+            rel="noopener"
+            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <HelpCircle className="h-4 w-4" /> Help
+          </a>
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -245,6 +253,14 @@ export function AdminLayout() {
               ))}
             </nav>
             <div className="p-3 border-t border-border space-y-0.5">
+              <a
+                href="/help"
+            target="_blank"
+            rel="noopener"
+                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <HelpCircle className="h-4 w-4" /> Help
+              </a>
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
