@@ -9,7 +9,7 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, parseISO, differenceInCalendarDays } from "date-fns";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { HelpCircle, Loader2, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useRoomRates, roomRatesKey } from "@/hooks/useRoomRates";
@@ -86,7 +86,17 @@ export function RoomRatesEditor({ propertyId, room }: Props) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="text-sm font-semibold">Seasonal rates</h3>
+        <h3 className="text-sm font-semibold">
+          Seasonal rates{" "}
+          <a
+            href="/help#seasonal-rates"
+            target="_blank"
+            rel="noopener"
+            className="ml-1 inline-flex items-center gap-0.5 align-middle text-xs font-normal text-primary hover:underline"
+          >
+            <HelpCircle className="h-3.5 w-3.5" /> Help
+          </a>
+        </h3>
         <p className="text-xs text-muted-foreground mt-0.5">
           Charge a different nightly price for peak or off-season dates (Christmas, April–May, Onam…). Nights outside
           these dates use the base price above. The Fri/Sat multiplier still applies on top.
