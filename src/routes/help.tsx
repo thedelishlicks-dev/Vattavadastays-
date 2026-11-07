@@ -56,6 +56,25 @@ function Block({ block }: { block: GuideBlock }) {
           ))}
         </ul>
       );
+    case "image":
+      return (
+        <figure className="mx-auto w-full max-w-[300px]">
+          <a href={block.src} target="_blank" rel="noopener" aria-label="Open full-size screenshot">
+            <img
+              src={block.src}
+              alt={block.alt}
+              width={block.width}
+              height={block.height}
+              loading="lazy"
+              decoding="async"
+              className="h-auto w-full rounded-xl border border-border shadow-sm"
+            />
+          </a>
+          <figcaption className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
+            {renderInline(block.caption)}
+          </figcaption>
+        </figure>
+      );
     case "note":
       return (
         <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm leading-relaxed text-amber-900">
