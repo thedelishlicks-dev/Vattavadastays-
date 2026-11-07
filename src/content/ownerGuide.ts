@@ -131,14 +131,15 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open **Calendar**. It starts on **All rooms**, showing every room together.",
-          "Tap a room name above the calendar to see **one room only**.",
-          "Read each day: **green** is open, **blue Full** means no room is free that day, and **orange** text means a request is waiting (pending). The small text under the date counts rooms that are free, booked or pending.",
+          "Open **Calendar**. It starts on **All rooms**. The strip at the top shows today: how many rooms are free, how many guests are **arriving** and **leaving**, and any **pending** requests.",
+          "Each day shows **one small circle per room**. A **hollow green** circle is free, **blue** is booked, **amber** is a pending request, **red** is blocked, and a **light-blue ring** means a guest checks out that day.",
+          "**Tap a day.** A panel opens under the calendar listing every room, who is staying and its status. Tap **View** to open a booking, or **Reopen** on a blocked room.",
+          "Today is the dark circle. Past days are faded.",
+          "To see one room only, tap its name above the calendar. If you have many rooms (tents or houseboats), a **drop-down** replaces the buttons, and each day shows how many rooms are free, with a coloured bar.",
           "Use the arrows beside the month name to move to another month.",
         ],
       },
-      shot("06-calendar.webp", "Calendar showing room filters, full days and a day with a pending request", "**1** Block dates. **2** Choose All rooms or one room. **3** Blue: no room is free. **4** Orange text: a request is waiting."),
-      { type: "note", label: "Good to know", text: "On a small phone the words inside each day are shortened. If you are unsure about a day, open **Bookings** and check the dates." },
+      { type: "note", label: "Good to know", text: "The circles follow the order of your rooms, so the same position is always the same room. If you are unsure, tap the day and read the panel." },
     ],
   },
   {
@@ -156,7 +157,7 @@ export const SITUATIONS: GuideSection[] = [
           "Save.",
         ],
       },
-      { type: "p", text: "The dates show **Blocked** and guests cannot book them. If the work finishes early, tap a **Blocked** date on the Calendar and choose to **reopen** it." },
+      { type: "p", text: "The dates show **Blocked** and guests cannot book them. If the work finishes early, tap that day on the **Calendar** and tap **Reopen** next to the room. (In a single room's calendar, tap the **Blocked** date.)" },
       { type: "note", label: "Watch out", text: "If the room **already has a booking** on those dates, the app will tell you and will not block over it. Move that guest first, with **Edit Stay**." },
     ],
   },
@@ -190,12 +191,13 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open the booking and tap **Edit Stay** (next to Confirm and Edit Guest).",
-          "Change the **check-out to 26 Dec**. The app works out the price again: Thursday ₹4,500 + Friday ₹5,625 + extra guest ₹1,000 = **₹11,125**.",
+          "Open the booking and tap **Edit Stay** (next to Confirm and Edit Guest). The **Edit Stay Details** screen opens, and it says the total will be recalculated.",
+          "Tap the new dates on the calendar: **check-in 24 Dec**, then **check-out 26 Dec**. Crossed-out days are in the past. The app works out the price again: Thursday ₹4,500 + Friday ₹5,625 + extra guest ₹1,000 = **₹11,125**.",
           "Save. The app shows **Refund due ₹875**, because they paid ₹12,000.",
           "Send the ₹875 back yourself, outside the app. It is **not** sent automatically.",
         ],
       },
+      shot("14-edit-stay.webp", "Edit Stay Details with the room, the stay calendar and the chosen dates", "**1** Choose the room. **2** Tap the new check-in, then check-out. **3** Check the dates shown here before saving."),
       { type: "p", text: "If they had paid less than the new total, **Balance due** shows instead. Collect it, then record it. To change room, use **Edit Stay** and pick the new room; check it is free first." },
       { type: "note", label: "Watch out", text: "The app tells you about a refund but does not move any money." },
     ],
@@ -423,6 +425,8 @@ export const PROBLEMS: GuideSection[] = [
     title: "Money problems",
     summary: "Wrong amount, refund due, commission looks wrong.",
     blocks: [
+      { type: "p", text: "Open **Money → Payments** to see where you stand." },
+      shot("13-payments-overview.webp", "Payments page with the Collected, Outstanding and Total billed cards", "**1** Collected so far, and how many bookings are fully or part paid. **2** Outstanding balance, and how many have not started paying. **3** Total billed: room total plus charges minus discounts."),
       {
         type: "list",
         items: [
