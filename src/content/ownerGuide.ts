@@ -12,7 +12,18 @@ export type GuideBlock =
   | { type: "steps"; items: string[] }
   | { type: "list"; items: string[] }
   | { type: "note"; label: string; text: string }
+  | { type: "image"; src: string; alt: string; caption: string; width: number; height: number }
   | { type: "table"; head: string[]; rows: string[][] };
+
+/** Screenshot block. Files live in public/help/, 720 px wide WebP. */
+const shot = (file: string, alt: string, caption: string): GuideBlock => ({
+  type: "image",
+  src: `/help/${file}`,
+  alt,
+  caption,
+  width: 720,
+  height: 1232,
+});
 
 export type GuideSection = {
   id: string;
@@ -33,17 +44,20 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open **Bookings → Quotes** and start a new quote.",
-          "Enter the guest's **name and WhatsApp number**.",
-          "Pick **check-in 24 Dec** and **check-out 27 Dec**.",
-          "Tap **Mud House** and set **3 guests**.",
-          "Add meals or a campfire from **Add-ons & packages** if they want them.",
-          "Set **Quote valid until** (for example 2 days from now), and a discount if you are giving one.",
-          "Read the **Preview message**. The room total should be **₹15,750**, plus **₹1,500** for the extra guest: **₹17,250** before add-ons.",
+          "Open **Bookings**, tap the **Quotes** tab, then tap **New quote**.",
+          "Under **Guest**, enter the name (optional) and the guest's **WhatsApp number**.",
+          "Under **Stay**, tap the **check-in** and **check-out** dates on the calendar (24 Dec and 27 Dec). Past dates are crossed out.",
+          "Under **Rooms**, tap **Mud House** to include it, then set **3 guests**.",
+          "Under **Add-ons & packages**, add meals or a campfire if they want them. Pick the dates first, or the list stays empty.",
+          "Under **Discount & validity**, set a **Discount ₹** if you are giving one, and **Quote valid until** (for example 2 days from now). The **Private note** is for you and is not sent.",
+          "Check the **Summary**. The room total should be **₹15,750**, plus **₹1,500** for the extra guest: **₹17,250** before add-ons. You can also read the **Preview message** before sending.",
           "Tap **Send on WhatsApp**.",
         ],
       },
-      { type: "p", text: "When the guest says yes, open the quote and tap **Convert quote to booking**. Their details carry over. Ask for the advance, then follow \"The guest says they paid\" below." },
+      shot("08-quote-guest-stay.webp", "New quote form showing the guest fields and the stay calendar", "**1** Guest name and WhatsApp number. **2** Tap your check-in and check-out dates."),
+      shot("09-quote-rooms-addons.webp", "New quote form showing the room list and the add-ons list", "**1** Tap a room to include it and set its guests. **2** Pick the dates first, then choose add-ons here."),
+      shot("10-quote-discount-send.webp", "New quote form showing discount, validity date and the Send on WhatsApp button", "**1** Discount. **2** Quote valid until. **3** Send on WhatsApp."),
+      { type: "p", text: "When the guest says yes, find the quote under **Quotes** and tap **Convert to booking**. Their details carry over. A converted quote shows **Booked ✓** with a **View in Bookings** button. Ask for the advance, then follow \"The guest says they paid\" below." },
       { type: "note", label: "Watch out", text: "A quote does **not** hold the room. Until it becomes a booking, someone else can take the dates. Convert it as soon as the guest agrees." },
     ],
   },
@@ -62,6 +76,8 @@ export const SITUATIONS: GuideSection[] = [
           "A **Booking confirmed** prompt appears. Tap it to send the guest their confirmation on WhatsApp.",
         ],
       },
+      shot("01-home-needs-attention.webp", "Home screen with a booking request under Needs your attention", "**1** A new request appears under **Needs your attention**. Tap it to open the booking."),
+      shot("02-booking-record-payment.webp", "Booking screen with the Confirm button and the Amount received field marked", "**1** Tap **Confirm** yourself, or **2** type the amount received in **Record advance payment**. **25% or more** confirms it by itself (the app suggests the 25% amount)."),
       { type: "note", label: "Watch out", text: "If you have not confirmed it or recorded the advance before the hold hours end (24 by default), the request is **cancelled and the dates released, with no message to anyone**. Check **Home** every few hours and reply early." },
     ],
   },
@@ -79,6 +95,7 @@ export const SITUATIONS: GuideSection[] = [
           "Tap the **Booking confirmed** prompt to send the confirmation.",
         ],
       },
+      shot("02-booking-record-payment.webp", "Booking screen with the Confirm button and the Amount received field marked", "**1** Tap **Confirm** yourself, or **2** type the amount received in **Record advance payment**."),
       { type: "p", text: "**If the request has vanished from Home:** it probably ran out of time. Open **Bookings**, filter **Cancelled**, and search the guest. If the **Calendar** still shows the dates **Open**, use **Add booking** to enter the stay again as **Confirmed**, and record their payment." },
       { type: "note", label: "Watch out", text: "The app cannot see your bank. A payment only counts when **you** record it." },
     ],
@@ -101,8 +118,27 @@ export const SITUATIONS: GuideSection[] = [
           "Open your own booking page and try those dates to see what guests see.",
         ],
       },
+      shot("05-seasonal-rates.webp", "Room editor showing a saved seasonal rate and the Add seasonal rate button", "**1** A saved rate shows its dates, number of nights and price. **2** Tap **Add seasonal rate** to create another."),
       { type: "p", text: "**Prefer an exact price?** Choose **Fixed ₹ per night** instead, and set the price for one room." },
       { type: "note", label: "Watch out", text: "Under **Property → Add-ons** there is also a thing called **Seasons**. That only prices meals and extras. It does **not** change room prices." },
+    ],
+  },
+  {
+    id: "read-calendar",
+    title: "Which rooms are free on which days?",
+    summary: "Read the Calendar at a glance.",
+    blocks: [
+      {
+        type: "steps",
+        items: [
+          "Open **Calendar**. It starts on **All rooms**, showing every room together.",
+          "Tap a room name above the calendar to see **one room only**.",
+          "Read each day: **green** is open, **blue Full** means no room is free that day, and **orange** text means a request is waiting (pending). The small text under the date counts rooms that are free, booked or pending.",
+          "Use the arrows beside the month name to move to another month.",
+        ],
+      },
+      shot("06-calendar.webp", "Calendar showing room filters, full days and a day with a pending request", "**1** Block dates. **2** Choose All rooms or one room. **3** Blue: no room is free. **4** Orange text: a request is waiting."),
+      { type: "note", label: "Good to know", text: "On a small phone the words inside each day are shortened. If you are unsure about a day, open **Bookings** and check the dates." },
     ],
   },
   {
@@ -113,7 +149,7 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open **Calendar** and tap **Block dates**.",
+          "Tap **Block dates**, on **Home** under Quick actions or on the **Calendar**.",
           "Pick the room.",
           "Tap the **first day**, then the **last day**.",
           "Write a note, such as **Roof repair**.",
@@ -121,7 +157,7 @@ export const SITUATIONS: GuideSection[] = [
         ],
       },
       { type: "p", text: "The dates show **Blocked** and guests cannot book them. If the work finishes early, tap a **Blocked** date on the Calendar and choose to **reopen** it." },
-      { type: "note", label: "Watch out", text: "If the room **already has a booking** on those dates, the app will tell you and will not block over it. Move that guest first, with **Edit stay**." },
+      { type: "note", label: "Watch out", text: "If the room **already has a booking** on those dates, the app will tell you and will not block over it. Move that guest first, with **Edit Stay**." },
     ],
   },
   {
@@ -132,15 +168,17 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Check the **Calendar** to see that the room is **Open**.",
-          "Open **Bookings** and tap **Add booking**.",
-          "Enter the **guest name and phone**, then the **dates and room**. The app checks availability for you.",
-          "Set the status: **Confirmed** if the guest is paying now or has paid, **Pending** if you are waiting for the advance (the room is held for your hold hours, then released).",
-          "Add a **discount** if you promised one, then tap **Create booking**.",
-          "Record any money received.",
-          "Send the **Booking confirmed** message on WhatsApp.",
+          "Check the **Calendar** to see that the room is free on those days.",
+          "Tap **Add booking**, on **Home** under Quick actions or on the **Bookings** page.",
+          "Under **Guest details**, enter the **guest name** (required) and **phone**. Email is optional.",
+          "Under **How did this booking come in?**, choose **Direct** (they phoned you), **Walk-in** or **Agent**.",
+          "Under **Select rooms**, tap the room to include it. The card shows its price, weekend price and extra guest charge.",
+          "Choose the **dates**, and set the status: **Confirmed** if the guest is paying now or has paid, **Pending** if you are waiting for the advance (the room is held for your hold hours, then released).",
+          "Add a **discount** if you promised one, then tap **Add booking** at the bottom.",
+          "Record any money received, then send the **Booking confirmed** message on WhatsApp.",
         ],
       },
+      shot("07-add-booking.webp", "Add Booking form with guest details, how the booking came in, and room selection", "**1** Guest name and phone. **2** How the booking came in. **3** Tap a room. **4** Tap Add booking."),
     ],
   },
   {
@@ -152,13 +190,13 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open the booking and tap **Edit stay**.",
+          "Open the booking and tap **Edit Stay** (next to Confirm and Edit Guest).",
           "Change the **check-out to 26 Dec**. The app works out the price again: Thursday ₹4,500 + Friday ₹5,625 + extra guest ₹1,000 = **₹11,125**.",
           "Save. The app shows **Refund due ₹875**, because they paid ₹12,000.",
           "Send the ₹875 back yourself, outside the app. It is **not** sent automatically.",
         ],
       },
-      { type: "p", text: "If they had paid less than the new total, **Balance due** shows instead. Collect it, then record it. To change room, use **Edit stay** and pick the new room; check it is free first." },
+      { type: "p", text: "If they had paid less than the new total, **Balance due** shows instead. Collect it, then record it. To change room, use **Edit Stay** and pick the new room; check it is free first." },
       { type: "note", label: "Watch out", text: "The app tells you about a refund but does not move any money." },
     ],
   },
@@ -171,17 +209,19 @@ export const SITUATIONS: GuideSection[] = [
       {
         type: "steps",
         items: [
-          "Open **Money → Agents & Commissions** and add the agent's **name and phone**.",
-          "Set a **default commission**: **percentage** (a share of the room rate) or **flat amount** (a fixed ₹ per booking, for example ₹1,000).",
+          "Open **Money**, tap the **Agents & Commissions** tab, then tap **Add agent**.",
+          "Enter the agent's **name** and phone, and set a **default commission**: **percentage** (a share of the room rate, shown for example as **10%**) or **flat amount** (a fixed ₹ per booking, shown for example as **₹500 flat**).",
         ],
       },
+      shot("12-agents-commissions.webp", "Agents and Commissions page with the Add agent button and the list of agents", "**1** Add agent. **2** Total commission owed for confirmed stays. **3** Tap the arrow beside an agent to see their bookings."),
       { type: "p", text: "**Each time**" },
       {
         type: "steps",
         items: [
-          "When you **Add booking** for the agent's guest, choose the agent. The commission is worked out for you.",
-          "Open **Agents & Commissions** at any time to see what is **Owed**.",
+          "When you tap **Add booking** for the agent's guest, choose **Agent** under **How did this booking come in?** and pick the agent. The commission is worked out for you.",
+          "Open **Agents & Commissions** at any time. The top card shows **Total commission owed**, and each agent shows what is **owed**.",
           "After you pay the agent, tap **Mark paid**. The date is saved.",
+          "**Export CSV** downloads the list for your accounts.",
         ],
       },
       { type: "note", label: "Watch out", text: "A **percentage** commission cannot be more than 100%. If the amount looks wrong, check you chose percentage or flat correctly." },
@@ -197,12 +237,13 @@ export const SITUATIONS: GuideSection[] = [
         items: [
           "Open **Bookings** and find the stay.",
           "On the **Charges** tab, add anything extra the guest used: meals, campfire, laundry, trek guide. The **balance** updates.",
-          "Collect the balance. Then on the **Payments** page tap **Mark fully paid**, or record the amount on the booking.",
+          "Collect the balance. Then open **Money → Payments**, tap **View … in ledger** for the month, find the booking and tap **Mark fully paid**. Or record the amount on the booking.",
           "Check the booking shows **Fully paid**.",
           "If **Refund due** appears in red, the guest has overpaid. Return the difference yourself.",
           "Open the **Invoice** tab if the guest wants a printed copy.",
         ],
       },
+      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in ledger** to see each booking and its balance."),
       { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page tap **Correct collected amount** and enter the right figure." },
     ],
   },
@@ -238,13 +279,15 @@ export const SETUP: GuideSection[] = [
         head: ["Field", "What it means"],
         rows: [
           ["**Room name**", "What guests see, for example Mud House"],
-          ["**Bed type**", "For example double or twin"],
+          ["**Room type**", "For example Deluxe"],
+          ["**Bed type**", "For example King or twin"],
           ["**Guests included in the price**", "How many guests the nightly price already covers"],
           ["**Most guests allowed**", "The most the room can hold. Guests can never book more than this."],
           ["**Active / Inactive**", "Inactive hides the room from guests, for repairs or off-season"],
         ],
       },
-      { type: "p", text: "Add up to **6 photos** per room. The **first photo** is the one on the room card, so choose your best." },
+      { type: "p", text: "Add up to **6 photos** per room. The photo marked **Main** is the one on the room card. To change it, tap **Make main** on another photo." },
+      shot("03-room-photos-and-guests.webp", "Room editor showing photos with Make main, and the guest number fields", "**1** Tap **Make main** to choose the card photo. **2** Guests the price already covers. **3** The most the room can hold."),
     ],
   },
   {
@@ -263,6 +306,7 @@ export const SETUP: GuideSection[] = [
         ],
       },
       { type: "p", text: "A **Price preview** shows a weekday and a weekend night so you can check before saving." },
+      shot("04-room-pricing.webp", "Room pricing fields with the price preview", "**1** Base price (Sunday to Thursday). **2** Extra guest charge. **3** Weekend multiplier. **4** Price preview."),
       { type: "p", text: "**Seasonal rates** change the price for set dates, such as Christmas or April–May. Tap **Add seasonal rate**, pick the first and last night (the last night is included), then choose **Fixed ₹ per night** or **% change on base price** (30 for 30% higher, −20 for 20% lower). Tick **Apply to all rooms** if the same rule fits every room." },
       {
         type: "list",
@@ -273,6 +317,7 @@ export const SETUP: GuideSection[] = [
           "New rates apply to **new** bookings only. Existing bookings keep their price.",
         ],
       },
+      shot("05-seasonal-rates.webp", "Room editor showing a saved seasonal rate and the Add seasonal rate button", "**1** A saved seasonal rate. **2** Tap **Add seasonal rate** to create another."),
       { type: "p", text: "**Worked example.** Mud House: base ₹3,000, weekend 1.25, extra guest ₹500 above 2 guests, Christmas fixed ₹4,500 (24 Dec to 1 Jan)." },
       {
         type: "table",
