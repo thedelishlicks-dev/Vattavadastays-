@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
@@ -10,7 +10,7 @@ import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
 import { friendlyNote, isIcalNote } from '@/lib/icalClient'
 import { CHANNEL_SYNC_ENABLED } from '@/lib/features'
-import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, bookingForCell, type CalBookingRef, type DayState } from '@/lib/calendarState'
+import { buildCalendarIndex, stateOf as stateOfIdx, summarizeDate, bookingForCell, type CalBookingRef, type DayState, type DaySummary, type RoomDay } from '@/lib/calendarState'
 import { waDigits } from '@/lib/phone'
 
 export const Route = createFileRoute('/admin/calendar')({
@@ -48,6 +48,80 @@ const CELL: Record<DayState, { bg: string; text: string; label: string; short?: 
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Pending' },
   checkout: { bg: 'bg-sky-50', text: 'text-sky-700', label: 'Check-out', short: 'Out' },
   blocked: { bg: 'bg-red-50', text: 'text-red-500', label: 'Blocked' },
+}
+
+// ---------------------------------------------------------------------------
+// Phone-friendly "All rooms" cells.
+// Seven columns on a phone leave ~47 px per day: too narrow for words. So each
+// day shows one dot per room (colour AND shape: free is a hollow ring, the rest
+// are solid), and the words live in the day panel under the grid. Properties
+// with more rooms than DOT_MAX (tents, houseboats...) show "N free" plus a thin
+// stacked bar instead, because 15-20 dots would not fit a cell.
+// ---------------------------------------------------------------------------
+const DOT_MAX = 6
+const todayYmd = () => {
+  const t = new Date()
+  return ymd(t.getFullYear(), t.getMonth(), t.getDate())
+}
+
+const DOT: Record<DayState, string> = {
+  open: 'border-[1.5px] border-green-600 bg-transparent',
+  booked: 'bg-blue-500',
+  pending: 'bg-amber-500',
+  checkout: 'border-[1.5px] border-sky-500 bg-sky-200',
+  blocked: 'bg-red-500',
+}
+
+const LEGEND_LABEL: Record<DayState, string> = {
+  open: 'Free',
+  booked: 'Booked',
+  pending: 'Pending',
+  checkout: 'Check-out day',
+  blocked: 'Blocked',
+}
+
+function Dot({ state }: { state: DayState }) {
+  return <span className={`block h-[9px] w-[9px] shrink-0 rounded-full ${DOT[state]}`} aria-hidden="true" />
+}
+
+function RoomDots({ rooms }: { rooms: RoomDay[] }) {
+  const cols = Math.min(rooms.length, 3)
+  return (
+    <div className="grid gap-[3px]" style={{ gridTemplateColumns: `repeat(${cols}, 9px)` }}>
+      {rooms.map((r) => (
+        <Dot key={r.id} state={r.state} />
+      ))}
+    </div>
+  )
+}
+
+function OccupancyBar({ s }: { s: DaySummary }) {
+  const parts: [number, string][] = [
+    [s.booked, 'bg-blue-500'],
+    [s.pending, 'bg-amber-500'],
+    [s.leaving, 'bg-sky-400'],
+    [s.blocked, 'bg-red-500'],
+    [s.free, 'bg-green-300'],
+  ]
+  return (
+    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+      {parts.map(([n, cls], i) =>
+        n > 0 ? <span key={i} className={cls} style={{ width: `${(n / s.total) * 100}%` }} /> : null,
+      )}
+    </div>
+  )
+}
+
+function DayNum({ day, isToday }: { day: number; isToday: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full text-xs font-medium ${
+        isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
+      }`}
+    >
+      {day}
+    </span>
+  )
 }
 
 function CalendarSkeleton() {
@@ -165,71 +239,106 @@ function BookingPeek({
 // what each room is doing that day (tooltips don't exist on iPad/phone) and lets
 // the owner reopen a blocked room straight from here.
 // ---------------------------------------------------------------------------
-function DayDialog({
-  date,
-  rooms,
-  onClose,
+const STATE_ORDER: DayState[] = ['pending', 'booked', 'checkout', 'blocked']
+
+function RoomRow({
+  r,
   onReopen,
   onView,
 }: {
-  date: string
-  rooms: { id: string; name: string; state: DayState; guest?: string }[]
-  onClose: () => void
+  r: RoomDay
   onReopen: (roomId: string) => void
   onView: (roomId: string, state: DayState) => void
+}) {
+  const c = CELL[r.state]
+  return (
+    <li className="flex items-center justify-between gap-3 px-3 py-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium truncate">{r.name}</p>
+        {r.guest && <p className="text-xs text-muted-foreground truncate">{r.guest}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>
+        {r.state === 'blocked' && (
+          <button
+            onClick={() => onReopen(r.id)}
+            className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+          >
+            Reopen
+          </button>
+        )}
+        {(r.state === 'booked' || r.state === 'pending' || r.state === 'checkout') && (
+          <button
+            onClick={() => onView(r.id, r.state)}
+            className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+          >
+            View
+          </button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+// The tapped day, in the page (not a pop-up), so the owner can tap through days.
+// With many rooms (tents, houseboats) rooms that need attention are listed first
+// and the free ones are folded into one line.
+function DayPanel({
+  date,
+  rooms,
+  onReopen,
+  onView,
+  innerRef,
+}: {
+  date: string
+  rooms: RoomDay[]
+  onReopen: (roomId: string) => void
+  onView: (roomId: string, state: DayState) => void
+  innerRef: React.Ref<HTMLDivElement>
 }) {
   const pretty = new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', {
     weekday: 'long',
     day: 'numeric',
     month: 'long',
-    year: 'numeric',
   })
+  const many = rooms.length > 8
+  const count = (st: DayState) => rooms.filter((r) => r.state === st).length
+  const free = rooms.filter((r) => r.state === 'open')
+  const listed = many ? STATE_ORDER.flatMap((st) => rooms.filter((r) => r.state === st)) : rooms
+  const summary = [
+    `${free.length} free`,
+    count('booked') > 0 && `${count('booked')} booked`,
+    count('pending') > 0 && `${count('pending')} pending`,
+    count('checkout') > 0 && `${count('checkout')} check-out`,
+    count('blocked') > 0 && `${count('blocked')} blocked`,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="font-semibold">{pretty}</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <ul className="divide-y divide-border rounded-xl border border-border">
-          {rooms.map((r) => {
-            const c = CELL[r.state]
-            return (
-              <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{r.name}</p>
-                  {r.guest && <p className="text-xs text-muted-foreground truncate">{r.guest}</p>}
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${c.bg} ${c.text}`}>{c.label}</span>
-                  {r.state === 'blocked' && (
-                    <button
-                      onClick={() => onReopen(r.id)}
-                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
-                    >
-                      Reopen
-                    </button>
-                  )}
-                  {(r.state === 'booked' || r.state === 'pending' || r.state === 'checkout') && (
-                    <button
-                      onClick={() => onView(r.id, r.state)}
-                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
-                    >
-                      View
-                    </button>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-        <button onClick={onClose} className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
-          Close
-        </button>
+    <div ref={innerRef} className="mt-4 rounded-xl border border-border bg-card p-4 space-y-3 scroll-mb-24">
+      <div>
+        <h2 className="font-semibold">{pretty}</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>
       </div>
+      {listed.length > 0 && (
+        <ul className="divide-y divide-border rounded-xl border border-border">
+          {listed.map((r) => (
+            <RoomRow key={r.id} r={r} onReopen={onReopen} onView={onView} />
+          ))}
+        </ul>
+      )}
+      {many && free.length > 0 && (
+        <details className="rounded-xl border border-border px-3 py-2 text-sm">
+          <summary className="cursor-pointer font-medium">Free rooms ({free.length})</summary>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {free.map((r) => (
+              <span key={r.id} className="rounded-full bg-green-50 px-2.5 py-1 text-xs text-green-700">
+                {r.name}
+              </span>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   )
 }
@@ -337,9 +446,24 @@ function AdminCalendar() {
   const [showSync, setShowSync] = useState(false)
   useIcalAutoSync(property?.id)
   const [reopen, setReopen] = useState<{ roomId: string; roomName: string; date: string; note: string | null } | null>(null)
-  const [dayDetail, setDayDetail] = useState<string | null>(null)
+  const [selectedDay, setSelectedDay] = useState<string | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const pickedByTap = useRef(false)
   const [peek, setPeek] = useState<{ roomId: string; date: string; state: DayState } | null>(null)
   const queryClient = useQueryClient()
+
+  const selectDay = (d: string) => {
+    pickedByTap.current = true
+    setSelectedDay(d)
+  }
+  // After a tap, bring the day panel into view (it sits under the grid, which on
+  // a phone can be below the fold). 'nearest' means no movement if already visible.
+  useEffect(() => {
+    if (pickedByTap.current) {
+      pickedByTap.current = false
+      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }, [selectedDay])
 
   const rooms = property?.rooms ?? []
   const activeRooms = rooms.filter((r: { is_active: boolean }) => r.is_active)
@@ -400,6 +524,12 @@ function AdminCalendar() {
     [bookings, availRows],
   )
   const stateOf = (roomId: string, date: string) => stateOfIdx(index, roomId, date)
+
+  const todayStr = todayYmd()
+  const monthPrefix = ymd(year, month, 1).slice(0, 7)
+  const monthHasToday = todayStr.startsWith(monthPrefix)
+  // The panel shows the tapped day, or today when the viewed month contains it.
+  const activeDay = selectedDay && selectedDay.startsWith(monthPrefix) ? selectedDay : monthHasToday ? todayStr : null
 
   if (propLoading) {
     return (
@@ -491,33 +621,76 @@ function AdminCalendar() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-6 flex-wrap">
-        {rooms.length > 1 && (
-          <button
-            onClick={() => setSelectedRoomId(ALL)}
-            className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
-              isAll
-                ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
-                : 'bg-background text-foreground border-border hover:border-primary'
-            }`}
+      {rooms.length > 5 ? (
+        <div className="mb-6">
+          <label htmlFor="cal-room" className="sr-only">
+            Room
+          </label>
+          <select
+            id="cal-room"
+            value={view ?? ALL}
+            onChange={(e) => setSelectedRoomId(e.target.value)}
+            className="w-full sm:w-auto rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium"
           >
-            All rooms
-          </button>
-        )}
-        {rooms.map((room) => (
-          <button
-            key={room.id}
-            onClick={() => setSelectedRoomId(room.id)}
-            className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
-              view === room.id
-                ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
-                : 'bg-background text-foreground border-border hover:border-primary'
-            }`}
-          >
-            {room.name}
-          </button>
-        ))}
-      </div>
+            <option value={ALL}>All rooms</option>
+            {rooms.map((room) => (
+              <option key={room.id} value={room.id}>
+                {room.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <div className="flex gap-2 mb-6 flex-wrap">
+          {rooms.length > 1 && (
+            <button
+              onClick={() => setSelectedRoomId(ALL)}
+              className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
+                isAll
+                  ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
+                  : 'bg-background text-foreground border-border hover:border-primary'
+              }`}
+            >
+              All rooms
+            </button>
+          )}
+          {rooms.map((room) => (
+            <button
+              key={room.id}
+              onClick={() => setSelectedRoomId(room.id)}
+              className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
+                view === room.id
+                  ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
+                  : 'bg-background text-foreground border-border hover:border-primary'
+              }`}
+            >
+              {room.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {isAll && activeRooms.length > 0 && monthHasToday && (() => {
+        const t = summarizeDate(index, activeRooms, todayStr)
+        const arriving = (bookings as unknown as { check_in?: string | null; status: string }[]).filter(
+          (b) => String(b.check_in ?? '').slice(0, 10) === todayStr && b.status !== 'cancelled',
+        ).length
+        return (
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">Today</span>
+            <span>
+              <strong className="text-foreground">{t.free}</strong> of {t.total} free
+            </span>
+            <span>
+              <strong className="text-foreground">{arriving}</strong> arriving
+            </span>
+            <span>
+              <strong className="text-foreground">{t.leaving}</strong> leaving
+            </span>
+            {t.pending > 0 && <span className="font-medium text-amber-700">{t.pending} pending</span>}
+          </div>
+        )
+      })()}
 
       <div className="flex items-center justify-between mb-4">
         <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors" aria-label="Previous month">
@@ -559,23 +732,40 @@ function AdminCalendar() {
 
               if (isAll) {
                 const s = summarize(dateStr)
+                const sm = summarizeDate(index, activeRooms, dateStr)
+                const isSel = dateStr === activeDay
+                const isPast = dateStr < todayStr
                 return (
                   <button
                     key={dateStr}
                     type="button"
-                    onClick={() => setDayDetail(dateStr)}
-                    className={`h-16 border-b border-r border-border/50 p-1.5 text-xs text-left w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${s.bg}`}
+                    onClick={() => selectDay(dateStr)}
+                    aria-pressed={isSel}
+                    aria-label={`${dateStr}: ${sm.lines.join(', ')}`}
+                    className={`h-14 sm:h-20 border-b border-r border-border/50 p-1 sm:p-1.5 text-xs w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary flex flex-col items-center sm:items-start gap-1 ${s.bg} ${isPast ? 'opacity-60' : ''} ${isSel ? 'ring-2 ring-inset ring-primary' : ''}`}
                     title={s.title || undefined}
                   >
-                    <div className="font-medium text-foreground">{day}</div>
-                    <div className={`mt-0.5 truncate font-medium ${s.text}`}>{s.label}</div>
-                    <div className="truncate text-[10px] leading-tight">
-                      {s.parts.map((p, i) => (
-                        <span key={p.text} className={p.cls}>
-                          {i > 0 ? ' · ' : ''}
-                          {p.text}
-                        </span>
-                      ))}
+                    <DayNum day={day} isToday={dateStr === todayStr} />
+                    {sm.total === 0 ? null : sm.total <= DOT_MAX ? (
+                      <RoomDots rooms={sm.rooms} />
+                    ) : (
+                      <div className="w-full space-y-0.5">
+                        <div className={`sm:hidden truncate text-center text-[11px] font-medium leading-none ${s.text}`}>
+                          {sm.free > 0 ? `${sm.free} free` : s.label}
+                        </div>
+                        <OccupancyBar s={sm} />
+                      </div>
+                    )}
+                    <div className="hidden sm:block w-full min-w-0">
+                      <div className={`truncate font-medium ${s.text}`}>{s.label}</div>
+                      <div className="truncate text-[10px] leading-tight">
+                        {s.parts.map((p, i) => (
+                          <span key={p.text} className={p.cls}>
+                            {i > 0 ? ' · ' : ''}
+                            {p.text}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </button>
                 )
@@ -597,7 +787,7 @@ function AdminCalendar() {
                     className={`h-16 border-b border-r border-border/50 p-1.5 text-xs text-left w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${c.bg}`}
                     title={noteText ? `Blocked — ${friendlyNote(noteText)}. Tap to reopen.` : 'Blocked. Tap to reopen.'}
                   >
-                    <div className="font-medium text-foreground">{day}</div>
+                    <div><DayNum day={day} isToday={dateStr === todayStr} /></div>
                     <div className={`mt-0.5 truncate ${c.text}`}>{c.label}</div>
                     <div className="text-muted-foreground truncate text-[10px]">{hint}</div>
                   </button>
@@ -620,7 +810,7 @@ function AdminCalendar() {
                       }
                     : {})}
                 >
-                  <div className="font-medium text-foreground">{day}</div>
+                  <div><DayNum day={day} isToday={dateStr === todayStr} /></div>
                   <div className={`mt-0.5 truncate ${c.text}`}>
                     {c.short ? (
                       <>
@@ -639,49 +829,67 @@ function AdminCalendar() {
         </div>
       )}
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        {isAll ? <>Tap any date to see each room. Pick a room above to see its bookings.</> : <>Tap a <strong>Blocked</strong> date to reopen it.</>}
-      </p>
-
-      <div className="flex gap-x-4 gap-y-2 mt-4 text-sm text-muted-foreground flex-wrap">
-        {(isAll
-          ? [
-              ['bg-green-100 border-green-300', 'Free rooms'],
-              ['bg-blue-200 border-blue-300', 'Full'],
-              ['bg-red-100 border-red-300', 'Blocked'],
-            ]
-          : [
-              ['bg-green-100 border-green-300', 'Open'],
-              ['bg-blue-100 border-blue-300', 'Booked'],
-              ['bg-amber-100 border-amber-300', 'Pending'],
-              ['bg-sky-100 border-sky-300', 'Check-out day'],
-              ['bg-red-100 border-red-300', 'Blocked'],
-            ]
-        ).map(([cls, label]) => (
-          <span key={label} className="flex items-center gap-1.5">
-            <span className={`w-3 h-3 rounded-sm border ${cls}`} />
-            {label}
-          </span>
-        ))}
+      <div className="flex gap-x-4 gap-y-2 mt-3 text-sm text-muted-foreground flex-wrap">
+        {isAll ? (
+          activeRooms.length <= DOT_MAX ? (
+            (['open', 'booked', 'pending', 'checkout', 'blocked'] as DayState[]).map((st) => (
+              <span key={st} className="flex items-center gap-1.5">
+                <Dot state={st} />
+                {LEGEND_LABEL[st]}
+              </span>
+            ))
+          ) : (
+            <>
+              <span>Number = rooms free</span>
+              {[
+                ['bg-blue-500', 'Booked'],
+                ['bg-amber-500', 'Pending'],
+                ['bg-sky-400', 'Check-out'],
+                ['bg-red-500', 'Blocked'],
+                ['bg-green-300', 'Free'],
+              ].map(([cls, label]) => (
+                <span key={label} className="flex items-center gap-1.5">
+                  <span className={`h-1.5 w-4 rounded-full ${cls}`} />
+                  {label}
+                </span>
+              ))}
+            </>
+          )
+        ) : (
+          [
+            ['bg-green-100 border-green-300', 'Open'],
+            ['bg-blue-100 border-blue-300', 'Booked'],
+            ['bg-amber-100 border-amber-300', 'Pending'],
+            ['bg-sky-100 border-sky-300', 'Check-out day'],
+            ['bg-red-100 border-red-300', 'Blocked'],
+          ].map(([cls, label]) => (
+            <span key={label} className="flex items-center gap-1.5">
+              <span className={`w-3 h-3 rounded-sm border ${cls}`} />
+              {label}
+            </span>
+          ))
+        )}
       </div>
 
-      {dayDetail && (
-        <DayDialog
-          date={dayDetail}
-          rooms={summarizeDate(index, activeRooms, dayDetail).rooms}
-          onClose={() => setDayDetail(null)}
+      <p className="mt-3 text-xs text-muted-foreground">
+        {isAll ? <>Tap a day to see each room. Pick a room above to see its bookings.</> : <>Tap a <strong>Blocked</strong> date to reopen it.</>}
+      </p>
+
+      {isAll && activeDay && rooms.length > 0 && !isLoading && (
+        <DayPanel
+          innerRef={panelRef}
+          date={activeDay}
+          rooms={summarizeDate(index, activeRooms, activeDay).rooms}
           onReopen={(roomId) => {
             const room = activeRooms.find((r: { id: string }) => r.id === roomId)
             const noteText =
               (availRows as { room_id: string; date: string; note?: string | null }[]).find(
-                (r) => r.room_id === roomId && String(r.date).slice(0, 10) === dayDetail,
+                (r) => r.room_id === roomId && String(r.date).slice(0, 10) === activeDay,
               )?.note ?? null
-            setReopen({ roomId, roomName: room?.name ?? 'Room', date: dayDetail, note: noteText })
-            setDayDetail(null)
+            setReopen({ roomId, roomName: room?.name ?? 'Room', date: activeDay, note: noteText })
           }}
           onView={(roomId, state) => {
-            setPeek({ roomId, date: dayDetail, state })
-            setDayDetail(null)
+            setPeek({ roomId, date: activeDay, state })
           }}
         />
       )}
