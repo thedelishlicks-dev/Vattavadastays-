@@ -1,4 +1,4 @@
-// src/components/RoomRatesEditor.tsx
+ // src/components/RoomRatesEditor.tsx
 //
 // Seasonal / date-range rates for ONE room, inside the room editor drawer.
 // Rates save immediately (their own table), independent of the drawer's
