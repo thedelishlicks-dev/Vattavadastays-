@@ -80,6 +80,14 @@ const LEGEND_LABEL: Record<DayState, string> = {
   blocked: 'Blocked',
 }
 
+// Single-room view: stays are drawn as bars (see the cell code below).
+type BarKind = 'booked' | 'pending' | 'blocked'
+const BAR: Record<BarKind, string> = {
+  booked: 'bg-blue-200 text-blue-900',
+  pending: 'bg-amber-200 text-amber-900',
+  blocked: 'bg-red-200 text-red-900',
+}
+
 function Dot({ state }: { state: DayState }) {
   return <span className={`block h-[9px] w-[9px] shrink-0 rounded-full ${DOT[state]}`} aria-hidden="true" />
 }
@@ -581,6 +589,49 @@ function AdminCalendar() {
     }
   }
 
+  // Single-room view: work out where each stay starts and ends, so a stay can be
+  // drawn as ONE bar with the guest's name written once, instead of a cut-off
+  // label in every day. Consecutive days with the same `key` are the same stay
+  // (or the same block).
+  type SingleDay = {
+    state: DayState
+    name?: string
+    key: string | null
+    kind: BarKind | null
+    label: string
+    leaving?: BarKind // a guest leaves this morning: draw a half bar
+  }
+  const singleDays: SingleDay[] =
+    isAll || !view
+      ? []
+      : Array.from({ length: daysInMonth }, (_, i) => {
+          const ds = ymd(year, month, i + 1)
+          const info = stateOf(view, ds)
+          let key: string | null = null
+          let kind: BarKind | null = null
+          let label = ''
+          if (info.state === 'booked' || info.state === 'pending') {
+            const bk = bookingForCell(bookings as unknown as CalBookingRef[], view, ds, info.state)
+            key = bk?.id ?? `${info.state}:${info.name ?? ''}`
+            kind = info.state
+            label = info.name ?? (info.state === 'pending' ? 'Pending' : 'Booked')
+          } else if (info.state === 'blocked') {
+            const note =
+              (availRows as { room_id: string; date: string; note?: string | null }[]).find(
+                (r) => r.room_id === view && String(r.date).slice(0, 10) === ds,
+              )?.note ?? null
+            key = `blocked:${note ?? ''}`
+            kind = 'blocked'
+            label = (note ? friendlyNote(note) : null) || 'Blocked'
+          }
+          let leaving: BarKind | undefined
+          {
+            const out = bookingForCell(bookings as unknown as CalBookingRef[], view, ds, 'checkout')
+            if (out) leaving = out.status === 'pending' ? 'pending' : 'booked'
+          }
+          return { state: info.state, name: info.name, key, kind, label, leaving }
+        })
+
   return (
     <div
       key="calendar-content"
@@ -771,12 +822,55 @@ function AdminCalendar() {
                 )
               }
 
-              const info = stateOf(view as string, dateStr)
-              const c = CELL[info.state]
-              const firstName = info.name ? info.name.split(' ')[0] : ''
-              const hint =
-                info.state === 'open' && firstName ? `Out: ${firstName}` : info.state === 'blocked' ? 'Tap to reopen' : info.state === 'open' ? '' : firstName
-              if (info.state === 'blocked') {
+              const sd = singleDays[i]
+              const c = CELL[sd.state]
+              const isToday = dateStr === todayStr
+              const dim = dateStr < todayStr ? 'opacity-60' : ''
+              const col = (firstWeekday + i) % 7
+              const isRunStart = sd.key !== null && (i === 0 || singleDays[i - 1].key !== sd.key)
+              const showBar = sd.kind !== null && (isRunStart || col === 0)
+              let barSpan = 1
+              if (showBar) {
+                while (i + barSpan < daysInMonth && col + barSpan < 7 && singleDays[i + barSpan].key === sd.key) barSpan++
+              }
+              const contLeft = showBar && !isRunStart
+              const contRight = showBar && i + barSpan < daysInMonth && singleDays[i + barSpan].key === sd.key
+              // Same-day turnover: one guest leaves, another arrives. The new bar starts mid-cell.
+              const turnover = showBar && isRunStart && !!sd.leaving
+              const leftPx = contLeft ? 0 : 3
+              const rightPx = contRight ? 0 : 3
+
+              const inner = (
+                <>
+                  <div className={dim}>
+                    <DayNum day={day} isToday={isToday} />
+                  </div>
+                  {sd.leaving && (
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute left-0 top-[27px] z-10 h-[22px] w-[calc(50%-2px)] rounded-r-md ${BAR[sd.leaving]} ${dim}`}
+                    />
+                  )}
+                  {showBar && sd.kind && (
+                    <span
+                      aria-hidden="true"
+                      className={`pointer-events-none absolute top-[27px] z-10 box-border flex h-[22px] items-center overflow-hidden whitespace-nowrap px-1.5 text-[11px] font-medium leading-none ${BAR[sd.kind]} ${dim} ${contLeft ? 'rounded-l-none' : 'rounded-l-md'} ${contRight ? 'rounded-r-none' : 'rounded-r-md'}`}
+                      style={{
+                        left: turnover ? 'calc(50% + 1px)' : leftPx,
+                        width: `calc(${barSpan * 100}% - ${leftPx + rightPx}px${turnover ? ' - 50%' : ''})`,
+                      }}
+                    >
+                      <span className="truncate">{barSpan === 1 ? sd.label.split(' ')[0] : sd.label}</span>
+                    </span>
+                  )}
+                  {sd.state === 'open' && !sd.leaving && <div className={`mt-0.5 hidden truncate sm:block ${c.text} ${dim}`}>{c.label}</div>}
+                </>
+              )
+              // Bars sit above their cells but let taps through (pointer-events-none),
+              // so every day still opens its own booking card or reopen dialog.
+              const base = `relative h-16 border-b border-r border-border/50 p-1.5 text-xs text-left ${sd.kind ? 'bg-card' : c.bg}`
+
+              if (sd.state === 'blocked') {
                 const noteText = (availRows as { room_id: string; date: string; note?: string | null }[]).find((r) => r.room_id === view && String(r.date).slice(0, 10) === dateStr)?.note ?? null
                 const roomName = rooms.find((r: { id: string }) => r.id === view)?.name ?? 'Room'
                 return (
@@ -784,44 +878,33 @@ function AdminCalendar() {
                     key={dateStr}
                     type="button"
                     onClick={() => setReopen({ roomId: view as string, roomName, date: dateStr, note: noteText })}
-                    className={`h-16 border-b border-r border-border/50 p-1.5 text-xs text-left w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary ${c.bg}`}
+                    className={`${base} flex w-full cursor-pointer flex-col items-start justify-start focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary`}
                     title={noteText ? `Blocked — ${friendlyNote(noteText)}. Tap to reopen.` : 'Blocked. Tap to reopen.'}
+                    aria-label={`${dateStr}: blocked${noteText ? `, ${friendlyNote(noteText)}` : ''}. Tap to reopen.`}
                   >
-                    <div><DayNum day={day} isToday={dateStr === todayStr} /></div>
-                    <div className={`mt-0.5 truncate ${c.text}`}>{c.label}</div>
-                    <div className="text-muted-foreground truncate text-[10px]">{hint}</div>
+                    {inner}
                   </button>
                 )
               }
               // Booked / pending / check-out cells open that booking's card.
-              const tappable = info.state === 'booked' || info.state === 'pending' || info.state === 'checkout'
-              const openPeek = () => setPeek({ roomId: view as string, date: dateStr, state: info.state })
+              const tappable = sd.state === 'booked' || sd.state === 'pending' || sd.state === 'checkout'
+              const openPeek = () => setPeek({ roomId: view as string, date: dateStr, state: sd.state })
               return (
                 <div
                   key={dateStr}
-                  className={`h-16 border-b border-r border-border/50 p-1.5 text-xs ${c.bg} ${tappable ? 'cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary' : ''}`}
-                  title={info.name ? `${c.label} — ${info.name}${tappable ? '. Tap for details.' : ''}` : c.label}
+                  className={`${base} ${tappable ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary' : ''}`}
+                  title={sd.name ? `${c.label} — ${sd.name}${tappable ? '. Tap for details.' : ''}` : c.label}
                   {...(tappable
                     ? {
                         role: 'button' as const,
                         tabIndex: 0,
+                        'aria-label': `${dateStr}: ${c.label}${sd.name ? `, ${sd.name}` : ''}`,
                         onClick: openPeek,
                         onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPeek() } },
                       }
                     : {})}
                 >
-                  <div><DayNum day={day} isToday={dateStr === todayStr} /></div>
-                  <div className={`mt-0.5 truncate ${c.text}`}>
-                    {c.short ? (
-                      <>
-                        <span className="hidden sm:inline">{c.label}</span>
-                        <span className="sm:hidden">{c.short}</span>
-                      </>
-                    ) : (
-                      c.label
-                    )}
-                  </div>
-                  {hint && <div className="text-muted-foreground truncate text-[10px]">{hint}</div>}
+                  {inner}
                 </div>
               )
             })}
@@ -856,23 +939,27 @@ function AdminCalendar() {
             </>
           )
         ) : (
-          [
-            ['bg-green-100 border-green-300', 'Open'],
-            ['bg-blue-100 border-blue-300', 'Booked'],
-            ['bg-amber-100 border-amber-300', 'Pending'],
-            ['bg-sky-100 border-sky-300', 'Check-out day'],
-            ['bg-red-100 border-red-300', 'Blocked'],
-          ].map(([cls, label]) => (
-            <span key={label} className="flex items-center gap-1.5">
-              <span className={`w-3 h-3 rounded-sm border ${cls}`} />
-              {label}
+          <>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-sm border border-green-300 bg-green-100" />
+              Open
             </span>
-          ))
+            {([['bg-blue-200', 'Booked'], ['bg-amber-200', 'Pending'], ['bg-red-200', 'Blocked']] as const).map(([cls, label]) => (
+              <span key={label} className="flex items-center gap-1.5">
+                <span className={`h-2.5 w-4 rounded ${cls}`} />
+                {label}
+              </span>
+            ))}
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2 rounded-r bg-blue-200" />
+              Guest leaves that morning
+            </span>
+          </>
         )}
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {isAll ? <>Tap a day to see each room. Pick a room above to see its bookings.</> : <>Tap a <strong>Blocked</strong> date to reopen it.</>}
+        {isAll ? <>Tap a day to see each room. Pick a room above to see its bookings.</> : <>Tap a booking to open it. Tap a <strong>blocked</strong> date to reopen it.</>}
       </p>
 
       {isAll && activeDay && rooms.length > 0 && !isLoading && (
