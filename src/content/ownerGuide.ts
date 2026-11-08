@@ -118,6 +118,7 @@ export const SITUATIONS: GuideSection[] = [
           "Open your own booking page and try those dates to see what guests see.",
         ],
       },
+      shot("17-seasonal-rate-form.webp", "Add seasonal rate form with the name field and the first and last night calendar", "**1** Name the season (optional). **2** Tap the first night, then the last night. Crossed-out days are in the past."),
       shot("05-seasonal-rates.webp", "Room editor showing a saved seasonal rate and the Add seasonal rate button", "**1** A saved rate shows its dates, number of nights and price. **2** Tap **Add seasonal rate** to create another."),
       { type: "p", text: "**Prefer an exact price?** Choose **Fixed ₹ per night** instead, and set the price for one room." },
       { type: "note", label: "Watch out", text: "Under **Property → Add-ons** there is also a thing called **Seasons**. That only prices meals and extras. It does **not** change room prices." },
@@ -140,6 +141,8 @@ export const SITUATIONS: GuideSection[] = [
           "Use the arrows beside the month name to move to another month.",
         ],
       },
+      shot("15-calendar-all-rooms.webp", "Calendar on All rooms with the Today strip and one circle per room on each day", "**1** Block dates. **2** All rooms, or tap one room. **3** Today: rooms free, arriving, leaving. **4** One circle per room on each day."),
+      shot("16-calendar-day-panel.webp", "Calendar colour key and the panel for a tapped day", "**1** The colour key. **2** Tap a day and this panel lists every room and its status."),
       { type: "note", label: "Good to know", text: "The circles follow the order of your rooms, so the same position is always the same room. If you are unsure, tap the day and read the panel." },
     ],
   },
@@ -320,6 +323,7 @@ export const SETUP: GuideSection[] = [
           "New rates apply to **new** bookings only. Existing bookings keep their price.",
         ],
       },
+      shot("17-seasonal-rate-form.webp", "Add seasonal rate form with the name field and the first and last night calendar", "**1** Name the season (optional). **2** Tap the first night, then the last night. Crossed-out days are in the past."),
       shot("05-seasonal-rates.webp", "Room editor showing a saved seasonal rate and the Add seasonal rate button", "**1** A saved seasonal rate. **2** Tap **Add seasonal rate** to create another."),
       { type: "p", text: "**Worked example.** Mud House: base ₹3,000, weekend 1.25, extra guest ₹500 above 2 guests, Christmas fixed ₹4,500 (24 Dec to 1 Jan)." },
       {
@@ -335,8 +339,43 @@ export const SETUP: GuideSection[] = [
     ],
   },
   {
+    id: "setup-addons",
+    title: "4. Add-ons, packages and extra seasons (optional)",
+    summary: "Meals, campfire, treks and bundles, with their own prices.",
+    blocks: [
+      { type: "p", text: "Open **Property → Add-ons**. This is your list of extras, so you can add them to a quote or booking in a few taps." },
+      { type: "p", text: "**An add-on** is one extra, such as Campfire, Full-board meals or a Guided trek." },
+      {
+        type: "steps",
+        items: [
+          "Add a new add-on and type its **Name**.",
+          "Choose its **Category** (for example Food) and how it is **Charged** (for example per person).",
+          "Under **Prices**, type the **Base ₹** price. Tap **Add option** if there are two versions, such as Veg and Non-veg.",
+          "If you have set up seasons, each season has its own price box. **Leave it blank to use the base price.** An amber triangle on a season price means it is blank.",
+          "Keep **Available when building quotes** ticked so the add-on appears in your quotes, then tap **Save**.",
+        ],
+      },
+      shot("18-addon-form.webp", "Add-on form with name, category, charged, base price and a season price", "**1** Name. **2** Category and how it is charged. **3** Base price. **4** The price for a season. Blank means the base price."),
+      { type: "p", text: "**A package** bundles several add-ons at one price, for example a Weekend Escape with full-board, campfire and a guided trek." },
+      {
+        type: "steps",
+        items: [
+          "Type the package **Name**, and a short **Description** if you like.",
+          "Choose how it is **Charged**. Most bundles are per person.",
+          "Under **Includes**, tick the add-ons in the bundle.",
+          "Set its **Prices** in the same way as an add-on, then tap **Save**.",
+        ],
+      },
+      shot("19-package-form.webp", "Package form with name, description, how it is charged, and the add-ons it includes", "**1** Name. **2** How it is charged. **3** Tick the add-ons that are included."),
+      { type: "p", text: "**Seasons for add-ons & packages** are your peak dates, such as Christmas or a festival. Set them once, and then each add-on and package can have its own price for every season. Tap **Add season** to create one. The pencil edits it, and the bin deletes it." },
+      shot("20-addon-seasons.webp", "Seasons for add-ons and packages with a Christmas season and the Add season button", "**1** A saved season with its dates. **2** Tap Add season to make another."),
+      { type: "note", label: "Do not confuse these", text: "These seasons only set prices for **add-ons and packages**. They never change **room prices**. For room prices, use **Seasonal rates** on the room." },
+      { type: "note", label: "Good to know", text: "Guests cannot buy add-ons or packages online. You add them to a quote or booking after talking to the guest." },
+    ],
+  },
+  {
     id: "setup-policies",
-    title: "4. Amenities, meals and policies",
+    title: "5. Amenities, meals and policies",
     summary: "What guests see before they pay.",
     blocks: [
       {
@@ -351,7 +390,7 @@ export const SETUP: GuideSection[] = [
   },
   {
     id: "setup-payments",
-    title: "5. Payment setup",
+    title: "6. Payment setup",
     summary: "Guests pay you directly.",
     blocks: [
       { type: "p", text: "Open **Property → Settings → Payment setup**. Add your **UPI ID** and choose the payment methods you accept. Guests pay **you directly**. stayidom.in never touches your money and takes no commission." },
@@ -359,7 +398,7 @@ export const SETUP: GuideSection[] = [
   },
   {
     id: "setup-golive",
-    title: "6. Ready to go live?",
+    title: "7. Ready to go live?",
     summary: "A last check before you share your page.",
     blocks: [
       {
