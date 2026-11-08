@@ -841,9 +841,9 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
           {commissionNote && (
             <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs">{commissionNote}</div>
           )}
-          {(stayAdvance > 0 || stayDiscount > 0) && hasChanges && nights > 0 && (
+          {hasChanges && nights > 0 && (
             <div className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-              <div>New total ₹{newTotal.toLocaleString("en-IN")}{stayChargesTotal > 0 ? ` + extras ₹${stayChargesTotal.toLocaleString("en-IN")}` : ""}{stayDiscount > 0 ? ` − discount ₹${stayDiscount.toLocaleString("en-IN")}` : ""} − advance ₹{stayAdvance.toLocaleString("en-IN")}</div>
+              <div>New total ₹{newTotal.toLocaleString("en-IN")}{stayChargesTotal > 0 ? ` + extras ₹${stayChargesTotal.toLocaleString("en-IN")}` : ""}{stayDiscount > 0 ? ` − discount ₹${stayDiscount.toLocaleString("en-IN")}` : ""}{stayAdvance > 0 ? ` − advance ₹${stayAdvance.toLocaleString("en-IN")}` : ""}</div>
               <div className="font-semibold">{after.refundDue > 0 ? `Guest has overpaid by ₹${after.refundDue.toLocaleString("en-IN")} — refund or adjust after saving.` : after.balance === 0 ? "Fully paid after this change." : `New balance due: ₹${after.balance.toLocaleString("en-IN")}`}</div>
               {stayDiscount > newTotal && <div>⚠️ The existing ₹{stayDiscount.toLocaleString("en-IN")} discount is larger than the new room total — review the discount after saving.</div>}
             </div>
