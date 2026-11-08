@@ -183,7 +183,7 @@ export function RoomRatesEditor({ propertyId, room }: Props) {
 
           <label className="flex items-center gap-2 text-xs cursor-pointer select-none">
             <input type="checkbox" checked={allRooms} onChange={(e) => setAllRooms(e.target.checked)} />
-            Apply to <strong>all rooms</strong> of this property (percent works best for this)
+            <span>Apply to <strong>all rooms</strong> of this property (percent works best for this)</span>
           </label>
 
           {preview && <p className="text-xs text-muted-foreground">{preview}</p>}
@@ -202,3 +202,4 @@ export function RoomRatesEditor({ propertyId, room }: Props) {
     </div>
   );
 }
+ 

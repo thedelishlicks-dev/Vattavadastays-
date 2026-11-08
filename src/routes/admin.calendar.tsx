@@ -837,15 +837,21 @@ function AdminCalendar() {
               const contRight = showBar && i + barSpan < daysInMonth && singleDays[i + barSpan].key === sd.key
               // Same-day turnover: one guest leaves, another arrives. The new bar starts mid-cell.
               const turnover = showBar && isRunStart && !!sd.leaving
+              // A stay runs from the afternoon of check-in to the morning of check-out, so its
+              // bar ends in the MIDDLE of the check-out day's cell. Drawing it that way gives
+              // every stay an extra half cell for the guest's name (a one-night stay is otherwise
+              // only ~40 px wide) and makes a same-day handover line up cleanly.
+              const reachesCheckout =
+                showBar && sd.kind !== 'blocked' && !contRight && col + barSpan < 7 && i + barSpan < daysInMonth && !!singleDays[i + barSpan]?.leaving
               const leftPx = contLeft ? 0 : 3
-              const rightPx = contRight ? 0 : 3
+              const rightPx = contRight || reachesCheckout ? 0 : 3
 
               const inner = (
                 <>
                   <div className={dim}>
                     <DayNum day={day} isToday={isToday} />
                   </div>
-                  {sd.leaving && (
+                  {sd.leaving && (col === 0 || i === 0) && (
                     <span
                       aria-hidden="true"
                       className={`pointer-events-none absolute left-0 top-[27px] z-10 h-[22px] w-[calc(50%-2px)] rounded-r-md ${BAR[sd.leaving]} ${dim}`}
@@ -857,13 +863,13 @@ function AdminCalendar() {
                       className={`pointer-events-none absolute top-[27px] z-10 box-border flex h-[22px] items-center overflow-hidden whitespace-nowrap px-1.5 text-[11px] font-medium leading-none ${BAR[sd.kind]} ${dim} ${contLeft ? 'rounded-l-none' : 'rounded-l-md'} ${contRight ? 'rounded-r-none' : 'rounded-r-md'}`}
                       style={{
                         left: turnover ? 'calc(50% + 1px)' : leftPx,
-                        width: `calc(${barSpan * 100}% - ${leftPx + rightPx}px${turnover ? ' - 50%' : ''})`,
+                        width: `calc(${barSpan * 100}% - ${leftPx + rightPx}px${reachesCheckout ? ' + 50% - 1px' : ''}${turnover ? ' - 50%' : ''})`,
                       }}
                     >
                       <span className="truncate">{barSpan === 1 ? sd.label.split(' ')[0] : sd.label}</span>
                     </span>
                   )}
-                  {sd.state === 'open' && !sd.leaving && <div className={`mt-0.5 hidden truncate sm:block ${c.text} ${dim}`}>{c.label}</div>}
+                  {sd.state === 'open' && !(sd.leaving && (col === 0 || i === 0)) && <div className={`mt-0.5 hidden truncate sm:block ${c.text} ${dim}`}>{c.label}</div>}
                 </>
               )
               // Bars sit above their cells but let taps through (pointer-events-none),
