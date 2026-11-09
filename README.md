@@ -74,13 +74,15 @@ src/
   hooks/          TanStack Query hooks
   lib/            Business logic (balance, pricing, calendar state, onboarding …) — pure and tested
   admin/          Admin shell and navigation (navConfig.ts)
+  content/        Owner Help text (ownerGuide.ts) — plain data, rendered by routes/help.tsx
   supabase/functions/   Supabase Edge Function (invite-owner)
 supabase/
   baseline/       Live database snapshot (16 Oct 2026)
   migrations/     Changes since the baseline
   tests/          Migration and RLS tests
 scripts/          Behaviour checks, typecheck and build helpers
-docs/             Parked features, polish notes, diagnostics
+docs/             Parked features, polish notes, diagnostics, owner Help and calendar notes
+public/help/      Owner Help screenshots (720 px WebP, numbered)
 ```
 
 ## Architecture and constraints
@@ -103,11 +105,18 @@ docs/             Parked features, polish notes, diagnostics
 
 Supabase Auth needs Site URL `https://stayidom.in`, redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`, and a customised "Invite user" email. Details in `HANDOVER.md` §9.
 
+## Owner Help
+
+Owners have a public guide at `/help` (also linked as **Help** in the dashboard menu). The text lives in `src/content/ownerGuide.ts` and the screenshots in `public/help/`. Change a label or screen the owner sees? Update the guide and the matching screenshot — see [docs/OWNER_HELP.md](docs/OWNER_HELP.md).
+
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) — rules for anyone (or any AI assistant) changing the code
 - [HANDOVER.md](HANDOVER.md) — current state, rules, known issues and what's left
 - [docs/GUEST_PAGE.md](docs/GUEST_PAGE.md) — how the guest page and booking flow work, migrations to run, how to test
+- [docs/OWNER_HELP.md](docs/OWNER_HELP.md) — the owner Help page: content format, screenshots, how to keep them current
+- [docs/CALENDAR_UI.md](docs/CALENDAR_UI.md) — the owner calendar: dots, day panel, stay bars, many-room mode
+- [docs/SEASONS_UNIFICATION_PLAN.md](docs/SEASONS_UNIFICATION_PLAN.md) — deferred plan to unify room and add-on seasons
 - [PRD.md](PRD.md) — product requirements and status
 - [docs/PARKED_FEATURES.md](docs/PARKED_FEATURES.md) — channel sync and how to turn it on
 - [supabase/baseline/README.md](supabase/baseline/README.md) — how to rebuild the database
