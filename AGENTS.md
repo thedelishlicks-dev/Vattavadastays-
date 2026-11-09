@@ -125,6 +125,7 @@ src/
     propertyConfig.ts   ← the ONLY writer of shared_amenities
     bookingAvailability.ts, paginate.ts, errorLog*.ts, dbErrors.ts, features.ts, …
   hooks/                ← TanStack Query hooks (useBookings, useCreateBooking, useRoomRates, …)
+  content/ownerGuide.ts ← owner Help text (data); rendered by routes/help.tsx; images in public/help/
   admin/                ← AdminLayout, navConfig.ts (navigation is data), SectionTabs
   components/           ← UI (see HANDOVER §3 for the "one home" components)
   routes/               ← TanStack file routes (admin.*, superadmin*, index, booking-status, …)
@@ -134,7 +135,7 @@ supabase/
   tests/                ← migration + RLS tests run by CI
 scripts/                ← *.check.ts behaviour checks, typecheck.sh, run-checks.sh
 tests/api/              ← tests for api/ handlers
-docs/                   ← GUEST_PAGE (guest page + flow), PARKED_FEATURES, POLISH_FIVE, CALENDAR_FIX, DB_CHECKS.sql
+docs/                   ← GUEST_PAGE (guest page + flow), OWNER_HELP, CALENDAR_UI, SEASONS_UNIFICATION_PLAN, PARKED_FEATURES, POLISH_FIVE, CALENDAR_FIX, DB_CHECKS.sql
 ```
 
 ---
@@ -310,6 +311,12 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - **Notifications:** guests notify the owner via WhatsApp deep link after booking. Owners send reminders via WhatsApp deep links from booking details.
 
 ---
+
+## Owner Help must stay true
+
+- The owner Help guide (`src/content/ownerGuide.ts`, `/help`) quotes button and field names exactly. If you rename a button, move a screen or change a rule an owner follows (the 25 % advance, the hold, rate maths), **update the guide in the same change** and flag any screenshot in `public/help/` that is now wrong (`docs/OWNER_HELP.md`).
+- Screenshots must never show real guest names, phone numbers, UPI IDs or booking links. The page is public. Blur or replace them first.
+- Do not add a markdown library or heavy images to `/help`; it must stay light on weak signal.
 
 ## Agent rules for changes
 
