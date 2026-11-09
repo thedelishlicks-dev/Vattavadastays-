@@ -1,8 +1,8 @@
-# stayidom.in — Handover v10.2
+# stayidom.in — Handover v10.3
 
-**Date:** 3 Nov 2026
-**Code baseline:** `main` at `b65460e` (Merge PR #456, `Dev`). Merge `Dev` → `main` only after the preview is tested.
-**Supersedes:** v10.1 (29 Oct 2026), v10 (25 Oct 2026) and v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**. The guest page has its own reference: **`docs/GUEST_PAGE.md`**.
+**Date:** 8 Nov 2026 (v10.2 was 3 Nov 2026)
+**Code baseline:** `main` at `c514402` (Merge PR #467, `Dev`). Merge `Dev` → `main` only after the preview is tested.
+**Supersedes:** v10.2 (3 Nov 2026), v10.1 (29 Oct 2026), v10 (25 Oct 2026) and v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**. The guest page has its own reference: **`docs/GUEST_PAGE.md`**.
 
 > **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code. Working on the guest page? Read `docs/GUEST_PAGE.md` too.
 
@@ -17,6 +17,7 @@ stayidom.in is a commission-free booking and property-management platform for ho
 | Marketing landing page | `stayidom.in` (root) | Prospective owners | `src/components/LandingPage.tsx` |
 | Guest booking page | `{subdomain}.stayidom.in` | Guests | `GuestPage` in `src/routes/index.tsx` |
 | Owner admin | `/admin/*` | Property owners | `src/admin/AdminLayout.tsx`, `src/routes/admin.*.tsx` |
+| Owner Help | `/help` (public, no login, `noindex`) | Owners, and prospects sent the link | `src/routes/help.tsx`, `src/content/ownerGuide.ts`, `public/help/*.webp` — see `docs/OWNER_HELP.md` |
 | Superadmin | `/superadmin` | Platform operator | `src/routes/superadmin*.tsx` |
 
 Owners collect money directly (UPI / bank / cash). stayidom never touches payments.
@@ -110,7 +111,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 | Section | Group | Tabs → route | Notes |
 |---|---|---|---|
 | **Home** | Daily | Home → `/admin/dashboard` | First-run checklist, quick actions, WhatsApp reminder picker (last month onward) |
-| **Calendar** | Daily | `/admin/calendar` | All-rooms view (default with 2+ rooms) + per-room; Block dates; "Sync with other sites" button **hidden** (flag off) |
+| **Calendar** | Daily | `/admin/calendar` | **All rooms** (default with 2+ rooms): one dot per room per day + a day panel under the grid + a Today strip; many rooms (7+) show `N free` and a bar, with a drop-down room picker. **Single room**: each stay is one bar with the guest's name. Block dates; "Sync with other sites" **hidden** (flag off). See `docs/CALENDAR_UI.md` |
 | **Bookings** | Daily | Bookings `/admin/bookings` · Quotes `/admin/quotes` | |
 | **Money** | Daily | Payments `/admin/payments` · Agents & Commissions `/admin/agents` | Agent delete also clears that agent's commission records (migration `20261020…`) |
 | **Rooms & Pricing** | Setup | `/admin/rooms` | Room editor includes **Seasonal rates** |
@@ -120,6 +121,7 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 - **Retired URLs (redirect, keep `?property=`):** `/admin/pricing` → `/admin/rooms`; `/admin/commissions` → `/admin/agents`.
 - **Not in the nav, still routed:** `/admin` index, `/admin/login`, `/superadmin`, `/login`, `/reset-password`, `/booking-status` (guest tracking: token links, plus legacy `?phone=` links until the 30-day revoke). `/setup` and `/test-booking` were removed in Oct 2026.
 - **Add a page:** create `src/routes/admin.<name>.tsx`, then add a tab or section in `navConfig.ts`.
+- **Help:** a **Help** item sits above Log out in the sidebar and the mobile More menu (`AdminLayout.tsx`). It opens `/help` in a **new tab/sheet** (`target="_blank"`). `/help` is outside the `/admin` PWA scope on purpose, so on a home-screen app it opens over the app instead of replacing the screen. "?" links in Settings (pending hold) and the room editor (Seasonal rates) deep-link to `/help#setup-settings` and `/help#seasonal-rates`.
 
 ---
 
@@ -208,6 +210,8 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 
 **Landing page — status:** the rewritten landing page described in earlier handovers (`PLATFORM_WHATSAPP`, `CONTENT`, `TESTIMONIAL` constants) is **not on `main`**. `main` has the old 973-line inline-styles version. Do not remove the Playfair Display `<link>` in `index.html` until the rewrite lands. The copy on `main` shows an invented example booking with a personal name and a sample Malayalam pricing grid; check before it goes live.
 
+**Owner Help (`/help`, 7–8 Nov 2026).** A public, lightweight guide for owners: scenarios ("what to do when…"), setup steps and troubleshooting, with 30 annotated phone screenshots. Content is plain data in `src/content/ownerGuide.ts` (no markdown library); images are 720 px WebP in `public/help/`. Edit the text there; keep screenshots in step with the UI (`docs/OWNER_HELP.md` has the rules, the image list and the screenshot backlog). `SUPPORT_CONTACT` in that file is **empty** — set it to show the "Still stuck?" box.
+
 **Parked: channel sync (iCal).** Built and tested (`docs/PARKED_FEATURES.md`). Switched off with `CHANNEL_SYNC_ENABLED = false`. The export `/api/ical?room=` is live and harmless. The import (`/api/ical-sync`), the pop-up, and the background cron are not switched on. The migration's cron snippet is commented out. Turn on only where owners sell on other sites too.
 
 **Service worker: deliberately not added** (v9.3). Static assets are cached for a year (`vercel.json`), and guests need live availability. Revisit only with measured evidence.
@@ -242,6 +246,13 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Room photos | Several photos per room; swipe, arrows, dots and a full-screen viewer on the card | migration 20261031…, `RoomPhotosManager.tsx`, `Rooms.tsx` |
 | Page order | Details and photos first, then the booking steps | `index.tsx`, `Header.tsx` |
 | Directions | Map links need both coordinates; Settings checks the pair. Directions open a **route from where the guest stands**; messages carry a short link (`/api/directions`), SMS text is cleaned of `&` and `#`; owner option to send guests to their Google listing, with a Test link | `location.ts`, `sms.ts`, `api/directions.ts`, `api/_lib/directions.ts`, `MapSection.tsx`, `Footer.tsx`, `booking-status.tsx`, `WhatsAppReminderModal.tsx`, `admin.settings.tsx`, migration 20261104… |
+| Owner Help | Public `/help` page, dashboard Help link (new tab), "?" links, 30 screenshots, three guide groups (situations, setup, troubleshooting) | `help.tsx`, `ownerGuide.ts`, `AdminLayout.tsx`, `admin.settings.tsx`, `RoomRatesEditor.tsx`, `public/help/` |
+| Calendar (All rooms) | One dot per room (hollow ring = free), tap a day for an in-page panel, Today strip (free / arriving / leaving / pending), 7+ rooms: `N free` + stacked bar + drop-down picker (>5 rooms), >8 rooms: attention rooms first, free rooms folded | `admin.calendar.tsx` (helpers `DOT_MAX`, `RoomDots`, `OccupancyBar`, `DayPanel`) |
+| Calendar (single room) | Each stay is one bar with the name once; bars run to the middle of the check-out day (extra half cell for the name); half bar when check-out is on a Sunday or the 1st; same-day handover starts the new bar mid-cell; bars let taps through | `admin.calendar.tsx` (`singleDays`, `BAR`) |
+| Edit Stay | New total / balance due now shows whenever the stay changes (it was hidden unless the booking had an advance or discount) | `admin.bookings.tsx` (`EditStayModal`) |
+| Rooms | "Apply to all rooms" label no longer breaks into columns | `RoomRatesEditor.tsx` |
+| Settings | Pending-hold help text now says it applies to guest requests too and that expiry is silent | `admin.settings.tsx` |
+| Home | The hold countdown on pending requests was added (4 Nov) and **removed again** (5 Nov, `f523308`); Home shows the request and dates only | `admin.dashboard.tsx` |
 
 ---
 
@@ -269,14 +280,14 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 18. **A booking's room can't be changed in the UI** (Edit Stay for a room inside a group does not update the group total). No UI path reaches it today.
 19. **No "record refund" button.** Lower "Collected so far" on the Payments page instead.
 20. **Supabase Free tier pauses on inactivity.** The first request can fail. Superadmin can view any property but can't write to owner-scoped tables of one it doesn't own (RLS). Test write flows as the real owner.
-21. **[OPEN, found 25 Oct 2026] Edit Stay date picker doesn't match the app's calendar.** `EditStayModal` in `src/routes/admin.bookings.tsx` uses `<input type="date">` for check-in and check-out, so it shows no availability. Add Booking uses `RoomAvailabilityCalendar`. Switching needs `RoomAvailabilityCalendar` to accept an `excludeBookingId`, and the booking's own nights must not show as blocked. Those nights come from both `bookings` and the `availability` mirror, which doesn't record which booking blocked a night. The database exclusion constraint still stops real overlaps on save.
+21. **[APPEARS DONE, check] Edit Stay date picker.** `admin.bookings.tsx` no longer contains `<input type="date">`, and an 8 Nov screenshot shows "Edit Stay Details" using the app calendar. Retest a stay change on the demo property, then close this item.
 
 ---
 
 **Guest / owner flow audit, 29 Oct 2026** (code read; build and live DB not run):
 22. **[DONE, PR #442] WhatsApp / call links broke for numbers saved without `91`** (rule 26).
 23. **[DONE on branch `fix/booking-retry-ids`, merge pending] Retry after a lost reply** collided with the guest's own pending booking and the guest never got the token (rule 27). Needs the manual weak-signal test in §12.
-24. **[OPEN, known risk] A guest who pays by UPI but isn't recorded by the owner within the hold window** has the booking cancelled silently by the 15-minute job. Consider an owner alert before expiry, or a longer hold once a payment screenshot is sent.
+24. **[OPEN, known risk] A guest who pays by UPI but isn't recorded by the owner within the hold window** has the booking cancelled silently by the 15-minute job. Consider an owner alert before expiry, or a longer hold once a payment screenshot is sent. **8 Nov 2026:** the Home countdown that would have warned the owner was removed again (change log), so the risk stands; the Help guide tells owners to check Home often.
 25. **[DONE 3 Nov 2026] Guest form started with adults = the room's `max_guests`.** The guest now states the party first (default 2 adults) and rooms are filled from it (rule 30).
 26. **[WON'T FIX for now] `eachDate()` (`bookingAvailability.ts`) repeats a date in daylight-saving timezones** (checked: Europe/London, 29 Mar 2026). No effect in India (no DST); use `setUTCDate` if guests outside India are ever supported.
 27. **[OPEN, minor]** a stale `blocked-dates` query key; `getDateState` mutates its argument.
@@ -292,6 +303,21 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 36. **[UNVERIFIED] "Listed on Google Maps" finds the listing by name and area,** which depends on Google matching the name. If a guest lands on the wrong place, the owner switches the option off (the route then ends at the pin). A Google Place ID would be exact but is too technical for owners to find. Check the Test link for every property that turns it on.
 37. **[UNVERIFIED] The route starts from the guest's location** because the link has no `origin`; Google asks the guest for location permission, and without it asks them to choose a start. Tried on an Android phone's SMS app only.
 35. **[OPEN] The owner onboarding checklist does not ask for the new content** (hero photo, 3+ gallery photos, Instagram handle, location pair, "Most guests allowed" per room). A site without photos looks like a template; this is the next suggested step (§11 item 16).
+
+---
+
+**Owner Help and calendar session, 7–8 Nov 2026** (build, typecheck and the 207 unit tests passed; the calendar was also run in a headless phone-sized Chromium with sample data; not yet checked on a range of real phones):
+38. **[DONE 8 Nov] Edit Stay hid the new balance** when the booking had no advance and no discount (extras alone did not trigger it). Fixed in `EditStayModal`.
+39. **[DONE 7 Nov] "Apply to all rooms" label** in the seasonal-rate form split into columns (text and `<strong>` were separate flex items). Fixed.
+40. **[OPEN, to verify] WhatsApp confirmation shows "�" where ✅ / 📋 should be** in an owner screenshot (a Xiaomi/Android phone, sent via a `wa.me` link). The source text in `src/lib/whatsapp.ts` (~line 124) is valid. Send a confirmation to a second phone. If it repeats, remove emoji from the templates. Dates in the messages are ISO (`2026-11-12`); a friendlier `12 Nov 2026` would help guests.
+41. **[OPEN, minor] Single-room calendar:** a one-night **blocked** day shows "Bl…" (narrow bar; tapping reopens it), and a one-night stay that starts on a Saturday on the same day another guest leaves gets a short bar (the bar cannot cross into the next week row).
+42. **[OPEN, minor] Select boxes truncate on narrow phones:** the seasonal rate "Price type" ("% change on…") and the add-on "Charged" ("per person /…").
+43. **[DESIGN DEBT] Seasons live in two places:** room rates (`room_rates`, per-room date ranges, one-off) and add-on seasons (`price_seasons`, named, repeat yearly, priority). Two UIs, two overlap rules. Plan to unify, with safeguards: `docs/SEASONS_UNIFICATION_PLAN.md` (deferred to a new session).
+44. **[OPEN] `SUPPORT_CONTACT` is empty** in `src/content/ownerGuide.ts`, so the Help page hides its "Still stuck?" box. The page is public: use a number you are happy to publish.
+45. **[OPEN] Help screenshots go stale** when a screen or label changes. Keep them in step (`docs/OWNER_HELP.md`). The guide quotes button names exactly.
+46. **[OPEN] Home "arriving" count (Today strip)** counts bookings with `check_in` = today and a status other than cancelled; how a multi-room booking is counted is unchecked.
+47. **[UNVERIFIED] Help new-tab behaviour on a home-screen app** (Android and iPhone). `/help` is outside the `/admin` manifest scope, so it should open in an in-app browser sheet. Test both.
+48. **[OPEN] Screenshot backlog:** Settings location pair and pending hold field, the "Send WhatsApp reminder" picker (the guide has no section on it yet), an agent opened showing **Mark paid**, the Edit Stay overpaid warning on a fully paid booking, the seasonal rate form's price section after the label fix, and the Invoice tab.
 
 ---
 
@@ -321,6 +347,11 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 17. Thumbnails for room photos (§10 item 31).
 18. Tap-to-load Instagram reel (§8) only if owners ask; it revisits the no-embeds rule.
 
+19. **Unify seasons** (§10 item 43). Start a new session with `docs/SEASONS_UNIFICATION_PLAN.md`; first read the live pricing function and write the read-only price check.
+20. Verify the WhatsApp emoji problem (§10 item 40) on a second phone; fix or remove emoji and use readable dates.
+21. Fill `SUPPORT_CONTACT`; take the screenshot backlog (§10 item 48); test Help on a home-screen app (§10 item 47).
+22. Consider bringing back an owner warning for expiring holds (§10 item 24): a countdown on Home, or an alert before expiry.
+
 **D. Later (from the v8 roadmap)**
 13. Agent self-service portal; WhatsApp Business API; billing (Razorpay); central listing page (PRD Phase 5).
 
@@ -334,7 +365,8 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 4. Walk the relevant checklist on a real device (iPad Safari + a phone). Highest-risk flows: Mark fully paid (single and group), seasonal rate on a guest booking (total equals the dialog total), Payment setup survives saving Meals/Policies/Amenities/Settings in a row, superadmin "manage property", guest booking lands as pending and unpaid.
 5. Landing changes: view at 375 px, check every CTA with and without `PLATFORM_WHATSAPP`, submit the form and confirm a row in `leads`.
 6. Link previews: `https://<property>.stayidom.in/?_ogdebug=1` shows each step.
-7. Guest page changes: follow `docs/GUEST_PAGE.md` §10 (throttled phone, a group of 6, the guest limit, `/api/weather`, the directions SMS, the packages enquiry) in a private tab.
+7. Owner Help changes: open `/help` and `/help#seasonal-rates` on a phone, check every image loads and the Close button works; walk the changed scenario on the demo property. Calendar changes: `docs/CALENDAR_UI.md` §7.
+8. Guest page changes: follow `docs/GUEST_PAGE.md` §10 (throttled phone, a group of 6, the guest limit, `/api/weather`, the directions SMS, the packages enquiry) in a private tab.
 
 ---
 
