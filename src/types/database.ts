@@ -43,6 +43,8 @@ export interface Property {
   setup_fee_amount: number;
   billing_notes: string | null;
   subscription_end_date: string | null;
+  /** Unified Seasons (rooms + add-ons). Off = the old per-room Seasonal rates. Only the platform admin changes it. */
+  season_pricing_v2?: boolean;
 }
 
 export interface Room {

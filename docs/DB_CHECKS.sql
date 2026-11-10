@@ -92,3 +92,15 @@ select conname, contype, pg_get_constraintdef(oid) as definition
 --     availability_pkey already indexes (room_id, date), so idx_availability_room_date
 --     only adds write cost on every availability upsert:
 --       drop index if exists public.idx_availability_room_date;
+
+-- 11. Unified seasons rollout (docs/SEASONS_ROLLOUT.md). Which properties are switched, and how
+--     many seasons / room rules each has. Read-only.
+select p.subdomain,
+       p.season_pricing_v2 as switched,
+       (select count(*) from public.room_rates rr where rr.property_id = p.id)         as old_room_rates,
+       (select count(*) from public.price_seasons s where s.property_id = p.id)        as seasons,
+       (select count(*) from public.season_room_rules r where r.property_id = p.id)    as room_rules
+  from public.properties p
+ order by p.subdomain;
+-- The old-vs-new price comparison for one property is supabase/season_price_check.sql
+-- (0 rows = safe to switch).
