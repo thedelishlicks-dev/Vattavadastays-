@@ -115,7 +115,7 @@ src/
     supabase.ts         ← single supabase client instance
     balance.ts          ← ALL money maths (computeBalance, advanceAmount, …)
     quoteBuilder.ts     ← priceRoomStay() — the one owner-side price calculator
-    roomRates.ts        ← seasonal-rate rules (pickRate); mirrors SQL stay_room_price()
+    roomRates.ts        ← room price rules (pickRate): legacy room_rates AND unified seasons; mirrors SQL stay_room_price()
     calendarState.ts    ← owner Calendar labels (pure, tested)
     onboarding.ts       ← superadmin statuses, checklist, WhatsApp helpers
     guestCount.ts       ← maxGuestsFor(): the one guest limit per room (owner's max_occupancy or included + 4)
@@ -150,7 +150,9 @@ Key tables (short form):
   - `subscription_status`: `'trial' | 'active' | 'pending_setup' | 'suspended'` (`trial` and `pending_setup` are the same stage in the UI).
   - `subscription_tier`: DB allows `'small' | 'large'`; the UI sells Starter / Growth / Pro. Unresolved — see HANDOVER §10 item 15.
 - `rooms`: `id, property_id, name, room_type, max_guests, base_price, extra_guest_price, weekend_multiplier, room_amenities, images, is_active`
-- `room_rates`: seasonal rate periods — `room_id` (null = all rooms), `start_date`, `end_date` (last night, inclusive), `kind` (`fixed` | `percent`), `value`
+- `price_seasons`: a season — `name, start_date, end_date, recurs_yearly, priority, for_addons` (false = rooms only; add-ons ignore it)
+- `season_room_rules`: room price of a season — `season_id`, `room_id` (null = all rooms), `kind` (`fixed` | `percent`), `value`. Used when `properties.season_pricing_v2` is true (platform admin sets it).
+- `room_rates`: OLD seasonal rate periods (used while `season_pricing_v2` is false) — `room_id` (null = all rooms), `start_date`, `end_date` (last night, inclusive), `kind` (`fixed` | `percent`), `value`
 - `availability`: `(room_id, date)` PK, `is_available`, `note`. `price_override` still exists and is **unused**.
 - `bookings`: `id, property_id, room_id, group_id, guest_name, guest_phone, check_in, check_out, nights (generated), room_price, extra_guest_charge, total_amount, status, advance_amount, is_paid, hold_expires_at, agent_id, commission_amount, commission_paid, source, …`
   - Statuses: `pending`, `confirmed`, `cancelled`, `completed`.
@@ -254,7 +256,7 @@ No RPC. Direct client calls in sequence:
    - `bookings_no_overlap` rejects overlapping active stays (SQLSTATE 23P01 → "Those dates were just booked for this room.").
 6. The mirror `availability` rows are written by `trg_mark_booking_nights` (not by the browser).
 
-`stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` covers this.
+`stay_room_price()` (SQL) and `priceRoomStay()` (TS) must stay identical. `scripts/pricing.check.ts` covers this; for seasons, `supabase/tests/season_parity_cases.json` is asserted by both `src/lib/roomRates.test.ts` and `supabase/tests/seasons.test.sql` — change a season rule in both and add a case.
 
 ### Guest page flow
 

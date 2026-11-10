@@ -1,6 +1,6 @@
 # Plan: one Seasons model for rooms and add-ons
 
-*Written 8 Nov 2026. **Deferred to a new session.** Nothing here has been built. The owner chose to do the full unification in one release, with safeguards (not a two-step rollout).*
+*Written 8 Nov 2026. **Built 10 Nov 2026 (not yet rolled out): see `docs/SEASONS_ROLLOUT.md`.** The owner chose to do the full unification in one release, with safeguards (not a two-step rollout).*
 
 ## 1. The problem
 

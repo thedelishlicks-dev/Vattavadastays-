@@ -10,6 +10,7 @@ end $$;
 
 create schema auth;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims', true), ''), '{}')::jsonb $$;
 create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role', true), '')::text $$;
 
 create table public.properties (id uuid primary key, owner_id uuid, subscription_status text default 'trial', pending_hold_hours int default 24);
@@ -37,9 +38,19 @@ create policy owners_manage_packages on public.packages for all to public
   using (property_id in (select id from public.properties where owner_id = auth.uid()))
   with check (property_id in (select id from public.properties where owner_id = auth.uid()));
 
+
+-- price_seasons exactly as in supabase/baseline/6_tables.sql + 7_constraints_indexes.sql + owner policy
+create table public.price_seasons (id uuid primary key default gen_random_uuid(), property_id uuid not null references public.properties(id) on delete cascade,
+  name text not null, start_date date not null, end_date date not null, recurs_yearly boolean not null default false, priority integer not null default 0,
+  created_at timestamptz not null default now(), constraint price_seasons_dates_ok check (recurs_yearly or end_date >= start_date));
+alter table public.price_seasons enable row level security;
+create policy owners_manage_price_seasons on public.price_seasons for all to public
+  using (property_id in (select id from public.properties where owner_id = auth.uid()))
+  with check (property_id in (select id from public.properties where owner_id = auth.uid()));
+
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
-grant execute on function auth.uid(), auth.role() to anon, authenticated, service_role;
+grant execute on function auth.uid(), auth.role(), auth.jwt() to anon, authenticated, service_role;
 
 create function public.t_assert(ok boolean, msg text) returns void language plpgsql as $$
 begin if ok is not true then raise exception 'ASSERTION FAILED: %', msg; end if; end $$;

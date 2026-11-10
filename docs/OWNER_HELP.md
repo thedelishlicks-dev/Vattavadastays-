@@ -21,7 +21,7 @@ It needs no login, so the link can be sent to a new owner on WhatsApp. The page 
 | Screenshots | `public/help/NN-name.webp` |
 | Dashboard link (sidebar + mobile More menu) | `src/admin/AdminLayout.tsx` |
 | "?" link by **Pending booking hold** | `src/routes/admin.settings.tsx` → `/help#setup-settings` |
-| "Help" link by **Seasonal rates** | `src/components/RoomRatesEditor.tsx` → `/help#seasonal-rates` |
+| "Help" link by **Seasonal rates** (old form only; the unified Seasons panel has none yet) | `src/components/RoomRatesEditor.tsx` → `/help#seasonal-rates` |
 
 How it opens: the dashboard links use `target="_blank"`. `/help` is outside the `/admin` manifest scope on purpose, so on a home-screen app it should open in an in-app browser sheet over the app instead of replacing the screen. **Not yet tested on a real Android and iPhone home-screen app** (HANDOVER §10 item 47). The page has a **Close** button (tries `window.close()`, then goes back, then to `/admin/dashboard`).
 
@@ -57,7 +57,7 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `02-booking-record-payment` | Booking: Confirm, Amount received | `guest-request`, `guest-says-paid` |
 | `03-room-photos-and-guests` | Room editor: photos, guests | `setup-rooms` |
 | `04-room-pricing` | Base, extra guest, weekend, preview | `seasonal-rates` |
-| `05-seasonal-rates` | A saved seasonal rate | `raise-prices`, `seasonal-rates` |
+| `05-seasonal-rates` | **RETIRED 10 Nov** (old room-editor form; removed from the guide). Replace with a Seasons screenshot, see below | — |
 | `07-add-booking` | Add booking form | `phone-booking` |
 | `08`, `09`, `10` quote: guest + stay, rooms + add-ons, discount + send | New quote | `guest-asks-price` |
 | `11-money-payments-summary` | Money → Payments monthly chart | `check-out-day` |
@@ -65,8 +65,9 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `13-payments-overview` | Collected / Outstanding / Total billed | `problem-money` |
 | `14-edit-stay` | Edit Stay Details | `change-or-leave-early` |
 | `15-calendar-all-rooms`, `16-calendar-day-panel` | Calendar, All rooms, day panel | `read-calendar` |
-| `17-seasonal-rate-form` | Add seasonal rate (name + dates) | `raise-prices`, `seasonal-rates` |
-| `18-addon-form`, `19-package-form`, `20-addon-seasons`, `23-addon-season-form` | Add-ons page | `setup-addons` |
+| `17-seasonal-rate-form` | **RETIRED 10 Nov** (old form; removed from the guide) | — |
+| `18-addon-form`, `19-package-form` | Add-ons page | `setup-addons` |
+| `20-addon-seasons`, `23-addon-season-form` | **RETIRED 10 Nov** (old Seasons box; removed from the guide) | — |
 | `21-quote-convert-booking`, `22-quotes-list` | Quotes list, convert | `guest-asks-price` |
 | `24-policies` | Policies | `setup-policies` |
 | `25-payment-setup` (UPI ID blurred) | Payment setup | `setup-payments` |
@@ -91,7 +92,9 @@ The guide quotes button and field names exactly (for example **Edit Stay**, **Ad
 2. Retake the matching screenshot (use the table above).
 3. Open `/help` on the Dev preview and check the section.
 
-Statements in the guide worth re-checking when code changes: the 25 % rule confirms a pending booking; a pending request is cancelled silently when its hold ends; the weekend multiplier applies on top of a seasonal rate; the last night of a seasonal rate is included; room-specific seasonal rates beat "all rooms"; **Seasons** under Add-ons never change room prices (see `docs/SEASONS_UNIFICATION_PLAN.md`, which would change this section).
+Statements in the guide worth re-checking when code changes: the 25 % rule confirms a pending booking; a pending request is cancelled silently when its hold ends; the weekend multiplier applies on top of a season price; the last night of a season is included; overlapping seasons: higher priority, then shorter; a one-room price beats "All rooms" inside a season; a season with no Room prices never changes room prices.
+
+**Screenshots to retake after rollout (new Seasons screen, on the demo property):** (1) Rooms & Pricing with the Seasons section and one season card showing Room prices and Add-ons & packages; (2) the Add season form with the Room prices box; (3) a room editor showing Season prices. Add them to `raise-prices` and `seasonal-rates`. Until a property is switched, the guide carries a "Not seeing Seasons?" note in `raise-prices`, `seasonal-rates`... remove those notes (`setup-addons` has one too) once every property is on unified seasons.
 
 Not screenshot-verified in the guide: that the booking shows **Refund due** after saving a shorter stay (the warning before saving is verified in code); the single-room "red bar" reopen tap; that "arriving" counts multi-room bookings correctly.
 

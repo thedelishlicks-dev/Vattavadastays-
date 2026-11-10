@@ -65,6 +65,7 @@ export const useSeasons = (propertyId: string) =>
     end_date: r.end_date,
     recurs_yearly: !!r.recurs_yearly,
     priority: Number(r.priority ?? 0),
+    for_addons: r.for_addons !== false,
   }));
 
 export const useAddons = (propertyId: string) =>
