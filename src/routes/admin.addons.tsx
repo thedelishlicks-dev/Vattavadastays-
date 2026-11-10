@@ -46,11 +46,11 @@ function Catalog({ propertyId, unified }: { propertyId: string; unified: boolean
         subtitle="What you offer beyond the room — meals, campfire, kitchen, trekking — with an exact price for each season. These power the quotes you send guests; nothing here is shown to guests or charged automatically."
       />
 
-      {unified && seasons.length === 0 && (
+      {unified && (
         <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Prices change in peak season or festivals? Add a season in{" "}
+          Seasons are set up once in{" "}
           <a href={seasonsHref} className="underline text-foreground">Rooms & Pricing → Seasons</a>
-          {" "}and tick “Also use for add-ons & packages”, then set a price for each add-on here.
+          . Tick “Also use for add-ons & packages” on a season, then give each add-on its price for it here.
         </div>
       )}
 
@@ -94,14 +94,8 @@ function Catalog({ propertyId, unified }: { propertyId: string; unified: boolean
         )}
       </Section>
 
-      {unified ? (
-        <Section title="Seasons" description="Seasons are now set up once for rooms and add-ons together.">
-          <a href={seasonsHref} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
-            Manage seasons in Rooms & Pricing
-          </a>
-        </Section>
-      ) : (
-        /* Old, add-ons-only seasons box — used until the property is switched to unified seasons. */
+      {/* Old add-ons-only seasons box: only until the property is switched to unified seasons. */}
+      {!unified && (
         <div id="seasons" className="scroll-mt-32">
           <SeasonsEditor propertyId={propertyId} />
         </div>
