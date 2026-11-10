@@ -200,6 +200,8 @@ Lockfile: `package-lock.json` (CI uses `npm ci`). Don't add `bun.lockb` back.
 
 The frontend UI was built on Lovable. Do not redesign, restyle, or restructure existing components. Only replace mock data with real Supabase data and add missing logic.
 
+**Exception (10 Nov 2026, owner-approved): admin section identity.** Each admin section has its own quiet accent colour, set with `data-section="<key>"` (colours in `src/styles.css`: `--section`, `--section-soft`, `--section-ink`, `--section-wash`, `--section-on`). Green stays the brand and the colour of every primary action (Save, Confirm, Add). Use the section variables only for identity: nav, tabs, page header tile, card top edge, and (for `bold` sections in `navConfig.ts`: Calendar and Money) a tinted page and card borders. Text on a solid section fill uses `--section-on`. New section colours must pass WCAG AA in light and dark. Guest pages and superadmin are unchanged.
+
 ---
 
 ## Environment variables

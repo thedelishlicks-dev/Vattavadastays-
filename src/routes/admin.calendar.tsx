@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
 import { supabase } from '@/lib/supabase'
-import { ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
 import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
@@ -124,7 +124,7 @@ function DayNum({ day, isToday }: { day: number; isToday: boolean }) {
   return (
     <span
       className={`inline-flex h-[22px] min-w-[22px] items-center justify-center rounded-full text-xs font-medium ${
-        isToday ? 'bg-primary text-primary-foreground' : 'text-foreground'
+        isToday ? 'bg-[var(--section)] text-[var(--section-on)]' : 'text-foreground'
       }`}
     >
       {day}
@@ -541,7 +541,7 @@ function AdminCalendar() {
 
   if (propLoading) {
     return (
-      <div className="animate-in fade-in duration-300 max-w-4xl mx-auto py-8 px-4">
+      <div className="animate-in fade-in duration-300 max-w-5xl mx-auto py-2 md:py-4 px-4">
         <div className="h-8 w-64 rounded-md bg-muted animate-pulse mb-6" />
         <div className="flex gap-2 mb-6">
           {[...Array(3)].map((_, i) => (
@@ -635,10 +635,15 @@ function AdminCalendar() {
   return (
     <div
       key="calendar-content"
-      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-4xl mx-auto py-8 px-4"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-5xl mx-auto py-2 md:py-4 px-4"
     >
-      <div className="flex items-start justify-between gap-3 mb-6">
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Calendar</h1>
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2.5">
+          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--section)] text-[var(--section-on)] shadow-[var(--shadow-neu-flat)]">
+            <CalendarDays className="h-5 w-5" />
+          </span>
+          <h1 className="font-display text-xl md:text-2xl font-semibold">Calendar</h1>
+        </div>
         <div className="flex flex-wrap justify-end gap-2">
           {CHANNEL_SYNC_ENABLED && (
             <button
@@ -673,7 +678,7 @@ function AdminCalendar() {
       )}
 
       {rooms.length > 5 ? (
-        <div className="mb-6">
+        <div className="mb-3">
           <label htmlFor="cal-room" className="sr-only">
             Room
           </label>
@@ -692,14 +697,14 @@ function AdminCalendar() {
           </select>
         </div>
       ) : (
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="flex gap-2 mb-3 flex-wrap">
           {rooms.length > 1 && (
             <button
               onClick={() => setSelectedRoomId(ALL)}
               className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
                 isAll
-                  ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
-                  : 'bg-background text-foreground border-border hover:border-primary'
+                  ? 'bg-[var(--section)] text-[var(--section-on)] border-[var(--section)] shadow-[var(--shadow-neu-flat)]'
+                  : 'bg-background text-foreground border-border hover:border-[var(--section)]'
               }`}
             >
               All rooms
@@ -711,8 +716,8 @@ function AdminCalendar() {
               onClick={() => setSelectedRoomId(room.id)}
               className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
                 view === room.id
-                  ? 'bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]'
-                  : 'bg-background text-foreground border-border hover:border-primary'
+                  ? 'bg-[var(--section)] text-[var(--section-on)] border-[var(--section)] shadow-[var(--shadow-neu-flat)]'
+                  : 'bg-background text-foreground border-border hover:border-[var(--section)]'
               }`}
             >
               {room.name}
@@ -743,12 +748,12 @@ function AdminCalendar() {
         )
       })()}
 
-      <div className="flex items-center justify-between mb-4">
-        <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors" aria-label="Previous month">
+      <div className="flex items-center justify-between mb-3 rounded-xl bg-[var(--section)] px-1.5 py-1 text-[var(--section-on)] shadow-[var(--shadow-neu-flat)]">
+        <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-[var(--section-on)]/15 transition-colors" aria-label="Previous month">
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="font-semibold text-foreground">{monthLabel}</span>
-        <button onClick={nextMonth} className="press-scale p-2 rounded-lg hover:bg-stone-100 transition-colors" aria-label="Next month">
+        <span className="font-display text-lg font-semibold">{monthLabel}</span>
+        <button onClick={nextMonth} className="press-scale p-2 rounded-lg hover:bg-[var(--section-on)]/15 transition-colors" aria-label="Next month">
           <ChevronRight className="h-5 w-5" />
         </button>
       </div>
@@ -764,9 +769,9 @@ function AdminCalendar() {
           key={view ?? 'none'}
           className="animate-in fade-in duration-[var(--duration-base)] ease-[var(--ease-smooth)] rounded-xl border border-border overflow-hidden bg-card shadow-[var(--shadow-neu-flat)]"
         >
-          <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
+          <div className="grid grid-cols-7 bg-[var(--section-soft)] border-b border-border">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-muted-foreground">
+              <div key={d} className="py-2 text-center text-xs font-medium text-[var(--section-ink)]">
                 {d}
               </div>
             ))}
@@ -793,7 +798,7 @@ function AdminCalendar() {
                     onClick={() => selectDay(dateStr)}
                     aria-pressed={isSel}
                     aria-label={`${dateStr}: ${sm.lines.join(', ')}`}
-                    className={`h-14 sm:h-20 border-b border-r border-border/50 p-1 sm:p-1.5 text-xs w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary flex flex-col items-center sm:items-start gap-1 ${s.bg} ${isPast ? 'opacity-60' : ''} ${isSel ? 'ring-2 ring-inset ring-primary' : ''}`}
+                    className={`h-14 sm:h-20 border-b border-r border-border/50 p-1 sm:p-1.5 text-xs w-full cursor-pointer hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--section)] flex flex-col items-center sm:items-start gap-1 ${s.bg} ${isPast ? 'opacity-60' : ''} ${isSel ? 'ring-2 ring-inset ring-[var(--section)]' : ''}`}
                     title={s.title || undefined}
                   >
                     <DayNum day={day} isToday={dateStr === todayStr} />
@@ -884,7 +889,7 @@ function AdminCalendar() {
                     key={dateStr}
                     type="button"
                     onClick={() => setReopen({ roomId: view as string, roomName, date: dateStr, note: noteText })}
-                    className={`${base} flex w-full cursor-pointer flex-col items-start justify-start focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary`}
+                    className={`${base} flex w-full cursor-pointer flex-col items-start justify-start focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--section)]`}
                     title={noteText ? `Blocked — ${friendlyNote(noteText)}. Tap to reopen.` : 'Blocked. Tap to reopen.'}
                     aria-label={`${dateStr}: blocked${noteText ? `, ${friendlyNote(noteText)}` : ''}. Tap to reopen.`}
                   >
@@ -898,7 +903,7 @@ function AdminCalendar() {
               return (
                 <div
                   key={dateStr}
-                  className={`${base} ${tappable ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary' : ''}`}
+                  className={`${base} ${tappable ? 'cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[var(--section)]' : ''}`}
                   title={sd.name ? `${c.label} — ${sd.name}${tappable ? '. Tap for details.' : ''}` : c.label}
                   {...(tappable
                     ? {

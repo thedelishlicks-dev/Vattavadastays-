@@ -59,7 +59,7 @@ export function SectionTabs({
               className={[
                 "shrink-0 whitespace-nowrap px-3 py-3 text-sm border-b-2 -mb-px transition-colors",
                 active
-                  ? "border-primary text-primary font-medium"
+                  ? "border-[var(--section)] text-[var(--section-ink)] font-medium"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               ].join(" ")}
             >
