@@ -15,11 +15,12 @@
 // supabase/tests/season_parity_cases.json is asserted by BOTH sides.
 //
 // TWO rule sets, one picker:
-//  • legacy  — room_rates rows: date range + rule, "room-specific, then later start".
-//  • seasons — a season (price_seasons) + a room rule (season_room_rules), used when
-//    properties.season_pricing_v2 is on. useRoomRates() flattens each rule into a
+//  • seasons — a season (price_seasons) + a room rule (season_room_rules). The app uses only
+//    this. useRoomRates() flattens each rule into a
 //    RoomRate that carries `season`, so every price calculation stays unchanged.
-//    Overlaps: higher season priority, then the SHORTER window, then name, then id;
+//  • legacy  — room_rates rows ("room-specific, then later start"). No longer loaded by the app;
+//    kept only until the old table and SQL path are removed in a later cleanup.
+//    Season overlaps: higher season priority, then the SHORTER window, then name, then id;
 //    inside the season a room-specific rule beats an all-rooms rule.
 
 import { inSeason, seasonSpanDays, type PriceSeason } from "./quotes";

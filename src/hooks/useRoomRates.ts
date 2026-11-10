@@ -1,10 +1,9 @@
 // Room price rules for one property, as one flat list that every price calculation reads
 // (guest page, owner modals, quote builder — see lib/roomRates.ts).
 //
-// Two sources, chosen per property by properties.season_pricing_v2:
-//   off → room_rates (the old "Seasonal rates" on each room), exactly as before;
-//   on  → seasons (price_seasons) + their room rules (season_room_rules), flattened by
-//         seasonRulesToRates() so callers never need to know which one is in use.
+// Source: seasons (price_seasons) + their room rules (season_room_rules), flattened by
+// seasonRulesToRates() into the list priceRoomStay() understands. (The old room_rates table
+// and the per-property switch season_pricing_v2 are no longer read by the app.)
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -15,13 +14,6 @@ export const roomRatesKey = (propertyId: string | undefined) => ["roomRates", pr
 export const seasonRulesKey = (propertyId: string | undefined) => ["seasonRoomRules", propertyId ?? ""] as const;
 
 const yesterday = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-/** Is the unified Seasons model on for this property? Any failure (column not there yet) = off. */
-async function seasonPricingOn(propertyId: string): Promise<boolean> {
-  const { data, error } = await supabase.from("properties").select("season_pricing_v2").eq("id", propertyId).maybeSingle();
-  if (error) return false;
-  return (data as { season_pricing_v2?: boolean } | null)?.season_pricing_v2 === true;
-}
 
 export async function fetchSeasonRules(propertyId: string): Promise<SeasonRoomRule[]> {
   const { data, error } = await supabase
@@ -49,20 +41,8 @@ async function fetchSeasonRates(propertyId: string): Promise<RoomRate[]> {
   return seasonRulesToRates(seasons, rules, yesterday());
 }
 
-async function fetchLegacyRates(propertyId: string): Promise<RoomRate[]> {
-  const { data, error } = await supabase
-    .from("room_rates")
-    .select("id, room_id, label, start_date, end_date, kind, value, created_at")
-    .eq("property_id", propertyId)
-    // Past periods can't price any future stay; keep the list small.
-    .gte("end_date", yesterday())
-    .order("start_date", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({ ...r, value: Number(r.value) })) as RoomRate[];
-}
-
 export async function fetchRoomRates(propertyId: string): Promise<RoomRate[]> {
-  return (await seasonPricingOn(propertyId)) ? fetchSeasonRates(propertyId) : fetchLegacyRates(propertyId);
+  return fetchSeasonRates(propertyId);
 }
 
 export function useRoomRates(propertyId: string | undefined) {

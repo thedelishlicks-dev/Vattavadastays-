@@ -124,7 +124,6 @@ export const SITUATIONS: GuideSection[] = [
       },
       { type: "p", text: "**Prefer an exact price, or a different price for one room?** On the season, tap **Set room prices**, choose the room, choose **Fixed ₹ per night** and type the price." },
       { type: "p", text: "**Meals and extras too?** Leave **Also use for add-ons & packages** ticked and set each add-on's price for this season on the Add-ons page. Untick it if only room prices should change." },
-      { type: "note", label: "Not seeing Seasons?", text: "If **Seasons** is not at the top of Rooms & Pricing yet, your property still uses the older screens: **Seasonal rates** inside each room, and **Seasons** under Property → Add-ons. Ask us and we will switch you." },
     ],
   },
   {
@@ -375,7 +374,6 @@ export const SETUP: GuideSection[] = [
       },
       shot("19-package-form.webp", "Package form with name, description, how it is charged, and the add-ons it includes", "**1** Name. **2** How it is charged. **3** Tick the add-ons that are included."),
       { type: "p", text: "**Seasons** are your peak dates, such as Christmas or a festival. They are set up once in **Rooms & Pricing → Seasons**, and the same season can change room prices and add-on prices. When you add a season there, keep **Also use for add-ons & packages** ticked, then come back here and give each add-on and package its own price for it. **Leave a price blank to use the base price.** **Fill blanks** on the season can copy the base price (or base plus a percentage) into every blank for you." },
-      { type: "note", label: "Not seeing Seasons in Rooms & Pricing?", text: "Your property still uses the older screen: **Seasons for add-ons & packages** at the bottom of this page, and **Seasonal rates** inside each room. Ask us and we will switch you." },
       { type: "note", label: "Good to know", text: "Guests cannot buy add-ons or packages online. You add them to a quote or booking after talking to the guest." },
     ],
   },

@@ -151,8 +151,8 @@ Key tables (short form):
   - `subscription_tier`: DB allows `'small' | 'large'`; the UI sells Starter / Growth / Pro. Unresolved — see HANDOVER §10 item 15.
 - `rooms`: `id, property_id, name, room_type, max_guests, base_price, extra_guest_price, weekend_multiplier, room_amenities, images, is_active`
 - `price_seasons`: a season — `name, start_date, end_date, recurs_yearly, priority, for_addons` (false = rooms only; add-ons ignore it)
-- `season_room_rules`: room price of a season — `season_id`, `room_id` (null = all rooms), `kind` (`fixed` | `percent`), `value`. Used when `properties.season_pricing_v2` is true (platform admin sets it).
-- `room_rates`: OLD seasonal rate periods (used while `season_pricing_v2` is false) — `room_id` (null = all rooms), `start_date`, `end_date` (last night, inclusive), `kind` (`fixed` | `percent`), `value`
+- `season_room_rules`: room price of a season — `season_id`, `room_id` (null = all rooms), `kind` (`fixed` | `percent`), `value`. The only room-price source the app reads. (`properties.season_pricing_v2` is now true for every property and the default; it is removed in a later cleanup.)
+- `room_rates`: OLD seasonal rate periods (no longer read by the app; kept until the cleanup) — `room_id` (null = all rooms), `start_date`, `end_date` (last night, inclusive), `kind` (`fixed` | `percent`), `value`
 - `availability`: `(room_id, date)` PK, `is_available`, `note`. `price_override` still exists and is **unused**.
 - `bookings`: `id, property_id, room_id, group_id, guest_name, guest_phone, check_in, check_out, nights (generated), room_price, extra_guest_charge, total_amount, status, advance_amount, is_paid, hold_expires_at, agent_id, commission_amount, commission_paid, source, …`
   - Statuses: `pending`, `confirmed`, `cancelled`, `completed`.
