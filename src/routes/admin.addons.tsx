@@ -4,7 +4,6 @@ import { ChevronDown, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react"
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAddons, useDeleteRow, usePackages, useSaveRow, useSeasons } from "@/hooks/useCatalog";
 import { PageHeader, Section, Field, inputCls } from "@/admin/formKit";
-import { SeasonsEditor } from "@/components/SeasonsEditor";
 import {
   CATEGORY_LABELS,
   UNIT_LABELS,
@@ -27,10 +26,10 @@ export const Route = createFileRoute("/admin/addons")({
 function AdminAddons() {
   const { data: property, isLoading } = useOwnerProperty();
   if (isLoading || !property) return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
-  return <Catalog propertyId={property.id} unified={!!property.season_pricing_v2} />;
+  return <Catalog propertyId={property.id} />;
 }
 
-function Catalog({ propertyId, unified }: { propertyId: string; unified: boolean }) {
+function Catalog({ propertyId }: { propertyId: string }) {
   const { data: allSeasons = [] } = useSeasons(propertyId);
   // Seasons that only change room prices have no add-on price boxes.
   const seasons = allSeasons.filter((s) => s.for_addons !== false);
@@ -46,27 +45,11 @@ function Catalog({ propertyId, unified }: { propertyId: string; unified: boolean
         subtitle="What you offer beyond the room — meals, campfire, kitchen, trekking — with an exact price for each season. These power the quotes you send guests; nothing here is shown to guests or charged automatically."
       />
 
-      {unified && seasons.length === 0 && (
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Prices change in peak season or festivals? Add a season in{" "}
-          <a href={seasonsHref} className="underline text-foreground">Rooms & Pricing → Seasons</a>
-          {" "}and tick “Also use for add-ons & packages”, then set a price for each add-on here.
-        </div>
-      )}
-
-      {!unified && seasons.length === 0 && (
-        <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-          Prices change in peak season or festivals? Define your seasons once in{" "}
-          <button
-            type="button"
-            onClick={() => document.getElementById("seasons")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            className="underline text-foreground"
-          >
-            Seasons (bottom of this page)
-          </button>
-          , then set a price for each add-on.
-        </div>
-      )}
+      <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+        Seasons are set up once in{" "}
+        <a href={seasonsHref} className="underline text-foreground">Rooms & Pricing → Seasons</a>
+        . Tick “Also use for add-ons & packages” on a season, then give each add-on its price for it here.
+      </div>
 
       <Section title="Add-ons" description="Individual things guests can add. Use variants for Veg / Non-veg or with / without guide.">
         {loadingAddons && <div className="h-16 rounded-lg bg-muted animate-pulse" />}
@@ -93,19 +76,6 @@ function Catalog({ propertyId, unified }: { propertyId: string; unified: boolean
           <AddButton label="Add package" onClick={() => setAdding("package")} />
         )}
       </Section>
-
-      {unified ? (
-        <Section title="Seasons" description="Seasons are now set up once for rooms and add-ons together.">
-          <a href={seasonsHref} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
-            Manage seasons in Rooms & Pricing
-          </a>
-        </Section>
-      ) : (
-        /* Old, add-ons-only seasons box — used until the property is switched to unified seasons. */
-        <div id="seasons" className="scroll-mt-32">
-          <SeasonsEditor propertyId={propertyId} />
-        </div>
-      )}
     </div>
   );
 }

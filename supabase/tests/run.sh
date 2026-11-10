@@ -19,3 +19,8 @@ for pass in 1 2; do
 done
 $PSQL -o /dev/null -d "$DB" -f supabase/tests/migrations.test.sql
 $PSQL -o /dev/null -d "$DB" -f supabase/tests/seasons.test.sql
+# Last: copy any late room_rates into seasons, then switch everything to seasons
+# (this changes the default the tests above rely on)
+$PSQL -d "$DB" -f supabase/migrations/20261109000000_unified_seasons.sql 2>&1 | grep -v NOTICE || true
+$PSQL -d "$DB" -f supabase/migrations/20261110000000_seasons_always_on.sql
+$PSQL -o /dev/null -d "$DB" -f supabase/tests/seasons_always_on.test.sql

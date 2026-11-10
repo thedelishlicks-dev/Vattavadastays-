@@ -6,8 +6,8 @@
 //   • Add-on prices — the season is used for add-ons & packages (exact prices are then typed on
 //     the Add-ons page; blanks use the base price, with the same "fill blanks" helper as before)
 // A season with no room rule never changes a room price; a season not used for add-ons never
-// changes an add-on price. Replaces the room editor's "Seasonal rates" form and the Add-ons
-// page's Seasons box once a property is switched to unified seasons (properties.season_pricing_v2).
+// changes an add-on price. This is the only Seasons screen (the room editor shows a room's season
+// prices read-only; the Add-ons page only links here).
 // Rules live in lib/roomRates.ts; the same rules run in SQL (stay_room_price).
 
 import { useMemo, useState } from "react";

@@ -70,7 +70,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 **Architecture**
 1. **One thing, one home (§5).** Don't add a second editor for the same data.
 2. **All writes to `properties.shared_amenities` go through `src/lib/propertyConfig.ts`** (`updateSharedAmenities` / `fetchSharedAmenities` / `withSentinel`). Never `update({ shared_amenities })` from cached data.
-3. **Room price fields live in `src/components/RoomPricingFields.tsx`.** Seasonal rates live in `RoomRatesEditor.tsx` (old model) or, for properties switched to unified seasons, in `SeasonsPanel.tsx` (Rooms & Pricing → Seasons). Don't create price inputs elsewhere.
+3. **Room price fields live in `src/components/RoomPricingFields.tsx`.** Seasons (room prices and add-on use) live only in `SeasonsPanel.tsx` (Rooms & Pricing → Seasons); `RoomSeasonPrices.tsx` shows a room's season prices read-only. Don't create price inputs elsewhere.
 4. **One booking-creation component:** `src/components/AddBookingModal.tsx`.
 5. **One price calculator:** `priceRoomStay()` in `src/lib/quoteBuilder.ts`. It reads room rates via `src/lib/roomRates.ts` (`pickRate`).
 6. **Navigation is data:** `src/admin/navConfig.ts`.
@@ -132,8 +132,8 @@ Six sections (`src/admin/navConfig.ts`); tabs appear under the header when a sec
 | Room name, type, bed, guests included, **most guests allowed**, room amenities | Rooms & Pricing → room editor | Most guests allowed = `rooms.max_occupancy` (rule 29) |
 | **Room photos** (up to 6; first = card photo) | Rooms & Pricing → room editor | `RoomPhotosManager`; saved as each photo uploads |
 | Room base prices (base, extra guest, weekend multiplier) | Rooms & Pricing → tap the price block | `RoomPricingFields` |
-| **Seasons** (name, dates, repeats yearly, priority) with **Room prices** (fixed ₹ or ±% of base; all rooms or one room) and **Add-ons & packages** use | Rooms & Pricing → Seasons (top) — when `properties.season_pricing_v2` is on | `SeasonsPanel`, tables `price_seasons` + `season_room_rules` |
-| **Seasonal / date-range rates** and add-on-only **Seasons** (OLD model, until a property is switched) | room editor → Seasonal rates; Property → Add-ons → Seasons | `RoomRatesEditor`, `SeasonsEditor`, tables `room_rates`, `price_seasons` |
+| **Seasons** (name, dates, repeats yearly, priority) with **Room prices** (fixed ₹ or ±% of base; all rooms or one room) and **Add-ons & packages** use | Rooms & Pricing → Seasons (top) | `SeasonsPanel`, tables `price_seasons` + `season_room_rules` |
+| **Per-add-on season prices** (exact ₹ per item per season) | Property → Add-ons → each item | `season_prices` on the item's variants |
 | Add-ons & packages | Property → Add-ons | Power the Quote Builder |
 | Shared amenities (tags) | Property → Amenities | Preserves `__` sentinels |
 | Meals (informational) | Property → Meals | `__meals:` |
@@ -312,7 +312,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 40. **[OPEN, to verify] WhatsApp confirmation shows "�" where ✅ / 📋 should be** in an owner screenshot (a Xiaomi/Android phone, sent via a `wa.me` link). The source text in `src/lib/whatsapp.ts` (~line 124) is valid. Send a confirmation to a second phone. If it repeats, remove emoji from the templates. Dates in the messages are ISO (`2026-11-12`); a friendlier `12 Nov 2026` would help guests.
 41. **[OPEN, minor] Single-room calendar:** a one-night **blocked** day shows "Bl…" (narrow bar; tapping reopens it), and a one-night stay that starts on a Saturday on the same day another guest leaves gets a short bar (the bar cannot cross into the next week row).
 42. **[OPEN, minor] Select boxes truncate on narrow phones:** the seasonal rate "Price type" ("% change on…") and the add-on "Charged" ("per person /…").
-43. **[BUILT 10 Nov, NOT YET ROLLED OUT] Unified seasons.** One season (`price_seasons`) now carries room price rules (`season_room_rules`) and add-on prices; one overlap rule (priority, then shorter window). Migration `20261109000000_unified_seasons.sql` is additive; `room_rates` is untouched. Each property is switched with `properties.season_pricing_v2` (default false, platform admin only). Steps, price check, backups and rollback: `docs/SEASONS_ROLLOUT.md`. **Still to do:** run the migration, test on the demo property, switch properties one at a time, retake screenshots (`docs/OWNER_HELP.md`), then delete `room_rates`, `RoomRatesEditor`'s old form, `SeasonsEditor` and the switch in a later cleanup.
+43. **[BUILT 10 Nov; rollout in progress] Unified seasons.** One season (`price_seasons`) now carries room price rules (`season_room_rules`) and add-on prices; one overlap rule (priority, then shorter window). Migration `20261109000000_unified_seasons.sql` is additive; `room_rates` is untouched. Old screens (`RoomRatesEditor`, `SeasonsEditor`) are removed. `20261110000000_seasons_always_on.sql` switches every property and makes new ones start on seasons. Steps, price check, backups and rollback: `docs/SEASONS_ROLLOUT.md`. **Still to do:** run the migrations in order, retake screenshots (`docs/OWNER_HELP.md`), then delete `room_rates`, `season_pricing_v2` and the legacy SQL/TS path in a later cleanup.
 44. **[OPEN] `SUPPORT_CONTACT` is empty** in `src/content/ownerGuide.ts`, so the Help page hides its "Still stuck?" box. The page is public: use a number you are happy to publish.
 45. **[OPEN] Help screenshots go stale** when a screen or label changes. Keep them in step (`docs/OWNER_HELP.md`). The guide quotes button names exactly.
 46. **[OPEN] Home "arriving" count (Today strip)** counts bookings with `check_in` = today and a status other than cancelled; how a multi-room booking is counted is unchecked.

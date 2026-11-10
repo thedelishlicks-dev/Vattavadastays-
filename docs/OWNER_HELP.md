@@ -21,7 +21,7 @@ It needs no login, so the link can be sent to a new owner on WhatsApp. The page 
 | Screenshots | `public/help/NN-name.webp` |
 | Dashboard link (sidebar + mobile More menu) | `src/admin/AdminLayout.tsx` |
 | "?" link by **Pending booking hold** | `src/routes/admin.settings.tsx` → `/help#setup-settings` |
-| "Help" link by **Seasonal rates** (old form only; the unified Seasons panel has none yet) | `src/components/RoomRatesEditor.tsx` → `/help#seasonal-rates` |
+| (none) the old "?" link by Seasonal rates was removed with the old form | — |
 
 How it opens: the dashboard links use `target="_blank"`. `/help` is outside the `/admin` manifest scope on purpose, so on a home-screen app it should open in an in-app browser sheet over the app instead of replacing the screen. **Not yet tested on a real Android and iPhone home-screen app** (HANDOVER §10 item 47). The page has a **Close** button (tries `window.close()`, then goes back, then to `/admin/dashboard`).
 
@@ -94,7 +94,7 @@ The guide quotes button and field names exactly (for example **Edit Stay**, **Ad
 
 Statements in the guide worth re-checking when code changes: the 25 % rule confirms a pending booking; a pending request is cancelled silently when its hold ends; the weekend multiplier applies on top of a season price; the last night of a season is included; overlapping seasons: higher priority, then shorter; a one-room price beats "All rooms" inside a season; a season with no Room prices never changes room prices.
 
-**Screenshots to retake after rollout (new Seasons screen, on the demo property):** (1) Rooms & Pricing with the Seasons section and one season card showing Room prices and Add-ons & packages; (2) the Add season form with the Room prices box; (3) a room editor showing Season prices. Add them to `raise-prices` and `seasonal-rates`. Until a property is switched, the guide carries a "Not seeing Seasons?" note in `raise-prices`, `seasonal-rates`... remove those notes (`setup-addons` has one too) once every property is on unified seasons.
+**Screenshots to retake after rollout (new Seasons screen, on the demo property):** (1) Rooms & Pricing with the Seasons section and one season card showing Room prices and Add-ons & packages; (2) the Add season form with the Room prices box; (3) a room editor showing Season prices. Add them to `raise-prices` and `seasonal-rates`.
 
 Not screenshot-verified in the guide: that the booking shows **Refund due** after saving a shorter stay (the warning before saving is verified in code); the single-room "red bar" reopen tap; that "arriving" counts multi-room bookings correctly.
 

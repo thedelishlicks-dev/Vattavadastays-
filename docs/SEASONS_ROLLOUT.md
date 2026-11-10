@@ -18,6 +18,17 @@ Built 10 Nov 2026 from `docs/SEASONS_UNIFICATION_PLAN.md`. **Nothing changes for
 
 **Not provable without the live database:** sign-in and RLS. Test on the demo property (step 4).
 
+## Update 10 Nov: switch everything and remove the old screens
+
+Decided with the owner: every property goes on seasons and the old screens are gone, so there is one model. **Order matters:**
+
+1. Export the CSV backups (step 1 below), run `20261109000000_unified_seasons.sql` and the price check as described (done for demo).
+2. Run **`supabase/migrations/20261110000000_seasons_always_on.sql`** in the SQL editor. It switches every property (and new ones) to seasons. If it stops with "has room_rates that are not copied into seasons yet", run `20261109000000_unified_seasons.sql` again, then this file. It is all-or-nothing.
+3. **Only then** merge/deploy the app version without the old screens. (The database must price with seasons before the app stops showing the old rates.)
+4. Rollback for one property is no longer a button: restore with the rollback script below, or `update public.properties set season_pricing_v2 = false` **and** redeploy the previous app version.
+
+Still in the database for safety, to remove in a later cleanup: table `room_rates`, column `season_pricing_v2`, the legacy pricing branch and `room_night_base_legacy()`.
+
 ## Steps (the migration touches the pricing function every property uses — pick a quiet time)
 
 1. **Back up.** Supabase → Table Editor → open `room_rates`, then `price_seasons`, then `properties` → *Export → CSV*. Keep the three files.
@@ -33,9 +44,9 @@ Built 10 Nov 2026 from `docs/SEASONS_UNIFICATION_PLAN.md`. **Nothing changes for
 - **One property:** `update public.properties set season_pricing_v2 = false where subdomain = '…';` — instant; prices and screens go back. Nothing is lost (rules entered meanwhile stay stored; `room_rates` was never changed, so edits made under the new screen are not in it).
 - **Everything:** `supabase/rollbacks/20261109000000_unified_seasons_rollback.sql` restores the previous pricing function and removes the new objects. Export `season_room_rules` to CSV first.
 
-## When every property is switched (later cleanup)
+## Later cleanup
 
-Delete `room_rates`, the old form in `RoomRatesEditor.tsx`, `SeasonsEditor.tsx`, the switch, and the "Not seeing Seasons?" Help notes; retake the screenshots listed in `docs/OWNER_HELP.md`.
+Delete table `room_rates`, the switch, `room_night_base_legacy()`, the legacy branch of `pickRate`/`parseRate` in `lib/roomRates.ts` (and its tests), and retake the screenshots listed in `docs/OWNER_HELP.md`. (The old `RoomRatesEditor`/`SeasonsEditor` screens and the Help "Not seeing Seasons?" notes were already removed on 10 Nov.)
 
 ## Decisions to confirm with the owner
 
