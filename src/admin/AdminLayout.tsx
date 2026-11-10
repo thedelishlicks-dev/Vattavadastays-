@@ -13,6 +13,7 @@ import {
   type NavSection,
 } from "@/admin/navConfig";
 import { SectionTabs } from "@/admin/SectionTabs";
+import { SectionContext } from "@/admin/sectionContext";
 
 // Navigation is defined in src/admin/navConfig.ts (6 sections; each owns one
 // or more existing pages, shown as tabs). Daily-use sections are listed first,
@@ -103,7 +104,8 @@ export function AdminLayout() {
   const propertyName = property?.name ?? "stayidom.in";
 
   return (
-    <div className="min-h-screen bg-muted/40 flex w-full">
+    <SectionContext.Provider value={activeSection}>
+    <div data-section={activeSection?.key} className="min-h-screen bg-muted/40 flex w-full">
       <DynamicManifest />
       <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
         <PropertyIdentity name={propertyName} logoUrl={property?.logo_url} subdomain={property?.subdomain} />
@@ -120,6 +122,7 @@ export function AdminLayout() {
                     to={SECTION_HOME(sec)}
                     label={sec.label}
                     icon={sec.icon}
+                    sectionKey={sec.key}
                     active={activeSection?.key === sec.key}
                     search={search}
                   />
@@ -167,7 +170,7 @@ export function AdminLayout() {
           <SectionTabs section={activeSection} path={path} propertyParam={propertyParam} />
         )}
 
-        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6">
+        <main data-bold={activeSection?.bold ? "" : undefined} className={["flex-1 p-4 md:p-6 pb-20 md:pb-6", activeSection?.bold ? "bg-[var(--section-wash)]" : ""].join(" ")}>
           <Outlet />
         </main>
 
@@ -181,15 +184,17 @@ export function AdminLayout() {
               <a
                 key={sec.key}
                 href={`${SECTION_HOME(sec)}${search}`}
+                data-section={sec.key}
+                aria-current={active ? "page" : undefined}
                 className={[
                   "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
-                  active ? "text-primary font-medium" : "text-muted-foreground",
+                  active ? "text-[var(--section-ink)] font-medium" : "text-muted-foreground",
                 ].join(" ")}
               >
                 <span
                   className={[
                     "flex items-center justify-center h-7 w-10 rounded-full transition-colors",
-                    active ? "bg-primary/10" : "",
+                    active ? "bg-[var(--section-soft)]" : "",
                   ].join(" ")}
                 >
                   <Icon className="h-5 w-5" />
@@ -198,15 +203,15 @@ export function AdminLayout() {
               </a>
             );
           })}
-          <button onClick={() => setMobileOpen(true)} className={[
+          <button onClick={() => setMobileOpen(true)} data-section={activeSection?.group === "setup" ? activeSection.key : undefined} className={[
               "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
-              activeSection?.group === "setup" ? "text-primary font-medium" : "text-muted-foreground",
+              activeSection?.group === "setup" ? "text-[var(--section-ink)] font-medium" : "text-muted-foreground",
             ].join(" ")}
           >
             <span
               className={[
                 "flex items-center justify-center h-7 w-10 rounded-full",
-                activeSection?.group === "setup" ? "bg-primary/10" : "",
+                activeSection?.group === "setup" ? "bg-[var(--section-soft)]" : "",
               ].join(" ")}
             >
               <Menu className="h-5 w-5" />
@@ -243,6 +248,7 @@ export function AdminLayout() {
                         to={SECTION_HOME(sec)}
                         label={sec.label}
                         icon={sec.icon}
+                        sectionKey={sec.key}
                         active={activeSection?.key === sec.key}
                         search={search}
                         onClick={() => setMobileOpen(false)}
@@ -272,6 +278,7 @@ export function AdminLayout() {
         </div>
       )}
     </div>
+    </SectionContext.Provider>
   );
 }
 
@@ -279,6 +286,7 @@ function NavItem({
   to,
   label,
   icon: Icon,
+  sectionKey,
   active,
   disabled,
   search,
@@ -287,6 +295,8 @@ function NavItem({
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  /** Carries this section's colours, so each item shows its own accent even when not active. */
+  sectionKey?: string;
   active: boolean;
   disabled?: boolean;
   search: string;
@@ -302,8 +312,19 @@ function NavItem({
     );
   }
   return (
-    <a href={`${to}${search}`} onClick={onClick} className={["flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors", active ? "bg-primary text-primary-foreground" : "text-foreground hover:bg-muted"].join(" ")}>
-      <Icon className="h-4 w-4" />
+    <a
+      href={`${to}${search}`}
+      onClick={onClick}
+      data-section={sectionKey}
+      aria-current={active ? "page" : undefined}
+      className={[
+        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors border-l-[3px]",
+        active
+          ? "bg-[var(--section-soft)] text-[var(--section-ink)] font-medium border-[var(--section)]"
+          : "text-foreground hover:bg-muted border-transparent",
+      ].join(" ")}
+    >
+      <Icon className={["h-4 w-4", active ? "" : "text-[var(--section-ink)] opacity-80"].join(" ")} />
       {label}
     </a>
   );

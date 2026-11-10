@@ -162,6 +162,35 @@
   }
 }
 
+/* ── Section identity (admin) ─────────────────────────────────────────────────
+   Each admin section has its own quiet accent so owners know where they are.
+   Set with data-section="<key>" (keys = src/admin/navConfig.ts). Green stays the
+   brand and the colour of every primary action; these colours are for identity only:
+     --section       decorative fills and edges (3:1 on the card)
+     --section-soft  tinted tile / pill background
+     --section-ink   text and icons on soft or card (7:1 or better, light and dark)
+     --section-wash  page background tint (used only where a section goes bolder)
+     --section-on    text/icons ON a solid --section fill (white in light, dark in dark mode)
+   Values checked for WCAG contrast; pure CSS, nothing to download. */
+[data-section="home"]     { --section: oklch(0.55 0.14 148);  --section-soft: oklch(0.955 0.03 148);  --section-ink: oklch(0.4 0.09 148);  --section-wash: oklch(0.965 0.006 148); --section-on: oklch(1 0 0); }
+[data-section="calendar"] { --section: oklch(0.55 0.14 235);  --section-soft: oklch(0.955 0.03 235);  --section-ink: oklch(0.4 0.09 235);  --section-wash: oklch(0.965 0.014 235); --section-on: oklch(1 0 0); }
+[data-section="bookings"] { --section: oklch(0.55 0.14 275);  --section-soft: oklch(0.955 0.03 275);  --section-ink: oklch(0.4 0.09 275);  --section-wash: oklch(0.965 0.006 275); --section-on: oklch(1 0 0); }
+[data-section="money"]    { --section: oklch(0.64 0.14 75);   --section-soft: oklch(0.955 0.03 75);   --section-ink: oklch(0.4 0.085 75);  --section-wash: oklch(0.965 0.014 80); --section-on: oklch(0.2 0.03 70); }
+[data-section="rooms"]    { --section: oklch(0.55 0.14 40);   --section-soft: oklch(0.955 0.03 40);   --section-ink: oklch(0.4 0.09 40);   --section-wash: oklch(0.965 0.006 40); --section-on: oklch(1 0 0); }
+[data-section="property"] { --section: oklch(0.55 0.04 250);  --section-soft: oklch(0.955 0.008 250); --section-ink: oklch(0.4 0.03 250);  --section-wash: oklch(0.965 0.003 250); --section-on: oklch(1 0 0); }
+
+/* Bolder sections (navConfig `bold`): cards pick up a hint of the section colour in their border.
+   Money also gets aligned digits everywhere, so columns of rupees line up like a ledger. */
+main[data-bold] .border-border { border-color: color-mix(in oklab, var(--section) 28%, var(--border)); }
+[data-section="money"] main { font-variant-numeric: tabular-nums; --section-on: oklch(1 0 0); }
+
+.dark [data-section="home"]     { --section: oklch(0.72 0.13 148); --section-soft: oklch(0.3 0.045 148); --section-ink: oklch(0.86 0.08 148); --section-wash: oklch(0.2 0.02 148); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="calendar"] { --section: oklch(0.72 0.13 235); --section-soft: oklch(0.3 0.045 235); --section-ink: oklch(0.86 0.08 235); --section-wash: oklch(0.2 0.025 235); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="bookings"] { --section: oklch(0.72 0.13 275); --section-soft: oklch(0.3 0.045 275); --section-ink: oklch(0.86 0.08 275); --section-wash: oklch(0.2 0.02 275); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="money"]    { --section: oklch(0.74 0.13 75);  --section-soft: oklch(0.3 0.045 75);  --section-ink: oklch(0.86 0.08 75);  --section-wash: oklch(0.2 0.025 75); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="rooms"]    { --section: oklch(0.72 0.13 40);  --section-soft: oklch(0.3 0.045 40);  --section-ink: oklch(0.86 0.08 40);  --section-wash: oklch(0.2 0.02 40); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="property"] { --section: oklch(0.72 0.04 250); --section-soft: oklch(0.3 0.012 250); --section-ink: oklch(0.86 0.025 250); --section-wash: oklch(0.2 0.01 250); --section-on: oklch(0.18 0.02 150); }
+
 @utility neu-raised {
   box-shadow: var(--shadow-neu-raised);
   transition: box-shadow var(--duration-base) var(--ease-smooth);

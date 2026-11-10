@@ -1,10 +1,26 @@
+import { useSection } from "@/admin/sectionContext";
 import { Save } from "lucide-react";
 
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  // Inside the admin layout the header carries the section's icon tile and a short accent bar
+  // (colours come from data-section, see styles.css). Elsewhere it renders as plain text.
+  const section = useSection();
+  const Icon = section?.icon;
   return (
-    <div>
-      <h1 className="font-display text-2xl md:text-3xl font-semibold">{title}</h1>
-      {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+    <div className="flex items-start gap-3">
+      {Icon && (
+        <span
+          aria-hidden="true"
+          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--section-soft)] text-[var(--section-ink)]"
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+      )}
+      <div className="min-w-0">
+        <h1 className="font-display text-2xl md:text-3xl font-semibold">{title}</h1>
+        {section && <span aria-hidden="true" className="mt-1 mb-1.5 block h-0.5 w-10 rounded-full bg-[var(--section)]" />}
+        {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
+      </div>
     </div>
   );
 }
@@ -18,8 +34,9 @@ export function Section({
   description?: string;
   children: React.ReactNode;
 }) {
+  // The thin top accent only shows inside an admin section (--section is undefined elsewhere).
   return (
-    <div className="bg-card border border-border rounded-xl p-4 md:p-5 space-y-4">
+    <div className="relative bg-card border border-border rounded-xl p-4 md:p-5 space-y-4 before:pointer-events-none before:absolute before:inset-x-5 before:top-0 before:h-0.5 before:rounded-full before:bg-[var(--section,transparent)] before:opacity-70">
       <div>
         <h2 className="font-medium">{title}</h2>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}

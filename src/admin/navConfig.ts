@@ -31,6 +31,8 @@ export type NavSection = {
   group: "daily" | "setup";
   /** First tab is the section's landing page. A single tab = no tab bar. */
   tabs: NavTab[];
+  /** Goes beyond the quiet accent: tinted page background and card borders (see styles.css). */
+  bold?: boolean;
 };
 
 export const NAV_SECTIONS: NavSection[] = [
@@ -46,6 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Calendar",
     icon: CalendarDays,
     group: "daily",
+    bold: true,
     tabs: [{ to: "/admin/calendar", label: "Calendar" }],
   },
   {
@@ -63,6 +66,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Money",
     icon: Wallet,
     group: "daily",
+    bold: true,
     tabs: [
       { to: "/admin/payments", label: "Payments" },
       { to: "/admin/agents", label: "Agents & Commissions" },

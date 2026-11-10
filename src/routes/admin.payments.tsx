@@ -18,6 +18,7 @@ import {
   Receipt,
 } from "lucide-react";
 import { MiniBarChart } from "@/components/MiniBarChart";
+import { PageHeader } from "@/admin/formKit";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups } from "@/hooks/useBookings";
 import { supabase } from "@/lib/supabase";
@@ -585,12 +586,7 @@ function AdminPayments() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Payments</h1>
-        <p className="text-sm text-muted-foreground">
-          Track collections and outstanding balances across all bookings.
-        </p>
-      </div>
+      <PageHeader title="Payments" subtitle="Track collections and outstanding balances across all bookings." />
 
       {justConfirmed && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
@@ -602,30 +598,33 @@ function AdminPayments() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground mb-1">Collected</p>
-          <p className="font-display text-2xl font-semibold text-primary">
-            ₹{stats.totalCollected.toLocaleString("en-IN")}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {stats.fullyPaid} fully paid · {stats.partPaid} part paid
-          </p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4">
-          <p className="text-xs text-muted-foreground mb-1">Outstanding</p>
-          <p className="font-display text-2xl font-semibold text-destructive">
-            ₹{stats.totalOutstanding.toLocaleString("en-IN")}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">{stats.unpaid} not started</p>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-4 col-span-2 md:col-span-1">
-          <p className="text-xs text-muted-foreground mb-1">Total billed</p>
-          <p className="font-display text-2xl font-semibold">
-            ₹{stats.totalBilled.toLocaleString("en-IN")}
-          </p>
-          <p className="text-xs text-muted-foreground mt-0.5">Room total + charges − discounts</p>
+      {/* Stats — one ledger strip: gold rule on top, large aligned figures, hairline dividers */}
+      <div className="overflow-hidden rounded-2xl border border-[var(--section)]/40 bg-card shadow-[var(--shadow-neu-flat)]">
+        <div className="h-1.5 bg-[var(--section)]" aria-hidden="true" />
+        <div className="grid grid-cols-2 md:grid-cols-3">
+          <div className="border-r border-[var(--section)]/25 p-4 md:p-5">
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Collected</p>
+            <p className="font-display text-2xl font-semibold tabular-nums text-primary md:text-3xl">
+              ₹{stats.totalCollected.toLocaleString("en-IN")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {stats.fullyPaid} fully paid · {stats.partPaid} part paid
+            </p>
+          </div>
+          <div className="p-4 md:border-r md:border-[var(--section)]/25 md:p-5">
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Outstanding</p>
+            <p className="font-display text-2xl font-semibold tabular-nums text-destructive md:text-3xl">
+              ₹{stats.totalOutstanding.toLocaleString("en-IN")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stats.unpaid} not started</p>
+          </div>
+          <div className="col-span-2 border-t border-[var(--section)]/25 p-4 md:col-span-1 md:border-t-0 md:p-5">
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Total billed</p>
+            <p className="font-display text-2xl font-semibold tabular-nums md:text-3xl">
+              ₹{stats.totalBilled.toLocaleString("en-IN")}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Room total + charges − discounts</p>
+          </div>
         </div>
       </div>
 
@@ -810,10 +809,10 @@ function AdminPayments() {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[1220px]">
-                <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/50">
+                <thead className="border-b-2 border-[var(--section)]/50 text-left text-xs uppercase tracking-wider text-[var(--section-ink)] bg-[var(--section-soft)]">
                   <tr>
                     <th
-                      className={`${thSortCls} sticky left-0 z-10 bg-muted/50`}
+                      className={`${thSortCls} sticky left-0 z-10 bg-[var(--section-soft)]`}
                       onClick={() => toggleSort("guest")}
                     >
                       <span className="inline-flex items-center gap-1">
