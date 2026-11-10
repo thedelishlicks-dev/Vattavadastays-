@@ -32,7 +32,9 @@ interface Draft {
 const emptyDraft = (): Draft => ({ name: "", start_date: "", end_date: "", recurs_yearly: false, priority: 0 });
 
 export function SeasonsEditor({ propertyId }: { propertyId: string }) {
-  const { data: seasons = [] } = useSeasons(propertyId);
+  const { data: allSeasons = [] } = useSeasons(propertyId);
+  // Seasons copied from room rates (rooms only) belong to the unified screen, not this add-ons-only box.
+  const seasons = allSeasons.filter((s) => s.for_addons !== false);
   const { data: addons = [] } = useAddons(propertyId);
   const { data: packages = [] } = usePackages(propertyId);
   const save = useSaveRow("price_seasons");

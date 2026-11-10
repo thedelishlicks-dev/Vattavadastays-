@@ -1,0 +1,478 @@
+{
+ "rooms": [
+  {
+   "id": "00000000-0000-0000-0000-0000000000e1",
+   "base_price": 2000
+  },
+  {
+   "id": "00000000-0000-0000-0000-0000000000e2",
+   "base_price": 1005
+  }
+ ],
+ "cases": [
+  {
+   "name": "yearly season across New Year (+30% all rooms)",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Christmas",
+     "start": "2026-12-20",
+     "end": "2027-01-05",
+     "yearly": true,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 30
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-19",
+     "expect": null
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-20",
+     "expect": 2600
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-01-05",
+     "expect": 2600
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-01-06",
+     "expect": null
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2031-01-02",
+     "expect": 2600
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2030-06-01",
+     "expect": null
+    }
+   ]
+  },
+  {
+   "name": "yearly season on 29 February",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Winter end",
+     "start": "2026-02-28",
+     "end": "2026-03-01",
+     "yearly": true,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000002",
+     "name": "Leap day",
+     "start": "2028-02-29",
+     "end": "2028-02-29",
+     "yearly": true,
+     "priority": 5
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "fixed",
+     "value": 3000
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000002",
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "kind": "fixed",
+     "value": 9000
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2028-02-29",
+     "expect": 9000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e2",
+     "date": "2028-02-29",
+     "expect": 3000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-02-28",
+     "expect": 3000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-03-01",
+     "expect": 3000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-03-02",
+     "expect": null
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2032-02-29",
+     "expect": 9000
+    }
+   ]
+  },
+  {
+   "name": "one-off season does not repeat",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Onam",
+     "start": "2026-08-20",
+     "end": "2026-08-30",
+     "yearly": false,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 50
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-08-25",
+     "expect": 3000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-08-25",
+     "expect": null
+    }
+   ]
+  },
+  {
+   "name": "higher priority beats a longer or earlier season",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Peak",
+     "start": "2026-12-01",
+     "end": "2027-01-31",
+     "yearly": true,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000002",
+     "name": "Festival",
+     "start": "2026-12-24",
+     "end": "2026-12-26",
+     "yearly": false,
+     "priority": 1
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 10
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000002",
+     "room": null,
+     "kind": "percent",
+     "value": 50
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-25",
+     "expect": 3000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-10",
+     "expect": 2200
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2027-01-10",
+     "expect": 2200
+    }
+   ]
+  },
+  {
+   "name": "same priority: the shorter season wins",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "December",
+     "start": "2026-12-01",
+     "end": "2026-12-31",
+     "yearly": false,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000002",
+     "name": "Week",
+     "start": "2026-12-20",
+     "end": "2026-12-25",
+     "yearly": false,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 10
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000002",
+     "room": null,
+     "kind": "percent",
+     "value": 40
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-22",
+     "expect": 2800
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-10",
+     "expect": 2200
+    }
+   ]
+  },
+  {
+   "name": "same priority and length: name decides (byte order), then id",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "alpha",
+     "start": "2026-12-01",
+     "end": "2026-12-10",
+     "yearly": false,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000002",
+     "name": "Zed",
+     "start": "2026-12-01",
+     "end": "2026-12-10",
+     "yearly": false,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000003",
+     "name": "same",
+     "start": "2026-11-01",
+     "end": "2026-11-10",
+     "yearly": false,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000004",
+     "name": "same",
+     "start": "2026-11-01",
+     "end": "2026-11-10",
+     "yearly": false,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "fixed",
+     "value": 1111
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000002",
+     "room": null,
+     "kind": "fixed",
+     "value": 2222
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000003",
+     "room": null,
+     "kind": "fixed",
+     "value": 3333
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000004",
+     "room": null,
+     "kind": "fixed",
+     "value": 4444
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-05",
+     "expect": 2222
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-11-05",
+     "expect": 3333
+    }
+   ]
+  },
+  {
+   "name": "inside a season a room rule beats the all-rooms rule",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Peak",
+     "start": "2026-12-20",
+     "end": "2027-01-02",
+     "yearly": false,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 10
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "kind": "fixed",
+     "value": 5000
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-25",
+     "expect": 5000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e2",
+     "date": "2026-12-25",
+     "expect": 1106
+    }
+   ]
+  },
+  {
+   "name": "a season with no rule for the room never blocks another season",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Add-ons only",
+     "start": "2026-12-01",
+     "end": "2026-12-31",
+     "yearly": false,
+     "priority": 9
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000002",
+     "name": "Rooms",
+     "start": "2026-12-01",
+     "end": "2026-12-31",
+     "yearly": false,
+     "priority": 0
+    },
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000003",
+     "name": "Only room one",
+     "start": "2026-12-10",
+     "end": "2026-12-12",
+     "yearly": false,
+     "priority": 5
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000002",
+     "room": null,
+     "kind": "percent",
+     "value": 20
+    },
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000003",
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "kind": "fixed",
+     "value": 7000
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-11",
+     "expect": 7000
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e2",
+     "date": "2026-12-11",
+     "expect": 1206
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-12-20",
+     "expect": 2400
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e2",
+     "date": "2027-01-01",
+     "expect": null
+    }
+   ]
+  },
+  {
+   "name": "percent rounds half up (Postgres round)",
+   "seasons": [
+    {
+     "id": "aaaaaaaa-0000-0000-0000-000000000001",
+     "name": "Plus ten",
+     "start": "2026-06-01",
+     "end": "2026-06-30",
+     "yearly": false,
+     "priority": 0
+    }
+   ],
+   "rules": [
+    {
+     "season": "aaaaaaaa-0000-0000-0000-000000000001",
+     "room": null,
+     "kind": "percent",
+     "value": 10
+    }
+   ],
+   "checks": [
+    {
+     "room": "00000000-0000-0000-0000-0000000000e2",
+     "date": "2026-06-15",
+     "expect": 1106
+    },
+    {
+     "room": "00000000-0000-0000-0000-0000000000e1",
+     "date": "2026-06-15",
+     "expect": 2200
+    }
+   ]
+  }
+ ]
+}

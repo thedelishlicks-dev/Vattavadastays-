@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
 import type { Room } from '@/types/database'
 import { RoomRatesEditor } from '@/components/RoomRatesEditor'
+import { SeasonsPanel } from '@/components/SeasonsPanel'
 import { RoomPhotosManager } from '@/components/RoomPhotosManager'
 import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
 
@@ -156,7 +157,7 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
 // Room drawer (add / edit)
 // ---------------------------------------------------------------------------
 
-function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void; focusPricing?: boolean }) {
+function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, seasonPricing = false, onGoToSeasons }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void; focusPricing?: boolean; seasonPricing?: boolean; onGoToSeasons?: () => void }) {
   // Tapping the price block on a room card opens this same editor already scrolled to pricing.
   const pricingRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -276,10 +277,10 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false }
           </div>
 
           {room ? (
-            <RoomRatesEditor propertyId={propertyId} room={{ id: room.id, name: room.name, base_price: room.base_price }} />
+            <RoomRatesEditor propertyId={propertyId} room={{ id: room.id, name: room.name, base_price: room.base_price }} seasonPricing={seasonPricing} onGoToSeasons={onGoToSeasons} />
           ) : (
             <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">
-              Save the room first, then reopen it to add seasonal rates (peak / off-season prices).
+              Save the room first, then reopen it to see its seasonal prices (peak / off-season).
             </p>
           )}
 
@@ -389,6 +390,12 @@ function AdminRooms() {
     )
 
   const rooms = property.rooms ?? []
+  const seasonPricing = !!property.season_pricing_v2
+  const goToSeasons = () => {
+    setDrawerRoom(undefined)
+    setFocusPricing(false)
+    setTimeout(() => document.getElementById('seasons')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
+  }
 
   return (
     <div
@@ -406,6 +413,12 @@ function AdminRooms() {
           <Plus className="h-4 w-4" /> Add room
         </button>
       </div>
+
+      {seasonPricing && (
+        <div id="seasons" className="scroll-mt-32">
+          <SeasonsPanel propertyId={property.id} rooms={rooms.map((r) => ({ id: r.id, name: r.name, base_price: r.base_price }))} />
+        </div>
+      )}
 
       {rooms.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
@@ -494,7 +507,7 @@ function AdminRooms() {
       )}
 
       {drawerRoom !== undefined && (
-        <RoomDrawer room={drawerRoom} propertyId={property.id} focusPricing={focusPricing} onClose={() => { setDrawerRoom(undefined); setFocusPricing(false) }} onSaved={handleSaved} />
+        <RoomDrawer room={drawerRoom} propertyId={property.id} focusPricing={focusPricing} seasonPricing={!!property.season_pricing_v2} onGoToSeasons={goToSeasons} onClose={() => { setDrawerRoom(undefined); setFocusPricing(false) }} onSaved={handleSaved} />
       )}
 
       {deleteRoom && (

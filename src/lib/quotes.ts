@@ -56,6 +56,8 @@ export interface PriceSeason {
   end_date: string;
   recurs_yearly: boolean;
   priority: number;
+  /** false = this season only prices ROOMS; add-ons ignore it. Missing = true (older rows). */
+  for_addons?: boolean;
 }
 
 export interface Addon {
@@ -148,9 +150,12 @@ export function stayDates(checkIn: string, checkOut: string): string[] {
 
 // ── Seasons ─────────────────────────────────────────────────────────────────
 
+/** The dates part of a season — what rooms and add-ons share. */
+export type SeasonWindow = Pick<PriceSeason, "start_date" | "end_date" | "recurs_yearly">;
+
 const mmdd = (date: string) => date.slice(5, 10);
 
-function inSeason(date: string, s: PriceSeason): boolean {
+export function inSeason(date: string, s: SeasonWindow): boolean {
   if (!s.recurs_yearly) return date >= s.start_date && date <= s.end_date;
   const d = mmdd(date);
   const a = mmdd(s.start_date);
@@ -159,7 +164,7 @@ function inSeason(date: string, s: PriceSeason): boolean {
   return a <= b ? d >= a && d <= b : d >= a || d <= b;
 }
 
-function seasonSpanDays(s: PriceSeason): number {
+export function seasonSpanDays(s: SeasonWindow): number {
   if (!s.recurs_yearly) return Math.round((toUTC(s.end_date) - toUTC(s.start_date)) / DAY_MS) + 1;
   // Recurring: measure inside leap year 2000 so Feb 29 is representable.
   const at = (date: string) => Date.UTC(2000, Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
@@ -177,6 +182,7 @@ function seasonSpanDays(s: PriceSeason): number {
 export function resolveSeason(date: string, seasons: PriceSeason[]): PriceSeason | null {
   let best: PriceSeason | null = null;
   for (const s of seasons) {
+    if (s.for_addons === false) continue; // a rooms-only season never changes an add-on price
     if (!inSeason(date, s)) continue;
     if (!best) {
       best = s;
@@ -393,6 +399,7 @@ export function coverageGaps(items: { variants: PriceVariant[] }[], seasons: Pri
   const gaps: Record<string, number> = {};
   for (const s of seasons) {
     gaps[s.id] = 0;
+    if (s.for_addons === false) continue; // rooms-only season: no add-on prices expected
     for (const item of items) {
       for (const v of item.variants) {
         const p = v.season_prices?.[s.id];
