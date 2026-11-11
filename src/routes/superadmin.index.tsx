@@ -12,14 +12,15 @@ import {
 import type { PropertyActivity, PropertyFilter } from '@/lib/onboarding'
 import { useLeads } from '../hooks/useLeads'
 import { useClientErrors, useClearClientErrors, groupErrors } from '../hooks/useClientErrors'
-import { Loader2, Plus, X, ExternalLink, Copy, Check, MessageCircle, ArrowRight, Link2, ChevronDown, ChevronUp, Search, Circle } from 'lucide-react'
+import { Modal, ModalActions, Button, fieldCls } from '@/components/ds'
+import { Loader2, Plus, ExternalLink, Copy, Check, MessageCircle, ArrowRight, Link2, ChevronDown, ChevronUp, Search, Circle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export const Route = createFileRoute('/superadmin/')({
   component: SuperAdminIndex,
 })
 
-const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+const inputCls = fieldCls
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
 type Tab = 'properties' | 'leads' | 'errors'
@@ -158,23 +159,27 @@ function LinkOwnerModal({ target, onClose, onLinked }: { target: LinkTarget; onC
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-card rounded-2xl shadow-xl flex flex-col max-h-[95dvh]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div>
-            <h2 className="font-display text-base font-semibold">{target.alreadyLinked ? 'Change owner' : 'Invite owner'}</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{target.name}</p>
+    <Modal
+      title={target.alreadyLinked ? 'Change owner' : 'Invite owner'}
+      subtitle={target.name}
+      onClose={onClose}
+      footer={
+        !done ? (
+          <div className="space-y-2">
+            <Button size="lg" block onClick={handleInvite} disabled={busy !== null} loading={busy === 'invite'}>Send invite &amp; link</Button>
+            <ModalActions>
+              <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+              <Button variant="soft" size="lg" className="flex-1" onClick={handleLink} disabled={busy !== null} loading={busy === 'link'}>Link existing account</Button>
+            </ModalActions>
           </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto p-5 space-y-4">
+        ) : undefined
+      }
+    >
           {done ? (
-            <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800 text-center font-medium">✅ {done}</div>
+            <div className="rounded-2xl bg-green-50 p-4 text-sm text-green-800 text-center font-medium">✅ {done}</div>
           ) : (
             <>
-              <div className="rounded-xl bg-muted/50 border border-border p-3 text-xs text-muted-foreground space-y-1">
+              <div className="rounded-2xl bg-muted/60 p-3.5 text-xs text-muted-foreground space-y-1">
                 <p className="font-medium text-foreground">How this works</p>
                 <p><strong>Send invite &amp; link</strong> emails the owner a link to set their own password and links their login to this property straight away. If that email already has a login, it is just linked.</p>
                 <p><strong>Link existing account</strong> is for an owner who already has a login (for example one you invited from Supabase).</p>
@@ -187,7 +192,7 @@ function LinkOwnerModal({ target, onClose, onLinked }: { target: LinkTarget; onC
               </div>
 
               {target.alreadyLinked && (
-                <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 cursor-pointer">
+                <label className="flex items-start gap-2 rounded-2xl bg-amber-50 p-3.5 text-xs text-amber-900 cursor-pointer">
                   <input type="checkbox" checked={confirmReplace} onChange={(e) => setConfirmReplace(e.target.checked)} className="mt-0.5" />
                   <span>This property already has an owner. The new login will become the owner and the old one will lose access to it.</span>
                 </label>
@@ -196,25 +201,7 @@ function LinkOwnerModal({ target, onClose, onLinked }: { target: LinkTarget; onC
               {error && <p className="text-xs text-destructive">{error}</p>}
             </>
           )}
-        </div>
-
-        {!done && (
-          <div className="px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border space-y-2">
-            <button onClick={handleInvite} disabled={busy !== null} className="w-full rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
-              {busy === 'invite' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Send invite &amp; link
-            </button>
-            <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-              <button onClick={handleLink} disabled={busy !== null} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted disabled:opacity-50 flex items-center justify-center gap-2">
-                {busy === 'link' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Link existing account
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -258,24 +245,26 @@ function AddPropertyModal({ onClose, onInviteNow }: { onClose: () => void; onInv
   const supabaseUsersUrl = 'https://supabase.com/dashboard/project/vzzfqgqxnodlrvnaxpbw/auth/users'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={!created ? onClose : undefined} />
-      <div className="relative w-full max-w-lg bg-card rounded-2xl shadow-xl flex flex-col max-h-[95dvh]">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">
-            {created ? 'Property Created' : 'Add New Property'}
-          </h2>
-          {!created && (
-            <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto p-5">
+    <Modal
+      size="lg"
+      locked={!!created}
+      title={created ? 'Property created' : 'Add new property'}
+      onClose={onClose}
+      footer={
+        !created ? (
+          <>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            <ModalActions>
+              <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+              <Button size="lg" className="flex-1" onClick={handleSave} loading={isPending}>Create property</Button>
+            </ModalActions>
+          </>
+        ) : undefined
+      }
+    >
           {created ? (
             <div className="space-y-4">
-              <div className="rounded-xl bg-green-50 border border-green-200 p-4 text-sm text-green-800">
+              <div className="rounded-2xl bg-green-50 p-4 text-sm text-green-800">
                 <div className="font-semibold mb-1">✅ Property created</div>
                 <a href={`https://${created.subdomain}.stayidom.in`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 underline text-green-700">
                   {created.subdomain}.stayidom.in
@@ -283,8 +272,8 @@ function AddPropertyModal({ onClose, onInviteNow }: { onClose: () => void; onInv
                 </a>
               </div>
 
-              <div className="rounded-xl border border-border p-4 space-y-4">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Next steps</div>
+              <div className="rounded-2xl bg-muted/60 p-4 space-y-4">
+                <div className="text-xs font-semibold text-muted-foreground">Next steps</div>
 
                 <div className="flex gap-3">
                   <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center shrink-0 font-semibold mt-0.5">1</div>
@@ -320,7 +309,7 @@ function AddPropertyModal({ onClose, onInviteNow }: { onClose: () => void; onInv
                 </p>
               </div>
 
-              <button onClick={onClose} className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Done — I'll invite later</button>
+              <Button variant="soft" size="lg" block onClick={onClose}>Done — I'll invite later</Button>
             </div>
           ) : (
             <div className="space-y-4">
@@ -332,8 +321,8 @@ function AddPropertyModal({ onClose, onInviteNow }: { onClose: () => void; onInv
               <div>
                 <label className={labelCls}>Subdomain *</label>
                 <div className="flex items-center gap-0">
-                  <input value={form.subdomain} onChange={(e) => handleSubdomain(e.target.value)} className="flex-1 rounded-l-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="greenvalley" />
-                  <span className="rounded-r-lg border border-l-0 border-border bg-muted px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">.stayidom.in</span>
+                  <input value={form.subdomain} onChange={(e) => handleSubdomain(e.target.value)} className="flex-1 min-w-0 rounded-l-xl border-0 bg-muted px-3.5 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" placeholder="greenvalley" />
+                  <span className="rounded-r-xl bg-muted/60 px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">.stayidom.in</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">3–30 lowercase letters and numbers. Checked against existing properties.</p>
               </div>
@@ -361,22 +350,7 @@ function AddPropertyModal({ onClose, onInviteNow }: { onClose: () => void; onInv
               </div>
             </div>
           )}
-        </div>
-
-        {!created && (
-          <div className="px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border space-y-2">
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <div className="flex gap-2">
-              <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-              <button onClick={handleSave} disabled={isPending} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
-                {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Create property
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    </Modal>
   )
 }
 
