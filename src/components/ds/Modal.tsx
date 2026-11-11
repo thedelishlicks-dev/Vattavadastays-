@@ -12,6 +12,8 @@ interface ModalProps {
   footer?: ReactNode;
   /** Narrow (default) for short forms; wide for calendars and tables. */
   size?: "md" | "lg";
+  /** Opens on top of another modal (z-60). */
+  nested?: boolean;
   className?: string;
 }
 
@@ -20,7 +22,7 @@ interface ModalProps {
  * Large title + round close button on top, scrolling body, sticky footer. Esc and a tap on the
  * backdrop close it; focus moves into it and returns on close.
  */
-export function Modal({ title, subtitle, onClose, children, footer, size = "md", className }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, footer, size = "md", nested, className }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -42,7 +44,7 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <div className={cn("fixed inset-0 flex", nested ? "z-[60]" : "z-50", "items-end md:items-center justify-center")}>
       <div className="absolute inset-0 bg-black/45 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
       <div
         ref={panel}

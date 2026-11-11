@@ -1,6 +1,7 @@
 import { directionsShortLink } from "@/lib/location";
 import { useMemo, useState } from "react";
-import { X, Send } from "lucide-react";
+import { Send } from "lucide-react";
+import { Modal, ModalActions, Button, Field, EmptyState, fieldCls } from "@/components/ds";
 import {
   buildConfirmationText,
   buildDayBeforeReminderText,
@@ -153,96 +154,69 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
   const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 
   return (
-    <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)] max-h-[92vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Send className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-sm">Send WhatsApp reminder</h2>
-          </div>
-          <button onClick={onClose} className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {bookings.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No bookings found.</p>
-          ) : (
-            <>
-              {/* Booking picker */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest / booking</label>
-                <select
-                  value={bookingId}
-                  onChange={e => setBookingId(e.target.value)}
-                  className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none"
-                >
-                  {bookings.map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.guest_name} — {b.check_in} ({roomNameMap[b.room_id] ?? "room"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Template picker */}
-              <div>
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Message type</label>
-                <div className="mt-1.5 flex flex-wrap gap-2">
-                  {templates.map(t => (
-                    <button
-                      key={t.key}
-                      onClick={() => setTemplate(t.key)}
-                      className={[
-                        "press-scale text-xs px-3 py-1.5 rounded-full border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
-                        template === t.key
-                          ? "bg-primary text-primary-foreground border-primary shadow-[var(--shadow-neu-flat)]"
-                          : "bg-background border-border hover:bg-muted",
-                      ].join(" ")}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Message preview */}
-              {booking && (
-                <div key={bookingId + template} className="animate-in fade-in duration-200">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preview</label>
-                  <div className="mt-1.5 rounded-xl bg-[#dcfce7] border border-[#bbf7d0] p-4 text-sm text-[#14532d] leading-relaxed whitespace-pre-wrap">
-                    {message}
-                  </div>
-                  <p className="mt-1.5 text-xs text-muted-foreground">
-                    Sending to: {booking.guest_phone}
-                  </p>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 pb-5 pt-2 border-t border-border">
-          <button onClick={onClose} className="press-scale px-4 py-2 text-sm rounded-full border border-border hover:bg-muted transition-colors">
-            Cancel
-          </button>
+    <Modal
+      title="Send WhatsApp reminder"
+      onClose={onClose}
+      footer={
+        <ModalActions>
+          <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
           {booking && (
             <a
               href={waUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={onClose}
-              className="press-scale inline-flex items-center gap-2 px-5 py-2 text-sm rounded-full bg-[#25D366] text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:bg-[#1ebe5d] active:shadow-[var(--shadow-neu-pressed)]"
+              className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-full bg-primary px-6 text-base font-semibold text-primary-foreground transition-colors press-scale hover:opacity-90"
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-4 w-4" />
               Open in WhatsApp
             </a>
           )}
-        </div>
-      </div>
-    </div>
+        </ModalActions>
+      }
+    >
+      {bookings.length === 0 ? (
+        <EmptyState title="No bookings found" />
+      ) : (
+        <>
+          <Field label="Guest / booking">
+            <select value={bookingId} onChange={e => setBookingId(e.target.value)} className={fieldCls}>
+              {bookings.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.guest_name} — {b.check_in} ({roomNameMap[b.room_id] ?? "room"})
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">Message type</p>
+            <div className="flex flex-wrap gap-2">
+              {templates.map(t => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTemplate(t.key)}
+                  className={[
+                    "press-scale rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
+                    template === t.key ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70",
+                  ].join(" ")}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {booking && (
+            <div key={bookingId + template} className="animate-in fade-in duration-200 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground">Preview</p>
+              <div className="rounded-2xl bg-[#dcfce7] p-4 text-sm leading-relaxed whitespace-pre-wrap text-[#14532d]">{message}</div>
+              <p className="text-xs text-muted-foreground">Sending to: {booking.guest_phone}</p>
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
   );
 }
