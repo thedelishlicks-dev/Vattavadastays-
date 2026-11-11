@@ -359,3 +359,11 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - [ ] Plan-tier enforcement decision
 - [ ] Channel sync (iCal import) — built, switched off (`CHANNEL_SYNC_ENABLED`)
 - [ ] Agent self-service, WhatsApp Business API, billing, central listing
+
+## UI building blocks (src/components/ds)
+
+New and migrated UI uses the shared pieces in `src/components/ds`, not hand-rolled markup:
+- `Modal` + `ModalActions` for every dialog (centred card on desktop, bottom sheet on phones; 26px bold title, round close button, sticky footer on ONE row: Cancel left, the one primary button filling the rest, so phones keep room for the form).
+- `Button` (primary / soft / ghost / danger; flat, fully rounded, no shadow), `Field` / `TextInput` / `fieldCls` (soft grey filled controls, no borders), `FieldGroup` (round coloured icon per group of fields), `StatusChip` (coloured text + dot, never a loud pill), `EmptyState`.
+- Direction: simple and Google Pay-like. Flat surfaces, no neumorphic shadows, no thick borders, Inter for UI text (serif only for the brand name), large titles, colour from icons and avatars. Do not build a new modal or button style; extend these.
+- Migration is one section per PR. Still hand-rolled: AgentFormModal, BlockDatesModal, ChannelSyncModal, WhatsAppReminderModal, PhotoViewer, and the modals inside admin.bookings/payments/calendar/rooms/superadmin.index and the AdminLayout drawer.

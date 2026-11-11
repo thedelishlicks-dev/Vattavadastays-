@@ -2,7 +2,7 @@ import { splitGuests, sumGuests } from "@/lib/guestSplit";
 import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
 import { friendlyDbError } from "@/lib/dbErrors";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Loader2, X, Check, ChevronDown, AlertTriangle, Tag, Plus } from "lucide-react";
+import { X, Check, ChevronDown, AlertTriangle, Tag, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
@@ -15,9 +15,10 @@ import { newTrackingToken } from "@/lib/trackingToken";
 import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
 import { extractUPIId } from "@/utils/upi";
+import { Modal, ModalActions, Button } from "@/components/ds";
 import type { BookingStatus, BookingSource, Agent } from "@/types/database";
 
-const inputCls = "focus-glow w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none";
+const inputCls = "w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] placeholder:text-muted-foreground/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const SOURCE_OPTIONS: { value: BookingSource; label: string }[] = [
@@ -437,17 +438,30 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
+    <>
+    <Modal
+      title={fromQuote ? "Convert quote to booking" : "Add booking"}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          {hasConflicts && (
+            <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
+            </div>
+          )}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={hasConflicts} loading={saving}>
+              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
+            </Button>
+          </ModalActions>
+        </>
+      }
+    >
       {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
       <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
-      <div className="animate-in fade-in duration-200 absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="animate-in fade-in slide-in-from-bottom-8 md:slide-in-from-bottom-0 md:zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-[var(--shadow-neu-raised)] max-h-[92dvh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">{fromQuote ? "Convert quote to booking" : "Add Booking"}</h2>
-          <button onClick={onClose} className="press-scale h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"><X className="h-4 w-4" /></button>
-        </div>
-
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
           {fromQuote && (
             <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
               <p className="font-medium text-foreground">Pre-filled from the quote you sent.</p>
@@ -477,7 +491,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           )}
           {/* Guest details */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guest details</p>
+            <p className="text-xs font-semibold text-muted-foreground">Guest details</p>
             <div className="grid grid-cols-2 gap-3">
               <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" /></div>
               <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", formatIndianPhoneInput(e.target.value))} className={inputCls} /></div>
@@ -487,16 +501,16 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
           {/* Booking source */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">How did this booking come in?</p>
-            <div className="flex rounded-lg border border-border overflow-hidden">
+            <p className="text-xs font-semibold text-muted-foreground">How did this booking come in?</p>
+            <div className="flex rounded-full bg-muted p-1 gap-1">
               {SOURCE_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => handleSourceChange(opt.value)}
                   className={[
-                    "flex-1 px-3 py-2 text-sm font-medium transition-colors",
-                    form.source === opt.value ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+                    "flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                    form.source === opt.value ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60",
                   ].join(" ")}
                 >
                   {opt.label}
@@ -562,7 +576,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
           {/* Room selection */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
+            <p className="text-xs font-semibold text-muted-foreground">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
             <div className="space-y-2">
               {rooms.map((r) => {
                 const selected = selectedRoomIds.includes(r.id);
@@ -606,7 +620,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
           {/* Stay dates */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stay dates</p>
+            <p className="text-xs font-semibold text-muted-foreground">Stay dates</p>
             <RoomAvailabilityCalendar
               roomIds={selectedRoomIds}
               checkIn={form.check_in}
@@ -714,7 +728,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           {/* Extra charges (blanket, meals, …) */}
           {nights > 0 && selectedRooms.length > 0 && (
             <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Extra charges <span className="normal-case font-normal">(optional)</span></p>
+              <p className="text-xs font-semibold text-muted-foreground">Extra charges <span className="normal-case font-normal">(optional)</span></p>
               {/* Add-ons and packages from Property → Add-ons, priced for these dates and guests. Each one is
                   added as ordinary editable rows below, so totals, the 25% advance and saving work as before. */}
               <CatalogExtrasPicker
@@ -741,7 +755,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           {/* Summary */}
           {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
             <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
+              <p className="text-xs font-semibold text-muted-foreground">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
               {roomTotals.map((rt) => (
                 <div key={rt.room.id} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{rt.room.name}</span><span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span></div>
               ))}
@@ -768,29 +782,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
               )}
             </div>
           )}
-        </div>
-
-        <div className="shrink-0 px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-border space-y-2">
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          {hasConflicts && (
-            <div className="flex items-center gap-2 rounded-lg bg-destructive/10 border border-destructive/20 px-3 py-2 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button onClick={onClose} className="press-scale flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors">Cancel</button>
-            <button
-              onClick={handleSave}
-              disabled={saving || hasConflicts}
-              className="press-scale flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100 flex items-center justify-center gap-2"
-            >
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
-            </button>
-          </div>
-        </div>
-      </div>
+    </Modal>
 
       {showNewAgentModal && (
         <AgentFormModal
@@ -800,6 +792,6 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           onSaved={handleAgentCreated}
         />
       )}
-    </div>
+    </>
   );
 }
