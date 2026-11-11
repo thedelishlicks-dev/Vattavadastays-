@@ -5,7 +5,7 @@ import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
 import { supabase } from '@/lib/supabase'
 import { CalendarDays, ChevronLeft, ChevronRight, Ban, AlertTriangle, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
-import { Modal, ModalActions, Button } from '@/components/ds'
+import { Modal, ModalActions, Button, EmptyState } from '@/components/ds'
 import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
@@ -44,7 +44,7 @@ const pad = (n: number) => String(n).padStart(2, '0')
 const ymd = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`
 
 const CELL: Record<DayState, { bg: string; text: string; label: string; short?: string }> = {
-  open: { bg: 'bg-green-50', text: 'text-green-700', label: 'Open' },
+  open: { bg: 'bg-card', text: 'text-green-700', label: 'Open' },
   booked: { bg: 'bg-blue-50', text: 'text-blue-600', label: 'Booked' },
   pending: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'Pending' },
   checkout: { bg: 'bg-sky-50', text: 'text-sky-700', label: 'Check-out', short: 'Out' },
@@ -135,7 +135,7 @@ function DayNum({ day, isToday }: { day: number; isToday: boolean }) {
 
 function CalendarSkeleton() {
   return (
-    <div className="animate-in fade-in duration-300 rounded-xl border border-border overflow-hidden">
+    <div className="animate-in fade-in duration-300 rounded-3xl border border-border/60 overflow-hidden">
       <div className="grid grid-cols-7 bg-muted/50 border-b border-border">
         {[...Array(7)].map((_, i) => (
           <div key={i} className="h-8" />
@@ -261,7 +261,7 @@ function RoomRow({
         {r.state === 'blocked' && (
           <button
             onClick={() => onReopen(r.id)}
-            className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+            className="rounded-full bg-muted px-3.5 py-1.5 text-xs font-medium hover:bg-muted/70"
           >
             Reopen
           </button>
@@ -269,7 +269,7 @@ function RoomRow({
         {(r.state === 'booked' || r.state === 'pending' || r.state === 'checkout') && (
           <button
             onClick={() => onView(r.id, r.state)}
-            className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted"
+            className="rounded-full bg-muted px-3.5 py-1.5 text-xs font-medium hover:bg-muted/70"
           >
             View
           </button>
@@ -314,20 +314,20 @@ function DayPanel({
     .filter(Boolean)
     .join(' · ')
   return (
-    <div ref={innerRef} className="mt-4 rounded-xl border border-border bg-card p-4 space-y-3 scroll-mb-24">
+    <div ref={innerRef} className="mt-4 rounded-3xl bg-muted/50 p-4 space-y-3 scroll-mb-24">
       <div>
-        <h2 className="font-semibold">{pretty}</h2>
+        <h2 className="text-lg font-semibold">{pretty}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>
       </div>
       {listed.length > 0 && (
-        <ul className="divide-y divide-border rounded-xl border border-border">
+        <ul className="divide-y divide-border/60 rounded-2xl bg-card">
           {listed.map((r) => (
             <RoomRow key={r.id} r={r} onReopen={onReopen} onView={onView} />
           ))}
         </ul>
       )}
       {many && free.length > 0 && (
-        <details className="rounded-xl border border-border px-3 py-2 text-sm">
+        <details className="rounded-2xl bg-card px-4 py-2.5 text-sm">
           <summary className="cursor-pointer font-medium">Free rooms ({free.length})</summary>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {free.map((r) => (
@@ -613,37 +613,27 @@ function AdminCalendar() {
       key="calendar-content"
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] max-w-5xl mx-auto py-2 md:py-4 px-4"
     >
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <div className="flex items-center gap-2.5">
-          <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--section)] text-[var(--section-on)] shadow-[var(--shadow-neu-flat)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-3">
+          <span aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--section-soft)] text-[var(--section-ink)]">
             <CalendarDays className="h-5 w-5" />
           </span>
-          <h1 className="font-display text-xl md:text-2xl font-semibold">Calendar</h1>
+          <h1 className="text-[28px] leading-tight font-bold tracking-tight">Calendar</h1>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
           {CHANNEL_SYNC_ENABLED && (
-            <button
-              type="button"
-              onClick={() => setShowSync(true)}
-              disabled={activeRooms.length === 0}
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-            >
+            <Button variant="soft" size="sm" onClick={() => setShowSync(true)} disabled={activeRooms.length === 0}>
               <Link2 className="h-4 w-4" /> Sync with other sites
-            </button>
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={() => setShowBlock(true)}
-            disabled={activeRooms.length === 0}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
+          <Button variant="soft" size="sm" onClick={() => setShowBlock(true)} disabled={activeRooms.length === 0}>
             <Ban className="h-4 w-4" /> Block dates
-          </button>
+          </Button>
         </div>
       </div>
 
       {(bookingsError || availError) && (
-        <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900" role="alert">
+        <div className="mb-4 flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900" role="alert">
           <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
           <span>
             Couldn&apos;t load {bookingsError ? 'your bookings' : 'availability'} — booked dates may show wrongly (as Blocked or Open)
@@ -662,7 +652,7 @@ function AdminCalendar() {
             id="cal-room"
             value={view ?? ALL}
             onChange={(e) => setSelectedRoomId(e.target.value)}
-            className="w-full sm:w-auto rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium"
+            className="w-full sm:w-auto rounded-full border-0 bg-muted px-4 py-2.5 text-sm font-medium"
           >
             <option value={ALL}>All rooms</option>
             {rooms.map((room) => (
@@ -677,10 +667,10 @@ function AdminCalendar() {
           {rooms.length > 1 && (
             <button
               onClick={() => setSelectedRoomId(ALL)}
-              className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
+              className={`press-scale px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 isAll
-                  ? 'bg-[var(--section)] text-[var(--section-on)] border-[var(--section)] shadow-[var(--shadow-neu-flat)]'
-                  : 'bg-background text-foreground border-border hover:border-[var(--section)]'
+                  ? 'bg-[var(--section)] text-[var(--section-on)]'
+                  : 'bg-muted text-foreground/80 hover:bg-muted/70'
               }`}
             >
               All rooms
@@ -690,10 +680,10 @@ function AdminCalendar() {
             <button
               key={room.id}
               onClick={() => setSelectedRoomId(room.id)}
-              className={`press-scale px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] ${
+              className={`press-scale px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 view === room.id
-                  ? 'bg-[var(--section)] text-[var(--section-on)] border-[var(--section)] shadow-[var(--shadow-neu-flat)]'
-                  : 'bg-background text-foreground border-border hover:border-[var(--section)]'
+                  ? 'bg-[var(--section)] text-[var(--section-on)]'
+                  : 'bg-muted text-foreground/80 hover:bg-muted/70'
               }`}
             >
               {room.name}
@@ -708,7 +698,7 @@ function AdminCalendar() {
           (b) => String(b.check_in ?? '').slice(0, 10) === todayStr && b.status !== 'cancelled',
         ).length
         return (
-          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-border bg-card px-3 py-2 text-sm text-muted-foreground">
+          <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-muted/60 px-4 py-2.5 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">Today</span>
             <span>
               <strong className="text-foreground">{t.free}</strong> of {t.total} free
@@ -724,30 +714,30 @@ function AdminCalendar() {
         )
       })()}
 
-      <div className="flex items-center justify-between mb-3 rounded-xl bg-[var(--section)] px-1.5 py-1 text-[var(--section-on)] shadow-[var(--shadow-neu-flat)]">
-        <button onClick={prevMonth} className="press-scale p-2 rounded-lg hover:bg-[var(--section-on)]/15 transition-colors" aria-label="Previous month">
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <span className="font-display text-lg font-semibold">{monthLabel}</span>
-        <button onClick={nextMonth} className="press-scale p-2 rounded-lg hover:bg-[var(--section-on)]/15 transition-colors" aria-label="Next month">
-          <ChevronRight className="h-5 w-5" />
-        </button>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-2xl font-bold tracking-tight">{monthLabel}</span>
+        <div className="flex gap-2">
+          <button onClick={prevMonth} className="press-scale flex h-10 w-10 items-center justify-center rounded-full bg-muted hover:bg-muted/70 transition-colors" aria-label="Previous month">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button onClick={nextMonth} className="press-scale flex h-10 w-10 items-center justify-center rounded-full bg-muted hover:bg-muted/70 transition-colors" aria-label="Next month">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       {rooms.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Add a room first (Rooms &amp; Pricing) — then your bookings and blocked dates will show here.
-        </div>
+        <EmptyState icon={CalendarDays} title="Add a room first" hint="Add a room in Rooms & Pricing, then your bookings and blocked dates will show here." />
       ) : isLoading ? (
         <CalendarSkeleton />
       ) : (
         <div
           key={view ?? 'none'}
-          className="animate-in fade-in duration-[var(--duration-base)] ease-[var(--ease-smooth)] rounded-xl border border-border overflow-hidden bg-card shadow-[var(--shadow-neu-flat)]"
+          className="animate-in fade-in duration-[var(--duration-base)] ease-[var(--ease-smooth)] rounded-3xl border border-border/60 overflow-hidden bg-card"
         >
-          <div className="grid grid-cols-7 bg-[var(--section-soft)] border-b border-border">
+          <div className="grid grid-cols-7 bg-[var(--section-soft)]">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-medium text-[var(--section-ink)]">
+              <div key={d} className="py-2.5 text-center text-xs font-semibold text-[var(--section-ink)]">
                 {d}
               </div>
             ))}
