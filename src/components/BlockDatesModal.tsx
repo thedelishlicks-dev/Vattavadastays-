@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { X, Ban, Loader2, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import {
   format,
   addMonths,
@@ -13,6 +13,7 @@ import {
   isSameDay,
   isSameMonth,
 } from "date-fns";
+import { Modal, ModalActions, Button, fieldCls } from "@/components/ds";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { eachDate, addOneDay, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
@@ -178,28 +179,30 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
   };
 
   return (
-    <div className="animate-in fade-in duration-200 fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="animate-in fade-in zoom-in-95 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] bg-card border border-border rounded-2xl w-full max-w-md shadow-[var(--shadow-neu-raised)] flex flex-col max-h-[calc(100dvh-2rem)]">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-border shrink-0">
-          <div className="flex items-center gap-2">
-            <Ban className="h-4 w-4 text-primary" />
-            <h2 className="font-semibold text-sm">Block dates</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-            aria-label="Close"
+    <Modal
+      title="Block dates"
+      onClose={onClose}
+      footer={
+        <ModalActions>
+          <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+          <Button
+            variant="danger"
+            size="lg"
+            className="flex-1"
+            onClick={handleSave}
+            disabled={selected.size === 0 || selectedRoomIds.length === 0 || done || (conflicts.length > 0 && !acknowledgedConflict)}
+            loading={saving}
           >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Body scrolls on its own so the Save button below is always reachable (iPad / phone). */}
-        <div className="p-5 space-y-4 overflow-y-auto overscroll-contain flex-1 min-h-0">
+            {done
+              ? "Blocked ✓"
+              : `Block ${rowCount > 0 ? rowCount : ""} night${rowCount !== 1 ? "s" : ""}${selectedRoomIds.length > 1 && rowCount > 0 ? " in total" : ""}`}
+          </Button>
+        </ModalActions>
+      }
+    >
           {/* Rooms */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <label className="text-xs font-medium text-muted-foreground">
               Rooms
             </label>
             <div className="mt-1.5 flex flex-wrap gap-2">
@@ -330,7 +333,7 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
           )}
 
           {conflicts.length > 0 && (
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-2">
+            <div className="rounded-2xl bg-amber-50 p-3.5 space-y-2">
               <div className="flex items-start gap-2 text-xs text-amber-800">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>
@@ -355,40 +358,18 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
 
           {/* Note */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <label className="text-xs font-medium text-muted-foreground">
               Note (optional)
             </label>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="e.g. Maintenance, personal use…"
-              className="focus-glow mt-1.5 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] focus:outline-none"
+              className={`mt-1.5 ${fieldCls}`}
             />
           </div>
 
           {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-border shrink-0">
-          <button
-            onClick={onClose}
-            className="press-scale px-4 py-2 text-sm rounded-full border border-border hover:bg-muted transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || selected.size === 0 || selectedRoomIds.length === 0 || done || (conflicts.length > 0 && !acknowledgedConflict)}
-            className="press-scale px-5 py-2 text-sm rounded-full bg-red-500 text-white shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {done
-              ? "Blocked ✓"
-              : `Block ${rowCount > 0 ? rowCount : ""} night${rowCount !== 1 ? "s" : ""}${selectedRoomIds.length > 1 && rowCount > 0 ? " in total" : ""}`}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
