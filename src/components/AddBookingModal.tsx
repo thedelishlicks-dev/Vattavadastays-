@@ -452,10 +452,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             </div>
           )}
           <ModalActions>
-            <Button size="lg" block onClick={handleSave} disabled={hasConflicts} loading={saving}>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={hasConflicts} loading={saving}>
               {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
             </Button>
-            <Button variant="ghost" block onClick={onClose}>Cancel</Button>
           </ModalActions>
         </>
       }
