@@ -180,7 +180,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-[var(--shadow-neu-flat)]">
+    <div className="bg-card border border-border/60 rounded-3xl overflow-hidden">
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
           <div>
@@ -195,7 +195,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
           </div>
           <span className="text-sm font-semibold text-primary">{pct}%</span>
         </div>
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden shadow-[var(--shadow-neu-inset-sm)]">
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
           <div
             className="h-full rounded-full bg-primary transition-all duration-500 ease-[var(--ease-smooth)]"
             style={{ width: `${pct}%` }}
@@ -231,7 +231,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
             <button
               type="button"
               onClick={copyLink}
-              className="shrink-0 rounded-full border border-border bg-background px-4 py-2 text-xs font-medium hover:bg-muted"
+              className="shrink-0 rounded-full bg-muted px-4 py-2 text-xs font-medium hover:bg-muted/70"
             >
               {copied ? "Copied!" : "Copy link"}
             </button>
@@ -332,7 +332,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="animate-in fade-in slide-in-from-top-2 duration-300 [--tw-ease:var(--ease-smooth)] border border-primary/30 rounded-xl overflow-hidden shadow-[var(--shadow-neu-flat)]">
+    <div className="animate-in fade-in slide-in-from-top-2 duration-300 [--tw-ease:var(--ease-smooth)] border border-border/60 rounded-3xl overflow-hidden">
       <div className="px-4 py-2.5 text-xs uppercase tracking-wider text-muted-foreground bg-primary-light/20">
         Needs your attention
       </div>
@@ -416,7 +416,7 @@ function RecentBookings({
   roomNameMap: Record<string, string>;
 }) {
   return (
-    <div className="bg-card border border-border rounded-xl shadow-[var(--shadow-neu-flat)]">
+    <div className="bg-card border border-border/60 rounded-3xl">
       <div className="flex items-center justify-between p-4 border-b border-border">
         <h2 className="font-medium">Recent bookings</h2>
         <Link to="/admin/bookings" className="text-xs text-primary hover:underline">
@@ -582,7 +582,7 @@ function DashboardPage() {
     return (
       <div className="space-y-4">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
+          <div key={i} className="h-16 rounded-3xl bg-muted animate-pulse" />
         ))}
       </div>
     );
@@ -599,7 +599,7 @@ function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Home</h1>
+        <h1 className="text-[28px] leading-tight font-bold tracking-tight">Home</h1>
         <p className="text-sm text-muted-foreground">
           Snapshot of bookings, revenue, and inquiries.
         </p>
@@ -609,7 +609,7 @@ function DashboardPage() {
 
       <AttentionSection rows={attentionRows} />
 
-      <div className="bg-card border border-border rounded-xl p-4 shadow-[var(--shadow-neu-flat)]">
+      <div className="bg-card border border-border/60 rounded-3xl p-4">
         <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
           Quick actions
         </div>
@@ -625,19 +625,19 @@ function DashboardPage() {
       </div>
 
       {hasBookingHistory && (
-        <div className="bg-card border border-border rounded-xl p-4 shadow-[var(--shadow-neu-flat)]">
+        <div className="bg-card border border-border/60 rounded-3xl p-4">
           <div className="flex divide-x divide-border">
             <div className="flex-1 pr-4">
               <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" /> Upcoming
               </div>
-              <div className="mt-1.5 font-display text-xl font-semibold">{stats.upcoming}</div>
+              <div className="mt-1.5 text-xl font-bold tabular-nums">{stats.upcoming}</div>
             </div>
             <div className="flex-1 px-4">
               <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
                 <IndianRupee className="h-3.5 w-3.5" /> This month
               </div>
-              <div className="mt-1.5 font-display text-xl font-semibold">
+              <div className="mt-1.5 text-xl font-bold tabular-nums">
                 ₹{stats.monthlyRevenue.toLocaleString("en-IN")}
               </div>
             </div>
@@ -645,7 +645,7 @@ function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
                 <MessageSquare className="h-3.5 w-3.5" /> Total bookings
               </div>
-              <div className="mt-1.5 font-display text-xl font-semibold">{totalBookings}</div>
+              <div className="mt-1.5 text-xl font-bold tabular-nums">{totalBookings}</div>
             </div>
           </div>
         </div>
@@ -704,7 +704,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
-      className="neu-interactive press-scale inline-flex items-center gap-2 rounded-full border border-border bg-background px-3.5 py-2 text-xs md:text-sm font-medium transition-colors hover:bg-muted"
+      className="press-scale inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-xs md:text-sm font-medium transition-colors hover:bg-muted"
     >
       <Icon className="h-4 w-4 text-primary" /> {label}
     </button>
