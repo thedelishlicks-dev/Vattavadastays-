@@ -10,13 +10,11 @@ import {
   IndianRupee,
   Download,
   Search,
-  ChevronUp,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Receipt,
 } from "lucide-react";
-import { Modal, ModalActions, Button, fieldCls } from "@/components/ds";
+import { Modal, ModalActions, Button, StatusChip, EmptyState, fieldCls, type Tone } from "@/components/ds";
 import { MiniBarChart } from "@/components/MiniBarChart";
 import { PageHeader } from "@/admin/formKit";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -89,11 +87,32 @@ function balanceOf(
 type FilterTab = "outstanding" | "paid" | "all";
 type SortKey = "checkin" | "guest" | "total" | "collected" | "balance";
 
-function paymentStatus(item: LedgerItem): { label: string; cls: string } {
-  if (item.is_paid) return { label: "Paid", cls: "bg-green-100 text-green-800" };
-  if (item.advance_amount > 0) return { label: "Partial", cls: "bg-amber-100 text-amber-800" };
-  return { label: "Unpaid", cls: "bg-red-100 text-red-700" };
+function paymentStatus(item: LedgerItem): { label: string; tone: Tone } {
+  if (item.is_paid) return { label: "Paid", tone: "green" };
+  if (item.advance_amount > 0) return { label: "Partial", tone: "amber" };
+  return { label: "Unpaid", tone: "rose" };
 }
+
+const AVATAR_TONE: Record<Tone, string> = {
+  green: "bg-[#dcfce7] text-[#166534]",
+  blue: "bg-[#dbeafe] text-[#1e3a8a]",
+  amber: "bg-[#fef3c7] text-[#92400e]",
+  rose: "bg-[#ffe4e6] text-[#9f1239]",
+  grey: "bg-muted text-foreground/80",
+};
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? "?") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+const SORT_LABELS: Record<SortKey, string> = {
+  checkin: "Check-in date",
+  guest: "Guest name",
+  total: "Total billed",
+  collected: "Collected",
+  balance: "Balance due",
+};
 
 // ---------------------------------------------------------------------------
 // Monthly summary — bucketed by check-in date (the same date the Dashboard's
@@ -547,153 +566,98 @@ function AdminPayments() {
   };
 
   if (isLoading || (!!property?.id && (!bookFetched || !groupsFetched))) {
-    return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
+    return <div className="h-48 rounded-3xl bg-muted animate-pulse" />;
   }
 
-  const sortIcon = (key: SortKey) =>
-    sortKey === key ? (
-      sortDir === "asc" ? (
-        <ChevronUp className="h-3 w-3" />
-      ) : (
-        <ChevronDown className="h-3 w-3" />
-      )
-    ) : null;
-
-  const thCls = "px-4 py-2.5 font-medium whitespace-nowrap select-none";
-  const thSortCls = `${thCls} cursor-pointer hover:text-foreground`;
-
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 max-w-3xl">
       <PageHeader title="Payments" subtitle="Track collections and outstanding balances across all bookings." />
 
       {justConfirmed && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-900">
           <span>✅ {justConfirmed.guest}'s booking is now confirmed. Send them the confirmation and tracking link.</span>
           <span className="flex items-center gap-3">
-            <a href={`/admin/bookings?${justConfirmed.kind === "group" ? "groupId" : "bookingId"}=${encodeURIComponent(justConfirmed.id)}${new URLSearchParams(window.location.search).get("property") ? `&property=${encodeURIComponent(new URLSearchParams(window.location.search).get("property") ?? "")}` : ""}`} className="rounded-full bg-green-700 px-4 py-1.5 text-xs font-medium text-white hover:opacity-90">Open booking</a>
+            <a href={`/admin/bookings?${justConfirmed.kind === "group" ? "groupId" : "bookingId"}=${encodeURIComponent(justConfirmed.id)}${new URLSearchParams(window.location.search).get("property") ? `&property=${encodeURIComponent(new URLSearchParams(window.location.search).get("property") ?? "")}` : ""}`} className="rounded-full bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90">Open booking</a>
             <button type="button" onClick={() => setJustConfirmed(null)} className="text-xs underline">Dismiss</button>
           </span>
         </div>
       )}
 
-      {/* Stats — one ledger strip: gold rule on top, large aligned figures, hairline dividers */}
-      <div className="overflow-hidden rounded-2xl border border-[var(--section)]/40 bg-card shadow-[var(--shadow-neu-flat)]">
-        <div className="h-1.5 bg-[var(--section)]" aria-hidden="true" />
-        <div className="grid grid-cols-2 md:grid-cols-3">
-          <div className="border-r border-[var(--section)]/25 p-4 md:p-5">
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Collected</p>
-            <p className="font-display text-2xl font-semibold tabular-nums text-primary md:text-3xl">
-              ₹{stats.totalCollected.toLocaleString("en-IN")}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {stats.fullyPaid} fully paid · {stats.partPaid} part paid
-            </p>
+      {/* Headline: one big number, two quiet cards beside it */}
+      <div className="space-y-3">
+        <div className="rounded-3xl bg-[var(--section-soft)] px-6 py-5">
+          <p className="text-sm text-[var(--section-ink)]">Collected</p>
+          <p className="text-4xl md:text-5xl font-bold tracking-tight tabular-nums text-[var(--section-ink)]">₹{stats.totalCollected.toLocaleString("en-IN")}</p>
+          <p className="mt-1 text-sm text-[var(--section-ink)]/80">{stats.fullyPaid} fully paid · {stats.partPaid} part paid</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-3xl bg-[#ffe4e6] px-5 py-4">
+            <p className="text-sm text-[#9f1239]">Outstanding</p>
+            <p className="text-2xl font-semibold tabular-nums text-[#881337]">₹{stats.totalOutstanding.toLocaleString("en-IN")}</p>
+            <p className="mt-0.5 text-xs text-[#9f1239]">{stats.unpaid} not started</p>
           </div>
-          <div className="p-4 md:border-r md:border-[var(--section)]/25 md:p-5">
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Outstanding</p>
-            <p className="font-display text-2xl font-semibold tabular-nums text-destructive md:text-3xl">
-              ₹{stats.totalOutstanding.toLocaleString("en-IN")}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{stats.unpaid} not started</p>
-          </div>
-          <div className="col-span-2 border-t border-[var(--section)]/25 p-4 md:col-span-1 md:border-t-0 md:p-5">
-            <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-[var(--section-ink)]">Total billed</p>
-            <p className="font-display text-2xl font-semibold tabular-nums md:text-3xl">
-              ₹{stats.totalBilled.toLocaleString("en-IN")}
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">Room total + charges − discounts</p>
+          <div className="rounded-3xl bg-muted px-5 py-4">
+            <p className="text-sm text-muted-foreground">Total billed</p>
+            <p className="text-2xl font-semibold tabular-nums">₹{stats.totalBilled.toLocaleString("en-IN")}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Rooms + extras − discounts</p>
           </div>
         </div>
       </div>
 
-      {/* Monthly summary — fixed-size trend chart + one-month-at-a-time
-          scrubber, instead of a table that adds a row every month forever. */}
+      {/* Monthly summary: fixed-size trend + one month at a time */}
       {monthlyStats.length > 0 && scrubMonth && (
         <div className="space-y-3">
           <div>
-            <h2 className="font-semibold text-sm">Monthly Summary</h2>
+            <h2 className="text-base font-semibold">Monthly summary</h2>
             <p className="text-xs text-muted-foreground mt-0.5">By check-in date.</p>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+          <div className="rounded-3xl bg-muted/50 p-4 space-y-4">
             {trendData.length > 1 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-muted-foreground">
-                    Last {trendData.length} months
-                  </span>
+                  <span className="text-xs text-muted-foreground">Last {trendData.length} months</span>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: "var(--primary)" }}
-                      />
-                      Collected
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        className="h-2 w-2 rounded-full"
-                        style={{ background: "var(--destructive)", opacity: 0.7 }}
-                      />
-                      Outstanding
-                    </span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--primary)" }} />Collected</span>
+                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--destructive)", opacity: 0.7 }} />Outstanding</span>
                   </div>
                 </div>
                 <MiniBarChart data={trendData} />
               </div>
             )}
 
-            {/* Single-month detail with prev/next — browse any month without
-                the page growing a permanent row for it. */}
-            <div className={trendData.length > 1 ? "border-t border-border pt-3" : ""}>
+            <div className={trendData.length > 1 ? "border-t border-border/60 pt-3" : ""}>
               <div className="flex items-center justify-between gap-2">
                 <button
                   onClick={() => setScrubIndex((i) => Math.min(i + 1, monthlyStats.length - 1))}
                   disabled={scrubIndex >= monthlyStats.length - 1}
-                  className="h-7 w-7 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="h-9 w-9 shrink-0 rounded-full bg-card flex items-center justify-center hover:bg-card/70 disabled:opacity-30"
                   aria-label="Older month"
                 >
-                  <ChevronLeft className="h-3.5 w-3.5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
-
                 <div className="flex-1 text-center min-w-0">
-                  <div className="text-sm font-semibold">{monthLabel(scrubMonth.monthKey)}</div>
+                  <div className="text-base font-semibold">{monthLabel(scrubMonth.monthKey)}</div>
                   <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-1 text-xs">
                     <span className="text-muted-foreground">{scrubMonth.count} bookings</span>
-                    <span className="text-muted-foreground">
-                      Billed ₹{scrubMonth.billed.toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-primary font-medium">
-                      Collected ₹{scrubMonth.collected.toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-destructive font-medium">
-                      Outstanding{" "}
-                      {scrubMonth.outstanding > 0
-                        ? `₹${scrubMonth.outstanding.toLocaleString("en-IN")}`
-                        : "₹0"}
-                    </span>
-                    <span className={`font-semibold ${pctColorCls(collectedPct(scrubMonth))}`}>
-                      {collectedPct(scrubMonth)}% collected
-                    </span>
+                    <span className="text-muted-foreground">Billed ₹{scrubMonth.billed.toLocaleString("en-IN")}</span>
+                    <span className="text-primary font-medium">Collected ₹{scrubMonth.collected.toLocaleString("en-IN")}</span>
+                    <span className="text-destructive font-medium">Outstanding {scrubMonth.outstanding > 0 ? `₹${scrubMonth.outstanding.toLocaleString("en-IN")}` : "₹0"}</span>
+                    <span className={`font-semibold ${pctColorCls(collectedPct(scrubMonth))}`}>{collectedPct(scrubMonth)}% collected</span>
                   </div>
                 </div>
-
                 <button
                   onClick={() => setScrubIndex((i) => Math.max(i - 1, 0))}
                   disabled={scrubIndex <= 0}
-                  className="h-7 w-7 shrink-0 rounded-full border border-border flex items-center justify-center hover:bg-muted disabled:opacity-30 disabled:hover:bg-transparent"
+                  className="h-9 w-9 shrink-0 rounded-full bg-card flex items-center justify-center hover:bg-card/70 disabled:opacity-30"
                   aria-label="Newer month"
                 >
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-
-              <div className="text-center mt-2">
-                <button
-                  onClick={() => setMonthFilter(scrubMonth.monthKey)}
-                  className="text-xs text-primary hover:underline font-medium"
-                >
-                  View {monthLabel(scrubMonth.monthKey)} in ledger →
+              <div className="text-center mt-3">
+                <button onClick={() => setMonthFilter(scrubMonth.monthKey)} className="text-sm text-primary hover:underline font-semibold">
+                  View {monthLabel(scrubMonth.monthKey)} in the list →
                 </button>
               </div>
             </div>
@@ -701,249 +665,121 @@ function AdminPayments() {
         </div>
       )}
 
-      {/* Ledger */}
-      <div className="space-y-3">
+      {/* Ledger as a list: avatar, name, amount and status; actions underneath */}
+      <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-semibold text-sm">
-            Payment Ledger
-            {monthFilter && (
-              <span className="ml-2 font-normal text-xs text-muted-foreground">
-                · {monthLabel(monthFilter)}
-              </span>
-            )}
+          <h2 className="text-base font-semibold">
+            Payments
+            {monthFilter && <span className="ml-2 font-normal text-sm text-muted-foreground">· {monthLabel(monthFilter)}</span>}
           </h2>
-          <button
-            onClick={exportCsv}
-            disabled={sortedItems.length === 0}
-            className="shrink-0 flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
-          >
+          <Button variant="soft" size="sm" onClick={exportCsv} disabled={sortedItems.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-full border border-border overflow-hidden shrink-0">
-            {(
-              [
-                { key: "outstanding", label: "Outstanding" },
-                { key: "paid", label: "Paid" },
-                { key: "all", label: "All" },
-              ] as { key: FilterTab; label: string }[]
-            ).map((t) => (
+          <div className="flex shrink-0 rounded-full bg-muted p-1 gap-1">
+            {([
+              { key: "outstanding", label: "Outstanding" },
+              { key: "paid", label: "Paid" },
+              { key: "all", label: "All" },
+            ] as { key: FilterTab; label: string }[]).map((tab) => (
               <button
-                key={t.key}
-                onClick={() => setFilterTab(t.key)}
-                className={[
-                  "px-3 py-1.5 text-xs font-medium transition-colors",
-                  filterTab === t.key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background text-muted-foreground hover:bg-muted",
-                ].join(" ")}
+                key={tab.key}
+                onClick={() => setFilterTab(tab.key)}
+                className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", filterTab === tab.key ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}
               >
-                {t.label}
+                {tab.label}
               </button>
             ))}
           </div>
           <div className="relative flex-1 min-w-[160px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search guest or phone…"
-              className="w-full rounded-full border border-border bg-background pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+              aria-label="Search guest or phone"
+              className="w-full rounded-full border-0 bg-muted pl-10 pr-4 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             />
           </div>
+          <select
+            aria-label="Sort by"
+            value={sortKey}
+            onChange={(e) => {
+              const k = e.target.value as SortKey;
+              setSortKey(k);
+              setSortDir(k === "balance" || k === "collected" || k === "total" ? "desc" : "asc");
+            }}
+            className="rounded-full border-0 bg-muted px-4 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          >
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABELS[k]}</option>)}
+          </select>
           {monthFilter && (
-            <button
-              onClick={() => setMonthFilter(null)}
-              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary border border-primary/20 px-3 py-1.5 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-            >
-              {monthLabel(monthFilter)} <X className="h-3 w-3" />
+            <button onClick={() => setMonthFilter(null)} className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">
+              {monthLabel(monthFilter)} <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
 
         {sortedItems.length === 0 ? (
-          <div className="bg-card border border-border rounded-xl p-8 text-center">
-            {filterTab === "outstanding" ? (
-              <>
-                <IndianRupee className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground font-medium">All caught up!</p>
-                <p className="text-xs text-muted-foreground mt-0.5">No outstanding payments.</p>
-              </>
-            ) : (
-              <>
-                <Receipt className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground font-medium">Nothing here yet.</p>
-              </>
-            )}
-          </div>
+          filterTab === "outstanding"
+            ? <EmptyState icon={IndianRupee} title="All caught up" hint="No outstanding payments." />
+            : <EmptyState icon={Receipt} title="Nothing here yet" />
         ) : (
-          // Horizontal-scroll fix: the old markup put overflow-hidden directly
-          // on the div wrapping <table>, which just clips overflow instead of
-          // scrolling it. The scrollable element now needs its own
-          // overflow-x-auto wrapper, separate from the outer rounded-corner
-          // clipping container.
-          <div className="bg-card border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[1220px]">
-                <thead className="border-b-2 border-[var(--section)]/50 text-left text-xs uppercase tracking-wider text-[var(--section-ink)] bg-[var(--section-soft)]">
-                  <tr>
-                    <th
-                      className={`${thSortCls} sticky left-0 z-10 bg-[var(--section-soft)]`}
-                      onClick={() => toggleSort("guest")}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        Guest {sortIcon("guest")}
-                      </span>
-                    </th>
-                    <th className={thSortCls} onClick={() => toggleSort("checkin")}>
-                      <span className="inline-flex items-center gap-1">
-                        Check-in {sortIcon("checkin")}
-                      </span>
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
-                      Room total
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
-                      Discount
-                    </th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">
-                      Charges
-                    </th>
-                    <th className={`${thSortCls} text-right`} onClick={() => toggleSort("total")}>
-                      <span className="inline-flex items-center gap-1 justify-end w-full">
-                        Gross total {sortIcon("total")}
-                      </span>
-                    </th>
-                    <th
-                      className={`${thSortCls} text-right`}
-                      onClick={() => toggleSort("collected")}
-                    >
-                      <span className="inline-flex items-center gap-1 justify-end w-full">
-                        Collected {sortIcon("collected")}
-                      </span>
-                    </th>
-                    <th className={`${thSortCls} text-right`} onClick={() => toggleSort("balance")}>
-                      <span className="inline-flex items-center gap-1 justify-end w-full">
-                        Balance due {sortIcon("balance")}
-                      </span>
-                    </th>
-                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Method</th>
-                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Reference</th>
-                    <th className="px-4 py-2.5 font-medium whitespace-nowrap">Status</th>
-                    <th className="px-4 py-2.5 font-medium text-right whitespace-nowrap">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedItems.map((item) => {
-                    const balance = balanceOf(item);
-                    const status = paymentStatus(item);
-                    return (
-                      <tr key={`${item.kind}-${item.id}`} className="border-t border-border">
-                        <td className="px-4 py-3 sticky left-0 z-10 bg-card">
-                          <div className="font-medium flex items-center gap-1.5">
-                            {item.guest_name}
-                            {item.roomLabel && (
-                              <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
-                                {item.roomLabel}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-muted-foreground">{item.guest_phone}</div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                          {item.check_in}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          ₹{item.total_amount.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap text-green-600">
-                          {item.discount_amount > 0
-                            ? `-₹${item.discount_amount.toLocaleString("en-IN")}`
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap text-amber-700">
-                          {item.charges_total > 0
-                            ? `+₹${item.charges_total.toLocaleString("en-IN")}`
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap font-medium">
-                          ₹{grossTotal(item).toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap text-primary">
-                          ₹{item.advance_amount.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap font-semibold">
-                          ₹{balance.toLocaleString("en-IN")}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                          {item.payment_method ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs whitespace-nowrap">
-                          {item.payment_reference ?? "—"}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${status.cls}`}
-                          >
-                            {status.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className="inline-flex items-center gap-1.5">
-                            {balance > 0 || !item.is_paid ? (
-                              <button
-                                onClick={() => setPayModal({ item, mode: "full" })}
-                                className="h-8 px-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xs font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-                              >
-                                <Check className="h-3 w-3" /> Mark fully paid
-                              </button>
-                            ) : (
-                              <span className="text-xs text-muted-foreground px-2">Settled</span>
-                            )}
-                            <button
-                              onClick={() => setPayModal({ item, mode: "correct" })}
-                              title="Correct collected amount"
-                              aria-label="Correct collected amount"
-                              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => openBooking(item)}
-                              title="Open booking"
-                              aria-label="Open booking"
-                              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <ul className="space-y-1">
+            {sortedItems.map((item) => {
+              const balance = balanceOf(item);
+              const status = paymentStatus(item);
+              return (
+                <li key={`${item.kind}-${item.id}`} className="rounded-3xl px-2 py-3 hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center gap-3.5">
+                    <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${AVATAR_TONE[status.tone]}`}>{initials(item.guest_name)}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-medium">
+                        {item.guest_name}
+                        {item.roomLabel && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{item.roomLabel}</span>}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {item.check_in}{item.payment_method ? ` · ${item.payment_method}` : ""}{item.payment_reference ? ` · ${item.payment_reference}` : ""}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[15px] font-semibold tabular-nums">₹{grossTotal(item).toLocaleString("en-IN")}</p>
+                      <StatusChip tone={status.tone}>{status.label}</StatusChip>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-[3.625rem]">
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      Collected ₹{item.advance_amount.toLocaleString("en-IN")}
+                      {balance > 0 && <> · <span className="font-semibold text-foreground">₹{balance.toLocaleString("en-IN")} due</span></>}
+                      {item.discount_amount > 0 && <> · −₹{item.discount_amount.toLocaleString("en-IN")} discount</>}
+                      {item.charges_total > 0 && <> · +₹{item.charges_total.toLocaleString("en-IN")} extras</>}
+                    </span>
+                    <span className="ml-auto inline-flex items-center gap-1.5">
+                      {balance > 0 || !item.is_paid ? (
+                        <Button size="sm" onClick={() => setPayModal({ item, mode: "full" })}><Check className="h-3.5 w-3.5" /> Mark fully paid</Button>
+                      ) : (
+                        <span className="px-2 text-xs text-muted-foreground">Settled</span>
+                      )}
+                      <button onClick={() => setPayModal({ item, mode: "correct" })} title="Correct collected amount" aria-label="Correct collected amount" className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"><Pencil className="h-4 w-4" /></button>
+                      <button onClick={() => openBooking(item)} title="Open booking" aria-label="Open booking" className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"><ExternalLink className="h-4 w-4" /></button>
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
       </div>
 
       {/* Payment setup moved to Settings — one home for UPI / accepted methods */}
-      <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+      <div className="rounded-3xl bg-muted/50 p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Wallet className="h-4 w-4 text-primary shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.
-          </p>
+          <Wallet className="h-5 w-5 text-primary shrink-0" />
+          <p className="text-sm text-muted-foreground">UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.</p>
         </div>
-        <Link
-          to="/admin/settings"
-          className="shrink-0 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
-        >
-          Open
-        </Link>
+        <Link to="/admin/settings" className="shrink-0 rounded-full bg-card px-4 py-2 text-sm font-semibold hover:bg-card/70">Open</Link>
       </div>
 
       {payModal && (
