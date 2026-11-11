@@ -2,7 +2,7 @@ import { friendlyDbError } from "@/lib/dbErrors";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import {
-  Search, Plus, Loader2, X, IndianRupee, Utensils, MessageCircle, Check, LogOut,
+  Search, Plus, Loader2, IndianRupee, Utensils, MessageCircle, Check, LogOut,
   Trash2, ChevronRight, ChevronLeft, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
   Tag, Pencil, Hotel, ChevronDown, ChevronUp,
 } from "lucide-react";
@@ -25,6 +25,7 @@ import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
+import { Modal, ModalActions, ModalTab, Button, fieldCls } from "@/components/ds";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 import { computeBalance, meetsConfirmationAdvance, advanceAmount } from "@/lib/balance";
@@ -48,7 +49,7 @@ function groupConfirmHref(group: BookingGroup, roomNameMap: Record<string, strin
   return confirmationLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property.name, roomName: names.length > 0 ? names.join(", ") : "your rooms", roomLabel: names.length > 1 ? "Rooms" : "Room", checkIn: group.check_in, checkOut: group.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, group.tracking_token, group.property_id) });
 }
 
-const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const inputCls = fieldCls;
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const STATUS_FILTERS = ["all", "pending", "confirmed", "completed", "cancelled"] as const;
@@ -323,27 +324,26 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
     } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
-        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{group.group_reference}</p></div>
-          <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-        </div>
-        <div className="p-5 space-y-3">
+    <Modal
+      nested
+      title="Edit guest details"
+      subtitle={group.group_reference}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={false} loading={saving}>Save</Button>
+          </ModalActions>
+        </>
+      }
+    >
           <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
           <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
           <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -454,35 +454,32 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col">
-          <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-          <div className="px-5 pt-3 pb-4 border-b border-border">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2"><h2 className="font-display text-lg font-semibold">{group.guest_name}</h2><span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span></div>
-                <div className="flex items-center gap-2 mt-1"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span></div>
-              </div>
-              <button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button>
-            </div>
+      <Modal
+        size="lg"
+        bare
+        title={group.guest_name}
+        onClose={onClose}
+        headerExtra={
+          <>
+            <div className="flex flex-wrap items-center gap-2 mb-3"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span><span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span></div>
             <div className="flex gap-2 mt-3 flex-wrap">
               {group.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updatingStatus} icon={<Check className="h-3.5 w-3.5" />} label="Confirm all" color="green" />}
               {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
-              <button onClick={() => setShowEditGroupGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
-              {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
-              {group.guest_phone && <a href={group.status === "confirmed" ? (groupConfirmHref(group, roomNameMap, property) ?? `https://wa.me/${clean(group.guest_phone)}`) : `https://wa.me/${clean(group.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {group.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>}
+              <button onClick={() => setShowEditGroupGuest(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
+              {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
+              {group.guest_phone && <a href={group.status === "confirmed" ? (groupConfirmHref(group, roomNameMap, property) ?? `https://wa.me/${clean(group.guest_phone)}`) : `https://wa.me/${clean(group.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {group.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>}
             </div>
             {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
-          </div>
-          <div className="flex border-b border-border px-5">
-            {([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: GroupModalTab; label: string }[]).map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)} className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
-                {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          </>
+        }
+        tabs={
+          ([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: GroupModalTab; label: string }[]).map((t) => (
+            <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+              {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">{charges.length}</span>}
+            </ModalTab>
+          ))
+        }
+      >
             {tab === "overview" && (
               <div className="p-5 space-y-4">
                 <Section title="Stay details">
@@ -543,9 +540,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
                 <BookingInvoice booking={invoiceBooking} roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} />
               </div>
             )}
-          </div>
-        </div>
-      </div>
+      </Modal>
       {showEditGroupGuest && <EditGroupGuestModal group={group} onClose={() => setShowEditGroupGuest(false)} onSaved={() => { setShowEditGroupGuest(false); onRefresh(); }} />}
     </>
   );
@@ -675,31 +670,34 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
   };
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-        <div className="relative w-full md:max-w-lg bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] flex flex-col">
-          <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-          <div className="px-5 pt-3 pb-4 border-b border-border">
-            <div className="flex items-start justify-between"><div><h2 className="font-display text-lg font-semibold">{booking.guest_name}</h2><div className="flex items-center gap-2 mt-1"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center -mt-1"><X className="h-4 w-4" /></button></div>
+      <Modal
+        size="lg"
+        bare
+        title={booking.guest_name}
+        onClose={onClose}
+        headerExtra={
+          <>
+            <div className="flex flex-wrap items-center gap-2 mb-3"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div>
             <div className="flex gap-2 mt-3 flex-wrap">
               {booking.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updating} icon={<Check className="h-3.5 w-3.5" />} label="Confirm" color="green" />}
               {booking.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updating} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete" color="amber" />}
-              <button onClick={() => setShowEditGuest(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
-              {canEditStay && <button onClick={() => setShowEditStay(true)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Stay</button>}
-              <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>
-              <a href={booking.status === "confirmed" ? (bookingConfirmHref(booking, roomName, property) ?? `https://wa.me/${clean(booking.guest_phone)}`) : `https://wa.me/${clean(booking.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/40 bg-[#25D366]/5 text-[#128C7E] px-3 py-1.5 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {booking.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>
-              {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
+              <button onClick={() => setShowEditGuest(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
+              {canEditStay && <button onClick={() => setShowEditStay(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Stay</button>}
+              <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>
+              <a href={booking.status === "confirmed" ? (bookingConfirmHref(booking, roomName, property) ?? `https://wa.me/${clean(booking.guest_phone)}`) : `https://wa.me/${clean(booking.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {booking.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>
+              {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
             </div>
             {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
-          </div>
-          <div className="flex border-b border-border px-5">
-            {([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: ModalTab; label: string }[]).map((t) => (
-              <button key={t.key} onClick={() => setTab(t.key)} className={["px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px", tab === t.key ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"].join(" ")}>
-                {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 text-xs bg-amber-100 text-amber-700 rounded-full px-1.5 py-0.5">{charges.length}</span>}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+          </>
+        }
+        tabs={
+          ([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: ModalTab; label: string }[]).map((t) => (
+            <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+              {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">{charges.length}</span>}
+            </ModalTab>
+          ))
+        }
+      >
             {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
             {tab === "charges" && (
               <div className="p-5 space-y-4">
@@ -713,9 +711,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
               </div>
             )}
             {tab === "invoice" && <div className="p-5"><BookingInvoice booking={booking} roomName={roomName} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} /></div>}
-          </div>
-        </div>
-      </div>
+      </Modal>
       {showEditGuest && <EditGuestModal booking={booking} onClose={() => setShowEditGuest(false)} onSaved={() => { setShowEditGuest(false); onPaymentSaved(); }} />}
       {showEditStay && <EditStayModal booking={booking} rooms={rooms} property={property} onClose={() => setShowEditStay(false)} onSaved={() => { setShowEditStay(false); onPaymentSaved(); }} />}
     </>
@@ -724,7 +720,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
 
 function ActionChip({ onClick, loading, icon, label, color }: { onClick: () => void; loading: boolean; icon: React.ReactNode; label: string; color: "green" | "blue" | "amber" }) {
   const colors = { green: "bg-green-600 text-white hover:bg-green-700", blue: "bg-blue-600 text-white hover:bg-blue-700", amber: "bg-amber-500 text-white hover:bg-amber-600" };
-  return <button onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${colors[color]}`}>{loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}{label}</button>;
+  return <button onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${colors[color]}`}>{loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}{label}</button>;
 }
 
 function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClose: () => void; onSaved: () => void }) {
@@ -737,21 +733,26 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
     catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
-        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Guest Details</h2><p className="text-xs text-muted-foreground mt-0.5">{booking.id.slice(0, 8).toUpperCase()}</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
-        <div className="p-5 space-y-3">
+    <Modal
+      nested
+      title="Edit guest details"
+      subtitle={booking.id.slice(0, 8).toUpperCase()}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={false} loading={saving}>Save</Button>
+          </ModalActions>
+        </>
+      }
+    >
           <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
           <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
           <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2 pt-1"><button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -822,12 +823,21 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
     } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
   };
   return (
-    <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full md:max-w-md bg-card rounded-t-3xl md:rounded-2xl shadow-2xl max-h-[92dvh] overflow-y-auto overscroll-contain">
-        <div className="md:hidden flex justify-center pt-3 pb-1"><div className="w-10 h-1 rounded-full bg-border" /></div>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border"><div><h2 className="font-display text-base font-semibold">Edit Stay Details</h2><p className="text-xs text-muted-foreground mt-0.5">Total will be recalculated</p></div><button onClick={onClose} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button></div>
-        <div className="p-5 space-y-3">
+    <Modal
+      nested
+      title="Edit stay details"
+      subtitle={"Total will be recalculated"}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={!hasChanges} loading={saving}>Save changes</Button>
+          </ModalActions>
+        </>
+      }
+    >
           <div><label className={labelCls}>Room</label><select value={form.room_id} onChange={(e) => set("room_id", e.target.value)} className={inputCls}>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included</option>)}</select></div>
           <div className="space-y-2"><label className={labelCls}>Stay dates</label><RoomAvailabilityCalendar roomIds={form.room_id ? [form.room_id as string] : []} checkIn={form.check_in as string} checkOut={form.check_out as string} turnoverSafe={turnoverSafe} exclude={{ bookingId: booking.id, roomId: booking.room_id ?? "", checkIn: booking.check_in, checkOut: booking.check_out }} onChange={(ci, co) => { set("check_in", ci); set("check_out", co); }} /><p className="text-xs text-muted-foreground">Check-in {(form.check_in as string) || "—"} · Check-out {(form.check_out as string) || "—"}</p></div>
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
@@ -848,11 +858,7 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
               {stayDiscount > newTotal && <div>⚠️ The existing ₹{stayDiscount.toLocaleString("en-IN")} discount is larger than the new room total — review the discount after saving.</div>}
             </div>
           )}
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2 pt-1"><button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving || !hasChanges} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save changes</button></div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

@@ -1,4 +1,4 @@
-export { Modal, ModalActions } from "./Modal";
+export { Modal, ModalActions, ModalTab } from "./Modal";
 export { Button } from "./Button";
 export { Field, TextInput, FieldGroup, fieldCls, type Tone } from "./Field";
 export { StatusChip } from "./StatusChip";

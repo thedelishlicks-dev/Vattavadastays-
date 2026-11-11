@@ -12,6 +12,12 @@ interface ModalProps {
   footer?: ReactNode;
   /** Narrow (default) for short forms; wide for calendars and tables. */
   size?: "md" | "lg";
+  /** Status, chips or actions shown right under the title (detail modals). */
+  headerExtra?: ReactNode;
+  /** Tab bar between the header and the body. */
+  tabs?: ReactNode;
+  /** Body supplies its own padding (tabbed detail modals). */
+  bare?: boolean;
   /** Opens on top of another modal (z-60). */
   nested?: boolean;
   className?: string;
@@ -22,7 +28,7 @@ interface ModalProps {
  * Large title + round close button on top, scrolling body, sticky footer. Esc and a tap on the
  * backdrop close it; focus moves into it and returns on close.
  */
-export function Modal({ title, subtitle, onClose, children, footer, size = "md", nested, className }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, footer, size = "md", nested, headerExtra, tabs, bare, className }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -74,7 +80,9 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 md:px-6 py-2 space-y-4 md:space-y-5 overscroll-contain">{children}</div>
+        {headerExtra && <div className="px-5 md:px-6 pb-3">{headerExtra}</div>}
+        {tabs && <div className="flex gap-1 border-b border-border px-3 md:px-4">{tabs}</div>}
+        <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", bare ? "" : "px-5 md:px-6 py-2 space-y-4 md:space-y-5")}>{children}</div>
         {footer && <div className="shrink-0 px-5 md:px-6 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-2 border-t border-border/60">{footer}</div>}
       </div>
     </div>
@@ -82,6 +90,20 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
 }
 
 /** Standard footer: one row, plain Cancel on the left, the one primary button filling the rest (keeps phones roomy). */
+/** One tab in a Modal's tab bar. */
+export function ModalTab({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={cn("-mb-px border-b-2 px-3.5 py-3 text-sm font-semibold transition-colors", active ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground")}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function ModalActions({ children }: { children: ReactNode }) {
   return <div className="flex items-center gap-2">{children}</div>;
 }
