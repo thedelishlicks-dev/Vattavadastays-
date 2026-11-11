@@ -3,7 +3,6 @@ import { csvCell } from "@/lib/csv";
 import { useState, useEffect, useMemo } from "react";
 import {
   Wallet,
-  Loader2,
   Check,
   X,
   Pencil,
@@ -17,6 +16,7 @@ import {
   ChevronRight,
   Receipt,
 } from "lucide-react";
+import { Modal, ModalActions, Button, fieldCls } from "@/components/ds";
 import { MiniBarChart } from "@/components/MiniBarChart";
 import { PageHeader } from "@/admin/formKit";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
@@ -29,8 +29,7 @@ export const Route = createFileRoute("/admin/payments")({
   component: AdminPayments,
 });
 
-const inputCls =
-  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const inputCls = fieldCls;
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const PAYMENT_METHODS = ["UPI", "Bank Transfer", "Cash on Arrival"];
@@ -223,25 +222,21 @@ function PaymentActionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-semibold">
-              {mode === "full" ? "Mark fully paid" : "Correct collected amount"}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {item.guest_name}
-              {item.roomLabel ? ` · ${item.roomLabel}` : ""}
-            </p>
-          </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="rounded-lg bg-muted/50 px-3 py-2 text-sm space-y-1">
+    <Modal
+      title={mode === "full" ? "Mark fully paid" : "Correct collected amount"}
+      subtitle={`${item.guest_name}${item.roomLabel ? ` · ${item.roomLabel}` : ""}`}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={save} loading={saving}>{mode === "full" ? "Confirm payment" : "Save"}</Button>
+          </ModalActions>
+        </>
+      }
+    >
+        <div className="rounded-2xl bg-muted/60 px-4 py-3 text-sm space-y-1">
           <div className="flex justify-between"><span className="text-muted-foreground">Gross total</span><span className="font-medium">{fmt(gross)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Collected so far</span><span className="font-medium text-primary">{fmt(item.advance_amount)}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Balance due</span><span className="font-semibold">{fmt(balance)}</span></div>
@@ -283,24 +278,7 @@ function PaymentActionModal({
             </p>
           </div>
         )}
-
-        {error && <p className="text-xs text-destructive">{error}</p>}
-
-        <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
-            Cancel
-          </button>
-          <button
-            onClick={save}
-            disabled={saving}
-            className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            {mode === "full" ? "Confirm payment" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

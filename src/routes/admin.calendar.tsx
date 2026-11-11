@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { useBookings } from '@/hooks/useBookings'
 import { supabase } from '@/lib/supabase'
-import { CalendarDays, ChevronLeft, ChevronRight, Ban, AlertTriangle, Loader2, X, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, Ban, AlertTriangle, Link2, Phone, MessageCircle, ExternalLink } from 'lucide-react'
+import { Modal, ModalActions, Button } from '@/components/ds'
 import { BlockDatesModal } from '@/components/BlockDatesModal'
 import { ChannelSyncModal } from '@/components/ChannelSyncModal'
 import { useIcalAutoSync } from '@/hooks/useIcalFeeds'
@@ -192,22 +193,17 @@ function BookingPeek({
   const wa = waDigits(phone)
   const total = Number(booking.total_amount ?? 0)
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="font-semibold truncate">{booking.guest_name}</h2>
-            <p className="text-xs text-muted-foreground">
-              {roomName} · {state === 'checkout' ? `checks out ${pretty(date)}` : pretty(date)}
-            </p>
-          </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center shrink-0" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <dl className="rounded-xl border border-border divide-y divide-border text-sm">
+    <Modal
+      title={booking.guest_name}
+      subtitle={`${roomName} · ${state === 'checkout' ? `checks out ${pretty(date)}` : pretty(date)}`}
+      onClose={onClose}
+      footer={
+        <a href={href} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary text-base font-semibold text-primary-foreground transition-colors hover:opacity-90">
+          <ExternalLink className="h-4 w-4" /> Open booking
+        </a>
+      }
+    >
+        <dl className="rounded-2xl bg-muted/60 divide-y divide-border/60 text-sm">
           <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Status</dt><dd className="font-medium capitalize">{booking.status}</dd></div>
           <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Stay</dt><dd className="font-medium">{pretty(booking.check_in)} → {pretty(booking.check_out)} ({nights} night{nights > 1 ? 's' : ''})</dd></div>
           {booking.guest_count ? <div className="flex justify-between px-3 py-2"><dt className="text-muted-foreground">Guests</dt><dd className="font-medium">{booking.guest_count}</dd></div> : null}
@@ -216,29 +212,24 @@ function BookingPeek({
 
         {phone && (
           <div className="flex gap-2">
-            <a href={`tel:+${wa}`} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-border py-2 text-sm font-medium hover:bg-muted">
+            <a href={`tel:+${wa}`} className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70">
               <Phone className="h-4 w-4" /> Call
             </a>
-            <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-border py-2 text-sm font-medium hover:bg-muted">
+            <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70">
               <MessageCircle className="h-4 w-4" /> WhatsApp
             </a>
           </div>
         )}
 
         {state === 'checkout' && nightClosed && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 space-y-2">
+          <div className="rounded-2xl bg-amber-50 p-3.5 text-xs text-amber-800 space-y-2">
             <p>The night starting this day is also marked unavailable. If you closed it yourself, you can reopen it — the guest's stay is not affected.</p>
-            <button onClick={onReopen} className="rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-medium hover:bg-amber-100">
+            <button onClick={onReopen} className="rounded-full bg-white px-3.5 py-1.5 text-xs font-medium hover:bg-amber-100">
               Reopen this night
             </button>
           </div>
         )}
-
-        <a href={href} className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90">
-          <ExternalLink className="h-4 w-4" /> Open booking
-        </a>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -399,50 +390,35 @@ function ReopenDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4 max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Reopen this date?</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              {roomName} · {pretty}
-            </p>
-          </div>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center" aria-label="Close">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <Modal
+      title="Reopen this date?"
+      subtitle={`${roomName} · ${pretty}`}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleReopen} loading={saving}>Reopen date</Button>
+          </ModalActions>
+        </>
+      }
+    >
         {note && (
-          <p className="rounded-lg bg-muted/50 px-3 py-2 text-sm">
+          <p className="rounded-2xl bg-muted/60 px-3.5 py-2.5 text-sm">
             <span className="text-muted-foreground">{isIcalNote(note) ? 'Source: ' : 'Reason you gave: '}</span>
             {friendlyNote(note)}
           </p>
         )}
         {isIcalNote(note) && (
-          <p className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+          <p className="rounded-2xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-900">
             This night is held by a booking on another site. Reopening it here won&apos;t cancel that booking, and the next sync will block it again. To free it, cancel the booking on the other site.
           </p>
         )}
         <p className="text-sm text-muted-foreground">
           This makes the date available for bookings again (on your guest page too). It doesn&apos;t touch any booking.
         </p>
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">
-            Cancel
-          </button>
-          <button
-            onClick={handleReopen}
-            disabled={saving}
-            className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Reopen date
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

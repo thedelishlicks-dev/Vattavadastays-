@@ -18,6 +18,8 @@ interface ModalProps {
   tabs?: ReactNode;
   /** Body supplies its own padding (tabbed detail modals). */
   bare?: boolean;
+  /** Closes only through the modal's own buttons: no backdrop tap, Esc or close icon. */
+  locked?: boolean;
   /** Opens on top of another modal (z-60). */
   nested?: boolean;
   className?: string;
@@ -28,16 +30,18 @@ interface ModalProps {
  * Large title + round close button on top, scrolling body, sticky footer. Esc and a tap on the
  * backdrop close it; focus moves into it and returns on close.
  */
-export function Modal({ title, subtitle, onClose, children, footer, size = "md", nested, headerExtra, tabs, bare, className }: ModalProps) {
+export function Modal({ title, subtitle, onClose, children, footer, size = "md", nested, headerExtra, tabs, bare, locked, className }: ModalProps) {
   const panel = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const lockedRef = useRef(!!locked);
+  lockedRef.current = !!locked;
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     panel.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
+      if (e.key === "Escape" && !lockedRef.current) onCloseRef.current();
     };
     document.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
@@ -51,7 +55,7 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
 
   return (
     <div className={cn("fixed inset-0 flex", nested ? "z-[60]" : "z-50", "items-end md:items-center justify-center")}>
-      <div className="absolute inset-0 bg-black/45 animate-in fade-in duration-200" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-black/45 animate-in fade-in duration-200" onClick={locked ? undefined : onClose} aria-hidden="true" />
       <div
         ref={panel}
         role="dialog"
@@ -71,6 +75,7 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
             <h2 className="text-[26px] leading-tight font-bold tracking-tight font-body">{title}</h2>
             {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
           </div>
+          {!locked && (
           <button
             type="button"
             onClick={onClose}
@@ -79,6 +84,7 @@ export function Modal({ title, subtitle, onClose, children, footer, size = "md",
           >
             <X className="h-4 w-4" />
           </button>
+          )}
         </div>
         {headerExtra && <div className="px-5 md:px-6 pb-3">{headerExtra}</div>}
         {tabs && <div className="flex gap-1 border-b border-border px-3 md:px-4">{tabs}</div>}

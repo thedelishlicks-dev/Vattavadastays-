@@ -4,7 +4,8 @@ import { useOwnerProperty } from '@/hooks/useOwnerProperty'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/hooks/useAuth'
-import { Loader2, BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
+import { BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
+import { Modal, ModalActions, Button, fieldCls } from '@/components/ds'
 import type { Room } from '@/types/database'
 import { RoomSeasonPrices } from '@/components/RoomSeasonPrices'
 import { SeasonsPanel } from '@/components/SeasonsPanel'
@@ -22,7 +23,7 @@ const AMENITY_OPTIONS = [
   'kitchen', 'view', 'wifi', 'wardrobe', 'mini_fridge', 'work_desk',
 ]
 
-const inputCls = 'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+const inputCls = fieldCls
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
 type RoomForm = {
@@ -103,23 +104,24 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-sm bg-card rounded-2xl shadow-xl p-5 space-y-4">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-            <Trash2 className="h-5 w-5 text-destructive" />
-          </div>
-          <div>
-            <h2 className="font-semibold text-sm">Delete room?</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{room.name}</p>
-          </div>
-        </div>
-
+    <Modal
+      title="Delete room?"
+      subtitle={room.name}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Keep room</Button>
+            <Button variant="danger" size="lg" className="flex-1" onClick={handleDelete} disabled={blocked || checkingBookings} loading={deleting}>Delete</Button>
+          </ModalActions>
+        </>
+      }
+    >
         {checkingBookings ? (
-          <div className="h-16 rounded-xl bg-muted animate-pulse" />
+          <div className="h-16 rounded-2xl bg-muted animate-pulse" />
         ) : blocked ? (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800 space-y-1.5">
+          <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1.5">
             <p className="font-medium">
               Can't delete — {upcomingCount} upcoming or in-progress booking{upcomingCount === 1 ? "" : "s"} still reference this room.
             </p>
@@ -131,7 +133,7 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
             </p>
           </div>
         ) : (
-          <div className="rounded-xl bg-destructive/5 border border-destructive/20 px-4 py-3 text-xs text-destructive space-y-1">
+          <div className="rounded-2xl bg-destructive/5 px-4 py-3 text-xs text-destructive space-y-1">
             <p className="font-medium">This cannot be undone. This will permanently delete:</p>
             <ul className="list-disc list-inside space-y-0.5 text-destructive/80">
               <li>The room and all its details</li>
@@ -140,16 +142,7 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
             <p className="mt-1 text-destructive/70">Past bookings for this room will not be deleted but will show "Unknown room".</p>
           </div>
         )}
-        {error && <p className="text-xs text-destructive">{error}</p>}
-        <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Keep room</button>
-          <button onClick={handleDelete} disabled={deleting || blocked || checkingBookings} className="flex-1 rounded-full bg-destructive text-white py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
-            {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Delete
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -220,17 +213,20 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute right-0 top-0 bottom-0 w-full max-w-md bg-card shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <h2 className="font-display text-lg font-semibold">{room ? 'Edit Room' : 'Add New Room'}</h2>
-          <button onClick={onClose} className="h-8 w-8 rounded-md hover:bg-muted flex items-center justify-center">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+    <Modal
+      size="lg"
+      title={room ? 'Edit room' : 'Add new room'}
+      onClose={onClose}
+      footer={
+        <>
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <ModalActions>
+            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} loading={saving}>{room ? 'Save changes' : 'Add room'}</Button>
+          </ModalActions>
+        </>
+      }
+    >
           {room && <RoomPhotosManager roomId={room.id} propertyId={propertyId} photos={room.images ?? []} onChanged={onSaved} />}
 
           <div>
@@ -317,20 +313,7 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, 
             </div>
             <span className="text-sm font-medium">{form.is_active ? 'Active — visible to guests' : 'Inactive — hidden from guests'}</span>
           </label>
-        </div>
-
-        <div className="px-5 py-4 border-t border-border space-y-2">
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
-            <button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
-              {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {room ? 'Save changes' : 'Add room'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
