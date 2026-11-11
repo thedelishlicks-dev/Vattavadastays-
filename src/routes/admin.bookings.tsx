@@ -126,7 +126,7 @@ function dateBucket(checkIn: string, todayStr: string): string {
 function StatusPill({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? { label: status, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" };
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${cfg.color}`}>
+    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${cfg.color.replace(/bg-\S+/g, "")}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -250,7 +250,7 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
   const { balance, refundDue } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
   const bookings = group.bookings ?? [];
   return (
-    <div className="bg-card border border-primary/20 rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-card border border-border/60 rounded-3xl overflow-hidden">
       <button onClick={onClick} className="w-full text-left p-4 hover:bg-muted/30 transition-colors group">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
@@ -276,7 +276,7 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
           {advance > 0 ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
-              {refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-0.5">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
+              {refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
             </div>
           ) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>}
         </div>
@@ -629,7 +629,7 @@ function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string;
 function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomName: string; onClick: () => void }) {
   const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = chargesSum(booking.booking_charges); const displayTotal = Number(booking.total_amount) + chargesTotal - discount; const { balance, refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance }); const isActive = !["cancelled", "completed"].includes(booking.status);
   return (
-    <button onClick={onClick} className="w-full text-left bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/30 transition-all active:scale-[0.99] group">
+    <button onClick={onClick} className="w-full text-left bg-card border border-border/60 rounded-3xl p-4 hover:bg-muted/40 transition-colors active:scale-[0.99] group">
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="min-w-0"><div className="font-semibold text-foreground truncate">{booking.guest_name}</div><div className="text-xs text-muted-foreground mt-0.5">{booking.guest_phone || <span className="italic text-amber-600">No phone — tap to edit</span>}</div></div>
         <div className="flex items-center gap-2 shrink-0"><StatusPill status={booking.status} /><ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /></div>
@@ -642,9 +642,9 @@ function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomNam
       </div>
       <div className="flex items-center justify-between pt-3 border-t border-border">
         <div className="text-xs text-muted-foreground">Total <span className="font-semibold text-foreground">₹{displayTotal.toLocaleString("en-IN")}</span>{chargesTotal > 0 && <span className="ml-1.5 text-amber-700 font-medium">+₹{chargesTotal.toLocaleString("en-IN")} extras</span>}{discount > 0 && <span className="ml-1.5 text-green-600 font-medium">-₹{discount.toLocaleString("en-IN")} disc</span>}</div>
-        {isActive && (advance > 0 ? (<div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-0.5">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
+        {isActive && (advance > 0 ? (<div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
       </div>
-      {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (<div className="mt-3 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800 flex items-center gap-1.5"><IndianRupee className="h-3 w-3 shrink-0" />Guest may have paid — tap to record advance</div>)}
+      {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (<div className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 flex items-center gap-1.5"><IndianRupee className="h-3 w-3 shrink-0" />Guest may have paid — tap to record advance</div>)}
     </button>
   );
 }
@@ -1159,7 +1159,7 @@ function BookingsAdmin() {
   const isLoading = propLoading || bookingsLoading || groupsLoading || (!!property?.id && (!bookingsFetched || !groupsFetched));
   const totalItems = sortedItems.length;
 
-  if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}</div>;
+  if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>;
 
   return (
     <div
@@ -1167,42 +1167,42 @@ function BookingsAdmin() {
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] space-y-5"
     >
       <div className="flex items-center justify-between">
-        <div><h1 className="font-display text-2xl md:text-3xl font-semibold">Bookings</h1><p className="text-sm text-muted-foreground">Tap any booking to view details.</p></div>
-        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"><Plus className="h-4 w-4" /> Add</button>
+        <div><h1 className="text-[28px] leading-tight font-bold tracking-tight">Bookings</h1><p className="text-sm text-muted-foreground">Tap any booking to view details.</p></div>
+        <Button onClick={() => setShowAdd(true)}><Plus className="h-4 w-4" /> Add</Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-primary-light flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-primary" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="font-display text-2xl font-semibold">{stats.active}</div></div></div>
-        <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3"><div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-amber-600" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="font-display text-xl font-semibold text-amber-700">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
+        <div className="bg-muted/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#166534]" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="text-2xl font-bold tabular-nums">{stats.active}</div></div></div>
+        <div className="bg-muted/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-[#92400e]" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="text-xl font-bold tabular-nums text-[#92400e]">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
       </div>
 
       <div className="space-y-2">
-        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm" /></div>
+        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-full border-0 bg-muted pl-10 pr-4 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" /></div>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((s) => (
-            <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
+            <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-sm px-3.5 py-2 rounded-full font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
               {s === "all" ? "All" : (STATUS_CONFIG[s]?.label ?? s)}
             </button>
           ))}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-full border border-border overflow-hidden shrink-0">
-            <button onClick={() => setDateScope("upcoming")} className={["px-3 py-1.5 text-xs font-medium transition-colors", dateScope === "upcoming" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"].join(" ")}>Upcoming</button>
-            <button onClick={() => setDateScope("month")} className={["px-3 py-1.5 text-xs font-medium transition-colors border-l border-border", dateScope === "month" ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted"].join(" ")}>By month</button>
+          <div className="flex rounded-full bg-muted p-1 gap-1 shrink-0">
+            <button onClick={() => setDateScope("upcoming")} className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", dateScope === "upcoming" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}>Upcoming</button>
+            <button onClick={() => setDateScope("month")} className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", dateScope === "month" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}>By month</button>
           </div>
           {dateScope === "month" && (
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-muted"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronLeft className="h-3.5 w-3.5" /></button>
               <span className="text-xs font-medium min-w-[96px] text-center">{monthLabel}</span>
-              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-7 w-7 rounded-full border border-border flex items-center justify-center hover:bg-muted"><ChevronRight className="h-3.5 w-3.5" /></button>
+              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           )}
           <div className="flex items-center gap-1.5 text-xs ml-auto">
             <span className="text-muted-foreground hidden sm:inline">Sort:</span>
             {SORT_OPTIONS.map((s) => (
-              <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-2.5 py-1 rounded-full border font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 border-primary text-primary" : "bg-background border-border text-muted-foreground hover:bg-muted"].join(" ")}>
+              <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-3 py-1.5 rounded-full font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 text-primary" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
                 {s.label}
               </button>
             ))}
@@ -1210,14 +1210,14 @@ function BookingsAdmin() {
         </div>
 
         {filterStatus !== "cancelled" && (
-          <button onClick={() => setHideCancelled((v) => !v)} className={["self-start text-xs px-3 py-1.5 rounded-full border font-medium transition-colors", hideCancelled ? "bg-muted border-border text-muted-foreground" : "bg-red-50 border-red-200 text-red-600"].join(" ")}>
+          <button onClick={() => setHideCancelled((v) => !v)} className={["self-start text-xs px-3.5 py-2 rounded-full font-medium transition-colors", hideCancelled ? "bg-muted text-foreground/80" : "bg-red-50 text-red-700"].join(" ")}>
             {hideCancelled ? "Show cancelled" : "Hide cancelled"}
           </button>
         )}
       </div>
 
       {totalItems === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
+        <div className="rounded-3xl bg-muted/50 p-12 text-center text-muted-foreground">
           {dateScope === "upcoming" && filterStatus === "all" && !q
             ? "No upcoming bookings — you're all caught up! Switch to \"By month\" to see past bookings."
             : "No bookings match these filters."}
@@ -1230,7 +1230,7 @@ function BookingsAdmin() {
               let header: React.ReactNode = null;
               if (showDateHeaders) {
                 const bucket = dateBucket(it.checkIn, todayStr);
-                if (bucket !== lastBucket) { header = <div className="text-xs uppercase tracking-wider font-medium text-muted-foreground pt-2 first:pt-0">{bucket}</div>; lastBucket = bucket; }
+                if (bucket !== lastBucket) { header = <div className="text-sm font-semibold text-muted-foreground pt-2 first:pt-0">{bucket}</div>; lastBucket = bucket; }
               }
               return (
                 <div key={`${it.kind}-${it.id}`}>

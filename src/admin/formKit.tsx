@@ -11,14 +11,13 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
       {Icon && (
         <span
           aria-hidden="true"
-          className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--section-soft)] text-[var(--section-ink)]"
+          className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--section-soft)] text-[var(--section-ink)]"
         >
           <Icon className="h-5 w-5" />
         </span>
       )}
       <div className="min-w-0">
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">{title}</h1>
-        {section && <span aria-hidden="true" className="mt-1 mb-1.5 block h-0.5 w-10 rounded-full bg-[var(--section)]" />}
+        <h1 className="text-[28px] leading-tight font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
       </div>
     </div>
@@ -34,11 +33,10 @@ export function Section({
   description?: string;
   children: React.ReactNode;
 }) {
-  // The thin top accent only shows inside an admin section (--section is undefined elsewhere).
-  return (
-    <div className="relative bg-card border border-border rounded-xl p-4 md:p-5 space-y-4 before:pointer-events-none before:absolute before:inset-x-5 before:top-0 before:h-0.5 before:rounded-full before:bg-[var(--section,transparent)] before:opacity-70">
+    return (
+    <div className="bg-card border border-border/60 rounded-3xl p-5 md:p-6 space-y-4">
       <div>
-        <h2 className="font-medium">{title}</h2>
+        <h2 className="text-base font-semibold">{title}</h2>
         {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
       </div>
       {children}
@@ -65,7 +63,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full h-10 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary";
+  "w-full h-11 rounded-xl border-0 bg-muted px-3.5 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
 
 export function SaveBar({ onSave, dirty }: { onSave: () => void; dirty?: boolean }) {
   return (
