@@ -192,7 +192,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       <button onClick={onClose} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> All quotes
       </button>
-      <h1 className="font-display text-2xl font-semibold">{initial ? "Edit quote" : "New quote"}</h1>
+      <h1 className="text-2xl font-semibold">{initial ? "Edit quote" : "New quote"}</h1>
 
       <Section title="Guest">
         <div className="grid grid-cols-2 gap-3">
@@ -216,12 +216,12 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
           onChange={(ci, co) => { setCheckIn(ci); setCheckOut(co); }}
         />
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-lg border border-border px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
+          <div className="rounded-2xl border border-border/60 px-3 py-2">
+            <div className="text-[10px]  text-muted-foreground">Check-in</div>
             <div className="mt-0.5 font-medium">{checkIn || "Select date"}</div>
           </div>
-          <div className="rounded-lg border border-border px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
+          <div className="rounded-2xl border border-border/60 px-3 py-2">
+            <div className="text-[10px]  text-muted-foreground">Check-out</div>
             <div className="mt-0.5 font-medium">{checkOut || "Select date"}</div>
           </div>
         </div>
@@ -249,9 +249,9 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
                 {on && (
                   <div className="mt-3 flex items-center justify-between gap-3">
                     <div className="inline-flex items-center gap-2">
-                      <button onClick={() => setRoomSel((s) => ({ ...s, [r.id]: Math.max(1, s[r.id] - 1) }))} className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border" aria-label="Fewer guests"><Minus className="h-4 w-4" /></button>
+                      <button onClick={() => setRoomSel((s) => ({ ...s, [r.id]: Math.max(1, s[r.id] - 1) }))} className="h-9 w-9 inline-flex items-center justify-center rounded-2xl border border-border/60" aria-label="Fewer guests"><Minus className="h-4 w-4" /></button>
                       <span className="w-20 text-center text-sm">{roomSel[r.id]} guest{roomSel[r.id] > 1 ? "s" : ""}</span>
-                      <button onClick={() => setRoomSel((s) => ({ ...s, [r.id]: s[r.id] + 1 }))} className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border" aria-label="More guests"><Plus className="h-4 w-4" /></button>
+                      <button onClick={() => setRoomSel((s) => ({ ...s, [r.id]: s[r.id] + 1 }))} className="h-9 w-9 inline-flex items-center justify-center rounded-2xl border border-border/60" aria-label="More guests"><Plus className="h-4 w-4" /></button>
                     </div>
                     {datesOk && line && <div className="text-sm font-semibold">{formatINR(line.total)}</div>}
                   </div>
@@ -298,7 +298,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
 
         <div className="space-y-3">
           {priced.map(({ it, item, line }, idx) => (
-            <div key={idx} className="rounded-lg border border-border p-3 space-y-3">
+            <div key={idx} className="rounded-2xl border border-border/60 p-3 space-y-3">
               {!item || !line ? (
                 <div className="flex items-center justify-between text-sm text-muted-foreground">
                   <span>This item was removed from your catalog.</span>
@@ -402,7 +402,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
         <button
           onClick={() => void persist("draft")}
           disabled={!canSend || save.isPending}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-6 py-3 font-medium hover:bg-muted disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-muted px-6 py-3 font-medium hover:bg-muted/70 disabled:opacity-50"
         >
           {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Save draft
         </button>

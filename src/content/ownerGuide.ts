@@ -247,7 +247,7 @@ export const SITUATIONS: GuideSection[] = [
         items: [
           "Open **Bookings** and find the stay.",
           "On the **Charges** tab, under **Add from your catalog**, choose the item, its option (such as Veg) and the number of **People**, then tap **Add to extras**. The **balance** updates.",
-          "Collect the balance. Then open **Money → Payments**, tap **View … in ledger** for the month, find the booking and tap **Mark fully paid**. Or record the amount on the booking.",
+          "Collect the balance. Then open **Money → Payments**, tap **View … in the list →** under the month, find the booking and tap **Mark fully paid**. Or record the amount on the booking.",
           "Check the booking shows **Fully paid**. When the guest has left, tap **Complete**. The booking then shows **Completed**, with the check-out time.",
           "If **Refund due** appears in red, the guest has overpaid. Return the difference yourself.",
           "Open the **Invoice** tab if the guest wants a printed copy.",

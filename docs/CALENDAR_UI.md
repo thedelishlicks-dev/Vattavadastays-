@@ -1,5 +1,7 @@
 # Owner calendar: how it works now
 
+> **11 Nov 2026 look update:** the page chrome is now the flat owner style (28px bold title, big month name with round arrow buttons, soft room chips, white month card with a lightly tinted weekday row, soft day panel, shared `Modal` for the booking card and Reopen). The drawing rules below (dots, bars, half bars, turnover) are unchanged.
+
 *Written 8 Nov 2026. File: `src/routes/admin.calendar.tsx`. The logic in `src/lib/calendarState.ts` (`buildCalendarIndex`, `stateOf`, `summarizeDate`, `bookingForCell`) is unchanged; only the drawing changed.*
 
 ## 1. Why it changed

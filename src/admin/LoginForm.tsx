@@ -26,12 +26,12 @@ export function LoginForm() {
 
   return (
     <div className="min-h-dvh flex items-center justify-center bg-muted/40 px-4">
-      <div className="w-full max-w-sm bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]">
+      <div className="w-full max-w-sm bg-card rounded-[28px] p-6 md:p-8 shadow-[0_12px_40px_rgba(28,25,23,0.10)]">
         <h1 className="font-display text-2xl font-semibold text-primary">Bleaf Admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">Owner login</p>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Email</span>
+            <span className="text-xs font-medium text-muted-foreground">Email</span>
             <input
               required
               type="email"
@@ -39,11 +39,11 @@ export function LoginForm() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@example.com"
               autoComplete="email"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="mt-1.5 w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             />
           </label>
           <label className="block">
-            <span className="text-xs uppercase tracking-wider text-muted-foreground">Password</span>
+            <span className="text-xs font-medium text-muted-foreground">Password</span>
             <input
               required
               type="password"
@@ -51,7 +51,7 @@ export function LoginForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               autoComplete="current-password"
-              className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              className="mt-1.5 w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
             />
           </label>
           {error && <p className="text-xs text-destructive">{error}</p>}

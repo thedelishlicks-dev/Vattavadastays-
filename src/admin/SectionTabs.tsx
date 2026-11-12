@@ -33,7 +33,7 @@ export function SectionTabs({
   if (section.tabs.length < 2) return null;
 
   return (
-    <div className="sticky top-14 z-10 bg-card border-b border-border">
+    <div className="sticky top-14 z-10 bg-card border-b border-border/60">
       <nav
         aria-label={`${section.label} pages`}
         className="flex gap-1 overflow-x-auto px-3 md:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -59,7 +59,7 @@ export function SectionTabs({
               className={[
                 "shrink-0 whitespace-nowrap px-3 py-3 text-sm border-b-2 -mb-px transition-colors",
                 active
-                  ? "border-[var(--section)] text-[var(--section-ink)] font-medium"
+                  ? "border-[var(--section)] text-[var(--section-ink)] font-semibold"
                   : "border-transparent text-muted-foreground hover:text-foreground",
               ].join(" ")}
             >

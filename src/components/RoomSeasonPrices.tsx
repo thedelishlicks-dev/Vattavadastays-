@@ -36,10 +36,10 @@ export function RoomSeasonPrices({ propertyId, room, onGoToSeasons }: { property
       {lines.length > 0 && (
         <ul className="space-y-1.5">
           {lines.map(({ season, rule }) => (
-            <li key={season.id} className="rounded-lg border border-border px-3 py-2 text-sm">
+            <li key={season.id} className="rounded-2xl border border-border/60 px-3 py-2 text-sm">
               <div className="font-medium">
                 {season.name}
-                {rule.room_id === null && <span className="ml-2 text-[10px] uppercase tracking-wider rounded-full bg-muted px-2 py-0.5 text-muted-foreground align-middle">All rooms</span>}
+                {rule.room_id === null && <span className="ml-2 text-[10px]  rounded-full bg-muted px-2 py-0.5 text-muted-foreground align-middle">All rooms</span>}
               </div>
               <div className="text-xs text-muted-foreground">
                 {fmt(season.start_date)} – {fmt(season.end_date)}

@@ -88,7 +88,7 @@ export function PaymentSetupSection() {
   // type="button" everywhere: this section is rendered on the Settings page,
   // which has its own <form> elsewhere, and must never submit it.
   return (
-    <div id="payment-setup" className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div id="payment-setup" className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
       <h2 className="font-semibold text-sm flex items-center gap-2">
         <Wallet className="h-4 w-4 text-primary" /> Payment setup
       </h2>

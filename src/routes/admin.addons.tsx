@@ -45,7 +45,7 @@ function Catalog({ propertyId }: { propertyId: string }) {
         subtitle="What you offer beyond the room — meals, campfire, kitchen, trekking — with an exact price for each season. These power the quotes you send guests; nothing here is shown to guests or charged automatically."
       />
 
-      <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground">
         Seasons are set up once in{" "}
         <a href={seasonsHref} className="underline text-foreground">Rooms & Pricing → Seasons</a>
         . Tick “Also use for add-ons & packages” on a season, then give each add-on its price for it here.
@@ -84,7 +84,7 @@ function AddButton({ label, onClick }: { label: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted"
+      className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70"
     >
       <Plus className="h-4 w-4" /> {label}
     </button>
@@ -305,7 +305,7 @@ function ItemCard({
             </div>
 
             {draft.variants.map((v, i) => (
-              <div key={v.key} className="rounded-md border border-border p-3 space-y-3 bg-muted/20">
+              <div key={v.key} className="rounded-2xl border border-border/60 p-3 space-y-3 bg-muted/20">
                 <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
                   <Field label="Option">
                     <input className={inputCls} value={v.label} onChange={(e) => setVariant(i, { label: e.target.value })} />
@@ -316,7 +316,7 @@ function ItemCard({
                   {draft.variants.length > 1 && (
                     <button
                       onClick={() => setDraft((d) => ({ ...d, variants: d.variants.filter((_, idx) => idx !== i) }))}
-                      className="h-10 w-10 inline-flex items-center justify-center rounded-md border border-border text-destructive hover:bg-muted"
+                      className="h-10 w-10 inline-flex items-center justify-center rounded-2xl border border-border/60 text-destructive hover:bg-muted"
                       aria-label="Remove option"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -368,7 +368,7 @@ function ItemCard({
               </button>
             )}
             <div className="flex gap-2 ml-auto">
-              <button onClick={close} className="rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">Cancel</button>
+              <button onClick={close} className="rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70">Cancel</button>
               <button
                 onClick={handleSave}
                 disabled={save.isPending}

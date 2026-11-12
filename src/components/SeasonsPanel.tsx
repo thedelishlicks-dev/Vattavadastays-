@@ -196,7 +196,7 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
           const seasonRules = rules.filter((r) => r.season_id === s.id);
           const usesAddons = s.for_addons !== false;
           return (
-            <div key={s.id} className="rounded-lg border border-border p-3 space-y-3">
+            <div key={s.id} className="rounded-2xl border border-border/60 p-3 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-medium">{s.name}</div>
@@ -208,14 +208,14 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
                 <div className="flex gap-1.5 shrink-0">
                   <button
                     onClick={() => { setError(""); setDraft({ ...s, for_addons: usesAddons, roomPercent: "" }); }}
-                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted"
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-2xl border border-border/60 hover:bg-muted"
                     aria-label={`Edit ${s.name}`}
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
                     onClick={() => deleteSeason(s)}
-                    className="h-8 w-8 inline-flex items-center justify-center rounded-md border border-border hover:bg-muted text-destructive"
+                    className="h-8 w-8 inline-flex items-center justify-center rounded-2xl border border-border/60 hover:bg-muted text-destructive"
                     aria-label={`Delete ${s.name}`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -225,7 +225,7 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
 
               {/* Rooms */}
               <div className="rounded-md bg-muted/40 p-2.5 space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Room prices</div>
+                <div className="text-[11px] font-semibold  text-muted-foreground">Room prices</div>
                 {seasonRules.length === 0 ? (
                   <p className="text-xs text-muted-foreground">No change — rooms keep their normal price in this season.</p>
                 ) : (
@@ -261,7 +261,7 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
 
               {/* Add-ons */}
               <div className="rounded-md bg-muted/40 p-2.5 space-y-2">
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Add-ons & packages</div>
+                <div className="text-[11px] font-semibold  text-muted-foreground">Add-ons & packages</div>
                 {usesAddons ? (
                   <>
                     <p className="text-xs text-muted-foreground">
@@ -362,7 +362,7 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex gap-2 justify-end">
-            <button onClick={() => { setDraft(null); setError(""); }} className="rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
+            <button onClick={() => { setDraft(null); setError(""); }} className="rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70">
               Cancel
             </button>
             <button onClick={saveSeason} disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
@@ -372,7 +372,7 @@ export function SeasonsPanel({ propertyId, rooms }: { propertyId: string; rooms:
           </div>
         </div>
       ) : (
-        <button onClick={() => { setError(""); setDraft(emptyDraft()); }} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
+        <button onClick={() => { setError(""); setDraft(emptyDraft()); }} className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70">
           <Plus className="h-4 w-4" /> Add season
         </button>
       )}
@@ -437,7 +437,7 @@ function RuleForm({
   };
 
   return (
-    <div className="rounded-md border border-border bg-background p-2.5 space-y-2.5">
+    <div className="rounded-xl border-0 bg-muted p-2.5 space-y-2.5">
       <div className="grid grid-cols-2 gap-2">
         <Field label="For">
           <select className={inputCls} value={target} onChange={(e) => setTarget(e.target.value)}>
@@ -466,7 +466,7 @@ function RuleForm({
       )}
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2">
-        <button onClick={onCancel} className="flex-1 rounded-full border border-border py-1.5 text-xs hover:bg-muted">Cancel</button>
+        <button onClick={onCancel} className="flex-1 rounded-full bg-muted py-1.5 text-xs hover:bg-muted/70">Cancel</button>
         <button onClick={save} disabled={saving || !parsed.ok} className="flex-1 rounded-full bg-primary text-primary-foreground py-1.5 text-xs font-medium hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-1.5">
           {saving && <Loader2 className="h-3 w-3 animate-spin" />} Save price
         </button>

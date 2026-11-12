@@ -191,19 +191,19 @@ function ChargesList({
         <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
         <div className="flex flex-wrap gap-1.5">
           {CHARGE_PRESETS.map((p) => (
-            <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full border border-border hover:bg-muted transition-colors">
+            <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 transition-colors">
               {p.description} · ₹{p.unit_price}
             </button>
           ))}
         </div>
       </div>
       )}
-      <div className="rounded-xl border border-border p-3 space-y-2">
+      <div className="rounded-2xl border border-border/60 p-3 space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Or add your own charge</p>
         <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
         <div className="flex gap-2">
-          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
-          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
+          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
+          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
           <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">
             {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
           </button>
@@ -532,7 +532,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
             {tab === "invoice" && (
               <div className="p-5">
                 <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Group booking · {group.group_reference}</p>
+                  <p className="text-xs font-medium text-muted-foreground ">Group booking · {group.group_reference}</p>
                   {bookings.map((b) => (
                     <div key={b.id} className="flex justify-between text-sm"><span className="text-muted-foreground">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
                   ))}
@@ -561,7 +561,7 @@ function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: Book
       <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 1000" autoFocus /></div>
       <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Group booking" /></div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90">Save</button></div>
+      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90">Save</button></div>
     </div>
   );
 }
@@ -589,7 +589,7 @@ function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onC
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvance.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
       {group.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal, newAdvance)} needed={advanceAmount(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal)} />}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
+      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
     </div>
   );
 }
@@ -617,7 +617,7 @@ function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string;
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Cancel all rooms in this booking? Cannot be undone.</p>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all</button></div>
+      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all</button></div>
     </div>
   );
 }
@@ -842,14 +842,14 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
           <div className="space-y-2"><label className={labelCls}>Stay dates</label><RoomAvailabilityCalendar roomIds={form.room_id ? [form.room_id as string] : []} checkIn={form.check_in as string} checkOut={form.check_out as string} turnoverSafe={turnoverSafe} exclude={{ bookingId: booking.id, roomId: booking.room_id ?? "", checkIn: booking.check_in, checkOut: booking.check_out }} onChange={(ci, co) => { set("check_in", ci); set("check_out", co); }} /><p className="text-xs text-muted-foreground">Check-in {(form.check_in as string) || "—"} · Check-out {(form.check_out as string) || "—"}</p></div>
           <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
           {nights > 0 && selectedRoom && (
-            <div className="rounded-xl border border-border p-3 space-y-1">
+            <div className="rounded-2xl border border-border/60 p-3 space-y-1">
               <div className="flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · room</span><span>₹{(stay?.room_price ?? 0).toLocaleString("en-IN")}</span></div>
               {guestCount > selectedRoom.max_guests && <div className="flex justify-between text-sm text-muted-foreground"><span>{guestCount - selectedRoom.max_guests} extra guest{guestCount - selectedRoom.max_guests > 1 ? "s" : ""}</span><span>₹{(Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")}</span></div>}
               <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1"><span>New total</span><span>₹{newTotal.toLocaleString("en-IN")}</span></div>
             </div>
           )}
           {commissionNote && (
-            <div className="rounded-xl border border-border bg-muted/40 px-3 py-2 text-xs">{commissionNote}</div>
+            <div className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-xs">{commissionNote}</div>
           )}
           {hasChanges && nights > 0 && (
             <div className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
@@ -873,7 +873,7 @@ function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booki
       <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} max={Number(booking.total_amount)} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 500" autoFocus /></div>
       <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Regular guest" /></div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2">{discount > 0 && <button onClick={handleRemove} disabled={saving} className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50">Remove</button>}<button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
+      <div className="flex gap-2">{discount > 0 && <button onClick={handleRemove} disabled={saving} className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50">Remove</button>}<button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
     </div>
   );
 }
@@ -917,7 +917,7 @@ function OverviewTab({ booking, roomName, property, advance, discount, balance, 
 }
 
 function WALink({ href, label }: { href: string; label: string }) {
-  return <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-sm hover:bg-muted transition-colors"><MessageCircle className="h-4 w-4 text-[#25D366]" />{label}</a>;
+  return <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-2xl border border-border/60 px-3 py-2.5 text-sm hover:bg-muted transition-colors"><MessageCircle className="h-4 w-4 text-[#25D366]" />{label}</a>;
 }
 
 function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { bookingId: string; roomId: string; checkIn: string; checkOut: string; onCancelled: () => void }) {
@@ -941,7 +941,7 @@ function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { b
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Are you sure? This cannot be undone.</p>
       {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-lg border border-border py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button></div>
+      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button></div>
     </div>
   );
 }
@@ -974,13 +974,13 @@ function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, 
       {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvanceTotal.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
       {booking.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal, newAdvanceTotal)} needed={suggested} />}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full border border-border py-2 text-sm hover:bg-muted">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
+      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><div className="text-xs uppercase tracking-wider font-medium text-muted-foreground">{title}</div><div className="bg-muted/30 rounded-xl border border-border px-4 py-3 space-y-2">{children}</div></div>;
+  return <div className="space-y-2"><div className="text-xs  font-medium text-muted-foreground">{title}</div><div className="bg-muted/30 rounded-2xl border border-border/60 px-4 py-3 space-y-2">{children}</div></div>;
 }
 
 function Row({ label, value, highlight, bold, small }: { label: string; value: string; highlight?: "green" | "amber"; bold?: boolean; small?: boolean }) {

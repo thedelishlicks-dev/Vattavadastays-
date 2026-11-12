@@ -52,7 +52,7 @@ function PropertyIdentity({
   subdomain?: string | null;
 }) {
   return (
-    <div className="px-4 py-4 flex items-center gap-3 border-b border-border">
+    <div className="px-4 py-4 flex items-center gap-3">
       {logoUrl ? (
         <img
           src={logoUrl}
@@ -107,12 +107,12 @@ export function AdminLayout() {
     <SectionContext.Provider value={activeSection}>
     <div data-section={activeSection?.key} className="min-h-screen bg-muted/40 flex w-full">
       <DynamicManifest />
-      <aside className="hidden md:flex w-60 flex-col border-r border-border bg-card">
+      <aside className="hidden md:flex w-60 flex-col border-r border-border/60 bg-card">
         <PropertyIdentity name={propertyName} logoUrl={property?.logo_url} subdomain={property?.subdomain} />
         <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
           {NAV_GROUP_DEFS.map((g) => (
             <div key={g.label}>
-              <div className="px-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+              <div className="px-3 pb-1.5 text-xs text-muted-foreground font-semibold">
                 {g.label}
               </div>
               <div className="space-y-0.5">
@@ -131,18 +131,18 @@ export function AdminLayout() {
             </div>
           ))}
         </nav>
-        <div className="p-3 border-t border-border space-y-0.5">
+        <div className="p-3 border-t border-border/60 space-y-0.5">
           <a
             href="/help"
             target="_blank"
             rel="noopener"
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="w-full flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <HelpCircle className="h-4 w-4" /> Help
           </a>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="w-full flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <LogOut className="h-4 w-4" /> Log out
           </button>
@@ -150,8 +150,8 @@ export function AdminLayout() {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b border-border flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
-          <button className="md:hidden p-2 -ml-2 rounded-md hover:bg-muted" onClick={() => setMobileOpen(true)} aria-label="Open menu">
+        <header className="h-14 bg-card/95 backdrop-blur border-b border-border/60 flex items-center px-3 md:px-6 gap-3 sticky top-0 z-20">
+          <button className="md:hidden flex h-10 w-10 -ml-2 items-center justify-center rounded-full hover:bg-muted" onClick={() => setMobileOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </button>
           <div className="font-medium text-sm md:text-base truncate">{propertyName}</div>
@@ -176,7 +176,7 @@ export function AdminLayout() {
 
         {/* Bottom nav: the four daily sections + More (which opens the full
             menu, including Rooms & Pricing and Property). */}
-        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border grid grid-cols-5">
+        <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 bg-card border-t border-border/60 grid grid-cols-5">
           {BOTTOM_NAV.map((sec) => {
             const Icon = sec.icon;
             const active = activeSection?.key === sec.key;
@@ -224,21 +224,21 @@ export function AdminLayout() {
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col">
+          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-card flex flex-col rounded-r-3xl">
             {/* No PropertyIdentity here: the top app bar (visible on the
                 screen this drawer opens from) already shows the property
                 name, so repeating name/logo/subdomain here would just cost
                 vertical space without telling the owner anything new. */}
-            <div className="h-14 px-5 flex items-center border-b border-border justify-between">
+            <div className="h-14 px-5 flex items-center justify-between">
               <span className="font-display text-lg font-semibold text-primary">{propertyName}</span>
-              <button onClick={() => setMobileOpen(false)} className="p-2 -mr-2 rounded-md hover:bg-muted" aria-label="Close menu">
+              <button onClick={() => setMobileOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-muted hover:bg-muted/70" aria-label="Close menu">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
               {NAV_GROUP_DEFS.map((g) => (
                 <div key={g.label}>
-                  <div className="px-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                  <div className="px-3 pb-1.5 text-xs text-muted-foreground font-semibold">
                     {g.label}
                   </div>
                   <div className="space-y-0.5">
@@ -258,18 +258,18 @@ export function AdminLayout() {
                 </div>
               ))}
             </nav>
-            <div className="p-3 border-t border-border space-y-0.5">
+            <div className="p-3 border-t border-border/60 space-y-0.5">
               <a
                 href="/help"
             target="_blank"
             rel="noopener"
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="w-full flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <HelpCircle className="h-4 w-4" /> Help
               </a>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="w-full flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <LogOut className="h-4 w-4" /> Log out
               </button>
@@ -304,10 +304,10 @@ function NavItem({
 }) {
   if (disabled) {
     return (
-      <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-muted-foreground/60 cursor-not-allowed" title="Coming soon">
+      <div className="flex items-center gap-3 px-4 py-2.5 rounded-full text-sm text-muted-foreground/60 cursor-not-allowed" title="Coming soon">
         <Icon className="h-4 w-4" />
         <span className="flex-1">{label}</span>
-        <span className="text-[10px] uppercase tracking-wider">Soon</span>
+        <span className="text-[10px] font-medium">Soon</span>
       </div>
     );
   }
@@ -318,10 +318,10 @@ function NavItem({
       data-section={sectionKey}
       aria-current={active ? "page" : undefined}
       className={[
-        "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors border-l-[3px]",
+        "flex items-center gap-3 px-4 py-2.5 rounded-full text-sm transition-colors",
         active
-          ? "bg-[var(--section-soft)] text-[var(--section-ink)] font-medium border-[var(--section)]"
-          : "text-foreground hover:bg-muted border-transparent",
+          ? "bg-[var(--section-soft)] text-[var(--section-ink)] font-semibold"
+          : "text-foreground hover:bg-muted",
       ].join(" ")}
     >
       <Icon className={["h-4 w-4", active ? "" : "text-[var(--section-ink)] opacity-80"].join(" ")} />

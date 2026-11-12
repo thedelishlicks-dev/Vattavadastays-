@@ -29,7 +29,7 @@ export const Route = createFileRoute('/admin/settings')({
 })
 
 const inputCls =
-  'w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
+  'w-full rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40'
 const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
 
 // ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ function ImageUploadField({
   const isLogo = preset === 'logo'
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
       <div>
         <h2 className="text-sm font-semibold">{label}</h2>
         <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
@@ -144,7 +144,7 @@ function ImageUploadField({
       {error && <p className="text-xs text-destructive">{error}</p>}
 
       {!currentUrl && !uploading && (
-        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm hover:bg-muted">
+        <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70">
           <Upload className="h-4 w-4" /> Upload {label.toLowerCase()}
         </button>
       )}
@@ -205,7 +205,7 @@ function ChangePasswordSection({ email }: { email: string }) {
   }
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
       <div className="flex items-center gap-3">
         <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
           <KeyRound className="h-5 w-5 text-primary" />
@@ -224,10 +224,10 @@ function ChangePasswordSection({ email }: { email: string }) {
             </div>
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={() => { setMode('change'); setSuccess(''); setError('') }} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted flex items-center justify-center gap-2">
+            <button type="button" onClick={() => { setMode('change'); setSuccess(''); setError('') }} className="flex-1 rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70 flex items-center justify-center gap-2">
               <KeyRound className="h-4 w-4" /> Change password
             </button>
-            <button type="button" onClick={handleSendReset} disabled={saving} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted flex items-center justify-center gap-2 disabled:opacity-50">
+            <button type="button" onClick={handleSendReset} disabled={saving} className="flex-1 rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70 flex items-center justify-center gap-2 disabled:opacity-50">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
               Email reset link
             </button>
@@ -252,7 +252,7 @@ function ChangePasswordSection({ email }: { email: string }) {
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={() => { setMode('idle'); setError('') }} className="flex-1 rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted">Cancel</button>
+            <button type="button" onClick={() => { setMode('idle'); setError('') }} className="flex-1 rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70">Cancel</button>
             <button type="button" onClick={handleChangePassword} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2">
               {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save password
             </button>
@@ -447,7 +447,7 @@ function AdminSettings() {
             key={j.id}
             type="button"
             onClick={() => document.getElementById(j.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-            className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="shrink-0 rounded-full bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/70 hover:text-foreground"
           >
             {j.label}
           </button>
@@ -483,7 +483,7 @@ function AdminSettings() {
         <div id="branding" className="space-y-4 scroll-mt-32">
           <h2 className="text-sm font-semibold text-stone-900">Branding & Appearance</h2>
 
-          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Color Theme</h3>
               <p className="text-xs text-muted-foreground mt-0.5">Choose a color palette for your guest booking page.</p>
@@ -494,13 +494,13 @@ function AdminSettings() {
                   <div className="h-10 w-10 rounded-full shadow-sm flex items-center justify-center text-white" style={{ backgroundColor: theme.primary }}>
                     {selectedTheme === key && <Check className="h-5 w-5" />}
                   </div>
-                  <span className="text-[10px] font-medium uppercase tracking-wider">{theme.name}</span>
+                  <span className="text-[10px] font-medium ">{theme.name}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+          <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
             <div>
               <h3 className="text-sm font-semibold">Heading Font</h3>
               <p className="text-xs text-muted-foreground mt-0.5">Pick a typography style for headings and titles.</p>
@@ -613,7 +613,7 @@ function AdminSettings() {
               <label className={labelCls}>Longitude</label>
               <input type="text" name="location_lng" inputMode="decimal" value={form.location_lng} onChange={handleChange} placeholder="e.g. 77.15" className={inputCls} />
             </div>
-            <div className="col-span-2 rounded-lg border border-border p-3 space-y-2">
+            <div className="col-span-2 rounded-2xl border border-border/60 p-3 space-y-2">
               <label className="flex items-start gap-2 text-sm text-stone-800">
                 <input type="checkbox" checked={directionsByName} onChange={(e) => persistDirectionsByName(e.target.checked)} className="mt-0.5" />
                 <span>My property is listed on Google Maps. Send guests to my listing.</span>
@@ -633,7 +633,7 @@ function AdminSettings() {
         </div>
 
         {/* ── Add to Home Screen ── */}
-        <div id="install-app" className="bg-card border border-border rounded-xl p-5 space-y-4 scroll-mt-32">
+        <div id="install-app" className="bg-card border border-border/60 rounded-3xl p-5 space-y-4 scroll-mt-32">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
               <Smartphone className="h-5 w-5 text-primary" />
@@ -660,7 +660,7 @@ function AdminSettings() {
               <p className="text-xs text-muted-foreground leading-relaxed">Open your dashboard link in Chrome → tap the ⋮ menu → tap <span className="font-medium text-foreground">Add to Home Screen</span></p>
             </div>
 
-            <button type="button" onClick={handleCopyLink} className="w-full rounded-full border border-border py-2.5 text-sm font-medium hover:bg-muted transition-colors flex items-center justify-center gap-2">
+            <button type="button" onClick={handleCopyLink} className="w-full rounded-full bg-muted py-2.5 text-sm font-medium hover:bg-muted/70 transition-colors flex items-center justify-center gap-2">
               {linkCopied ? (
                 <><Check className="h-4 w-4 text-primary" /><span className="text-primary">Copied!</span></>
               ) : (

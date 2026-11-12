@@ -63,7 +63,7 @@ function AdminMeals() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Meals</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold">Meals</h1>
         <p className="text-sm text-muted-foreground">
           Let guests know what's on offer before they book. This is informational only —
           when a guest actually orders food during their stay, add it as a charge on that
@@ -74,7 +74,7 @@ function AdminMeals() {
       </div>
 
       {/* Breakfast */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Coffee className="h-4 w-4 text-primary" />
           <h2 className="font-semibold text-sm">Breakfast</h2>
@@ -111,7 +111,7 @@ function AdminMeals() {
       </div>
 
       {/* Lunch / dinner via in-house kitchen */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <UtensilsCrossed className="h-4 w-4 text-primary" />
           <h2 className="font-semibold text-sm">Lunch &amp; dinner</h2>
@@ -149,7 +149,7 @@ function AdminMeals() {
       </div>
 
       {/* Delivery */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Truck className="h-4 w-4 text-primary" />
           <h2 className="font-semibold text-sm">Food delivery</h2>
