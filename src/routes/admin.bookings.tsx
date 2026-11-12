@@ -1172,8 +1172,8 @@ function BookingsAdmin() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-muted/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#166534]" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="text-2xl font-bold tabular-nums">{stats.active}</div></div></div>
-        <div className="bg-muted/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-[#92400e]" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="text-xl font-bold tabular-nums text-[#92400e]">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
+        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#166534]" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="text-2xl font-bold tabular-nums">{stats.active}</div></div></div>
+        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-[#92400e]" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="text-xl font-bold tabular-nums text-[#92400e]">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
       </div>
 
       <div className="space-y-2">
@@ -1199,8 +1199,8 @@ function BookingsAdmin() {
               <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-xs ml-auto">
-            <span className="text-muted-foreground hidden sm:inline">Sort:</span>
+          <div className="flex items-center gap-1.5 text-xs w-full overflow-x-auto pb-0.5">
+            <span className="text-muted-foreground shrink-0">Sort:</span>
             {SORT_OPTIONS.map((s) => (
               <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-3 py-1.5 rounded-full font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 text-primary" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
                 {s.label}

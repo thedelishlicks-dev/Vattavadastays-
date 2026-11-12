@@ -314,7 +314,7 @@ function DayPanel({
     .filter(Boolean)
     .join(' · ')
   return (
-    <div ref={innerRef} className="mt-4 rounded-3xl bg-muted/50 p-4 space-y-3 scroll-mb-24">
+    <div ref={innerRef} className="mt-4 rounded-3xl bg-card border border-border/60 p-4 space-y-3 scroll-mb-24">
       <div>
         <h2 className="text-lg font-semibold">{pretty}</h2>
         <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>

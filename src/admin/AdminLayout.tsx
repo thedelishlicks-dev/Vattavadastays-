@@ -105,7 +105,7 @@ export function AdminLayout() {
 
   return (
     <SectionContext.Provider value={activeSection}>
-    <div data-section={activeSection?.key} className="min-h-screen bg-muted/40 flex w-full">
+    <div data-section={activeSection?.key} className="owner-ui min-h-screen bg-muted/40 flex w-full">
       <DynamicManifest />
       <aside className="hidden md:flex w-60 flex-col border-r border-border/60 bg-card">
         <PropertyIdentity name={propertyName} logoUrl={property?.logo_url} subdomain={property?.subdomain} />
