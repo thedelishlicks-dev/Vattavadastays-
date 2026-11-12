@@ -303,7 +303,7 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, 
 
             <div className="flex gap-2 mt-2">
               <input value={customAmenity} onChange={(e) => setCustomAmenity(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomAmenity()} placeholder="Add custom amenity" className={`${inputCls} flex-1`} />
-              <button type="button" onClick={addCustomAmenity} className="px-3 rounded-lg border border-border bg-background hover:bg-muted text-sm">Add</button>
+              <button type="button" onClick={addCustomAmenity} className="px-3 rounded-xl border-0 bg-muted hover:bg-muted/70 text-sm">Add</button>
             </div>
           </div>
 
@@ -354,7 +354,7 @@ function AdminRooms() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-card rounded-xl border border-border overflow-hidden">
+            <div key={i} className="bg-card rounded-2xl border border-border/60 overflow-hidden">
               <div className="w-full h-40 bg-muted animate-pulse" />
               <div className="p-5 space-y-3">
                 <div className="h-5 w-2/3 rounded-md bg-muted animate-pulse" />
@@ -386,7 +386,7 @@ function AdminRooms() {
     >
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Rooms & Pricing</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold">Rooms & Pricing</h1>
           <p className="text-sm text-muted-foreground">
             {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {rooms.filter((r) => r.is_active).length} active
           </p>
@@ -412,7 +412,7 @@ function AdminRooms() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {rooms.map((room) => (
-            <div key={room.id} className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+            <div key={room.id} className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
               {room.images?.[0] ? (
                 <img src={room.images[0]} alt={room.name} className="w-full h-40 object-cover" />
               ) : (
@@ -432,7 +432,7 @@ function AdminRooms() {
                     <span className={`text-xs px-2 py-0.5 rounded-full ${room.is_active ? 'bg-primary-light text-primary' : 'bg-muted text-muted-foreground'}`}>
                       {room.is_active ? 'Active' : 'Inactive'}
                     </span>
-                    <button onClick={() => setDrawerRoom(room)} className="h-7 w-7 rounded-md border border-border hover:bg-muted flex items-center justify-center" title="Edit room">
+                    <button onClick={() => setDrawerRoom(room)} className="h-7 w-7 rounded-2xl border border-border/60 hover:bg-muted flex items-center justify-center" title="Edit room">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
                     <button onClick={() => setDeleteRoom(room)} className="h-7 w-7 rounded-md border border-destructive/30 hover:bg-destructive/5 text-destructive flex items-center justify-center" title="Delete room">
@@ -455,7 +455,7 @@ function AdminRooms() {
                 <button
                   type="button"
                   onClick={() => { setFocusPricing(true); setDrawerRoom(room) }}
-                  className="mt-3 w-full text-left rounded-lg border border-border bg-muted/30 hover:bg-muted/60 transition-colors px-3 py-2.5 flex items-center justify-between gap-3"
+                  className="mt-3 w-full text-left rounded-2xl border border-border/60 bg-muted/30 hover:bg-muted/60 transition-colors px-3 py-2.5 flex items-center justify-between gap-3"
                   title="Edit pricing"
                 >
                   <div className="text-sm space-y-0.5">

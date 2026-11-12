@@ -86,6 +86,8 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 
 ## 5. Keeping the guide true
 
+> **11 Nov 2026: every screenshot is now out of date.** The owner side got a new look (soft flat cards, round buttons, one dialog style, avatar list on Payments, flat Calendar, pill navigation; see HANDOVER §10 item 50). Names and steps in the text are still right (the one wording change: Payments now says **View … in the list →**), but retake all screenshots in one session on the demo property so the guide looks consistent. Order of value: Home, Booking, Payments, Calendar, Block dates, Rooms editor, Settings.
+
 The guide quotes button and field names exactly (for example **Edit Stay**, **Add to extras**, **Block 1 night**). When you change one of these, or a rule an owner follows (the 25 % advance gate, the hold hours, rate maths):
 
 1. Search `ownerGuide.ts` for the old wording and update it.

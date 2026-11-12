@@ -69,7 +69,7 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
   const addons = items.filter((i) => i.kind === "addon");
 
   return (
-    <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-2">
+    <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Add from your catalog</p>
       <select value={itemKey} onChange={(e) => setItemKey(e.target.value)} className={fieldCls} aria-label="Add-on or package">
         <option value="">Choose an add-on or package…</option>
@@ -105,7 +105,7 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
             value={qty}
             onChange={(e) => setQty(e.target.value)}
             placeholder={String(defaultQty)}
-            className="w-20 rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="w-20 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
         </div>
       )}

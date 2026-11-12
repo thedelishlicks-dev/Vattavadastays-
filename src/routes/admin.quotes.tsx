@@ -119,7 +119,7 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
           const st = displayStatus(q);
           const n = nightsBetween(q.check_in, q.check_out);
           return (
-            <div key={q.id} className="rounded-xl border border-border bg-card p-4 space-y-3">
+            <div key={q.id} className="rounded-2xl border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="font-medium truncate">{q.guest_name}</div>
@@ -157,10 +157,10 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                 >
                   <Send className="h-3.5 w-3.5" /> {q.status === "draft" ? "Send" : "Resend"}
                 </a>
-                <a href={telLink(q.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 hover:bg-muted">
+                <a href={telLink(q.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
                   <Phone className="h-3.5 w-3.5" /> Call
                 </a>
-                <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 hover:bg-muted">
+                <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
                 {!q.converted_booking_id && q.status !== "lost" && (
@@ -182,7 +182,7 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                   </button>
                 )}
                 {!q.converted_booking_id && q.status !== "lost" && (
-                  <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "lost" })} className="rounded-full border border-border px-3 py-1.5 hover:bg-muted">
+                  <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "lost" })} className="rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
                     Lost
                   </button>
                 )}

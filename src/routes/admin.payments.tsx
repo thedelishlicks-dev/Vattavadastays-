@@ -161,7 +161,7 @@ function pctColorCls(pct: number): string {
 // ---------------------------------------------------------------------------
 // Payment action modal — the ONLY payment writes on this page.
 //
-//  "full"    → "Mark fully paid": records the remaining balance as a real
+//  "full"   → "Mark fully paid": records the remaining balance as a real
 //              payment (advance_amount += balance) with a method + optional
 //              reference, flips is_paid, and confirms a pending booking.
 //              This mirrors handleSavePayment / RecordPaymentForm in

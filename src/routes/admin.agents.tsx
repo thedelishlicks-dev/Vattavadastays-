@@ -171,7 +171,7 @@ function AdminAgents() {
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl md:text-3xl font-semibold">Agents & Commissions</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold">Agents & Commissions</h1>
           <p className="text-sm text-muted-foreground">
             Your booking agents, their commission rates, and what you owe each.
           </p>
@@ -185,15 +185,15 @@ function AdminAgents() {
       </div>
 
       {agentRows.length > 0 && (
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between gap-3">
+        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground mb-1">Total commission owed (confirmed stays)</p>
-            <p className="font-display text-2xl font-semibold text-primary">₹{totalOwed.toLocaleString("en-IN")}</p>
+            <p className="text-2xl font-semibold text-primary">₹{totalOwed.toLocaleString("en-IN")}</p>
           </div>
           <button
             onClick={exportCsv}
             disabled={items.length === 0}
-            className="shrink-0 flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            className="shrink-0 flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-sm font-medium hover:bg-muted/70 disabled:opacity-50"
           >
             <Download className="h-4 w-4" /> Export CSV
           </button>
@@ -203,7 +203,7 @@ function AdminAgents() {
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
       {agentRows.length === 0 ? (
-        <div className="bg-card border border-border rounded-xl p-8 text-center space-y-2">
+        <div className="bg-card border border-border/60 rounded-3xl p-8 text-center space-y-2">
           <Handshake className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm font-medium">No agents yet</p>
           <p className="text-xs text-muted-foreground">
@@ -216,7 +216,7 @@ function AdminAgents() {
             const isExpanded = expanded.has(agent.id);
             const hasItems = agentItems.length > 0;
             return (
-              <div key={agent.id} className="bg-card border border-border rounded-xl overflow-hidden">
+              <div key={agent.id} className="bg-card border border-border/60 rounded-3xl overflow-hidden">
                 <div className="flex items-stretch">
                   {/* Tap the name area to open the agent's bookings */}
                   <button

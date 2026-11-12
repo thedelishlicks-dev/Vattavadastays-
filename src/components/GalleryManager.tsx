@@ -77,7 +77,7 @@ export function GalleryManager({ propertyId, photos, onChange }: Props) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+    <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
       <div>
         <h2 className="text-sm font-semibold">Gallery ({photos.length}/{MAX_GALLERY_PHOTOS})</h2>
         <p className="text-xs text-muted-foreground mt-0.5">
@@ -142,7 +142,7 @@ export function InstagramField({ value, onSave }: IgProps) {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-5 space-y-3">
+    <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-3">
       <div>
         <h2 className="text-sm font-semibold">Instagram</h2>
         <p className="text-xs text-muted-foreground mt-0.5">Your username or profile link. Guests see a "Follow" button in the gallery and in the page footer. Leave empty to hide it.</p>

@@ -203,7 +203,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
         </div>
       </div>
 
-      <div className="px-4 pt-3 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+      <div className="px-4 pt-3 pb-1 text-[11px]  text-muted-foreground font-medium">
         Essentials to take bookings
       </div>
       <div className="divide-y divide-border">
@@ -212,7 +212,7 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
         ))}
       </div>
 
-      <div className="px-4 pt-4 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground font-medium border-t border-border">
+      <div className="px-4 pt-4 pb-1 text-[11px]  text-muted-foreground font-medium border-t border-border">
         Optional polish
       </div>
       <div className="divide-y divide-border">
@@ -333,7 +333,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
 
   return (
     <div className="animate-in fade-in slide-in-from-top-2 duration-300 [--tw-ease:var(--ease-smooth)] border border-border/60 rounded-3xl overflow-hidden">
-      <div className="px-4 py-2.5 text-xs uppercase tracking-wider text-muted-foreground bg-primary-light/20">
+      <div className="px-4 py-2.5 text-xs  text-muted-foreground bg-primary-light/20">
         Needs your attention
       </div>
       <div className="divide-y divide-border">
@@ -610,7 +610,7 @@ function DashboardPage() {
       <AttentionSection rows={attentionRows} />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground mb-3">
+        <div className="text-xs  text-muted-foreground mb-3">
           Quick actions
         </div>
         <div className="flex flex-wrap gap-2">
@@ -628,13 +628,13 @@ function DashboardPage() {
         <div className="bg-card border border-border/60 rounded-3xl p-4">
           <div className="flex divide-x divide-border">
             <div className="flex-1 pr-4">
-              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" /> Upcoming
               </div>
               <div className="mt-1.5 text-xl font-bold tabular-nums">{stats.upcoming}</div>
             </div>
             <div className="flex-1 px-4">
-              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
                 <IndianRupee className="h-3.5 w-3.5" /> This month
               </div>
               <div className="mt-1.5 text-xl font-bold tabular-nums">
@@ -642,7 +642,7 @@ function DashboardPage() {
               </div>
             </div>
             <div className="flex-1 pl-4">
-              <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+              <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
                 <MessageSquare className="h-3.5 w-3.5" /> Total bookings
               </div>
               <div className="mt-1.5 text-xl font-bold tabular-nums">{totalBookings}</div>
@@ -704,7 +704,7 @@ function ActionBtn({
   return (
     <button
       onClick={onClick}
-      className="press-scale inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-xs md:text-sm font-medium transition-colors hover:bg-muted"
+      className="press-scale inline-flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-xs md:text-sm font-medium transition-colors hover:bg-muted/70"
     >
       <Icon className="h-4 w-4 text-primary" /> {label}
     </button>

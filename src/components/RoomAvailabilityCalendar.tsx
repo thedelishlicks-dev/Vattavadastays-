@@ -165,7 +165,7 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
   };
 
   return (
-    <div className="rounded-xl border border-border p-3">
+    <div className="rounded-2xl border border-border/60 p-3">
       <div className="flex items-center justify-between mb-3">
         <button type="button" onClick={() => setMonth((m) => addMonths(m, -1))} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Previous month">
           <ChevronLeft className="h-4 w-4" />

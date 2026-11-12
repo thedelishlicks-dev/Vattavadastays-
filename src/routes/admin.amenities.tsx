@@ -109,14 +109,14 @@ function AdminAmenities() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Amenities</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold">Amenities</h1>
         <p className="text-sm text-muted-foreground">
           Property-wide amenities shown on the guest booking page.
         </p>
       </div>
 
       {/* Property amenities */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">Property Amenities</h2>
 
         <div className="flex flex-wrap gap-2">
@@ -166,7 +166,7 @@ function AdminAmenities() {
           />
           <button
             onClick={addCustom}
-            className="px-3 rounded-lg border border-border bg-background hover:bg-muted text-sm"
+            className="px-3 rounded-xl border-0 bg-muted hover:bg-muted/70 text-sm"
           >
             Add
           </button>
@@ -193,7 +193,7 @@ function AdminAmenities() {
             <span className="text-xs text-muted-foreground">Edit in Rooms & Pricing → Rooms</span>
           </div>
           {rooms.map((room) => (
-            <div key={room.id} className="bg-card border border-border rounded-xl p-4">
+            <div key={room.id} className="bg-card border border-border/60 rounded-3xl p-4">
               <p className="font-medium text-sm mb-2">{room.name}</p>
               {room.room_amenities && room.room_amenities.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">

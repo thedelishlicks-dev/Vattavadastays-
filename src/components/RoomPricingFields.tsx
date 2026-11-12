@@ -134,8 +134,8 @@ export function RoomPricingFields({
       </div>
 
       {showPreview && (
-        <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2 text-sm">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">Price preview</p>
+        <div className="rounded-2xl border border-border/60 bg-muted/40 p-4 space-y-2 text-sm">
+          <p className="text-xs font-medium text-muted-foreground  mb-3">Price preview</p>
           <div className="flex justify-between">
             <span className="text-muted-foreground">Weekday (Sun–Thu)</span>
             <span className="font-semibold">{fmt(weekday)}</span>

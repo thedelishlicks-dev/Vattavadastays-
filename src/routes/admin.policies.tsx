@@ -146,14 +146,14 @@ function AdminPolicies() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="font-display text-2xl md:text-3xl font-semibold">Policies</h1>
+        <h1 className="text-2xl md:text-3xl font-semibold">Policies</h1>
         <p className="text-sm text-muted-foreground">
           Check-in times, cancellation policy, and house rules shown to guests.
         </p>
       </div>
 
       {/* Check-in / Check-out */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">Check-in & Check-out</h2>
         <div className="flex gap-4 overflow-hidden">
           <div className="flex-1 min-w-0">
@@ -182,7 +182,7 @@ function AdminPolicies() {
       </div>
 
       {/* Cancellation policy */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">Cancellation Policy</h2>
 
         <div className="flex flex-wrap gap-2">
@@ -215,7 +215,7 @@ function AdminPolicies() {
       </div>
 
       {/* House rules */}
-      <div className="bg-card border border-border rounded-xl p-5 space-y-4">
+      <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
         <h2 className="font-semibold text-sm">House Rules</h2>
 
         <div className="flex flex-wrap gap-2">
