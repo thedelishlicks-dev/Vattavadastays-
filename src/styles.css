@@ -254,6 +254,12 @@ main[data-bold] .border-border { border-color: color-mix(in oklab, var(--section
     letter-spacing: -0.02em;
   }
 
+  /* Owner admin: headings use the UI font (serif stays for brand names and guest pages). */
+  .owner-ui :is(h1, h2, h3, h4) {
+    font-family: var(--font-body);
+    letter-spacing: -0.01em;
+  }
+
   .font-malayalam {
     font-family: var(--font-malayalam);
   }

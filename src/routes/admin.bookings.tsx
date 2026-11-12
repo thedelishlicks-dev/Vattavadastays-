@@ -1199,8 +1199,8 @@ function BookingsAdmin() {
               <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronRight className="h-3.5 w-3.5" /></button>
             </div>
           )}
-          <div className="flex items-center gap-1.5 text-xs ml-auto">
-            <span className="text-muted-foreground hidden sm:inline">Sort:</span>
+          <div className="flex items-center gap-1.5 text-xs w-full overflow-x-auto pb-0.5">
+            <span className="text-muted-foreground shrink-0">Sort:</span>
             {SORT_OPTIONS.map((s) => (
               <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-3 py-1.5 rounded-full font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 text-primary" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
                 {s.label}
