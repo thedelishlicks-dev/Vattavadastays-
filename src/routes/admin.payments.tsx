@@ -596,7 +596,7 @@ function AdminPayments() {
             <p className="text-2xl font-semibold tabular-nums text-[#881337]">₹{stats.totalOutstanding.toLocaleString("en-IN")}</p>
             <p className="mt-0.5 text-xs text-[#9f1239]">{stats.unpaid} not started</p>
           </div>
-          <div className="rounded-3xl bg-muted px-5 py-4">
+          <div className="rounded-3xl bg-card border border-border/60 px-5 py-4">
             <p className="text-sm text-muted-foreground">Total billed</p>
             <p className="text-2xl font-semibold tabular-nums">₹{stats.totalBilled.toLocaleString("en-IN")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Rooms + extras − discounts</p>
@@ -612,7 +612,7 @@ function AdminPayments() {
             <p className="text-xs text-muted-foreground mt-0.5">By check-in date.</p>
           </div>
 
-          <div className="rounded-3xl bg-muted/50 p-4 space-y-4">
+          <div className="rounded-3xl bg-card border border-border/60 p-4 space-y-4">
             {trendData.length > 1 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
@@ -774,7 +774,7 @@ function AdminPayments() {
       </div>
 
       {/* Payment setup moved to Settings — one home for UPI / accepted methods */}
-      <div className="rounded-3xl bg-muted/50 p-4 flex items-center justify-between gap-3">
+      <div className="rounded-3xl bg-card border border-border/60 p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Wallet className="h-5 w-5 text-primary shrink-0" />
           <p className="text-sm text-muted-foreground">UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.</p>
