@@ -81,7 +81,7 @@ export const SITUATIONS: GuideSection[] = [
       },
       shot("01-home-needs-attention.webp", "Home screen with a booking request under Needs your attention", "**1** A new request appears under **Needs your attention**. Tap it to open the booking."),
       shot("02-booking-record-payment.webp", "Booking screen with the Confirm button and the Amount received field marked", "**1** Tap **Confirm** yourself, or **2** type the amount received in **Record advance payment**. **25% or more** confirms it by itself (the app suggests the 25% amount)."),
-      shot("30-booking-confirmed-prompt.webp", "Booking confirmed prompt with the Send confirmation on WhatsApp button", "**1** You can also send it later with **Send confirmation** at the top of the booking. **2** Tap **Send confirmation on WhatsApp**. **3** Or tap **Not now, I'll send it later**."),
+      shot("30-booking-confirmed-prompt.webp", "Booking confirmed prompt with the Send confirmation on WhatsApp button", "**1** You can also send it later with **Send confirmation** at the top of the booking. **2** Tap **Send confirmation on WhatsApp**. **3** Or tap **Not now — I'll send it later**."),
       { type: "note", label: "Watch out", text: "If you have not confirmed it or recorded the advance before the hold hours end (24 by default), the request is **cancelled and the dates released, with no message to anyone**. Check **Home** every few hours and reply early." },
     ],
   },
@@ -100,6 +100,7 @@ export const SITUATIONS: GuideSection[] = [
         ],
       },
       shot("02-booking-record-payment.webp", "Booking screen with the Confirm button and the Amount received field marked", "**1** Tap **Confirm** yourself, or **2** type the amount received in **Record advance payment**."),
+      { type: "p", text: "**Already received something?** The button then reads **Record part payment** and the box reads **New payment (₹)**. Type only the new money. You can also open **Money → Payments**, find the booking and tap **Mark fully paid**. If that confirms a pending booking, a green message appears with **Open booking**, so you can send the guest their confirmation." },
       { type: "p", text: "**If the request has vanished from Home:** it probably ran out of time. Open **Bookings**, filter **Cancelled**, and search the guest. If the **Calendar** still shows the dates **Open**, use **Add booking** to enter the stay again as **Confirmed**, and record their payment." },
       { type: "note", label: "Watch out", text: "The app cannot see your bank. A payment only counts when **you** record it." },
     ],
@@ -114,7 +115,7 @@ export const SITUATIONS: GuideSection[] = [
         items: [
           "Open **Rooms & Pricing**. **Seasons** is at the top. Tap **Add season**.",
           "Name it **Christmas / New Year**.",
-          "Pick **Starts 24 Dec** and **Ends 1 Jan**. The last night is **included**.",
+          "Set **Starts** to 24 Dec and **Ends (last night included)** to 1 Jan.",
           "Tick **Repeats every year** so you never have to enter it again.",
           "Under **Room prices in this season**, type **30** (30% higher for every room).",
           "Tap **Save season**.",
@@ -247,7 +248,7 @@ export const SITUATIONS: GuideSection[] = [
         items: [
           "Open **Bookings** and find the stay.",
           "On the **Charges** tab, under **Add from your catalog**, choose the item, its option (such as Veg) and the number of **People**, then tap **Add to extras**. The **balance** updates.",
-          "Collect the balance. Then open **Money → Payments**, tap **View … in the list →** under the month, find the booking and tap **Mark fully paid**. Or record the amount on the booking.",
+          "Collect the balance. Then open **Money → Payments**, tap **View … in the list →** under the month (or just search the guest), find the booking and tap **Mark fully paid**. **Outstanding**, **Paid** and **All** above the list help you find it. Or record the amount on the booking.",
           "Check the booking shows **Fully paid**. When the guest has left, tap **Complete**. The booking then shows **Completed**, with the check-out time.",
           "If **Refund due** appears in red, the guest has overpaid. Return the difference yourself.",
           "Open the **Invoice** tab if the guest wants a printed copy.",
@@ -255,8 +256,8 @@ export const SITUATIONS: GuideSection[] = [
       },
       shot("26-charges-tab.webp", "Charges tab with the catalog dropdown, option, people and Add to extras button", "**1** Choose an item from your catalog. **2** Choose its option. **3** Set the number of people. **4** Tap Add to extras."),
       shot("28-checkout-summary.webp", "A completed booking with its payment summary showing Fully paid", "**1** The Charges tab shows a number when extras were added. **2** The payment summary. **3** **Fully paid** means nothing is left to collect."),
-      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in ledger** to see each booking and its balance."),
-      { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page tap **Correct collected amount** and enter the right figure." },
+      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
+      { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page, find the booking and tap the **pencil** button (**Correct collected amount**) on its row. Enter the right figure." },
       shot("27-correct-collected.webp", "Correct collected amount form on the Payments page", "**1** Type the **total** amount actually received. Set it to 0 to mark the booking unpaid. **2** Tap Save."),
     ],
   },
@@ -268,7 +269,7 @@ export const SETUP: GuideSection[] = [
     title: "1. Property Settings",
     summary: "Fill these first. Guests see them on your booking page.",
     blocks: [
-      { type: "p", text: "Open **Property → Settings**. Small buttons at the top (**Basic**, **Branding**, **Photos**, **Payments** and more) jump to each part." },
+      { type: "p", text: "Open **Property → Settings**. Small buttons at the top (**Payments**, **Photos**, **Branding**, **Basic info**, **Owner**, **Location** and more) jump to each part." },
       {
         type: "list",
         items: [
@@ -486,7 +487,7 @@ export const PROBLEMS: GuideSection[] = [
       {
         type: "list",
         items: [
-          "**I recorded the wrong amount:** on the **Payments** page tap **Correct collected amount**.",
+          "**I recorded the wrong amount:** on the **Payments** page, tap the **pencil** button (**Correct collected amount**) on that booking's row.",
           "**It says Refund due:** the guest has paid more than the booking now costs. You return the money yourself, outside the app.",
           "**An agent's commission looks wrong:** check the default commission in **Agents & Commissions**. A percentage applies to the room rate; a flat amount is a fixed ₹ per booking.",
         ],
