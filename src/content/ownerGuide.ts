@@ -16,13 +16,13 @@ export type GuideBlock =
   | { type: "table"; head: string[]; rows: string[][] };
 
 /** Screenshot block. Files live in public/help/, 720 px wide WebP. */
-const shot = (file: string, alt: string, caption: string): GuideBlock => ({
+const shot = (file: string, alt: string, caption: string, height = 1232): GuideBlock => ({
   type: "image",
   src: `/help/${file}`,
   alt,
   caption,
   width: 720,
-  height: 1232,
+  height,
 });
 
 export type GuideSection = {
@@ -55,8 +55,8 @@ export const SITUATIONS: GuideSection[] = [
         ],
       },
       shot("08-quote-guest-stay.webp", "New quote form showing the guest fields and the stay calendar", "**1** Guest name and WhatsApp number. **2** Tap your check-in and check-out dates."),
-      shot("09-quote-rooms-addons.webp", "New quote form showing the room list and the add-ons list", "**1** Tap a room to include it and set its guests. **2** Pick the dates first, then choose add-ons here."),
-      shot("10-quote-discount-send.webp", "New quote form showing discount, validity date and the Send on WhatsApp button", "**1** Discount. **2** Quote valid until. **3** Send on WhatsApp."),
+      shot("09-quote-rooms-addons.webp", "New quote form showing the room list and the add-ons list", "**1** Tap a room to include it and set its guests. **2** Pick the dates first, then choose add-ons here. **3** Each add-on shows its price, option and guests.", 1679),
+      shot("10-quote-discount-send.webp", "New quote form showing discount, validity date and the Send on WhatsApp button", "**1** Discount. **2** Quote valid until. **3** Send on WhatsApp.", 1423),
       { type: "p", text: "When the guest says yes, find the quote under **Quotes** and tap **Convert to booking**. You can also mark a quote **Accepted** or **Lost** to keep the list tidy." },
       shot("22-quotes-list.webp", "Quotes list with a draft quote and its Send, Call, Edit, Convert to booking and Accepted buttons", "**1** Filter by Open, Accepted, Lost or All. **2** Send the quote on WhatsApp. **3** Convert it to a booking. **4** Mark it Accepted."),
       { type: "p", text: "The **Convert quote to booking** form opens already filled in. Room prices stay exactly as quoted, and add-ons are saved as **Extras** on the booking. It starts as **pending** and holds the dates until the advance arrives. Check the details and tap **Create booking**. A converted quote shows **Booked ✓** with a **View in Bookings** button. Ask for the advance, then follow \"The guest says they paid\" below." },
@@ -81,7 +81,7 @@ export const SITUATIONS: GuideSection[] = [
       },
       shot("01-home-needs-attention.webp", "Home screen with a booking request under Needs your attention", "**1** A new request appears under **Needs your attention**. Tap it to open the booking."),
       shot("02-booking-record-payment.webp", "Booking screen with the Confirm button and the Amount received field marked", "**1** Tap **Confirm** yourself, or **2** type the amount received in **Record advance payment**. **25% or more** confirms it by itself (the app suggests the 25% amount)."),
-      shot("30-booking-confirmed-prompt.webp", "Booking confirmed prompt with the Send confirmation on WhatsApp button", "**1** You can also send it later with **Send confirmation** at the top of the booking. **2** Tap **Send confirmation on WhatsApp**. **3** Or tap **Not now — I'll send it later**."),
+      shot("30-booking-confirmed-prompt.webp", "Booking confirmed prompt with the Send confirmation on WhatsApp button", "**1** Tap **Send confirmation on WhatsApp**. **2** Or tap **Not now — I'll send it later**. You can send it later with **Send confirmation** at the top of the booking."),
       { type: "note", label: "Watch out", text: "If you have not confirmed it or recorded the advance before the hold hours end (24 by default), the request is **cancelled and the dates released, with no message to anyone**. Check **Home** every few hours and reply early." },
     ],
   },
@@ -376,7 +376,7 @@ export const SETUP: GuideSection[] = [
           "Set its **Prices** in the same way as an add-on, then tap **Save**.",
         ],
       },
-      shot("19-package-form.webp", "Package form with name, description, how it is charged, and the add-ons it includes", "**1** Name. **2** How it is charged. **3** Tick the add-ons that are included."),
+      shot("19-package-form.webp", "Package form with name, description, how it is charged, and the add-ons it includes", "**1** Name. **2** How it is charged. **3** Tick the add-ons that are included.", 1335),
       { type: "p", text: "**Seasons** are your peak dates, such as Christmas or a festival. They are set up once in **Rooms & Pricing → Seasons**, and the same season can change room prices and add-on prices. When you add a season there, keep **Also use for add-ons & packages** ticked, then come back here and give each add-on and package its own price for it. **Leave a price blank to use the base price.** **Fill blanks** on the season can copy the base price (or base plus a percentage) into every blank for you." },
       { type: "note", label: "Good to know", text: "Guests cannot buy add-ons or packages online. You add them to a quote or booking after talking to the guest." },
     ],
