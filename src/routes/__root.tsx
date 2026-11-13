@@ -36,12 +36,16 @@ function RootComponent() {
   // replays the CSS entrance animation below — a gentle fade + rise instead
   // of the page just snapping into view.
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Admin pages share one layout (sidebar, auth check). Keying on every admin path
+  // remounted it on each tab switch, flashing the loading spinner. All admin paths
+  // share one key so the layout stays mounted; each page still animates in itself.
+  const transitionKey = pathname.startsWith("/admin") ? "admin" : pathname;
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <div
-          key={pathname}
+          key={transitionKey}
           className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)]"
         >
           <Outlet />

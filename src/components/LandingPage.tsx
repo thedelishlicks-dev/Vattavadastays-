@@ -935,6 +935,19 @@ export default function LandingPage() {
   const [selectedTier, setSelectedTier] = useState("");
   const [modalOpen, setModalOpen]       = useState(false);
 
+  // These two fonts are used only on this page, so they load here instead of on every
+  // property page (index.html carries just Fraunces + Inter for those).
+  useEffect(() => {
+    const id = "landing-fonts";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href =
+      "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,700&family=Noto+Sans+Malayalam:wght@400;500;600&display=swap";
+    document.head.appendChild(link);
+  }, []);
+
   const handleSelectTier = useCallback((tier: string) => {
     setSelectedTier(tier);
     setModalOpen(true);
