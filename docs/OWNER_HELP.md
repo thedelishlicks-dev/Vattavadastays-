@@ -57,7 +57,6 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `02-booking-record-payment` | Booking: Confirm, Amount received | `guest-request`, `guest-says-paid` |
 | `03-room-photos-and-guests` | Room editor: photos, guests | `setup-rooms` |
 | `04-room-pricing` | Base, extra guest, weekend, preview | `seasonal-rates` |
-| `05-seasonal-rates` | **RETIRED 10 Nov** (old room-editor form; removed from the guide). Replace with a Seasons screenshot, see below | — |
 | `07-add-booking` | Add booking form | `phone-booking` |
 | `08`, `09`, `10` quote: guest + stay, rooms + add-ons, discount + send | New quote | `guest-asks-price` |
 | `11-money-payments-summary` | Money → Payments monthly chart | `check-out-day` |
@@ -65,9 +64,7 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `13-payments-overview` | Collected / Outstanding / Total billed | `problem-money` |
 | `14-edit-stay` | Edit Stay Details | `change-or-leave-early` |
 | `15-calendar-all-rooms`, `16-calendar-day-panel` | Calendar, All rooms, day panel | `read-calendar` |
-| `17-seasonal-rate-form` | **RETIRED 10 Nov** (old form; removed from the guide) | — |
 | `18-addon-form`, `19-package-form` | Add-ons page | `setup-addons` |
-| `20-addon-seasons`, `23-addon-season-form` | **RETIRED 10 Nov** (old Seasons box; removed from the guide) | — |
 | `21-quote-convert-booking`, `22-quotes-list` | Quotes list, convert | `guest-asks-price` |
 | `24-policies` | Policies | `setup-policies` |
 | `25-payment-setup` (UPI ID blurred) | Payment setup | `setup-payments` |
@@ -79,7 +76,7 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `33-add-season-form` | Add season form | `raise-prices` |
 | `34-agent-opened` | An agent opened, with the **Paid** button | `agent-guest` |
 
-`06-calendar` was retired (old text-in-cell calendar) and is no longer in the repo. `public/help/Help images` is an empty placeholder file made when the folder was created; it can be deleted.
+`05`, `06`, `17`, `20` and `23` were retired (old calendar, room-editor season form and add-on Seasons box) and deleted on 13 Nov 2026, along with the empty `Help images` placeholder. Their numbers are not reused.
 
 ### Rules
 - **Names:** lowercase, hyphens, start with a two-digit number, `.webp`. The guide refers to files by exact name; renaming one means editing `ownerGuide.ts`.
