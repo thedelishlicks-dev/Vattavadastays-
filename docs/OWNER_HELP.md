@@ -75,6 +75,9 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `29-block-dates` | Block dates | `block-dates` |
 | `30-booking-confirmed-prompt` | "Booking confirmed" prompt | `guest-request` |
 | `31-calendar-single-room` | Single-room calendar bars | `read-calendar` |
+| `32-seasons-card` | Rooms & Pricing → Seasons, a season card (Room prices, Add-ons & packages) | `seasonal-rates` |
+| `33-add-season-form` | Add season form | `raise-prices` |
+| `34-agent-opened` | An agent opened, with the **Paid** button | `agent-guest` |
 
 `06-calendar` was retired (old text-in-cell calendar) and is no longer in the repo. `public/help/Help images` is an empty placeholder file made when the folder was created; it can be deleted.
 
@@ -88,6 +91,22 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 
 > **11 Nov 2026: every screenshot is now out of date.** The owner side got a new look (soft flat cards, round buttons, one dialog style, avatar list on Payments, flat Calendar, pill navigation; see HANDOVER §10 item 50). Names and steps in the text are still right (the one wording change: Payments now says **View … in the list →**), but retake all screenshots in one session on the demo property so the guide looks consistent. Order of value: Home, Booking, Payments, Calendar, Block dates, Rooms editor, Settings.
 
+> **13 Nov 2026: 12 screenshots retaken in the new look, 3 new ones added, 14 still old.**
+> Retaken (720 × 1232, status bar cropped, numbered red boxes, UPI ID pixelated): `11`, `12`, `13`, `15`, `16`, `18`, `22`, `25`, `27`, `28`, `29`, `31`. New: `32-seasons-card` and `33-add-season-form` (in `seasonal-rates` and `raise-prices`), `34-agent-opened` (in `agent-guest`). Wording fixes made with them: the agent booking button is **Paid** (not "Mark paid"); the Block dates button reads **Block nights**, then **Block 1 night**; **Set room prices** becomes **Add or change a room price** once a season has a room price.
+> **Still the old look, retake on the demo property:**
+> - `01-home-needs-attention`: needs a **pending request** under Needs your attention (the new Home shows a check-in item).
+> - `02-booking-record-payment`: needs a **pending** booking so **Confirm** and **Record advance payment** both show.
+> - `30-booking-confirmed-prompt`: the prompt right after tapping Confirm.
+> - `07-add-booking`: top of the form (guest name, phone, how it came in, room list).
+> - `14-edit-stay`: Edit Stay Details with the calendar and dates.
+> - `08`, `09`, `10` quote screens: guest and stay; rooms and add-ons; the bottom with **Send on WhatsApp**.
+> - `21-quote-convert-booking`: the pre-filled convert form.
+> - `03-room-photos-and-guests`, `04-room-pricing`: the room editor.
+> - `19-package-form`: the package form.
+> - `24-policies`: Policies.
+> - `26-charges-tab`: Charges tab with an item chosen so Option, People and **Add to extras** show.
+> A WhatsApp screenshot (the guest confirmation message) was offered and **not used**: it shows a live tracking link and a phone number.
+
 > **12 Nov 2026: the page and the wording are updated, the screenshots are not.** `src/routes/help.tsx` now uses the 11 Nov owner-side look (soft `rounded-3xl` cards, round buttons and chips, no shadows, no uppercase labels, no serif headings). In `ownerGuide.ts`: the Settings jump buttons are named as they appear (**Payments, Photos, Branding, Basic info, Owner, Location**); **Correct collected amount** is the **pencil** button on a Payments row; "View … in the list →" replaces "in ledger" in the screenshot caption; the confirmation prompt button reads **Not now — I'll send it later**; Seasons say **Starts** / **Ends (last night included)**; added the **Record part payment** / **New payment (₹)** wording and the **Mark fully paid** → **Open booking** banner. Screenshots still show the old look and must be retaken (see above).
 
 The guide quotes button and field names exactly (for example **Edit Stay**, **Add to extras**, **Block 1 night**). When you change one of these, or a rule an owner follows (the 25 % advance gate, the hold hours, rate maths):
@@ -98,7 +117,7 @@ The guide quotes button and field names exactly (for example **Edit Stay**, **Ad
 
 Statements in the guide worth re-checking when code changes: the 25 % rule confirms a pending booking; a pending request is cancelled silently when its hold ends; the weekend multiplier applies on top of a season price; the last night of a season is included; overlapping seasons: higher priority, then shorter; a one-room price beats "All rooms" inside a season; a season with no Room prices never changes room prices.
 
-**Screenshots to retake after rollout (new Seasons screen, on the demo property):** (1) Rooms & Pricing with the Seasons section and one season card showing Room prices and Add-ons & packages; (2) the Add season form with the Room prices box; (3) a room editor showing Season prices. Add them to `raise-prices` and `seasonal-rates`.
+**Seasons screenshots:** the Seasons card (`32`) and the Add season form (`33`) are done. Still to take: a room editor showing **Season prices** (add it to `seasonal-rates`).
 
 Not screenshot-verified in the guide: that the booking shows **Refund due** after saving a shorter stay (the warning before saving is verified in code); the single-room "red bar" reopen tap; that "arriving" counts multi-room bookings correctly.
 
