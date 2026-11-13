@@ -256,7 +256,7 @@ export const SITUATIONS: GuideSection[] = [
           "Open the **Invoice** tab if the guest wants a printed copy.",
         ],
       },
-      shot("26-charges-tab.webp", "Charges tab with the catalog dropdown, option, people and Add to extras button", "**1** Choose an item from your catalog. **2** Choose its option. **3** Set the number of people. **4** Tap Add to extras."),
+      shot("26-charges-tab.webp", "Charges tab with the catalog dropdown and the box for your own charge", "**1** Choose an add-on or package from your catalog. Once you pick one, its **Option** (if it has one), **People** or **Qty**, and **Add to extras** appear. **2** Or add your own charge: a description, a number, a price, then **Add**."),
       shot("28-checkout-summary.webp", "A completed booking with its payment summary showing Fully paid", "**1** The Charges tab shows a number when extras were added. **2** The payment summary. **3** **Fully paid** means nothing is left to collect."),
       shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
       { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page, find the booking and tap the **pencil** button (**Correct collected amount**) on its row. Enter the right figure." },
@@ -322,7 +322,7 @@ export const SETUP: GuideSection[] = [
         ],
       },
       { type: "p", text: "A **Price preview** shows a weekday and a weekend night so you can check before saving." },
-      shot("04-room-pricing.webp", "Room pricing fields with the price preview", "**1** Base price (Sunday to Thursday). **2** Extra guest charge. **3** Weekend multiplier. **4** Price preview."),
+      shot("04-room-pricing.webp", "Room editor showing the weekend multiplier, the price preview and the Season prices note", "**1** **Weekend multiplier (Fri – Sat)**. **2** **Price preview**: a weekday night, a weekend night and the extra guest charge. **3** **Season prices** shows whether a season changes this room. Change seasons in **Seasons**, at the top of the page. (**Base price** and **Extra guest charge** sit just above these.)"),
       { type: "p", text: "**Seasons** change prices for set dates, such as Christmas or April–May. You set them once, at the top of **Rooms & Pricing**: tap **Add season**, name it, pick the dates (the last night is included) and tick **Repeats every year** if the dates never move. Then choose what changes: on the season, **Room prices** can be **% change on base price** (30 for 30% higher, −20 for 20% lower) or **Fixed ₹ per night**, for **All rooms** or for one room. A room's editor shows its season prices, and **Change season prices** takes you back to Seasons." },
       shot("32-seasons-card.webp", "Rooms and Pricing page with the Seasons box and a New Year season showing Room prices and Add-ons and packages", "**1** A season shows its name and dates. Use the pencil to edit it. **2** **Room prices**: this season adds 20% to Misty Ridge Room. **3** **Add or change a room price**. **4** **Add-ons & packages** can have their own price for the season."),
       {
