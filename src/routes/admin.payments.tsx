@@ -18,7 +18,10 @@ import { Modal, ModalActions, Button, StatusChip, EmptyState, fieldCls, type Ton
 import { MiniBarChart } from "@/components/MiniBarChart";
 import { PageHeader } from "@/admin/formKit";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings, useBookingGroups } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups, useBookingTotal, KEEP_UNPAID_BOOKINGS, KEEP_UNPAID_GROUPS } from "@/hooks/useBookings";
+import { useHistoryWindow } from "@/hooks/useHistoryWindow";
+import { HistoryWindowBar } from "@/components/HistoryWindowBar";
+import { inWindow, sinceLabel } from "@/lib/historyWindow";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Booking, BookingGroup } from "@/types/database";
@@ -303,8 +306,13 @@ function PaymentActionModal({
 
 function AdminPayments() {
   const { data: property, isLoading } = useOwnerProperty();
-  const { data: bookings = [], isFetched: bookFetched } = useBookings(property?.id ?? "");
-  const { data: groups = [], isFetched: groupsFetched } = useBookingGroups(property?.id ?? "", { slim: true });
+  // Only the last 6 months of stays load at first (more on request), plus any older stay that still
+  // has a balance, so money owed never drops out of view. See lib/historyWindow.ts.
+  const win = useHistoryWindow();
+  const { data: bookings = [], isPending: bookPending, isFetching: bookFetching } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_BOOKINGS, keepPrevious: true });
+  const { data: groups = [], isPending: groupsPending, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_GROUPS, keepPrevious: true, slim: true });
+  const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
+  const hasMoreHistory = bookingTotal != null && bookingTotal > bookings.length;
   const queryClient = useQueryClient();
 
   const navigate = useNavigate();
@@ -380,25 +388,29 @@ function AdminPayments() {
     return [...fromBookings, ...fromGroups];
   }, [standaloneBookings, groups]);
 
-  // Stats are computed over the FULL ledger (not the filtered/searched view)
-  // so the two headline numbers always reflect the whole business, no matter
-  // what the table below is currently scoped to.
+  // Stats are computed over the whole loaded ledger (not the filtered/searched view), so they do not
+  // change with the table's tab or search. With a limited history, Collected / Billed / the counts
+  // cover stays inside the window (labelled "since ..."), while Outstanding and "not started" cover
+  // everything loaded, including older stays that still have a balance.
+  const windowItems = useMemo(() => items.filter((i) => inWindow(i.check_in, win.from)), [items, win.from]);
   const stats = useMemo(() => {
-    const totalCollected = items.reduce((s, i) => s + i.advance_amount, 0);
+    const totalCollected = windowItems.reduce((s, i) => s + i.advance_amount, 0);
     const totalOutstanding = items.reduce((s, i) => s + balanceOf(i), 0);
-    const totalBilled = items.reduce((s, i) => s + grossTotal(i), 0);
-    const fullyPaid = items.filter((i) => i.is_paid).length;
-    const partPaid = items.filter((i) => !i.is_paid && i.advance_amount > 0).length;
+    const totalBilled = windowItems.reduce((s, i) => s + grossTotal(i), 0);
+    const fullyPaid = windowItems.filter((i) => i.is_paid).length;
+    const partPaid = windowItems.filter((i) => !i.is_paid && i.advance_amount > 0).length;
     const unpaid = items.filter((i) => !i.is_paid && i.advance_amount === 0).length;
     return { totalCollected, totalOutstanding, totalBilled, fullyPaid, partPaid, unpaid };
-  }, [items]);
+  }, [items, windowItems]);
+  const sinceTag = win.from && hasMoreHistory ? ` · since ${sinceLabel(win.from)}` : "";
 
   // One entry per check-in month, most recent first — feeds the trend chart
   // and the month-scrubber below. This is never rendered as a one-row-per-
   // month table, so it doesn't grow the page as history piles up.
   const monthlyStats = useMemo(() => {
     const map = new Map<string, MonthSummary>();
-    items.forEach((i) => {
+    // Window only: an older unpaid stay would otherwise appear as a lone, misleading partial month.
+    windowItems.forEach((i) => {
       const key = i.check_in.slice(0, 7);
       const entry = map.get(key) ?? {
         monthKey: key,
@@ -414,7 +426,7 @@ function AdminPayments() {
       map.set(key, entry);
     });
     return [...map.values()].sort((a, b) => b.monthKey.localeCompare(a.monthKey));
-  }, [items]);
+  }, [windowItems]);
 
   // Fixed-size trend: always just the most recent 6 months that have data,
   // oldest to newest left-to-right, no matter how much history exists
@@ -565,13 +577,22 @@ function AdminPayments() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading || (!!property?.id && (!bookFetched || !groupsFetched))) {
+  if (isLoading || (!!property?.id && (bookPending || groupsPending))) {
     return <div className="h-48 rounded-3xl bg-muted animate-pulse" />;
   }
 
   return (
     <div className="space-y-6 max-w-3xl">
       <PageHeader title="Payments" subtitle="Track collections and outstanding balances across all bookings." />
+
+      <HistoryWindowBar
+        from={win.from}
+        hasMore={hasMoreHistory}
+        loading={bookFetching || groupsFetching}
+        onMore={win.loadMore}
+        onAll={win.loadAll}
+        note="older stays that still have a balance"
+      />
 
       {justConfirmed && (
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-900">
@@ -595,7 +616,7 @@ function AdminPayments() {
       {/* Headline: one big number, two quiet cards beside it */}
       <div className="space-y-3">
         <div className="rounded-3xl bg-[var(--section-soft)] px-6 py-5">
-          <p className="text-sm text-[var(--section-ink)]">Collected</p>
+          <p className="text-sm text-[var(--section-ink)]">Collected{sinceTag}</p>
           <p className="text-4xl md:text-5xl font-bold tracking-tight tabular-nums text-[var(--section-ink)]">₹{stats.totalCollected.toLocaleString("en-IN")}</p>
           <p className="mt-1 text-sm text-[var(--section-ink)]/80">{stats.fullyPaid} fully paid · {stats.partPaid} part paid</p>
         </div>
@@ -606,7 +627,7 @@ function AdminPayments() {
             <p className="mt-0.5 text-xs text-[#9f1239]">{stats.unpaid} not started</p>
           </div>
           <div className="rounded-3xl bg-card border border-border/60 px-5 py-4">
-            <p className="text-sm text-muted-foreground">Total billed</p>
+            <p className="text-sm text-muted-foreground">Total billed{sinceTag}</p>
             <p className="text-2xl font-semibold tabular-nums">₹{stats.totalBilled.toLocaleString("en-IN")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">Rooms + extras − discounts</p>
           </div>
