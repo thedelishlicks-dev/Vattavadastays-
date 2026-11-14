@@ -17,6 +17,7 @@ import {
 import { Modal, ModalActions, Button, StatusChip, EmptyState, fieldCls, type Tone } from "@/components/ds";
 import { MiniBarChart } from "@/components/MiniBarChart";
 import { PageHeader } from "@/admin/formKit";
+import { LoadFailed } from "@/components/LoadFailed";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useBookings, useBookingGroups, useBookingTotal, KEEP_UNPAID_BOOKINGS, KEEP_UNPAID_GROUPS } from "@/hooks/useBookings";
 import { useHistoryWindow } from "@/hooks/useHistoryWindow";
@@ -309,8 +310,8 @@ function AdminPayments() {
   // Only the last 6 months of stays load at first (more on request), plus any older stay that still
   // has a balance, so money owed never drops out of view. See lib/historyWindow.ts.
   const win = useHistoryWindow();
-  const { data: bookings = [], isPending: bookPending, isFetching: bookFetching } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_BOOKINGS, keepPrevious: true });
-  const { data: groups = [], isPending: groupsPending, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_GROUPS, keepPrevious: true, slim: true });
+  const { data: bookings = [], isPending: bookPending, isFetching: bookFetching, isError: bookError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_BOOKINGS, keepPrevious: true });
+  const { data: groups = [], isPending: groupsPending, isFetching: groupsFetching, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_GROUPS, keepPrevious: true, slim: true });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const hasMoreHistory = bookingTotal != null && bookingTotal > bookings.length;
   const queryClient = useQueryClient();
@@ -579,6 +580,10 @@ function AdminPayments() {
 
   if (isLoading || (!!property?.id && (bookPending || groupsPending))) {
     return <div className="h-48 rounded-3xl bg-muted animate-pulse" />;
+  }
+  // Without this the page showed ₹0 collected / ₹0 outstanding, which looks like the real answer.
+  if (bookError || groupsError) {
+    return <LoadFailed title="Couldn't load your payments" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
   }
 
   return (

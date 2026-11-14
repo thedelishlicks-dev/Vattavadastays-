@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdminEmail } from '@/lib/subdomain'
 import { AdminLayout } from '@/admin/AdminLayout'
 import { useOwnerProperty } from '@/hooks/useOwnerProperty'
+import { LoadFailed } from '@/components/LoadFailed'
 
 export const Route = createFileRoute('/admin')({
   component: AdminGuard,
@@ -17,7 +18,8 @@ function AdminGuard() {
   const propertySubdomain = new URLSearchParams(window.location.search).get('property') ?? ''
   const superAdminManaging = isSuperAdmin && !!propertySubdomain
 
-  const { data: property } = useOwnerProperty()
+  const propertyQuery = useOwnerProperty()
+  const property = propertyQuery.data
 
   const manifestSubdomain = isSuperAdmin ? propertySubdomain : (property?.subdomain ?? '')
 
@@ -76,6 +78,26 @@ function AdminGuard() {
 
   if (!isAuthenticated) return null
   if (isSuperAdmin && !superAdminManaging) return null
+
+  // Every admin page needs the property. If it could not be loaded, say so, instead of letting the
+  // pages below fall back to "No bookings yet", ₹0 totals or a grey skeleton that never ends.
+  if (propertyQuery.isError && !property) {
+    const notFound = (propertyQuery.error as { code?: string } | null)?.code === 'PGRST116'
+    return (
+      <div className="min-h-dvh flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          {notFound ? (
+            <LoadFailed
+              title={superAdminManaging ? "That property wasn't found" : 'No property is linked to this account'}
+              detail={superAdminManaging ? 'Check the property name in the address.' : "Ask Stayidom support to link your property to this login."}
+            />
+          ) : (
+            <LoadFailed title="Couldn't load your property" onRetry={() => void propertyQuery.refetch()} />
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

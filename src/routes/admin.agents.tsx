@@ -23,6 +23,7 @@ import { useHistoryWindow } from "@/hooks/useHistoryWindow";
 import { HistoryWindowBar } from "@/components/HistoryWindowBar";
 import { fetchAllRows } from "@/lib/paginate";
 import { AgentFormModal } from "@/components/AgentFormModal";
+import { LoadFailed } from "@/components/LoadFailed";
 import { supabase } from "@/lib/supabase";
 import type { Agent, Booking, BookingGroup, CommissionType } from "@/types/database";
 
@@ -69,12 +70,12 @@ async function fetchAgentRows(propertyId: string, agentId?: string) {
 
 function AdminAgents() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  const { data: agents = [], isLoading: agentsLoading } = useAgents(property?.id ?? "");
+  const { data: agents = [], isLoading: agentsLoading, isError: agentsError, refetch: refetchAgents } = useAgents(property?.id ?? "");
   // Only the last 6 months of stays load at first (more on request), plus every older agent stay whose
   // commission is still unpaid, so "owed" stays complete. See lib/historyWindow.ts.
   const win = useHistoryWindow();
-  const { data: bookings = [], isFetching: bookFetching } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_BOOKINGS, keepPrevious: true, withCharges: false });
-  const { data: groups = [], isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_GROUPS, keepPrevious: true, slim: true });
+  const { data: bookings = [], isFetching: bookFetching, isError: bookError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_BOOKINGS, keepPrevious: true, withCharges: false });
+  const { data: groups = [], isFetching: groupsFetching, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_GROUPS, keepPrevious: true, slim: true });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const hasMoreHistory = bookingTotal != null && bookingTotal > bookings.length;
   const [exporting, setExporting] = useState(false);
@@ -217,6 +218,10 @@ function AdminAgents() {
 
   if (propLoading || agentsLoading) {
     return <div className="h-48 rounded-xl bg-muted animate-pulse" />;
+  }
+  // Otherwise: "No agents yet" or "₹0 owed" when the real problem is that nothing loaded.
+  if (agentsError || bookError || groupsError) {
+    return <LoadFailed title="Couldn't load your agents and commissions" onRetry={() => { void refetchAgents(); void refetchBookings(); void refetchGroups(); }} />;
   }
 
   return (

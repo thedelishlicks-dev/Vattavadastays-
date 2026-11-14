@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { LoadFailed } from "@/components/LoadFailed";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
 import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
@@ -483,8 +484,8 @@ function DashboardPage() {
     const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
     return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
   }, []);
-  const { data: bookings = [], isLoading: bookLoading, isFetched: bookFetched } = useBookings(property?.id ?? "", { from: windowFrom });
-  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
+  const { data: bookings = [], isLoading: bookLoading, isFetched: bookFetched, isError: bookError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: windowFrom });
+  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const [modal, setModal] = useState<Modal>(null);
 
@@ -589,6 +590,10 @@ function DashboardPage() {
         ))}
       </div>
     );
+  }
+
+  if (bookError || groupsError) {
+    return <LoadFailed title="Couldn't load your bookings" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
   }
 
   // Only show the stats strip once there's real booking history — an empty
