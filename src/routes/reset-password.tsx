@@ -23,13 +23,14 @@ function ResetPasswordPage() {
     // By the time the component mounts, the session may already be set.
     // Check both: existing session AND the onAuthStateChange event.
 
-    let settled = false;
+    let ready = false;
 
+    // Also clears "expired": on slow mobile data the link can be processed AFTER the
+    // timeout below has already fired, and a valid link must still work then.
     const markReady = () => {
-      if (!settled) {
-        settled = true;
-        setSessionReady(true);
-      }
+      ready = true;
+      setSessionReady(true);
+      setLinkExpired(false);
     };
 
     // 1. Check if session already exists (token processed before mount)
@@ -46,13 +47,11 @@ function ResetPasswordPage() {
       }
     });
 
-    // 3. Timeout — if nothing fires in 8 seconds, link is likely expired
+    // 3. Timeout — if nothing fires in 20 seconds, link is likely expired. (Was 8 s, which
+    // showed "expired" for valid links on weak signal.) A late event still recovers, see markReady.
     const timeout = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        setLinkExpired(true);
-      }
-    }, 8000);
+      if (!ready) setLinkExpired(true);
+    }, 20000);
 
     return () => {
       subscription.unsubscribe();

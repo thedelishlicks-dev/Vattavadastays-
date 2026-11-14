@@ -998,8 +998,8 @@ type BookingListItem =
 
 function BookingsAdmin() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  const { data: bookings = [], isLoading: bookingsLoading, isFetched: bookingsFetched } = useBookings(property?.id ?? "");
-  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched } = useBookingGroups(property?.id ?? "");
+  const { data: bookings = [], isLoading: bookingsLoading, isFetched: bookingsFetched, isFetching: bookingsFetching } = useBookings(property?.id ?? "");
+  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
@@ -1026,12 +1026,13 @@ function BookingsAdmin() {
   // already ended, or a status filter is applied).
   useEffect(() => {
     // Wait until the property is known AND both lists have really been fetched.
-    // On a full page load (e.g. the dashboard's plain <a> link) the property is
-    // still loading, the queries are disabled and the lists are empty — running
-    // before that point found nothing and then erased ?bookingId= from the URL,
-    // so the booking card never opened.
+    // On a full page load the property is still loading, the queries are disabled and
+    // the lists are empty — running before that point found nothing and then erased
+    // ?bookingId= from the URL, so the booking card never opened. Arriving by in-app
+    // link has the mirror problem: the lists may be cached but stale (a booking made
+    // seconds ago is missing), so also wait for any refetch to finish.
     if (!property?.id || !bookingsFetched || !groupsFetched) return;
-    if (bookingsLoading || groupsLoading) return;
+    if (bookingsLoading || groupsLoading || bookingsFetching || groupsFetching) return;
     const params = new URLSearchParams(window.location.search);
     const bookingId = params.get("bookingId");
     const groupId = params.get("groupId");
@@ -1054,7 +1055,7 @@ function BookingsAdmin() {
     url.searchParams.delete("bookingId");
     url.searchParams.delete("groupId");
     window.history.replaceState({}, "", url.toString());
-  }, [property?.id, bookingsFetched, groupsFetched, bookingsLoading, groupsLoading, bookings, groups]);
+  }, [property?.id, bookingsFetched, groupsFetched, bookingsLoading, groupsLoading, bookingsFetching, groupsFetching, bookings, groups]);
 
   const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
   const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; (property?.rooms ?? []).forEach((r) => { map[r.id] = r.name; }); return map; }, [property]);

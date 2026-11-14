@@ -577,7 +577,16 @@ function AdminPayments() {
         <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-900">
           <span>✅ {justConfirmed.guest}'s booking is now confirmed. Send them the confirmation and tracking link.</span>
           <span className="flex items-center gap-3">
-            <a href={`/admin/bookings?${justConfirmed.kind === "group" ? "groupId" : "bookingId"}=${encodeURIComponent(justConfirmed.id)}${new URLSearchParams(window.location.search).get("property") ? `&property=${encodeURIComponent(new URLSearchParams(window.location.search).get("property") ?? "")}` : ""}`} className="rounded-full bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90">Open booking</a>
+            <Link
+              to="/admin/bookings"
+              search={{
+                ...(new URLSearchParams(window.location.search).get("property") ? { property: new URLSearchParams(window.location.search).get("property") } : {}),
+                ...(justConfirmed.kind === "group" ? { groupId: justConfirmed.id } : { bookingId: justConfirmed.id }),
+              } as never}
+              className="rounded-full bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
+            >
+              Open booking
+            </Link>
             <button type="button" onClick={() => setJustConfirmed(null)} className="text-xs underline">Dismiss</button>
           </span>
         </div>
