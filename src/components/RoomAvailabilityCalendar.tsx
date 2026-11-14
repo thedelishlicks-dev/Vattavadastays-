@@ -76,14 +76,17 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
 
   const [blockedByRoom, setBlockedByRoom] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(false);
+  // True when the last availability lookup failed. Without this the calendar showed every day as free.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setLoadFailed(false);
     if (roomIds.length === 0) { setBlockedByRoom({}); return; }
     setLoading(true);
     getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe, exclude)
       .then((res) => { if (!cancelled) setBlockedByRoom(res); })
-      .catch(() => { if (!cancelled) setBlockedByRoom({}); })
+      .catch(() => { if (!cancelled) { setBlockedByRoom({}); setLoadFailed(true); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,6 +96,10 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     blockedWhen === "all"
       ? roomIds.length > 0 && roomIds.every((id) => blockedByRoom[id]?.has(dateStr))
       : roomIds.some((id) => blockedByRoom[id]?.has(dateStr));
+
+  // With no room picked yet ("all" mode) a day is red only when EVERY room is taken. Days where some,
+  // but not all, rooms are taken are shown amber so partial bookings are visible too.
+  const takenRooms = (dateStr: string) => roomIds.filter((id) => blockedByRoom[id]?.has(dateStr)).length;
 
   const getDateState = (date: Date): DateState => {
     if (!isSameMonth(date, month)) return "out-of-month";
@@ -196,15 +203,20 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
           // check (excluding this day) decides if the range is actually free.
           const state: DateState = rawState === "blocked" && isCandidateCheckout ? "available" : rawState;
           const selected = inRange(d);
+          const dateStr = format(d, "yyyy-MM-dd");
+          const partialCount = blockedWhen === "all" && state === "available" ? takenRooms(dateStr) : 0;
+          const partial = partialCount > 0;
 
           let cellCls = "aspect-square rounded-md text-xs font-medium transition-colors ";
           if (state === "out-of-month") cellCls += "text-muted-foreground/20 cursor-default";
           else if (state === "past") cellCls += "text-muted-foreground/30 cursor-default line-through";
           else if (state === "blocked" && !(softBlock && (isStart || isEnd))) {
-            cellCls += softBlock ? "bg-red-50 text-red-400 cursor-pointer hover:bg-red-100" : "bg-red-50 text-red-300 cursor-not-allowed";
+            // Quote mode uses a stronger red: the pale one was easy to miss on a phone.
+            cellCls += softBlock ? "bg-red-100 text-red-600 cursor-pointer hover:bg-red-200" : "bg-red-50 text-red-300 cursor-not-allowed";
           }
           else if (isStart || isEnd) cellCls += "bg-primary text-primary-foreground cursor-pointer";
           else if (selected) cellCls += "bg-primary-light text-primary cursor-pointer";
+          else if (partial) cellCls += "bg-amber-100 text-amber-800 cursor-pointer hover:bg-amber-200";
           else cellCls += "text-foreground hover:bg-primary-light cursor-pointer";
 
           return (
@@ -213,7 +225,7 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
               type="button"
               disabled={state === "past" || state === "out-of-month" || (state === "blocked" && !softBlock && !isStart && !isEnd)}
               onClick={() => handlePick(d)}
-              title={state === "blocked" ? (softBlock ? "Already booked — you can still quote" : "Not available") : undefined}
+              title={state === "blocked" ? (softBlock ? "Already booked — you can still quote" : "Not available") : partial ? `${partialCount} of ${roomIds.length} rooms booked` : undefined}
               className={cellCls}
             >
               {format(d, "d")}
@@ -224,9 +236,16 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-background border border-border" />Available</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-50 border border-red-200" />{blockedWhen === "all" ? "Fully booked" : "Not available"}</span>
+        {blockedWhen === "all" && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300" />Some rooms booked</span>}
+        <span className="flex items-center gap-1"><span className={`w-2.5 h-2.5 rounded-sm border ${softBlock ? "bg-red-100 border-red-300" : "bg-red-50 border-red-200"}`} />{blockedWhen === "all" ? "Fully booked" : "Not available"}</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-primary" />Selected</span>
       </div>
+
+      {loadFailed && (
+        <p role="alert" className="text-xs text-destructive mt-2">
+          Couldn't load availability, so booked days may show as free. Check your connection, then change the month to try again.
+        </p>
+      )}
 
       {roomIds.length === 0 && (
         <p className="text-xs text-muted-foreground mt-2">Select a room below to see its availability.</p>
