@@ -28,6 +28,7 @@ import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { Modal, ModalActions, ModalTab, Button, fieldCls } from "@/components/ds";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { LoadFailed } from "@/components/LoadFailed";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 import { computeBalance, meetsConfirmationAdvance, advanceAmount } from "@/lib/balance";
 
@@ -1016,8 +1017,8 @@ function BookingsAdmin() {
   // Active and Outstanding counts stay complete) instead of every booking ever made. Browsing an older
   // month in "By month" loads back to cover it, 6 months at a time. See lib/historyWindow.ts.
   const loadFrom = useMemo(() => windowStartForMonth(new Date(), monthCursor.year, monthCursor.month), [monthCursor.year, monthCursor.month]);
-  const { data: bookings = [], isLoading: bookingsLoading, isPending: bookingsPending, isFetched: bookingsFetched, isFetching: bookingsFetching } = useBookings(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_BOOKINGS, keepPrevious: true });
-  const { data: groups = [], isLoading: groupsLoading, isPending: groupsPending, isFetched: groupsFetched, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_GROUPS, keepPrevious: true });
+  const { data: bookings = [], isLoading: bookingsLoading, isPending: bookingsPending, isFetched: bookingsFetched, isFetching: bookingsFetching, isError: bookingsError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_BOOKINGS, keepPrevious: true });
+  const { data: groups = [], isLoading: groupsLoading, isPending: groupsPending, isFetched: groupsFetched, isFetching: groupsFetching, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_GROUPS, keepPrevious: true });
 
   // Deep-link support: the dashboard's "Needs your attention" rows link
   // here with ?bookingId=<id> or ?groupId=<id> so tapping a specific
@@ -1183,6 +1184,7 @@ function BookingsAdmin() {
   const totalItems = sortedItems.length;
 
   if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>;
+  if (bookingsError || groupsError) return <LoadFailed title="Couldn't load your bookings" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
 
   return (
     <div
