@@ -27,7 +27,7 @@ export function Hero() {
       : "";
 
   return (
-    <section id="top" className="relative h-[88vh] min-h-[560px] w-full overflow-hidden">
+    <section id="top" className="relative h-[88svh] min-h-[560px] w-full overflow-hidden">
       {heroImage ? (
         <img
           src={heroImage}

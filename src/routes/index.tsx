@@ -171,7 +171,7 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         </div>
 
         {/* Hero skeleton */}
-        <div className="relative flex h-[88vh] min-h-[560px] w-full flex-col items-center justify-center gap-4 bg-muted/60 overflow-hidden">
+        <div className="relative flex h-[88svh] min-h-[560px] w-full flex-col items-center justify-center gap-4 bg-muted/60 overflow-hidden">
           <div className="h-24 w-24 rounded-full bg-muted animate-pulse md:h-32 md:w-32" />
           <div className="h-7 w-56 rounded-md bg-muted animate-pulse" />
           <div className="h-4 w-40 rounded-md bg-muted animate-pulse" />
