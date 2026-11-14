@@ -18,7 +18,10 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAgents, useDeleteAgent } from "@/hooks/useAgents";
-import { useBookings, useBookingGroups } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups, useBookingTotal, KEEP_OWED_COMMISSION_BOOKINGS, KEEP_OWED_COMMISSION_GROUPS } from "@/hooks/useBookings";
+import { useHistoryWindow } from "@/hooks/useHistoryWindow";
+import { HistoryWindowBar } from "@/components/HistoryWindowBar";
+import { fetchAllRows } from "@/lib/paginate";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { supabase } from "@/lib/supabase";
 import type { Agent, Booking, BookingGroup, CommissionType } from "@/types/database";
@@ -48,11 +51,33 @@ function thisMonthKey() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+// Every agent booking and group of the property (optionally one agent's), whatever the page's
+// history window is. Used where the answer must be complete: the delete warning and the CSV export.
+async function fetchAgentRows(propertyId: string, agentId?: string) {
+  const bookings = await fetchAllRows<any>((from, to) => {
+    let q = supabase.from("bookings").select("*", { count: "exact" }).eq("property_id", propertyId).not("agent_id", "is", null);
+    if (agentId) q = q.eq("agent_id", agentId);
+    return q.order("id").range(from, to);
+  });
+  const groups = await fetchAllRows<any>((from, to) => {
+    let q = supabase.from("booking_groups").select("*, bookings(id)", { count: "exact" }).eq("property_id", propertyId).not("agent_id", "is", null);
+    if (agentId) q = q.eq("agent_id", agentId);
+    return q.order("id").range(from, to);
+  });
+  return { bookings: bookings as Booking[], groups: groups as BookingGroup[] };
+}
+
 function AdminAgents() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   const { data: agents = [], isLoading: agentsLoading } = useAgents(property?.id ?? "");
-  const { data: bookings = [] } = useBookings(property?.id ?? "");
-  const { data: groups = [] } = useBookingGroups(property?.id ?? "", { slim: true });
+  // Only the last 6 months of stays load at first (more on request), plus every older agent stay whose
+  // commission is still unpaid, so "owed" stays complete. See lib/historyWindow.ts.
+  const win = useHistoryWindow();
+  const { data: bookings = [], isFetching: bookFetching } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_BOOKINGS, keepPrevious: true, withCharges: false });
+  const { data: groups = [], isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_OWED_COMMISSION_GROUPS, keepPrevious: true, slim: true });
+  const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
+  const hasMoreHistory = bookingTotal != null && bookingTotal > bookings.length;
+  const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
   const deleteAgent = useDeleteAgent();
 
@@ -109,11 +134,18 @@ function AdminAgents() {
   const handleDelete = async (agent: Agent) => {
     if (!property) return;
     // Say exactly what will be erased (it used to promise that records are kept, while they silently dropped out).
-    const preview = agentDeletePreview(bookings as Booking[], groups as BookingGroup[], agent.id);
-    if (!confirm(deleteAgentMessage(agent.name, preview))) return;
+    // Counted from the agent's FULL history, not just the part of it this page has loaded.
     setDeletingId(agent.id);
     setActionError("");
     try {
+      let preview;
+      if (hasMoreHistory) {
+        const full = await fetchAgentRows(property.id, agent.id);
+        preview = agentDeletePreview(full.bookings, full.groups, agent.id);
+      } else {
+        preview = agentDeletePreview(bookings as Booking[], groups as BookingGroup[], agent.id);
+      }
+      if (!confirm(deleteAgentMessage(agent.name, preview))) return;
       await deleteAgent.mutateAsync({ id: agent.id, propertyId: property.id });
     } catch (e) {
       setActionError(saveFailMessage(e, "Couldn't delete the agent. Please try again — nothing was deleted."));
@@ -138,10 +170,30 @@ function AdminAgents() {
     setTogglingId(null);
   };
 
-  const exportCsv = () => {
+  const exportCsv = async () => {
     const header = ["Agent", "Guest", "Check-in", "Rooms", "Commission", "Paid", "Paid date", "Booking status"];
+    // The file holds ALL commissions, so when this page has loaded only recent history, fetch the rest for it.
+    let byAgent = itemsByAgent;
+    if (hasMoreHistory && property) {
+      setExporting(true);
+      setActionError("");
+      try {
+        const full = await fetchAgentRows(property.id);
+        byAgent = new Map<string, CommissionItem[]>();
+        for (const i of buildLedgerItems(full.bookings, full.groups)) {
+          const list = byAgent.get(i.agent_id) ?? [];
+          list.push(i);
+          byAgent.set(i.agent_id, list);
+        }
+      } catch (e) {
+        setActionError(saveFailMessage(e, "Couldn't load the full history for the export. Please try again."));
+        return;
+      } finally {
+        setExporting(false);
+      }
+    }
     const rows = agentRows.flatMap((row) =>
-      row.items.map((i) => [
+      (byAgent.get(row.agent.id) ?? []).map((i) => [
         row.agent.name,
         i.guest_name,
         i.check_in,
@@ -192,13 +244,22 @@ function AdminAgents() {
           </div>
           <button
             onClick={exportCsv}
-            disabled={items.length === 0}
+            disabled={items.length === 0 || exporting}
             className="shrink-0 flex items-center gap-1.5 rounded-full bg-muted px-4 py-2 text-sm font-medium hover:bg-muted/70 disabled:opacity-50"
           >
-            <Download className="h-4 w-4" /> Export CSV
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export CSV
           </button>
         </div>
       )}
+
+      <HistoryWindowBar
+        from={win.from}
+        hasMore={hasMoreHistory}
+        loading={bookFetching || groupsFetching}
+        onMore={win.loadMore}
+        onAll={win.loadAll}
+        note="older stays whose commission is still unpaid"
+      />
 
       {actionError && <p className="text-sm text-destructive">{actionError}</p>}
 
@@ -250,7 +311,9 @@ function AdminAgents() {
                       <p className="text-xs text-muted-foreground mt-1">
                         {hasItems
                           ? `${bookingsThisMonth} booking${bookingsThisMonth === 1 ? "" : "s"} this month`
-                          : "No bookings yet"}
+                          : hasMoreHistory
+                            ? "No bookings in this period"
+                            : "No bookings yet"}
                       </p>
                     </div>
                   </button>

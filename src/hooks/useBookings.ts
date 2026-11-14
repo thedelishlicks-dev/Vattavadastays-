@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
 import { fetchAllRows, PAGE_SIZE } from "../lib/paginate";
@@ -19,7 +19,24 @@ export interface BookingFilters {
   overlapTo?: string;
   /** Include extra charges (default true). The Calendar doesn't need them. */
   withCharges?: boolean;
+  /**
+   * With `from`: ALSO keep older rows that match this PostgREST condition (see the KEEP_ constants
+   * below), so a limited history never hides money that is still owed.
+   */
+  alsoKeep?: string;
+  /** Keep showing the previous rows while a different window loads (no blank flash). */
+  keepPrevious?: boolean;
 }
+
+// Older stays that must stay visible when a page loads only recent history. Rooms of a multi-room
+// booking are covered by their group row, so the booking-table versions only keep standalone rows
+// (group_id is null): keeping a member room without its group would count it as a separate booking.
+/** Payments: not fully paid and not cancelled. */
+export const KEEP_UNPAID_BOOKINGS = "and(is_paid.eq.false,status.neq.cancelled,group_id.is.null)";
+export const KEEP_UNPAID_GROUPS = "and(is_paid.eq.false,status.neq.cancelled)";
+/** Agents: agent commission not yet paid out. */
+export const KEEP_OWED_COMMISSION_BOOKINGS = "and(source.eq.agent,commission_paid.eq.false,group_id.is.null)";
+export const KEEP_OWED_COMMISSION_GROUPS = "and(source.eq.agent,commission_paid.eq.false)";
 
 export const useBookings = (propertyId: string, filters?: BookingFilters) => {
   const { isAuthenticated } = useAuth();
@@ -39,7 +56,11 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
           .order("check_in", { ascending: false })
           .order("id");
         if (filters?.status) query = query.eq("status", filters.status);
-        if (filters?.from) query = query.gte("check_in", filters.from);
+        if (filters?.from) {
+          query = filters.alsoKeep
+            ? query.or(`check_in.gte.${filters.from},${filters.alsoKeep}`)
+            : query.gte("check_in", filters.from);
+        }
         if (filters?.to) query = query.lte("check_in", filters.to);
         if (filters?.overlapTo) query = query.lte("check_in", filters.overlapTo);
         if (filters?.overlapFrom) query = query.gte("check_out", filters.overlapFrom);
@@ -47,6 +68,7 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
       });
     },
     enabled: !!propertyId && isAuthenticated,
+    placeholderData: filters?.keepPrevious ? keepPreviousData : undefined,
   });
 };
 
@@ -60,6 +82,10 @@ export interface BookingGroupOptions {
    * The Bookings page needs the full rows, so it leaves this off.
    */
   slim?: boolean;
+  /** With `from`: also keep older groups matching this condition (see useBookings' KEEP_ constants). */
+  alsoKeep?: string;
+  /** Keep showing the previous rows while a different window loads (no blank flash). */
+  keepPrevious?: boolean;
 }
 
 export const useBookingGroups = (propertyId: string, options?: BookingGroupOptions) => {
@@ -77,12 +103,17 @@ export const useBookingGroups = (propertyId: string, options?: BookingGroupOptio
           .eq("property_id", propertyId)
           .order("created_at", { ascending: false })
           .order("id");
-        if (options?.from) query = query.gte("check_in", options.from);
+        if (options?.from) {
+          query = options.alsoKeep
+            ? query.or(`check_in.gte.${options.from},${options.alsoKeep}`)
+            : query.gte("check_in", options.from);
+        }
         return query.range(from, to);
       });
       return rows as BookingGroup[];
     },
     enabled: !!propertyId && isAuthenticated,
+    placeholderData: options?.keepPrevious ? keepPreviousData : undefined,
   });
 };
 
