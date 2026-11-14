@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAgents } from "@/hooks/useAgents";
 import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { RatesNotice } from "@/components/RatesNotice";
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
@@ -109,7 +110,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   const { data: agents = [] } = useAgents(propertyId);
-  const { data: rates } = useRoomRates(propertyId);
+  const ratesQ = useRoomRates(propertyId);
+  const rates = ratesQ.data;
   const [showNewAgentModal, setShowNewAgentModal] = useState(false);
   // Commission is auto-filled whenever the agent (or the room-rate total it's
   // based on) changes, but stays editable for one-off negotiated rates. Once
@@ -183,6 +185,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   // quote no longer applies and live pricing takes over. The quote's add-ons
   // are saved as normal Extras charges (same mechanism as every other extra).
   const quoteLocked = !!fromQuote && form.check_in === fromQuote.checkIn && form.check_out === fromQuote.checkOut;
+  // Live prices need the seasonal rates; until they load (or if they fail) totals would silently use base
+  // prices. A booking converted from a quote with its prices locked does not use live rates.
+  const pricingPending = !ratesQ.isSuccess && !quoteLocked;
   const roomTotals = useMemo(
     () => lockToQuote(liveRoomTotals, fromQuote?.rooms, quoteLocked, guestCount, guestSplit),
     [liveRoomTotals, fromQuote, quoteLocked, guestCount, JSON.stringify(guestSplit)], // eslint-disable-line react-hooks/exhaustive-deps
@@ -249,6 +254,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
     if (!isValidIndianMobile(form.guest_phone)) { setError("Enter the guest's 10-digit mobile number — it's needed for the booking link and reminders"); return; }
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
     if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
+    if (pricingPending) { setError("Seasonal prices haven't loaded yet, so the total isn't reliable. Wait a moment, or tap Try again."); return; }
     if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
     const discountAmt = Number(discountAmount) || 0;
     if (discountAmt < 0) { setDiscountError("Cannot be negative"); return; }
@@ -445,6 +451,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       footer={
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
+          {!quoteLocked && <RatesNotice query={ratesQ} />}
           {hasConflicts && (
             <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
@@ -453,7 +460,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           )}
           <ModalActions>
             <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={hasConflicts} loading={saving}>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={hasConflicts || pricingPending} loading={saving}>
               {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
             </Button>
           </ModalActions>
