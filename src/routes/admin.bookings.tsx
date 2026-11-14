@@ -7,7 +7,8 @@ import {
   Tag, Pencil, Hotel, ChevronDown, ChevronUp,
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings, useBookingGroups } from "@/hooks/useBookings";
+import { useBookings, useBookingGroups, KEEP_OPEN_BOOKINGS, KEEP_OPEN_GROUPS } from "@/hooks/useBookings";
+import { windowStartForMonth } from "@/lib/historyWindow";
 import {
   useBookingCharges, useAddCharge, useDeleteCharge,
   useGroupCharges, useAddGroupCharge, useDeleteGroupCharge, useAddChargeRows,
@@ -998,8 +999,6 @@ type BookingListItem =
 
 function BookingsAdmin() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  const { data: bookings = [], isLoading: bookingsLoading, isFetched: bookingsFetched, isFetching: bookingsFetching } = useBookings(property?.id ?? "");
-  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "");
   const queryClient = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [activeBooking, setActiveBooking] = useState<Booking | null>(null);
@@ -1012,6 +1011,13 @@ function BookingsAdmin() {
   const [dateScope, setDateScope] = useState<DateScope>("upcoming");
   const [sortBy, setSortBy] = useState<SortKey>("checkin");
   const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
+
+  // Loads stays from the last 6 months onward (plus older ones still pending / confirmed / unpaid, so the
+  // Active and Outstanding counts stay complete) instead of every booking ever made. Browsing an older
+  // month in "By month" loads back to cover it, 6 months at a time. See lib/historyWindow.ts.
+  const loadFrom = useMemo(() => windowStartForMonth(new Date(), monthCursor.year, monthCursor.month), [monthCursor.year, monthCursor.month]);
+  const { data: bookings = [], isLoading: bookingsLoading, isPending: bookingsPending, isFetched: bookingsFetched, isFetching: bookingsFetching } = useBookings(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_BOOKINGS, keepPrevious: true });
+  const { data: groups = [], isLoading: groupsLoading, isPending: groupsPending, isFetched: groupsFetched, isFetching: groupsFetching } = useBookingGroups(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_GROUPS, keepPrevious: true });
 
   // Deep-link support: the dashboard's "Needs your attention" rows link
   // here with ?bookingId=<id> or ?groupId=<id> so tapping a specific
@@ -1038,9 +1044,24 @@ function BookingsAdmin() {
     const groupId = params.get("groupId");
     if (!bookingId && !groupId) return;
 
+    // A link can point at a stay older than the loaded history (e.g. from Payments with its full
+    // history loaded), so when it is not in the lists, fetch just that one.
+    const propertyId = property.id;
+    const openOlderGroup = async (id: string) => {
+      const { data } = await supabase.from("booking_groups").select("*, bookings(*), booking_charges(*)").eq("id", id).eq("property_id", propertyId).maybeSingle();
+      if (data) setActiveGroup(data as BookingGroup);
+    };
+    const openOlderBooking = async (id: string) => {
+      const { data } = await supabase.from("bookings").select("*, booking_charges(*)").eq("id", id).eq("property_id", propertyId).maybeSingle();
+      if (!data) return;
+      if (data.group_id) await openOlderGroup(data.group_id as string);
+      else setActiveBooking(data as Booking);
+    };
+
     if (groupId) {
       const g = groups.find((g) => g.id === groupId);
       if (g) setActiveGroup(g);
+      else void openOlderGroup(groupId).catch(() => {});
     } else if (bookingId) {
       const b = bookings.find((b) => b.id === bookingId);
       // A booking that belongs to a multi-room group opens its group card
@@ -1048,6 +1069,7 @@ function BookingsAdmin() {
       const parent = b?.group_id ? groups.find((g) => g.id === b.group_id) : undefined;
       if (parent) setActiveGroup(parent);
       else if (b) setActiveBooking(b);
+      else void openOlderBooking(bookingId).catch(() => {});
     }
 
     // Clear the param so refreshing or navigating back doesn't reopen it.
@@ -1135,7 +1157,7 @@ function BookingsAdmin() {
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
     setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
     if (newStatus === "confirmed") {
-      const booking = bookings.find((b) => b.id === id);
+      const booking = bookings.find((b) => b.id === id) ?? (activeBooking?.id === id ? activeBooking : undefined);
       if (booking) promptSendConfirmation(bookingConfirmHref(booking, roomNameMap[booking.room_id] ?? "your room", property), booking.guest_name);
     }
   };
@@ -1157,7 +1179,7 @@ function BookingsAdmin() {
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
   };
 
-  const isLoading = propLoading || bookingsLoading || groupsLoading || (!!property?.id && (!bookingsFetched || !groupsFetched));
+  const isLoading = propLoading || bookingsLoading || groupsLoading || (!!property?.id && (bookingsPending || groupsPending));
   const totalItems = sortedItems.length;
 
   if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>;
@@ -1217,7 +1239,9 @@ function BookingsAdmin() {
         )}
       </div>
 
-      {totalItems === 0 ? (
+      {totalItems === 0 && dateScope === "month" && (bookingsFetching || groupsFetching) ? (
+        <div className="space-y-3">{[...Array(2)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>
+      ) : totalItems === 0 ? (
         <div className="rounded-3xl bg-muted/50 p-12 text-center text-muted-foreground">
           {dateScope === "upcoming" && filterStatus === "all" && !q
             ? "No upcoming bookings — you're all caught up! Switch to \"By month\" to see past bookings."
