@@ -339,15 +339,18 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
       <div className="divide-y divide-border">
         {rows.map((row) => {
           const isPending = row.kind === "pending";
-          // Plain <a>, not <Link>: the Bookings page reads bookingId/groupId
-          // from window.location.search (see admin.bookings.tsx) to open
-          // the exact booking's detail modal on load, rather than landing
-          // on the default Upcoming view where an unrelated guest happens
-          // to be on top.
+          // <Link> (client-side navigation, no full reload). The Bookings page reads
+          // bookingId/groupId from window.location.search (see admin.bookings.tsx) to open
+          // the exact booking's detail modal, so they go in the query string.
+          const prop = new URLSearchParams(window.location.search).get("property");
           return (
-            <a
+            <Link
               key={`${row.kind}-${row.id}`}
-              href={`/admin/bookings?${(() => { const prop = new URLSearchParams(window.location.search).get("property"); return prop ? `property=${encodeURIComponent(prop)}&` : ""; })()}${row.isGroup ? "groupId" : "bookingId"}=${row.id}`}
+              to="/admin/bookings"
+              search={{
+                ...(prop ? { property: prop } : {}),
+                ...(row.isGroup ? { groupId: row.id } : { bookingId: row.id }),
+              } as never}
               className="flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5"
             >
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -371,7 +374,7 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
                 </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-            </a>
+            </Link>
           );
         })}
       </div>
