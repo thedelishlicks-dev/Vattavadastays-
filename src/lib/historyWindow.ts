@@ -15,6 +15,17 @@ export function windowStart(now: Date, monthsBack: number): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-01`;
 }
 
+/**
+ * Where to start loading so a "by month" view of (year, month0) is complete. A stay can begin the
+ * month before, so the start is the 1st of the previous month or earlier, rounded back to a whole
+ * number of steps (6 months). Rounding means stepping back month by month re-fetches only every
+ * 6th step, not on every tap. Never later than the default window.
+ */
+export function windowStartForMonth(now: Date, year: number, month0: number, step: number = WINDOW_STEP_MONTHS): string {
+  const needed = (now.getFullYear() - year) * 12 + (now.getMonth() - month0) + 1;
+  return windowStart(now, Math.max(step, Math.ceil(needed / step) * step));
+}
+
 /** Is this check-in inside the window? No window (`from` undefined) means everything is. */
 export function inWindow(checkIn: string, from: string | undefined): boolean {
   return !from || checkIn.slice(0, 10) >= from;

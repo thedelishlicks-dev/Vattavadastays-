@@ -34,6 +34,11 @@ export interface BookingFilters {
 /** Payments: not fully paid and not cancelled. */
 export const KEEP_UNPAID_BOOKINGS = "and(is_paid.eq.false,status.neq.cancelled,group_id.is.null)";
 export const KEEP_UNPAID_GROUPS = "and(is_paid.eq.false,status.neq.cancelled)";
+/** Bookings page: still open (pending / confirmed) or not fully paid, so "Active" and "Outstanding" stay complete. */
+export const KEEP_OPEN_BOOKINGS =
+  "and(is_paid.eq.false,status.neq.cancelled,group_id.is.null),and(status.eq.pending,group_id.is.null),and(status.eq.confirmed,group_id.is.null)";
+export const KEEP_OPEN_GROUPS =
+  "and(is_paid.eq.false,status.neq.cancelled),and(status.eq.pending),and(status.eq.confirmed)";
 /** Agents: agent commission not yet paid out. */
 export const KEEP_OWED_COMMISSION_BOOKINGS = "and(source.eq.agent,commission_paid.eq.false,group_id.is.null)";
 export const KEEP_OWED_COMMISSION_GROUPS = "and(source.eq.agent,commission_paid.eq.false)";
