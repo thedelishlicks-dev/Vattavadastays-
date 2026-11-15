@@ -102,6 +102,8 @@ export function useProperty(subdomain: string) {
 
 RLS enforces all security. Owners only see their own data because `auth.uid()` is checked by Postgres.
 
+**Windows keep unsettled rows:** pass `alsoKeep` (`KEEP_*` in `useBookings.ts`) and `keepPrevious` with a window, gate skeletons on `isPending`, and show `LoadFailed` when a query errors (HANDOVER rules 35–37).
+
 **Do not call `useBookings()` / `useBookingGroups()` unwindowed** on a screen that doesn't need all-time data (see HANDOVER v9.5 rules, still in force).
 
 ---
