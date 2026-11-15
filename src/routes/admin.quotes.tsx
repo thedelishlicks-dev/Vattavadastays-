@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { CalendarCheck, MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { LoadFailed } from "@/components/LoadFailed";
 import { useDeleteQuote, useMarkQuoteConverted, useQuotes, useSaveQuote, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
@@ -55,7 +56,7 @@ function AdminQuotes() {
 type ListProperty = { id: string; name: string; owner_phone?: string; rooms?: { id: string; is_active?: boolean }[]; [k: string]: unknown };
 
 function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Quote | "new") => void }) {
-  const { data: quotes = [], isLoading } = useQuotes(property.id);
+  const { data: quotes = [], isLoading, isError, refetch } = useQuotes(property.id);
   const setStatus = useSetQuoteStatus();
   const del = useDeleteQuote();
   const markConverted = useMarkQuoteConverted();
@@ -107,7 +108,9 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
 
       {isLoading && <div className="h-24 rounded-xl bg-muted animate-pulse" />}
 
-      {!isLoading && shown.length === 0 && (
+      {isError && <LoadFailed title="Couldn't load your quotes" onRetry={() => void refetch()} />}
+
+      {!isLoading && !isError && shown.length === 0 && (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           <MessageSquareText className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
           {quotes.length === 0 ? "No quotes yet. Tap “New quote” when the next enquiry call comes in." : "Nothing in this view."}

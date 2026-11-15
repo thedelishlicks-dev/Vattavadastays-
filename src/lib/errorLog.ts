@@ -25,7 +25,7 @@ import {
   signatureOf,
 } from "@/lib/errorLogCore";
 
-export type ErrorSource = "window" | "promise" | "route" | "booking" | "admin";
+export type ErrorSource = "window" | "promise" | "route" | "booking" | "admin" | "query";
 
 const throttle = createThrottle();
 let installed = false;

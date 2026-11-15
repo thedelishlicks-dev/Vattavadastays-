@@ -58,7 +58,7 @@ function Index() {
 }
 
 function GuestPage({ subdomain }: { subdomain: string }) {
-  const { data: property, isLoading } = useProperty(subdomain);
+  const { data: property, isLoading, isError, error, refetch } = useProperty(subdomain);
 
   useEffect(() => {
     if (property?.name) {
@@ -191,6 +191,23 @@ function GuestPage({ subdomain }: { subdomain: string }) {
               ))}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // A failed request is not the same as a property that is closed: say so, so a guest on a weak
+  // connection does not leave thinking the place is unavailable. (PGRST116 = no such property.)
+  if (!isLoading && isError && !property && (error as { code?: string } | null)?.code !== "PGRST116") {
+    return (
+      <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6 text-center text-white">
+        <SeoTags subdomain={subdomain} />
+        <div className="space-y-4 max-w-md">
+          <p className="text-xl font-medium text-white/90 leading-relaxed">We couldn't load this page.</p>
+          <p className="text-sm text-white/60">Please check your connection and try again.</p>
+          <button type="button" onClick={() => void refetch()} className="rounded-full bg-white text-stone-950 px-6 py-2.5 text-sm font-semibold hover:bg-white/90">
+            Try again
+          </button>
         </div>
       </div>
     );

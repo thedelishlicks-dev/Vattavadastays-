@@ -10,9 +10,15 @@
 // redundant traffic while staying fresh enough for the owner Calendar
 // (mutations still invalidate their queries immediately).
 
-import { QueryClient } from "@tanstack/react-query";
+import { QueryCache, QueryClient } from "@tanstack/react-query";
+import { logClientError } from "@/lib/errorLog";
 
 export const queryClient = new QueryClient({
+  // A query that still fails after its retries is recorded (superadmin > Errors), so a screen that
+  // quietly could not load shows up there. The log scrubs and throttles repeats itself.
+  queryCache: new QueryCache({
+    onError: (error, query) => logClientError({ source: "query", error, context: { query: String(query.queryKey[0] ?? "") } }),
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,
