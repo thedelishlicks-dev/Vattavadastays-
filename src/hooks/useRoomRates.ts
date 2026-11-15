@@ -51,8 +51,9 @@ export function useRoomRates(propertyId: string | undefined) {
     enabled: !!propertyId,
     queryFn: () => fetchRoomRates(propertyId as string),
     staleTime: 60_000,
-    // Rates are an enhancement: if the table isn't there yet (migration not
-    // run) or the request fails, prices fall back to the room's base price.
+    // Callers that price a stay for the OWNER (Add booking, Quote builder, Edit stay) wait for this to
+    // succeed (RatesNotice shows the state): pricing from base rates while it is missing would quote or
+    // save a peak-season stay too cheap. Guest bookings are re-priced by the database regardless.
     retry: 1,
   });
 }

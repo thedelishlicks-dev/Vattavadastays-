@@ -12,6 +12,7 @@ import { ArrowLeft, Loader2, Minus, Plus, Send, Trash2, TriangleAlert } from "lu
 import { Section, Field, inputCls } from "@/admin/formKit";
 import { getConflictingDates, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { RatesNotice } from "@/components/RatesNotice";
 import { useAddons, usePackages, useSeasons } from "@/hooks/useCatalog";
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { useSaveQuote, type Quote, type QuoteInputs } from "@/hooks/useQuotes";
@@ -36,7 +37,8 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
   const { data: addons = [] } = useAddons(property.id);
   const { data: packages = [] } = usePackages(property.id);
   const save = useSaveQuote();
-  const { data: rates } = useRoomRates(property.id);
+  const ratesQ = useRoomRates(property.id);
+  const rates = ratesQ.data;
 
   const rooms = (property.rooms ?? []).filter((r) => r.is_active !== false);
 
@@ -117,7 +119,8 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
 
   const phoneDigits = guestPhone.replace(/\D/g, "");
   const phoneOk = phoneDigits.length >= 10;
-  const canSend = datesOk && phoneOk && roomLines.length > 0;
+  // A quote goes to a guest, so never price it from base rates while the seasonal prices are missing.
+  const canSend = datesOk && phoneOk && roomLines.length > 0 && ratesQ.isSuccess;
 
   const text = buildQuoteText({
     propertyName: property.name, guestName, checkIn, checkOut, guestCount,
@@ -388,6 +391,8 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
         )}
       </Section>
 
+      <RatesNotice query={ratesQ} />
+
       <div className="flex flex-col sm:flex-row gap-3">
         <a
           href={link}
@@ -409,7 +414,7 @@ export function QuoteBuilder({ property, initial, onClose }: { property: Builder
       </div>
       {!canSend && (
         <p className="text-xs text-muted-foreground">
-          Needs: {[!phoneOk && "guest phone", !datesOk && "valid dates", roomLines.length === 0 && "at least one room"].filter(Boolean).join(", ")}.
+          Needs: {[!phoneOk && "guest phone", !datesOk && "valid dates", roomLines.length === 0 && "at least one room", !ratesQ.isSuccess && "seasonal prices"].filter(Boolean).join(", ")}.
         </p>
       )}
       {saveMsg && <p className="text-sm text-muted-foreground">{saveMsg}</p>}

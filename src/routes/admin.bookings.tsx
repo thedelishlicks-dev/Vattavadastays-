@@ -28,6 +28,7 @@ import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { Modal, ModalActions, ModalTab, Button, fieldCls } from "@/components/ds";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
+import { RatesNotice } from "@/components/RatesNotice";
 import type { Booking, BookingGroup, BookingCharge, BookingStatus } from "@/types/database";
 import { computeBalance, meetsConfirmationAdvance, advanceAmount } from "@/lib/balance";
 
@@ -770,7 +771,8 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
   const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const { data: stayCharges = [] } = useBookingCharges(booking.id);
-  const { data: rates } = useRoomRates(booking.property_id);
+  const ratesQ = useRoomRates(booking.property_id);
+  const rates = ratesQ.data;
   const guestCount = Number(form.guest_count) || 1;
   // Same pricing rule as guest bookings and quotes (weekend multiplier +
   // extra guests) — see priceRoomStay().
@@ -814,6 +816,7 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
     : agentType && agentType !== "percentage" ? "Agent commission is a fixed amount and stays the same." : "";
   const handleSave = async () => {
     if (nights <= 0) { setError("Check-out must be after check-in"); return; }
+    if (!ratesQ.isSuccess) { setError("Seasonal prices haven't loaded yet, so the new total isn't reliable. Wait a moment, or tap Try again."); return; }
     setSaving(true); setError("");
     try {
       const roomCost = stay?.room_price ?? 0;
@@ -832,9 +835,10 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
       footer={
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
+          <RatesNotice query={ratesQ} />
           <ModalActions>
             <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={!hasChanges} loading={saving}>Save changes</Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} disabled={!hasChanges || !ratesQ.isSuccess} loading={saving}>Save changes</Button>
           </ModalActions>
         </>
       }
