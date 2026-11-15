@@ -1,8 +1,8 @@
-# stayidom.in — Handover v10.3
+# stayidom.in — Handover v10.4
 
-**Date:** 8 Nov 2026 (v10.2 was 3 Nov 2026)
-**Code baseline:** `main` at `c514402` (Merge PR #467, `Dev`). Merge `Dev` → `main` only after the preview is tested.
-**Supersedes:** v10.2 (3 Nov 2026), v10.1 (29 Oct 2026), v10 (25 Oct 2026) and v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**. The guest page has its own reference: **`docs/GUEST_PAGE.md`**.
+**Date:** 15 Nov 2026 (v10.3 was 8 Nov 2026)
+**Code baseline:** `main` at `6b8d049` (Merge PR #499). The 11–15 Nov speed and glitch PRs (#492–#499) went straight to `main`; `Dev` was not used for them. Merge `Dev` → `main` only after the preview is tested.
+**Supersedes:** v10.3 (8 Nov 2026), v10.2 (3 Nov 2026), v10.1 (29 Oct 2026), v10 (25 Oct 2026) and v9.7 (11–12 Oct 2026). The v8 archive and v9.x change history are in git history; this document describes the app **as the code is now**. The guest page has its own reference: **`docs/GUEST_PAGE.md`**.
 
 > **Read order:** §1 → §3 (rules) → §4 (admin map) → §10 (known issues) → §11 (what's left). Read `AGENTS.md` before writing code. Working on the guest page? Read `docs/GUEST_PAGE.md` too.
 
@@ -82,7 +82,7 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 12. **All money maths lives in `src/lib/balance.ts`** (`computeBalance`, `chargesSum`, `advanceAmount`, `fractionOf`, `paymentDueAmount`). Never write `total + extras - discount - advance` or `Math.max(0, …)` in a screen: the clamp hides overpayment. Show `refundDue` when > 0.
 13. **Every guest tracking link carries a secret token and the property id:** `guestTrackingUrl(origin, trackingToken, propertyId)` builds `/booking-status?t=<token>&property=<id>`. The browser generates the token for each booking submission (`src/lib/trackingToken.ts`), and every room in a group shares the group's token. Never build a link from a phone number.
 14. **"Paid" is derived, never trusted from `bookings.is_paid`.** Use `computeBalance(...).isPaid`.
-15. **Wait for the first fetch, not just `isLoading`.** Pages must also check `isFetched` once `property?.id` exists.
+15. **Wait for the first fetch, not just `isLoading`.** Pages must also check `isFetched` once `property?.id` exists. On a query that uses `keepPreviousData` (the history windows, rule 35) gate skeletons on `isPending` instead: `isFetched` stays true across a key change and the page flashes empty.
 16. **Modal sizing:** `dvh`. A panel with no height cap needs `max-h-[92dvh] overflow-y-auto overscroll-contain`; flex-col sheets need `min-h-0` on the scrolling body.
 17. **Security:** never expose a `SECURITY DEFINER` function to `anon` unless it validates the caller itself; run `01_audit_queries.sql` (query 4) after any DB change that adds a function; image uploads are scoped to the `<property_id>/` folder; the superadmin email must never own a property (trigger); owners must not edit billing columns (trigger).
 18. **Superadmin logic lives in `src/lib/onboarding.ts`** (statuses, renewal, setup checklist, filters, validation, WhatsApp numbers/messages). Add a test when adding a rule.
@@ -102,6 +102,12 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 32. **A map location is a pair.** Every maps link and the Settings check go through `src/lib/location.ts` (`hasCoordinates`, `directionsUrl`, `validateCoordinates`). One coordinate alone is never used or saved; the directions SMS falls back to a Google Maps search for the name and area. Never write `lat && lng` (0 is a valid value). **Links that go into message text (SMS, WhatsApp) must be the short link** `directionsShortLink()` → `/api/directions`, which has no `&`, comma, `#`, `%` or space: the Android SMS app ends a link at a comma, and a Xiaomi SMS app ends the whole message at the first `&` (found 4–5 Nov 2026). The server route redirects to Google's directions link with **no `origin`**, so the route starts where the guest stands. Buttons (hrefs) use `directionsUrl()` directly. `api/_lib/directions.ts` and `src/lib/location.ts` build the same link; `tests/api/directions.test.ts` keeps them identical. SMS text goes through `smsLink()` (`src/lib/sms.ts`), which cleans `&` and `#` from the body.
 33. **Weather only through `/api/weather`.** MET Norway Locationforecast: free, CC BY 4.0, commercial use allowed **with credit**, so the footer shows "Weather data from MET Norway" whenever a temperature is shown. The server route sets the identifying User-Agent, rounds coordinates, caches for an hour; the browser never calls the provider. Don't swap in a service that is non-commercial only (the free Open-Meteo tier was rejected for this). Date and time are shown in India time (`liveInfo.ts`).
 34. **Packages and add-ons are information only for guests.** Active items are readable by guests (policies `addons_public_read`, `packages_public_read`) and listed in `Packages.tsx`; the guest ticks items and sends one WhatsApp enquiry (`catalogEnquiryLink`). Nothing is booked or charged online; the owner adds the extras (`CatalogExtrasPicker`).
+35. **History windows must never hide unsettled money.** Bookings, Payments and Agents load stays from the last 6 months by check-in (`src/lib/historyWindow.ts`, `useHistoryWindow`, `HistoryWindowBar`: "Load 6 more months" / "Load all history"). Dates are local-date strings, never `toISOString()`. Older rows that still matter come back through `alsoKeep` (`KEEP_UNPAID_*`, `KEEP_OPEN_*`, `KEEP_OWED_COMMISSION_*` in `useBookings.ts`); the booking keep-rules require `group_id` null so group members are never orphaned. Bookings by month loads back via `windowStartForMonth` and uses `keepPrevious`; a deep link to an older booking or group fetches that one row (`openOlderBooking/openOlderGroup`). Agents delete preview and CSV export fetch everything (`fetchAgentRows`) when more history exists. Stats say "since …" except Outstanding (all loaded).
+36. **A failed load is never shown as "nothing here".** Use `LoadFailed` (`src/components/LoadFailed.tsx`, with Try again) for a failed property, bookings, groups, quotes or guest-page query; PGRST116 means "no property linked / not found". Every query error is logged through `QueryCache.onError` (`queryClient.ts`, source `"query"`, visible in `/superadmin` → Errors).
+37. **Owner-side pricing waits for the seasonal rates.** Add booking, Quote builder and Edit Stay stay disabled until `useRoomRates` succeeds (`RatesNotice`: "Checking seasonal prices…" / "Couldn't load…" + Try again), so a total is never computed at base rates by mistake. Guest bookings are still re-priced by the DB trigger (rule 19).
+38. **The admin layout must not remount on a tab switch.** `__root.tsx` keys the page transition by `"admin"` for every `/admin/*` path (`transitionKey`). Owner links to Bookings use `<Link to="/admin/bookings" search=…>`, never a plain `<a href>` (full reload). `/admin/login` only redirects to `/login`.
+39. **Fonts and viewport height.** `index.html` loads only Fraunces + Inter, non-blocking (`media="print"` swap). The landing page injects Playfair Display and Noto Sans Malayalam itself (`LandingPage.tsx`). Full-height heroes use `svh`, not `vh`.
+
 ---
 
 ## 4. Admin app map
@@ -253,6 +259,13 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Rooms | "Apply to all rooms" label no longer breaks into columns | `RoomRatesEditor.tsx` |
 | Settings | Pending-hold help text now says it applies to guest requests too and that expiry is silent | `admin.settings.tsx` |
 | Home | The hold countdown on pending requests was added (4 Nov) and **removed again** (5 Nov, `f523308`); Home shows the request and dates only | `admin.dashboard.tsx` |
+| Admin speed | Admin layout no longer remounts on tab switch; fonts reduced and non-blocking; heroes use `svh` | #492, `__root.tsx`, `index.html`, `Hero.tsx` |
+| Auth | Reset-password link no longer shows "expired" early (20 s wait, `ready` flag); `/admin/login` redirects to `/login` | #493 |
+| Admin links | Dashboard / Payments / Quotes links to Bookings are router links, not full reloads | #493 |
+| History | Payments, Agents (#494) and Bookings (#495) load 6 months with "Load more"; unsettled rows kept | rule 35 |
+| Quote calendar | Partly booked days show amber ("Some rooms booked"); load failure shows an alert | #496, `RoomAvailabilityCalendar.tsx` |
+| Pricing | Add booking, Quote builder, Edit Stay wait for seasonal rates | #497, rule 37 |
+| Errors | Explicit load-failure screens on admin pages and the guest page; query errors logged | #499, rule 36 |
 
 ---
 
@@ -315,6 +328,10 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 49. **[BUILT 10 Nov] Section identity (admin).** Each admin section has its own accent via `data-section` (`styles.css`, `navConfig.ts` `bold` flag, `admin/sectionContext.ts`; `PageHeader`/`Section` in `formKit.tsx` pick it up). Calendar and Money go bolder (tinted page, month bar / ledger strip). Home, Bookings, Rooms & Pricing and Property stay subtle. See AGENTS.md design exception. (Superseded in look by item 50: the bold tinted page and month bar are gone; the accent now shows in the round icon, nav pill and tabs.)
 43. **[BUILT 10 Nov; rollout in progress] Unified seasons.** One season (`price_seasons`) now carries room price rules (`season_room_rules`) and add-on prices; one overlap rule (priority, then shorter window). Migration `20261109000000_unified_seasons.sql` is additive; `room_rates` is untouched. Old screens (`RoomRatesEditor`, `SeasonsEditor`) are removed. `20261110000000_seasons_always_on.sql` switches every property and makes new ones start on seasons. Steps, price check, backups and rollback: `docs/SEASONS_ROLLOUT.md`. **Still to do:** run the migrations in order, retake screenshots (`docs/OWNER_HELP.md`), then delete `room_rates`, `season_pricing_v2` and the legacy SQL/TS path in a later cleanup.
 50. **[BUILT 11 Nov] Owner-side UI refresh (Google Pay-style).** Flat, soft, rounded: one `Modal` (centred card / phone bottom sheet; header, tabs, sticky one-row footer) for every dialog; `Button`, `Field`, `FieldGroup`, `StatusChip`, `EmptyState` in `src/components/ds`; Payments is a big "Collected" number, two soft cards and an avatar list (sort is a dropdown; CSV unchanged); Calendar is a flat white month with a big title and round arrows (cell and bar logic untouched); Bookings, Home, nav (pill items, no left bar), top bar, tabs and login follow. 28px bold page titles everywhere; serif only for brand names. Rules: AGENTS.md "UI building blocks". PRs: #477 to #485 and the owner sweep. **Not done:** the guest site keeps the old look; `BookingInvoice` untouched; no browser/phone check of the sweep was possible in the build sandbox (files only syntax-checked), so test the pages below on a phone. **Help screenshots are now out of date** (chrome, modals, Payments list, Calendar): retake all (`docs/OWNER_HELP.md`).
+51. **[OPEN] Guest page: hero image arrives late; a failed availability or release-dates fetch shows no notice** (it quietly looks free). Add a notice like rule 36.
+52. **[OPEN] Leftovers from the 15 Nov audit:** `select("*")` on wide tables; room photos not resized in the owner lists; login form labels; unused `src/data/rooms.ts` and `AuthGuard.tsx`; `WhatsAppReminderModal` computes "today" with `toISOString()` (UTC, a day off before 5:30 am; rule 35 style fix); a stale `is_paid` edge case.
+53. **[UNVERIFIED] The `alsoKeep` PostgREST `.or(...)` filters** are unit-tested only as strings; confirm on the live project that Bookings, Payments and Agents still show an old unpaid stay and an old group. Build and typecheck were never run for #492–#499 (sandbox); CI passed.
+54. **[SUGGESTED] A Playwright smoke test** (login, each admin tab, guest page) would catch blank or flashing screens before merge.
 44. **[OPEN] `SUPPORT_CONTACT` is empty** in `src/content/ownerGuide.ts`, so the Help page hides its "Still stuck?" box. The page is public: use a number you are happy to publish.
 45. **[OPEN, now due after item 50] Help screenshots go stale** when a screen or label changes. Keep them in step (`docs/OWNER_HELP.md`). The guide quotes button names exactly.
 46. **[OPEN] Home "arriving" count (Today strip)** counts bookings with `check_in` = today and a status other than cancelled; how a multi-room booking is counted is unchecked.
@@ -327,7 +344,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 
 **A. Make `main` match this document (cleanup, no new features)**
 1. Run the build, typecheck and tests locally (§12). Fix anything they report.
-2. Still open from §10: item 8 (`recharts`: not removed, not bundled). Item 5 is done: DB functions dropped, `/setup` removed.
+2. Still open from §10: items 51–54 (15 Nov audit leftovers) and item 8 (`recharts`: not removed, not bundled). Item 5 is done: DB functions dropped, `/setup` removed.
 3. Commit the migrations and DB objects that are live but missing from `supabase/migrations/`: `lookup_*`, `create_property_with_invite`, `link_property_owner`, booking triggers, base-table policies, `trg_mark_booking_nights`, `sync_availability_on_booking` (the 5 Oct file). The baseline holds the text; the migrations folder must hold the history.
 4. ~~Fix §10 item 1~~ — done (rule 10).
 
