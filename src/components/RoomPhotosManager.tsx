@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { ImageOff, Loader2, Star, Upload, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { validateAndCompress } from "@/lib/imageUtils";
-import { MAX_ROOM_PHOTOS } from "@/lib/gallery";
+import { MAX_ROOM_PHOTOS, fallbackToFull, thumbPath, thumbUrl } from "@/lib/gallery";
 
 const BUCKET = "room-images";
 
@@ -40,10 +40,13 @@ export function RoomPhotosManager({ roomId, propertyId, photos, onChanged }: Pro
     for (let i = 0; i < files.length; i++) {
       setProgress(`Uploading ${i + 1} of ${files.length}…`);
       try {
-        const { file } = await validateAndCompress(files[i], "room");
+        const [full, thumb] = await Promise.all([validateAndCompress(files[i], "room"), validateAndCompress(files[i], "galleryThumb")]);
         const path = `${propertyId}/${roomId}-${Date.now()}-${i}.webp`;
-        const up = await supabase.storage.from(BUCKET).upload(path, file, { upsert: true, contentType: "image/webp" });
+        const up = await supabase.storage.from(BUCKET).upload(path, full.file, { upsert: true, contentType: "image/webp" });
         if (up.error) throw up.error;
+        // Small copy for the owner screens (and the guest card); the full photo loads only where it is needed.
+        const upThumb = await supabase.storage.from(BUCKET).upload(thumbPath(path), thumb.file, { upsert: true, contentType: "image/webp" });
+        if (upThumb.error) throw upThumb.error;
         current = [...current, supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl];
         await save(current); // saved one by one, so a later failure never loses earlier photos
       } catch (err) {
@@ -63,7 +66,10 @@ export function RoomPhotosManager({ roomId, propertyId, photos, onChanged }: Pro
       // Best effort: free the storage too (ignored if the bucket doesn't allow deletes).
       const marker = `/object/public/${BUCKET}/`;
       const at = url.indexOf(marker);
-      if (at >= 0) await supabase.storage.from(BUCKET).remove([decodeURIComponent(url.slice(at + marker.length).split("?")[0])]);
+      if (at >= 0) {
+        const path = decodeURIComponent(url.slice(at + marker.length).split("?")[0]);
+        await supabase.storage.from(BUCKET).remove([path, thumbPath(path)]);
+      }
     } catch (err) {
       setError((err as Error).message ?? "Could not remove the photo");
     }
@@ -102,7 +108,7 @@ export function RoomPhotosManager({ roomId, propertyId, photos, onChanged }: Pro
           <div className="grid grid-cols-3 gap-2">
             {photos.map((url, i) => (
               <div key={url} className="relative aspect-square overflow-hidden rounded-lg bg-muted">
-                <img src={url} alt={`Room photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" />
+                <img src={thumbUrl(url)} alt={`Room photo ${i + 1}`} loading="lazy" className="h-full w-full object-cover" onError={fallbackToFull(url)} />
                 <button type="button" onClick={() => remove(url)} aria-label="Remove photo" className="absolute top-1 right-1 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"><X className="h-3.5 w-3.5" /></button>
                 {i === 0 ? (
                   <span className="absolute bottom-1 left-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">Main</span>
