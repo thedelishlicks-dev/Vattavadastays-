@@ -10,6 +10,7 @@ import type { Room } from '@/types/database'
 import { RoomSeasonPrices } from '@/components/RoomSeasonPrices'
 import { SeasonsPanel } from '@/components/SeasonsPanel'
 import { RoomPhotosManager } from '@/components/RoomPhotosManager'
+import { fallbackToFull, thumbUrl } from '@/lib/gallery'
 import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
 
 export const Route = createFileRoute('/admin/rooms')({
@@ -414,7 +415,7 @@ function AdminRooms() {
           {rooms.map((room) => (
             <div key={room.id} className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
               {room.images?.[0] ? (
-                <img src={room.images[0]} alt={room.name} className="w-full h-40 object-cover" />
+                <img src={thumbUrl(room.images[0])} alt={room.name} loading="lazy" className="w-full h-40 object-cover" onError={fallbackToFull(room.images[0])} />
               ) : (
                 <div className="w-full h-40 bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/70 transition-colors" onClick={() => setDrawerRoom(room)}>
                   <ImageOff className="h-6 w-6 text-muted-foreground/50" />

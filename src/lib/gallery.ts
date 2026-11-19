@@ -18,6 +18,20 @@ export function thumbPath(fullPath: string): string {
 }
 
 /**
+ * onError handler for an <img> that shows thumbUrl(url): photos uploaded before thumbnails
+ * existed have none, so fall back (once) to the full photo.
+ */
+export function fallbackToFull(url: string) {
+  return (ev: { currentTarget: HTMLImageElement }) => {
+    const img = ev.currentTarget;
+    if (img.dataset.fb !== "1") {
+      img.dataset.fb = "1";
+      img.src = url;
+    }
+  };
+}
+
+/**
  * Owners type a handle, an @handle or a whole Instagram link. Store only the handle.
  * Returns null for empty input and "invalid" for anything that is not a valid handle.
  */
