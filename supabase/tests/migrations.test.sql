@@ -334,4 +334,83 @@ update properties set directions_by_name = true where id = '00000000-0000-0000-0
 select t_assert((select directions_by_name from properties where id = '00000000-0000-0000-0000-0000000000a1'), 'the owner setting can be switched on');
 update properties set directions_by_name = false where id = '00000000-0000-0000-0000-0000000000a1';
 
+
+-- 14. expenses: owner isolation, constraints, superadmin, updated_at ---------------------------------
+reset role;
+insert into bookings (id, property_id, guest_name, check_in, check_out, total_amount, status)
+values ('00000000-0000-0000-0000-0000000000e1', :'A1', 'Expense link A1', '2027-07-01', '2027-07-02', 100, 'confirmed'),
+       ('00000000-0000-0000-0000-0000000000e2', :'A2', 'Expense link A2', '2027-07-01', '2027-07-02', 100, 'confirmed');
+
+do $$ begin
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  insert into expenses (property_id, category, amount, description) values ('00000000-0000-0000-0000-0000000000a1', 'electricity', 1500.50, 'Power bill');
+  insert into expenses (property_id, category, amount, booking_id) values ('00000000-0000-0000-0000-0000000000a1', 'ota_commission', 300, '00000000-0000-0000-0000-0000000000e1');
+  -- another owner's property: refused by RLS
+  begin insert into expenses (property_id, category, amount) values ('00000000-0000-0000-0000-0000000000a2', 'staff', 10); raise exception 'TEST_NO_ERROR cross-property insert';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  -- a booking of another property cannot be linked
+  begin insert into expenses (property_id, category, amount, booking_id) values ('00000000-0000-0000-0000-0000000000a1', 'other', 10, '00000000-0000-0000-0000-0000000000e2'); raise exception 'TEST_NO_ERROR cross-property booking link';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  reset role;
+end $$;
+select t_assert((select count(*) = 2 from expenses), 'owner recorded two expenses; both cross-property inserts refused');
+
+-- check constraints (as the table owner: the constraints, not RLS, must refuse these)
+do $$ begin
+  begin insert into expenses (property_id, category, amount) values ('00000000-0000-0000-0000-0000000000a1', 'electricity', 0); raise exception 'TEST_NO_ERROR zero amount';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  begin insert into expenses (property_id, category, amount) values ('00000000-0000-0000-0000-0000000000a1', 'electricity', -5); raise exception 'TEST_NO_ERROR negative amount';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+  begin insert into expenses (property_id, category, amount) values ('00000000-0000-0000-0000-0000000000a1', 'lunch', 5); raise exception 'TEST_NO_ERROR unknown category';
+  exception when others then if sqlerrm like 'TEST_NO_ERROR%' then raise; end if; end;
+end $$;
+
+-- the other owner sees nothing of A1's expenses and cannot edit or delete them; anon sees nothing
+do $$ declare n int; begin
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b2', true);
+  set local role authenticated;
+  select count(*) into n from expenses; if n <> 0 then raise exception 'owner B2 can read % expenses of A1', n; end if;
+  update expenses set amount = 1; get diagnostics n = row_count; if n <> 0 then raise exception 'owner B2 updated % rows', n; end if;
+  delete from expenses; get diagnostics n = row_count; if n <> 0 then raise exception 'owner B2 deleted % rows', n; end if;
+  reset role;
+  set local role anon;
+  begin select count(*) into n from expenses; raise exception 'TEST_NO_ERROR anon read % expenses', n;
+  exception when insufficient_privilege then null; end;
+  reset role;
+end $$;
+select t_assert((select count(*) = 2 from expenses), 'expenses of A1 untouched by the other owner');
+
+-- the owner can edit; updated_at moves forward, created_at does not
+do $$ declare c timestamptz; u timestamptz; begin
+  select created_at, updated_at into c, u from expenses where description = 'Power bill';
+  perform pg_sleep(0.01);
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
+  set local role authenticated;
+  update expenses set amount = 1600 where description = 'Power bill';
+  reset role;
+  if (select updated_at from expenses where description = 'Power bill') <= u then raise exception 'updated_at did not move'; end if;
+  if (select created_at from expenses where description = 'Power bill') <> c then raise exception 'created_at changed'; end if;
+end $$;
+
+-- the superadmin (by JWT email) sees every property's expenses
+insert into expenses (property_id, category, amount) values (:'A2', 'staff', 2000);
+do $$ declare n int; begin
+  perform set_config('request.jwt.claim.role', 'authenticated', true); perform set_config('request.jwt.claim.sub', '', true);
+  perform set_config('request.jwt.claims', '{"email":"thedelishlicks@gmail.com"}', true);
+  set local role authenticated;
+  select count(*) into n from expenses; if n <> 3 then raise exception 'superadmin sees % of 3 expenses', n; end if;
+  reset role;
+end $$;
+
+-- deleting a booking keeps the expense (booking_id set null); deleting a property removes its expenses
+delete from bookings where id = '00000000-0000-0000-0000-0000000000e1';
+select t_assert((select booking_id is null from expenses where category = 'ota_commission'), 'expense survives its booking being deleted');
+
+-- 15. booking_source_detail: nullable, existing rows untouched, source CHECK-free of it ---------------
+select t_assert((select count(*) = 0 from bookings where booking_source_detail is not null), 'existing bookings have no source detail');
+update bookings set booking_source_detail = 'instagram' where id = '00000000-0000-0000-0000-0000000000e2';
+select t_assert((select source = 'direct' and booking_source_detail = 'instagram' from bookings where id = '00000000-0000-0000-0000-0000000000e2'), 'source untouched, detail stored');
+select t_assert((select count(*) = 1 from information_schema.columns where table_name = 'booking_groups' and column_name = 'booking_source_detail' and is_nullable = 'YES'), 'booking_groups has a nullable booking_source_detail');
+
 \echo 'ALL DATABASE TESTS PASSED'
