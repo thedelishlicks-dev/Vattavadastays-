@@ -10,6 +10,7 @@ import {
   CATEGORY_ORDER,
   NOT_MEASURED,
   bandFor,
+  categoryProgress,
   computePropertyScore,
   pointsFor,
   summariseActivity,
@@ -626,4 +627,217 @@ test("summariseActivity on nothing is all zeros", () => {
     withPhone: 0,
     withSourceDetail: 0,
   });
+});
+
+// ── hardening: the denominator is never misleading ─────────────────────────
+const NO_ROOM: ScoreRoom[] = [];
+const INACTIVE_ONLY: ScoreRoom[] = [goodRoom({ is_active: false })];
+const BARE_ROOM: ScoreRoom[] = [
+  { is_active: true, base_price: 0, max_guests: 2, images: [], room_amenities: [] },
+];
+const GOOD_ROOMS: ScoreRoom[] = [goodRoom(), goodRoom()];
+const BARE_LISTING: ScoreProperty = { name: "Bare" };
+const BARE_BOOKING: ScoreProperty = {
+  check_in_time: "",
+  check_out_time: "",
+  shared_amenities: [],
+  owner_whatsapp: "",
+  is_active: true,
+  subscription_status: "trial",
+};
+
+/** Every combination of the setups below: a broad, deterministic sweep (no randomness). */
+function scenarios(): { name: string; property: ScoreProperty; signals: ScoreSignals }[] {
+  const out: { name: string; property: ScoreProperty; signals: ScoreSignals }[] = [];
+  const roomSets = { NO_ROOM, INACTIVE_ONLY, BARE_ROOM, GOOD_ROOMS };
+  const listings = { fullListing: FULL, bareListing: BARE_LISTING };
+  const bookings = { fullBooking: {}, bareBooking: BARE_BOOKING };
+  const signalSets = {
+    full: SIGNALS_FULL,
+    new: SIGNALS_NEW,
+    missing: { today: TODAY } as ScoreSignals,
+    noActivity: { ...SIGNALS_FULL, activity: null } as ScoreSignals,
+    noRates: { ...SIGNALS_FULL, seasonRates: null } as ScoreSignals,
+    pastRates: {
+      ...SIGNALS_FULL,
+      seasonRates: [{ start_date: "2025-01-01", end_date: "2025-02-01" }],
+    } as ScoreSignals,
+  };
+  for (const [rn, rooms] of Object.entries(roomSets))
+    for (const [ln, listing] of Object.entries(listings))
+      for (const [bn, booking] of Object.entries(bookings))
+        for (const [sn, signals] of Object.entries(signalSets))
+          out.push({
+            name: `${rn}/${ln}/${bn}/${sn}`,
+            property: { ...listing, ...booking, rooms },
+            signals,
+          });
+  return out;
+}
+
+test("sweep: the score is always an integer 0–100 computed on the measurable points only", () => {
+  const all = scenarios();
+  assert.equal(all.length, 4 * 2 * 2 * 6);
+  for (const { name, property, signals } of all) {
+    const r = computePropertyScore(property, signals);
+    assert.ok(Number.isInteger(r.score) && r.score >= 0 && r.score <= 100, name);
+    const earned = r.items.reduce((a, i) => a + i.points, 0);
+    const measurable = r.items.reduce((a, i) => a + (i.available ? i.maxPoints : 0), 0);
+    assert.equal(r.earnedPoints, earned, name);
+    assert.equal(r.measurablePoints, measurable, name);
+    assert.equal(r.score, Math.round((earned * 100) / measurable), name);
+    // categories add back up to the same numerator and denominator the score used
+    assert.equal(
+      r.categories.reduce((a, c) => a + c.points, 0),
+      earned,
+      name,
+    );
+    assert.equal(
+      r.categories.reduce((a, c) => a + c.measurablePoints, 0),
+      measurable,
+      name,
+    );
+  }
+});
+
+test("sweep: the denominator can never shrink to something misleading (at least 65 of 100 always measurable)", () => {
+  // Listing 20 + rooms 20 + booking readiness 15 + base and weekend pricing 10 never depend on loaded data.
+  for (const { name, property, signals } of scenarios()) {
+    const m = computePropertyScore(property, signals).measurablePoints;
+    assert.ok(m >= 65 && m <= 100, `${name}: ${m}`);
+  }
+});
+
+test("sweep: unavailable items earn nothing, promise nothing and are never recommended", () => {
+  for (const { name, property, signals } of scenarios()) {
+    const r = computePropertyScore(property, signals);
+    const top = new Set(r.topActions.map((a) => a.id));
+    for (const i of r.items.filter((x) => !x.available)) {
+      assert.equal(i.points, 0, `${name} ${i.id}`);
+      assert.equal(i.improvement, 0, `${name} ${i.id}`);
+      assert.equal(i.completed, false, `${name} ${i.id}`);
+      assert.ok(!top.has(i.id), `${name} ${i.id}`);
+      assert.ok(i.unavailableReason, `${name} ${i.id}`);
+    }
+    assert.deepEqual(
+      r.unavailable.map((u) => u.id),
+      r.items.filter((i) => !i.available).map((i) => i.id),
+      name,
+    );
+  }
+});
+
+test("the full score is reached only when every MEASURABLE item is done: unmeasured data never blocks or fakes 100", () => {
+  const r = computePropertyScore(FULL, { today: TODAY, seasonRates: SIGNALS_FULL.seasonRates });
+  assert.equal(r.score, 100);
+  assert.ok(r.items.filter((i) => i.available).every((i) => i.completed));
+  // …and a missing signal cannot lift an otherwise bare property above its real standing
+  const bare = computePropertyScore(BARE_LISTING, { today: TODAY });
+  assert.ok(bare.score <= 5);
+});
+
+test("categoryProgress: measurable denominator, never the nominal maximum", () => {
+  const r = computePropertyScore({ name: "New Stay", rooms: [] }, SIGNALS_NEW);
+  const ops = r.categories.find((c) => c.category === "operations")!;
+  assert.equal(ops.maxPoints, 15); // nominal
+  assert.deepEqual(categoryProgress(ops), { earned: 0, measurable: 6, share: 0, counted: true }); // only "bookings recorded" is measurable yet
+  const growth = r.categories.find((c) => c.category === "growth")!;
+  assert.equal(categoryProgress(growth).measurable, 8); // expenses 5 + Instagram 3 (source needs a booking first)
+  const listing = r.categories.find((c) => c.category === "listing")!;
+  assert.deepEqual(categoryProgress(listing), {
+    earned: 2,
+    measurable: 20,
+    share: 0.1,
+    counted: true,
+  });
+});
+
+test("categoryProgress: a category with nothing measurable is 'not counted', not 0 of something", () => {
+  const r = computePropertyScore(FULL, { today: TODAY }); // bookings could not be loaded
+  const ops = r.categories.find((c) => c.category === "operations")!;
+  assert.deepEqual(categoryProgress(ops), { earned: 0, measurable: 0, share: 0, counted: false });
+  assert.deepEqual(categoryProgress({ points: 5, measurablePoints: -3 }), {
+    earned: 0,
+    measurable: 0,
+    share: 0,
+    counted: false,
+  });
+  assert.deepEqual(categoryProgress({ points: 99, measurablePoints: 10 }), {
+    earned: 10,
+    measurable: 10,
+    share: 1,
+    counted: true,
+  });
+});
+
+// ── hardening: top 3 are genuinely owner-fixable ───────────────────────────
+test("sweep: every recommendation is something the owner can do, on a page they can open", () => {
+  for (const { name, property, signals } of scenarios()) {
+    const r = computePropertyScore(property, signals);
+    assert.ok(r.topActions.length <= 3, name);
+    assert.equal(new Set(r.topActions.map((a) => a.id)).size, r.topActions.length, name);
+    for (const a of r.topActions) {
+      const item = r.items.find((i) => i.id === a.id)!;
+      assert.ok(item.actionable, `${name} ${a.id}`);
+      assert.ok(item.available && !item.completed, `${name} ${a.id}`);
+      assert.ok(a.href && a.href.startsWith("/admin/"), `${name} ${a.id}`);
+      assert.ok(a.action.length > 0 && a.improvement > 0 && a.scoreAfter <= 100, `${name} ${a.id}`);
+      assert.notEqual(a.id, "booking_page", name); // platform-controlled
+    }
+    // best first
+    for (let i = 1; i < r.topActions.length; i++)
+      assert.ok(r.topActions[i - 1].improvement >= r.topActions[i].improvement, name);
+  }
+});
+
+test("sweep: with no active room only setup actions are recommended, never outcomes", () => {
+  const afterSetup = new Set([
+    "rooms_photos",
+    "rooms_occupancy",
+    "rooms_amenities",
+    "pricing_base",
+    "pricing_weekend",
+    "pricing_seasons",
+    "pricing_upcoming",
+    "ops_bookings",
+    "growth_source",
+    "growth_expenses",
+  ]);
+  for (const { name, property, signals } of scenarios().filter(
+    (s) => s.name.startsWith("NO_ROOM") || s.name.startsWith("INACTIVE_ONLY"),
+  )) {
+    for (const a of computePropertyScore(property, signals).topActions)
+      assert.ok(!afterSetup.has(a.id), `${name} ${a.id}`);
+  }
+});
+
+test("an item with no page to act on is never owner-fixable, whatever its flags", () => {
+  const r = computePropertyScore({ ...FULL, subscription_status: "trial" }, SIGNALS_FULL);
+  for (const i of r.items) assert.equal(i.actionable, i.id !== "booking_page", i.id);
+  assert.ok(r.items.filter((i) => i.actionable).every((i) => !!i.href));
+});
+
+test("booking page stays scored (3 points) but is not recommended, even when it is the biggest gap", () => {
+  const r = computePropertyScore({ ...FULL, subscription_status: "suspended" }, SIGNALS_FULL);
+  assert.equal(r.items.find((i) => i.id === "booking_page")!.maxPoints, 3);
+  assert.equal(r.score, 97);
+  assert.deepEqual(r.topActions, []);
+});
+
+test("bands and messages are exactly the agreed ones", () => {
+  assert.deepEqual(
+    [0, 24, 25, 49, 50, 74, 75, 89, 90, 100].map((n) => BAND_MESSAGES[bandFor(n)]),
+    [
+      "Let's get your property ready. Start with the actions below.",
+      "Let's get your property ready. Start with the actions below.",
+      "A good start. The actions below move your score most.",
+      "A good start. The actions below move your score most.",
+      "Good progress. A few changes will help.",
+      "Good progress. A few changes will help.",
+      "You're doing well.",
+      "You're doing well.",
+      "Outstanding. Your property is in great shape.",
+      "Outstanding. Your property is in great shape.",
+    ],
+  );
 });
