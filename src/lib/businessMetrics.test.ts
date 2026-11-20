@@ -6,6 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  accommodationRevenue,
   availableRoomNights,
   averageDailyRate,
   bookingCashCollected,
@@ -15,6 +16,7 @@ import {
   nightsInPeriod,
   occupancyPercent,
   occupiedRoomNights,
+  openBalances,
   outstandingAmount,
   periodDays,
   periodShare,
@@ -158,7 +160,9 @@ test("multi-room booking is billed once from the group, never per room", () => {
   const m = computeBusinessMetrics({ period: NOV, bookings: rooms, groups: [g], roomCount: 5 });
   assert.equal(m.revenue, 9500); // 10000 + 500 extras − 1000 discount
   assert.equal(m.occupiedRoomNights, 4); // 2 rooms × 2 nights
-  assert.equal(m.adr, 2375);
+  // ADR uses accommodation revenue: 10000 room total − 1000 discount, extras left out
+  assert.equal(m.accommodationRevenue, 9000);
+  assert.equal(m.adr, 2250);
 });
 
 test("a cancelled group takes its rooms with it, even if a room row still says confirmed", () => {
@@ -214,6 +218,7 @@ test("zero bookings: every figure is 0 (no NaN); only the available nights remai
     occupiedRoomNights: 0,
     availableRoomNights: 150,
     occupancyPercent: 0,
+    accommodationRevenue: 0,
     adr: 0,
     revPar: 0,
     totalExpenses: 0,
@@ -381,4 +386,60 @@ test("ratio helpers", () => {
   assert.equal(averageDailyRate(9000, 0), 0);
   assert.equal(revPar(9000, 150), 60);
   assert.equal(revPar(9000, 0), 0);
+});
+
+// ── accommodation revenue (ADR / RevPAR) and open balances ──────────────────
+test("ADR and RevPAR use room revenue: extras do not inflate the nightly rate", () => {
+  const b = booking({ discount_amount: 500, booking_charges: [{ qty: 4, unit_price: 500 }] }); // room 6000, extras 2000
+  const m = computeBusinessMetrics({ period: NOV, bookings: [b], roomCount: 5 });
+  assert.equal(m.revenue, 7500); // 6000 + 2000 − 500
+  assert.equal(m.accommodationRevenue, 5500); // 6000 − 500
+  assert.equal(m.adr, 2750);
+  assert.equal(m.revPar, 36.67);
+});
+
+test("accommodation revenue is split by nights and ignores cancelled/pending like revenue", () => {
+  const split = booking({ check_in: "2026-10-30", check_out: "2026-11-02", total_amount: 9000 });
+  assert.equal(accommodationRevenue([split], [], NOV), 3000);
+  assert.equal(
+    accommodationRevenue(
+      [booking({ status: "cancelled" }), booking({ status: "pending" })],
+      [],
+      NOV,
+    ),
+    0,
+  );
+});
+
+test("openBalances: only started, counted stays with money still due", () => {
+  const started = booking({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 1000,
+  }); // 5000 due
+  const upcoming = booking({ check_in: "2026-11-25", check_out: "2026-11-27" }); // not due yet
+  const paid = booking({ check_in: "2026-11-01", check_out: "2026-11-02", advance_amount: 6000 });
+  const pending = booking({ status: "pending", check_in: "2026-11-03", check_out: "2026-11-04" });
+  const cancelled = booking({
+    status: "cancelled",
+    check_in: "2026-11-03",
+    check_out: "2026-11-04",
+  });
+  assert.deepEqual(openBalances([started, upcoming, paid, pending, cancelled], [], "2026-11-19"), {
+    count: 1,
+    total: 5000,
+  });
+});
+
+test("openBalances bills a group once and counts it from its own advance", () => {
+  const { group: g, rooms } = group({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 2500,
+  });
+  assert.deepEqual(openBalances(rooms, [g], "2026-11-19"), { count: 1, total: 7000 }); // 9500 − 2500
+});
+
+test("openBalances on nothing is zero", () => {
+  assert.deepEqual(openBalances([], [], "2026-11-19"), { count: 0, total: 0 });
 });
