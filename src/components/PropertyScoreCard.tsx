@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRight } from "lucide-react";
-import type { PropertyScoreResult } from "@/lib/propertyScore";
+import { categoryProgress, type PropertyScoreResult } from "@/lib/propertyScore";
 
 // Property Score: one number, one sentence, three things to do. The score and the actions come from
 // lib/propertyScore.ts; this file only shows them. Always shows something useful, even at 0.
@@ -102,22 +102,25 @@ export function PropertyScoreCard({
           <ChevronRight className="h-4 w-4 transition-transform group-open:rotate-90" />
         </summary>
         <ul className="px-4 pb-3 space-y-2">
-          {categories.map((c) => (
-            <li key={c.category}>
-              <div className="flex items-baseline justify-between text-xs">
-                <span>{c.label}</span>
-                <span className="tabular-nums text-muted-foreground">
-                  {c.points} / {c.maxPoints}
-                </span>
-              </div>
-              <div className="mt-1 h-1 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-primary/70"
-                  style={{ width: `${(c.points / c.maxPoints) * 100}%` }}
-                />
-              </div>
-            </li>
-          ))}
+          {categories.map((c) => {
+            const p = categoryProgress(c);
+            return (
+              <li key={c.category}>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span>{c.label}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {p.counted ? `${p.earned} / ${p.measurable}` : "Not counted yet"}
+                  </span>
+                </div>
+                <div className="mt-1 h-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary/70"
+                    style={{ width: `${p.share * 100}%` }}
+                  />
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </details>
 
