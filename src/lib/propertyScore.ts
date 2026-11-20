@@ -143,7 +143,7 @@ export interface ScoreItem {
   /** What to do next (set whenever it is not completed). */
   action: string;
   href?: string;
-  /** The owner can do something about it. False for e.g. platform activation. */
+  /** The owner can fix it: not platform-controlled, and there is a page to do it on. Only these are recommended. */
   actionable: boolean;
   /** Only recommended once an active room exists (it still counts towards the score). Setup comes first. */
   needsRoom: boolean;
@@ -667,6 +667,23 @@ function buildDrafts(property: ScoreProperty, signals: ScoreSignals): Draft[] {
   return drafts;
 }
 
+/**
+ * What to show for one category: points earned out of the points that could be MEASURED (not the nominal
+ * maximum), so a category that is partly unmeasurable never reads as if the owner is missing points they
+ * could not have earned. `counted` is false when none of the category could be measured yet.
+ */
+export function categoryProgress(c: Pick<CategoryScore, "points" | "measurablePoints">): {
+  earned: number;
+  measurable: number;
+  share: number;
+  counted: boolean;
+} {
+  const measurable = Math.max(0, c.measurablePoints);
+  if (measurable === 0) return { earned: 0, measurable: 0, share: 0, counted: false };
+  const earned = Math.min(Math.max(0, c.points), measurable);
+  return { earned, measurable, share: earned / measurable, counted: true };
+}
+
 export function bandFor(score: number): ScoreBand {
   if (score >= 90) return "excellent";
   if (score >= 75) return "good";
@@ -711,7 +728,8 @@ export function computePropertyScore(
       unavailableReason: available ? undefined : d.unavailableReason,
       action: d.action,
       href: d.href,
-      actionable: d.actionable !== false,
+      // Owner-fixable = not platform-controlled AND there is a page to do it on.
+      actionable: d.actionable !== false && !!d.href,
       needsRoom: d.needsRoom === true,
       improvement,
     };
