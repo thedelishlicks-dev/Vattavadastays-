@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CalendarDays,
-  IndianRupee,
   MessageSquare,
   Ban,
   Plus,
@@ -23,9 +22,24 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
 import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
+import { BusinessSnapshot } from "@/components/BusinessSnapshot";
+import { RevenueOpportunities } from "@/components/RevenueOpportunities";
+import { useExpenses } from "@/hooks/useExpenses";
+import { computeBusinessMetrics, openBalances } from "@/lib/businessMetrics";
+import { buildCalendarIndex } from "@/lib/calendarState";
+import {
+  OPEN_NIGHTS_WINDOW_DAYS,
+  addDays,
+  buildBusinessSnapshot,
+  buildOpportunities,
+  countOpenNights,
+  monthPeriods,
+} from "@/lib/dashboardMetrics";
 import { extractUPIId } from "@/utils/upi";
 import type { Property } from "@/hooks/useProperty";
 
@@ -473,6 +487,8 @@ function RecentBookings({
 // Dashboard page
 // ---------------------------------------------------------------------------
 
+const NO_EXPENSES: never[] = [];
+
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   useIcalAutoSync(property?.id);
@@ -509,30 +525,12 @@ function DashboardPage() {
     [bookings, groupBookingIds],
   );
 
-  const stats = useMemo(() => {
-    const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-    const revenueOf = (b: {
-      check_in?: string;
-      status: string;
-      total_amount: number;
-      discount_amount?: number;
-      booking_charges?: ChargeLine[] | null;
-    }) => {
-      if (b.check_in?.slice(0, 7) !== thisMonth) return 0;
-      if (b.status !== "confirmed" && b.status !== "completed") return 0;
-      return Math.max(0, Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0));
-    };
-
-    const upcoming =
+  const upcoming = useMemo(
+    () =>
       standaloneBookings.filter((b) => b.check_in >= today && b.status !== "cancelled").length +
-      groups.filter((g) => g.check_in >= today && g.status !== "cancelled").length;
-
-    const monthlyRevenue =
-      standaloneBookings.reduce((sum, b) => sum + revenueOf(b), 0) +
-      groups.reduce((sum, g) => sum + revenueOf(g), 0);
-
-    return { upcoming, monthlyRevenue };
-  }, [standaloneBookings, groups, today]);
+      groups.filter((g) => g.check_in >= today && g.status !== "cancelled").length,
+    [standaloneBookings, groups, today],
+  );
 
   // Standalone bookings only: the rooms of a multi-room booking are represented by
   // the group row, so listing them too showed one booking three times.
@@ -582,6 +580,70 @@ function DashboardPage() {
     [property],
   );
 
+  // ── Business snapshot ──────────────────────────────────────────────────────
+  // Revenue, occupancy, ADR and profit are computed by lib/businessMetrics.ts from the SAME bookings and
+  // groups already loaded above (the window starts at last month, so both months are covered; a stay of
+  // more than a month that began before last month is the one thing it can miss). Only the expenses
+  // of the two months are an extra, small query.
+  const periods = useMemo(() => monthPeriods(new Date()), []);
+  const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const {
+    data: expenses,
+    isLoading: expensesLoading,
+    isError: expensesError,
+  } = useExpenses(property?.id ?? "", { startDate: periods.previousStart, endDate: periods.currentLastDay });
+  const expensesStatus = expensesError ? "error" : expensesLoading ? "loading" : "ready";
+  const expensesForMetrics = expensesStatus === "ready" && expenses ? expenses : NO_EXPENSES; // stable reference keeps the memo below from re-running every render
+
+  const snapshot = useMemo(() => {
+    const common = { bookings, groups, roomCount: activeRooms.length, expenses: expensesForMetrics };
+    const current = computeBusinessMetrics({ ...common, period: periods.current });
+    const previous = computeBusinessMetrics({ ...common, period: periods.previous });
+    // Last month is only a fair baseline if the property was already set up for all of it.
+    const firstRoom = (property?.rooms ?? [])
+      .map((r) => (r.created_at ?? "").slice(0, 10))
+      .filter(Boolean)
+      .sort()[0];
+    const historyCoversPrevious = !!firstRoom && firstRoom <= periods.previousStart;
+    return { current, data: buildBusinessSnapshot(current, previous, historyCoversPrevious) };
+  }, [bookings, groups, activeRooms.length, expensesForMetrics, periods, property?.rooms]);
+
+  // Next two weeks: which room-nights have nothing on them. One small query for blocked nights; booked and
+  // held nights come from the bookings already loaded, through the calendar's own state rules.
+  const roomIds = useMemo(() => activeRooms.map((r) => r.id), [activeRooms]);
+  const openWindowEnd = addDays(today, OPEN_NIGHTS_WINDOW_DAYS - 1);
+  const { data: blockedRows, isError: blockedError } = useQuery({
+    // Key starts with "availability-range" so BlockDatesModal's invalidation refreshes it.
+    queryKey: ["availability-range", "dashboard", roomIds.join(","), today, openWindowEnd],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("availability")
+        .select("room_id, date, is_available, note")
+        .in("room_id", roomIds)
+        .eq("is_available", false)
+        .gte("date", today)
+        .lte("date", openWindowEnd);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: roomIds.length > 0,
+  });
+
+  const opportunities = useMemo(() => {
+    // Without the blocked-nights answer, "open dates" could be wrong: say nothing rather than guess.
+    const openNights = blockedRows
+      ? countOpenNights(buildCalendarIndex(bookings, blockedRows), roomIds, today, OPEN_NIGHTS_WINDOW_DAYS)
+      : { open: 0, total: 0 };
+    return buildOpportunities({
+      hasBookingHistory: (bookingTotal ?? bookings.length) > 0 || groups.length > 0,
+      openBalance: openBalances(bookings, groups, today),
+      openNights: blockedError ? { open: 0, total: 0 } : openNights,
+      revenueThisMonth: snapshot.current.revenue,
+      expensesThisMonth: snapshot.current.totalExpenses,
+      expensesKnown: expensesStatus === "ready",
+    });
+  }, [bookings, groups, blockedRows, blockedError, roomIds, today, bookingTotal, snapshot, expensesStatus]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -609,13 +671,17 @@ function DashboardPage() {
       <div>
         <h1 className="text-[28px] leading-tight font-bold tracking-tight">Home</h1>
         <p className="text-sm text-muted-foreground">
-          Snapshot of bookings, revenue, and inquiries.
+          {property?.name ? `${property.name}${property.area ? ` · ${property.area}` : ""}` : "Your property at a glance."}
         </p>
       </div>
 
-      <OnboardingChecklist property={property as Property | undefined} />
+      {hasBookingHistory && (
+        <BusinessSnapshot data={snapshot.data} monthLabel={monthLabel} expensesStatus={expensesStatus} />
+      )}
 
       <AttentionSection rows={attentionRows} />
+
+      <RevenueOpportunities opportunities={opportunities} />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
         <div className="text-xs  text-muted-foreground mb-3">
@@ -632,6 +698,8 @@ function DashboardPage() {
         </div>
       </div>
 
+      <OnboardingChecklist property={property as Property | undefined} />
+
       {hasBookingHistory && (
         <div className="bg-card border border-border/60 rounded-3xl p-4">
           <div className="flex divide-x divide-border">
@@ -639,15 +707,7 @@ function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" /> Upcoming
               </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">{stats.upcoming}</div>
-            </div>
-            <div className="flex-1 px-4">
-              <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
-                <IndianRupee className="h-3.5 w-3.5" /> This month
-              </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">
-                ₹{stats.monthlyRevenue.toLocaleString("en-IN")}
-              </div>
+              <div className="mt-1.5 text-xl font-bold tabular-nums">{upcoming}</div>
             </div>
             <div className="flex-1 pl-4">
               <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
