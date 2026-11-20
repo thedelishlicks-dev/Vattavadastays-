@@ -29,6 +29,8 @@ import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
 import { BusinessSnapshot } from "@/components/BusinessSnapshot";
 import { RevenueOpportunities } from "@/components/RevenueOpportunities";
+import { PropertyScoreCard } from "@/components/PropertyScoreCard";
+import { usePropertyScore } from "@/hooks/usePropertyScore";
 import { useExpenses } from "@/hooks/useExpenses";
 import { computeBusinessMetrics, openBalances } from "@/lib/businessMetrics";
 import { buildCalendarIndex } from "@/lib/calendarState";
@@ -644,6 +646,9 @@ function DashboardPage() {
     });
   }, [bookings, groups, blockedRows, blockedError, roomIds, today, bookingTotal, snapshot, expensesStatus]);
 
+  // Property Score: reads the same cached queries as everything above (no extra requests).
+  const propertyScore = usePropertyScore(property);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -697,6 +702,12 @@ function DashboardPage() {
           />
         </div>
       </div>
+
+      <PropertyScoreCard
+        result={propertyScore.result}
+        isLoading={propertyScore.isLoading}
+        loadFailed={propertyScore.loadFailed}
+      />
 
       <OnboardingChecklist property={property as Property | undefined} />
 
