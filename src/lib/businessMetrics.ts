@@ -20,8 +20,11 @@
  *    boundary is split by nights: revenue, cash and outstanding are each × (nights inside the period ÷
  *    nights of the stay). The app stores no payment dates, so "cash collected" is the stay's `advance_amount`
  *    shared by nights, not cash received during the period.
- *  - Revenue is the whole net stay total (extras included), so ADR = revenue ÷ occupied room nights
- *    includes extras. ADR and RevPAR are 0, never NaN or Infinity, when there is nothing to divide by.
+ *  - Revenue is the whole net stay total (room + extras − discount). ADR and RevPAR use ACCOMMODATION
+ *    revenue instead: the room total less the discount, without extra charges (meals, add-ons), so
+ *    the rate reflects the room, not what was sold with it. (The discount is taken off the room because
+ *    the app does not record which part of the bill it applied to.) Both are 0, never NaN or Infinity,
+ *    when there is nothing to divide by.
  *  - Estimated operating profit = revenue − expenses recorded in the period. It is an estimate: agent
  *    commission is not deducted unless the owner also recorded it as an expense (ota_commission), and
  *    nothing is accrued for depreciation, tax or unrecorded costs.
@@ -89,9 +92,11 @@ export interface BusinessMetrics {
   availableRoomNights: number;
   /** 0–100, 2 decimals. */
   occupancyPercent: number;
-  /** revenue ÷ occupied room nights (₹, 2 decimals). */
+  /** Room total less discount (no extra charges) of those stays, by nights in the period. */
+  accommodationRevenue: number;
+  /** accommodation revenue ÷ occupied room nights (₹, 2 decimals). */
   adr: number;
-  /** revenue ÷ available room nights (₹, 2 decimals). */
+  /** accommodation revenue ÷ available room nights (₹, 2 decimals). */
   revPar: number;
   totalExpenses: number;
   /** revenue − totalExpenses. Can be negative. */
@@ -157,6 +162,8 @@ interface BillingUnit {
   check_in: string;
   check_out: string;
   net: number;
+  /** Room total less discount; extras excluded. */
+  accommodation: number;
   balance: number;
   refundDue: number;
   advance: number;
@@ -170,10 +177,17 @@ function unitFor(row: BookingLike | GroupLike): BillingUnit {
     advance: Number(row.advance_amount ?? 0),
   });
   const advance = Number(row.advance_amount ?? 0);
+  const room = computeBalance({
+    roomTotal: Number(row.total_amount),
+    chargesTotal: 0,
+    discount: Number(row.discount_amount ?? 0),
+    advance: 0,
+  });
   return {
     check_in: row.check_in,
     check_out: row.check_out,
     net: b.netTotal,
+    accommodation: room.netTotal,
     balance: b.balance,
     refundDue: b.refundDue,
     advance: Number.isFinite(advance) ? Math.max(0, advance) : 0,
@@ -210,6 +224,30 @@ export function bookingRevenue(
   period: Period,
 ): number {
   return sumShare(billingUnits(bookings, groups), period, (u) => u.net);
+}
+
+/** Room revenue for ADR / RevPAR: room total less discount, extras excluded, by nights in the period. */
+export function accommodationRevenue(
+  bookings: readonly BookingLike[],
+  groups: readonly GroupLike[],
+  period: Period,
+): number {
+  return sumShare(billingUnits(bookings, groups), period, (u) => u.accommodation);
+}
+
+/**
+ * Unpaid balance of confirmed/completed stays whose check-in is on or before `startedBy` (the guest has
+ * arrived, so the money is due). Whole balances, not split by month. Pending and cancelled never count.
+ */
+export function openBalances(
+  bookings: readonly BookingLike[],
+  groups: readonly GroupLike[],
+  startedBy: string,
+): { count: number; total: number } {
+  const due = billingUnits(bookings, groups).filter(
+    (u) => u.balance > 0 && dayNumber(u.check_in) <= dayNumber(startedBy),
+  );
+  return { count: due.length, total: round2(due.reduce((s, u) => s + u.balance, 0)) };
 }
 
 /** Money received (advance_amount) on confirmed/completed stays, by nights in the period. */
@@ -274,12 +312,12 @@ export function occupancyPercent(occupiedNights: number, availableNights: number
   return round2(safeDiv(occupiedNights, availableNights) * 100);
 }
 
-/** Average daily rate: revenue ÷ occupied room nights. 0 when no room night was sold. */
+/** Average daily rate: (accommodation) revenue ÷ occupied room nights. 0 when no room night was sold. */
 export function averageDailyRate(revenue: number, occupiedNights: number): number {
   return round2(safeDiv(revenue, occupiedNights));
 }
 
-/** Revenue per available room night. 0 when nothing is available. */
+/** (Accommodation) revenue per available room night. 0 when nothing is available. */
 export function revPar(revenue: number, availableNights: number): number {
   return round2(safeDiv(revenue, availableNights));
 }
@@ -311,6 +349,7 @@ export function computeBusinessMetrics(input: BusinessMetricsInput): BusinessMet
   const { period, bookings, roomCount } = input;
   const groups = input.groups ?? [];
   const revenue = bookingRevenue(bookings, groups, period);
+  const accommodation = accommodationRevenue(bookings, groups, period);
   const occupied = occupiedRoomNights(bookings, groups, period);
   const available = availableRoomNights(roomCount, period, input.outOfServiceRoomNights);
   const expensesTotal = totalExpenses(input.expenses ?? [], period);
@@ -322,8 +361,9 @@ export function computeBusinessMetrics(input: BusinessMetricsInput): BusinessMet
     occupiedRoomNights: occupied,
     availableRoomNights: available,
     occupancyPercent: occupancyPercent(occupied, available),
-    adr: averageDailyRate(revenue, occupied),
-    revPar: revPar(revenue, available),
+    accommodationRevenue: accommodation,
+    adr: averageDailyRate(accommodation, occupied),
+    revPar: revPar(accommodation, available),
     totalExpenses: expensesTotal,
     estimatedOperatingProfit: estimatedOperatingProfit(revenue, expensesTotal),
   };
