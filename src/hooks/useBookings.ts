@@ -89,6 +89,12 @@ export interface BookingGroupOptions {
   slim?: boolean;
   /** With `from`: also keep older groups matching this condition (see useBookings' KEEP_ constants). */
   alsoKeep?: string;
+  /**
+   * Only groups that overlap [overlapFrom, overlapTo]: check_in <= overlapTo AND check_out >= overlapFrom
+   * (same rule as useBookings' overlap filters). Lets the Money overview load one reporting period.
+   */
+  overlapFrom?: string;
+  overlapTo?: string;
   /** Keep showing the previous rows while a different window loads (no blank flash). */
   keepPrevious?: boolean;
 }
@@ -113,6 +119,8 @@ export const useBookingGroups = (propertyId: string, options?: BookingGroupOptio
             ? query.or(`check_in.gte.${options.from},${options.alsoKeep}`)
             : query.gte("check_in", options.from);
         }
+        if (options?.overlapTo) query = query.lte("check_in", options.overlapTo);
+        if (options?.overlapFrom) query = query.gte("check_out", options.overlapFrom);
         return query.range(from, to);
       });
       return rows as BookingGroup[];
