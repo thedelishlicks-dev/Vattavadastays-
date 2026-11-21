@@ -258,7 +258,7 @@ export const SITUATIONS: GuideSection[] = [
       },
       shot("26-charges-tab.webp", "Charges tab with the catalog dropdown and the box for your own charge", "**1** Choose an add-on or package from your catalog. Once you pick one, its **Option** (if it has one), **People** or **Qty**, and **Add to extras** appear. **2** Or add your own charge: a description, a number, a price, then **Add**."),
       shot("28-checkout-summary.webp", "A completed booking with its payment summary showing Fully paid", "**1** The Charges tab shows a number when extras were added. **2** The payment summary. **3** **Fully paid** means nothing is left to collect."),
-      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
+      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** This is the **Payments** tab of Money (Money also has Overview, Agents & Commissions and Expenses). **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
       { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page, find the booking and tap the **pencil** button (**Correct collected amount**) on its row. Enter the right figure." },
       shot("27-correct-collected.webp", "Correct collected amount form on the Payments page", "**1** Type the **total** amount actually received. Set it to 0 to mark the booking unpaid. **2** Tap Save."),
     ],
@@ -485,7 +485,7 @@ export const PROBLEMS: GuideSection[] = [
     title: "Money problems",
     summary: "Wrong amount, refund due, commission looks wrong.",
     blocks: [
-      { type: "p", text: "Open **Money → Payments** to see where you stand." },
+      { type: "p", text: "Open **Money → Overview** for the month at a glance: **Revenue**, **Collected**, **Outstanding**, **Expenses** and **Estimated operating profit**. Pick **This month**, **Last month** or **This year**. **Collected** here is the money recorded on that period's stays (the app does not keep payment dates), and the profit is an estimate from the expenses you recorded. Open **Money → Payments** to see where you stand booking by booking." },
       shot("13-payments-overview.webp", "Payments page with the Collected, Outstanding and Total billed cards", "**1** Collected so far, and how many bookings are fully or part paid. **2** Outstanding balance, and how many have not started paying. **3** Total billed: room total plus charges minus discounts."),
       {
         type: "list",
