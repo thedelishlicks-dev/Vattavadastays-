@@ -12,11 +12,13 @@ import {
   bookingCashCollected,
   bookingRevenue,
   computeBusinessMetrics,
+  dedupeStays,
   estimatedOperatingProfit,
   nightsInPeriod,
   occupancyPercent,
   occupiedRoomNights,
   openBalances,
+  outstandingBalances,
   outstandingAmount,
   periodDays,
   periodShare,
@@ -442,4 +444,74 @@ test("openBalances bills a group once and counts it from its own advance", () =>
 
 test("openBalances on nothing is zero", () => {
   assert.deepEqual(openBalances([], [], "2026-11-19"), { count: 0, total: 0 });
+});
+
+// ── dedupeStays / outstandingBalances (used by Revenue Intelligence) ────────
+test("dedupeStays: each confirmed/completed stay once; groups replace their rooms; cancelled and pending out", () => {
+  const { group: g, rooms } = group();
+  const solo = booking();
+  const cancelled = booking({ status: "cancelled" });
+  const pending = booking({ status: "pending" });
+  const stays = dedupeStays([...rooms, solo, cancelled, pending], [g]);
+  assert.deepEqual(
+    stays.map((s) => s.id),
+    [g.id, solo.id],
+  );
+  assert.deepEqual(
+    dedupeStays(rooms, []).map((s) => s.id),
+    rooms.map((r) => r.id),
+  ); // group not supplied: rooms stand alone
+  assert.deepEqual(dedupeStays([], []), []);
+});
+
+test("dedupeStays keeps the caller's own fields", () => {
+  const withSource = [{ ...booking(), source: "direct" as const }];
+  assert.equal(dedupeStays(withSource, [])[0].source, "direct");
+});
+
+test("outstandingBalances: upcoming and started stays, split; cancelled and pending never", () => {
+  const started = booking({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 1000,
+  }); // 5000 due
+  const upcoming = booking({ check_in: "2026-11-25", check_out: "2026-11-27" }); // 6000 due
+  const paid = booking({ advance_amount: 6000 });
+  const cancelled = booking({ status: "cancelled" });
+  const pending = booking({ status: "pending" });
+  assert.deepEqual(
+    outstandingBalances([started, upcoming, paid, cancelled, pending], [], "2026-11-19"),
+    {
+      count: 2,
+      total: 11000,
+      startedCount: 1,
+      startedTotal: 5000,
+    },
+  );
+});
+
+test("outstandingBalances follows balance.ts: discount, charges, advance, and overpayment is not negative", () => {
+  const b = booking({
+    discount_amount: 500,
+    advance_amount: 1000,
+    booking_charges: [{ qty: 1, unit_price: 300 }],
+  });
+  assert.equal(outstandingBalances([b], [], "2026-11-19").total, 4800);
+  assert.equal(outstandingBalances([booking({ advance_amount: 9000 })], [], "2026-11-19").total, 0);
+});
+
+test("outstandingBalances bills a group once and handles nothing", () => {
+  const { group: g, rooms } = group({ advance_amount: 2500 });
+  assert.deepEqual(outstandingBalances(rooms, [g], "2026-11-19"), {
+    count: 1,
+    total: 7000,
+    startedCount: 1, // the group's check-in (10 Nov) is before the 19 Nov "today"
+    startedTotal: 7000,
+  });
+  assert.deepEqual(outstandingBalances([], [], "2026-11-19"), {
+    count: 0,
+    total: 0,
+    startedCount: 0,
+    startedTotal: 0,
+  });
 });
