@@ -222,6 +222,47 @@ function billingUnits(
   return dedupeStays(bookings, groups).map(unitFor);
 }
 
+/**
+ * One counted stay with its money, restricted to the period: each figure is the stay's whole figure × the
+ * share of its nights inside the period (same split as every function below). Stays with no night in the
+ * period are left out. Used by the Money overview to group the SAME numbers by source, by started/upcoming…
+ * so a breakdown can never disagree with the headline.
+ */
+export interface PeriodStay<S> {
+  stay: S;
+  /** nights inside the period ÷ nights of the stay (0 < share ≤ 1). */
+  share: number;
+  revenue: number;
+  collected: number;
+  balance: number;
+  refundDue: number;
+  /** Balance of the WHOLE stay (not split by period): whether money is due on it at all. */
+  stayBalance: number;
+}
+
+export function periodStays<B extends BookingLike, G extends GroupLike>(
+  bookings: readonly B[],
+  groups: readonly G[],
+  period: Period,
+): PeriodStay<B | G>[] {
+  const out: PeriodStay<B | G>[] = [];
+  for (const stay of dedupeStays(bookings, groups)) {
+    const share = periodShare(stay.check_in, stay.check_out, period);
+    if (share <= 0) continue;
+    const u = unitFor(stay);
+    out.push({
+      stay,
+      share,
+      revenue: u.net * share,
+      collected: u.advance * share,
+      balance: u.balance * share,
+      refundDue: u.refundDue * share,
+      stayBalance: u.balance,
+    });
+  }
+  return out;
+}
+
 // ── The individual metrics ───────────────────────────────────────────────────
 
 function sumShare(units: BillingUnit[], period: Period, pick: (u: BillingUnit) => number): number {
