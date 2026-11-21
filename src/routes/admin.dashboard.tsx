@@ -22,8 +22,6 @@ import { LoadFailed } from "@/components/LoadFailed";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
 import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
@@ -31,17 +29,10 @@ import { BusinessSnapshot } from "@/components/BusinessSnapshot";
 import { RevenueOpportunities } from "@/components/RevenueOpportunities";
 import { PropertyScoreCard } from "@/components/PropertyScoreCard";
 import { usePropertyScore } from "@/hooks/usePropertyScore";
+import { useRevenueIntelligence } from "@/hooks/useRevenueIntelligence";
 import { useExpenses } from "@/hooks/useExpenses";
-import { computeBusinessMetrics, openBalances } from "@/lib/businessMetrics";
-import { buildCalendarIndex } from "@/lib/calendarState";
-import {
-  OPEN_NIGHTS_WINDOW_DAYS,
-  addDays,
-  buildBusinessSnapshot,
-  buildOpportunities,
-  countOpenNights,
-  monthPeriods,
-} from "@/lib/dashboardMetrics";
+import { computeBusinessMetrics } from "@/lib/businessMetrics";
+import { buildBusinessSnapshot, monthPeriods } from "@/lib/dashboardMetrics";
 import { extractUPIId } from "@/utils/upi";
 import type { Property } from "@/hooks/useProperty";
 
@@ -610,41 +601,9 @@ function DashboardPage() {
     return { current, data: buildBusinessSnapshot(current, previous, historyCoversPrevious) };
   }, [bookings, groups, activeRooms.length, expensesForMetrics, periods, property?.rooms]);
 
-  // Next two weeks: which room-nights have nothing on them. One small query for blocked nights; booked and
-  // held nights come from the bookings already loaded, through the calendar's own state rules.
-  const roomIds = useMemo(() => activeRooms.map((r) => r.id), [activeRooms]);
-  const openWindowEnd = addDays(today, OPEN_NIGHTS_WINDOW_DAYS - 1);
-  const { data: blockedRows, isError: blockedError } = useQuery({
-    // Key starts with "availability-range" so BlockDatesModal's invalidation refreshes it.
-    queryKey: ["availability-range", "dashboard", roomIds.join(","), today, openWindowEnd],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("availability")
-        .select("room_id, date, is_available, note")
-        .in("room_id", roomIds)
-        .eq("is_available", false)
-        .gte("date", today)
-        .lte("date", openWindowEnd);
-      if (error) throw error;
-      return data ?? [];
-    },
-    enabled: roomIds.length > 0,
-  });
-
-  const opportunities = useMemo(() => {
-    // Without the blocked-nights answer, "open dates" could be wrong: say nothing rather than guess.
-    const openNights = blockedRows
-      ? countOpenNights(buildCalendarIndex(bookings, blockedRows), roomIds, today, OPEN_NIGHTS_WINDOW_DAYS)
-      : { open: 0, total: 0 };
-    return buildOpportunities({
-      hasBookingHistory: (bookingTotal ?? bookings.length) > 0 || groups.length > 0,
-      openBalance: openBalances(bookings, groups, today),
-      openNights: blockedError ? { open: 0, total: 0 } : openNights,
-      revenueThisMonth: snapshot.current.revenue,
-      expensesThisMonth: snapshot.current.totalExpenses,
-      expensesKnown: expensesStatus === "ready",
-    });
-  }, [bookings, groups, blockedRows, blockedError, roomIds, today, bookingTotal, snapshot, expensesStatus]);
+  // Revenue Intelligence: the rules live in lib/revenueIntelligence.ts, not here. The hook reads the same cached
+  // queries as everything above plus one small blocked-nights request.
+  const revenueIntel = useRevenueIntelligence(property);
 
   // Property Score: reads the same cached queries as everything above (no extra requests).
   const propertyScore = usePropertyScore(property);
@@ -686,7 +645,7 @@ function DashboardPage() {
 
       <AttentionSection rows={attentionRows} />
 
-      <RevenueOpportunities opportunities={opportunities} />
+      <RevenueOpportunities opportunities={revenueIntel.opportunities} />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
         <div className="text-xs  text-muted-foreground mb-3">
