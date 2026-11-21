@@ -1,325 +1,517 @@
 /**
- * Unit tests for dashboardMetrics.ts — the figures and wording on the owner Home dashboard.
- *   npx tsx --test src/lib/dashboardMetrics.test.ts
+ * Unit tests for businessMetrics.ts.
+ *
+ *   npx tsx --test src/lib/businessMetrics.test.ts
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  addDays,
-  buildBusinessSnapshot,
-  buildOpportunities,
-  countOpenNights,
-  monthPeriods,
-  percentChange,
-  percentComparison,
-  pointsComparison,
-} from "./dashboardMetrics";
-import { computeBusinessMetrics, openBalances, type BookingLike } from "./businessMetrics";
-import { buildCalendarIndex } from "./calendarState";
+  accommodationRevenue,
+  availableRoomNights,
+  averageDailyRate,
+  bookingCashCollected,
+  bookingRevenue,
+  computeBusinessMetrics,
+  dedupeStays,
+  estimatedOperatingProfit,
+  nightsInPeriod,
+  occupancyPercent,
+  occupiedRoomNights,
+  openBalances,
+  outstandingBalances,
+  outstandingAmount,
+  periodDays,
+  periodShare,
+  refundDueAmount,
+  revPar,
+  totalExpenses,
+  type BookingLike,
+  type GroupLike,
+  type Period,
+} from "./businessMetrics";
+import { computeBalance, chargesSum } from "./balance";
 
-const m = monthPeriods(new Date(2026, 10, 19)); // 19 Nov 2026
+const NOV: Period = { start: "2026-11-01", endExclusive: "2026-12-01" }; // 30 days
+
 let n = 0;
-const stay = (over: Partial<BookingLike>): BookingLike => ({
-  id: `b${++n}`,
-  check_in: "2026-11-10",
-  check_out: "2026-11-12",
-  status: "confirmed",
-  total_amount: 6000,
-  discount_amount: 0,
-  advance_amount: 0,
-  ...over,
-});
-
-// ── periods ─────────────────────────────────────────────────────────────────
-test("monthPeriods: this and last calendar month from local date, year rollover", () => {
-  assert.deepEqual(m.current, { start: "2026-11-01", endExclusive: "2026-12-01" });
-  assert.deepEqual(m.previous, { start: "2026-10-01", endExclusive: "2026-11-01" });
-  assert.equal(m.currentLastDay, "2026-11-30");
-  const jan = monthPeriods(new Date(2027, 0, 5));
-  assert.deepEqual(jan.previous, { start: "2026-12-01", endExclusive: "2027-01-01" });
-});
-
-test("addDays crosses month and year ends", () => {
-  assert.equal(addDays("2026-11-30", 1), "2026-12-01");
-  assert.equal(addDays("2026-12-31", 14), "2027-01-14");
-});
-
-// ── comparison wording ──────────────────────────────────────────────────────
-test("percent comparison wording matches the spec", () => {
-  assert.equal(percentComparison(11800, 10000)?.text, "↑ 18% vs last month");
-  assert.equal(percentComparison(9600, 10000)?.text, "↓ 4% vs last month");
-  assert.equal(percentComparison(11800, 10000)?.direction, "up");
-  assert.equal(percentComparison(9600, 10000)?.direction, "down");
-});
-
-test("points comparison wording matches the spec", () => {
-  assert.equal(pointsComparison(57, 50)?.text, "↑ 7 pts vs last month");
-  assert.equal(pointsComparison(46, 50)?.text, "↓ 4 pts vs last month");
-});
-
-test("no change is stated plainly, not as 0%", () => {
-  assert.equal(percentComparison(10000, 10000)?.text, "No change vs last month");
-  assert.equal(percentComparison(10040, 10000)?.direction, "flat"); // rounds to 0%
-  assert.equal(pointsComparison(50.2, 50)?.direction, "flat");
-});
-
-test("no baseline, no percentage: zero, negative or invalid previous value", () => {
-  assert.equal(percentChange(5000, 0), null);
-  assert.equal(percentChange(5000, -200), null);
-  assert.equal(percentChange(5000, Number.NaN), null);
-  assert.equal(percentComparison(5000, 0), null);
-  assert.equal(pointsComparison(Number.NaN, 10), null);
-});
-
-test("falling to zero is a real 100% drop", () => {
-  assert.equal(percentComparison(0, 10000)?.text, "↓ 100% vs last month");
-});
-
-// ── snapshot: real figures through businessMetrics ──────────────────────────
-function metricsFor(
-  bookings: BookingLike[],
-  rooms: number,
-  expenses: { expense_date: string; amount: number }[] = [],
-) {
+function booking(over: Partial<BookingLike> = {}): BookingLike {
   return {
-    current: computeBusinessMetrics({ period: m.current, bookings, roomCount: rooms, expenses }),
-    previous: computeBusinessMetrics({ period: m.previous, bookings, roomCount: rooms, expenses }),
+    id: `b${++n}`,
+    check_in: "2026-11-10",
+    check_out: "2026-11-12", // 2 nights
+    status: "confirmed",
+    total_amount: 6000,
+    discount_amount: 0,
+    advance_amount: 0,
+    booking_charges: [],
+    ...over,
   };
 }
 
-test("snapshot: revenue, occupancy, ADR, profit and their comparisons", () => {
-  const bookings = [
-    stay({ check_in: "2026-10-10", check_out: "2026-10-12", total_amount: 5000 }), // Oct: 2 nights, 5000
-    stay({ check_in: "2026-11-10", check_out: "2026-11-13", total_amount: 9000 }), // Nov: 3 nights, 9000
-    stay({ check_in: "2026-11-20", check_out: "2026-11-21", total_amount: 3000 }), // Nov: 1 night, 3000
-  ];
-  const expenses = [
-    { expense_date: "2026-10-05", amount: 1000 },
-    { expense_date: "2026-11-05", amount: 4000 },
-  ];
-  const { current, previous } = metricsFor(bookings, 2, expenses);
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.revenue.value, 12000);
-  assert.equal(s.revenue.comparison?.text, "↑ 140% vs last month"); // 12000 vs 5000
-  assert.equal(s.occupancy.occupiedNights, 4);
-  assert.equal(s.occupancy.availableNights, 60); // 2 rooms × 30 days
-  assert.equal(s.occupancy.value, 6.67);
-  assert.equal(s.occupancy.comparison?.text, "↑ 3 pts vs last month"); // 6.67 vs 3.23 (2/62)
-  assert.equal(s.adr.value, 3000); // 12000 / 4 nights
-  assert.equal(s.adr.comparison?.text, "↑ 20% vs last month"); // vs 2500
-  assert.equal(s.profit.value, 8000); // 12000 − 4000
-  assert.equal(s.profit.comparison?.text, "↑ 100% vs last month"); // vs 4000
+// ── normal booking ──────────────────────────────────────────────────────────
+test("normal confirmed booking: revenue, nights, occupancy, ADR, RevPAR", () => {
+  const m = computeBusinessMetrics({ period: NOV, bookings: [booking()], roomCount: 5 });
+  assert.equal(m.revenue, 6000);
+  assert.equal(m.occupiedRoomNights, 2);
+  assert.equal(m.availableRoomNights, 150); // 5 rooms × 30 days
+  assert.equal(m.occupancyPercent, 1.33);
+  assert.equal(m.adr, 3000);
+  assert.equal(m.revPar, 40);
 });
 
-test("snapshot never calls revenue profit: no expenses recorded means no profit figure", () => {
-  const { current, previous } = metricsFor([stay({})], 2);
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.profit.value, null);
-  assert.equal(s.profit.expensesRecorded, false);
-  assert.equal(s.revenue.value, 6000);
+test("completed stays count like confirmed ones", () => {
+  assert.equal(bookingRevenue([booking({ status: "completed" })], [], NOV), 6000);
 });
 
-test("snapshot: first month of data shows no comparisons at all", () => {
-  const { current, previous } = metricsFor([stay({})], 2, [
-    { expense_date: "2026-11-05", amount: 500 },
-  ]);
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.revenue.comparison, null);
-  assert.equal(s.occupancy.comparison, null);
-  assert.equal(s.adr.comparison, null);
-  assert.equal(s.profit.comparison, null);
+// ── discount and charges: same definition as balance.ts ─────────────────────
+test("discounted booking: revenue is net of the discount", () => {
+  assert.equal(bookingRevenue([booking({ discount_amount: 500 })], [], NOV), 5500);
 });
 
-test("snapshot: a property not yet set up for all of last month shows no comparisons", () => {
-  const bookings = [
-    stay({ check_in: "2026-10-10", check_out: "2026-10-12", total_amount: 5000 }),
-    stay({}),
-  ];
-  const { current, previous } = metricsFor(bookings, 2, [
-    { expense_date: "2026-10-05", amount: 100 },
-    { expense_date: "2026-11-05", amount: 100 },
-  ]);
-  const s = buildBusinessSnapshot(current, previous, false);
-  assert.equal(s.revenue.comparison, null);
-  assert.equal(s.occupancy.comparison, null);
-  assert.equal(s.adr.comparison, null);
-  assert.equal(s.profit.comparison, null);
-  assert.equal(s.revenue.value, 6000); // the figures themselves still show
-});
-
-test("snapshot: zero rooms and zero bookings are safe (no NaN, no comparison)", () => {
-  const { current, previous } = metricsFor([], 0);
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.revenue.value, 0);
-  assert.equal(s.occupancy.value, null);
-  assert.equal(s.adr.value, null);
-  assert.equal(s.profit.value, null);
-  assert.equal(s.revenue.comparison, null);
-});
-
-test("snapshot: ADR is hidden when no night was sold this month", () => {
-  const { current, previous } = metricsFor(
-    [stay({ check_in: "2026-10-10", check_out: "2026-10-12" })],
-    2,
-  );
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.adr.value, null);
-  assert.equal(s.revenue.comparison?.text, "↓ 100% vs last month");
-});
-
-test("snapshot: profit % is hidden against a loss or when last month had no expenses entered", () => {
-  const bookings = [
-    stay({ check_in: "2026-10-10", check_out: "2026-10-12", total_amount: 1000 }),
-    stay({}),
-  ];
-  const lossLastMonth = metricsFor(bookings, 2, [
-    { expense_date: "2026-10-05", amount: 5000 },
-    { expense_date: "2026-11-05", amount: 100 },
-  ]);
-  assert.equal(
-    buildBusinessSnapshot(lossLastMonth.current, lossLastMonth.previous, true).profit.comparison,
-    null,
-  );
-  const noCostsLastMonth = metricsFor(bookings, 2, [{ expense_date: "2026-11-05", amount: 100 }]);
-  assert.equal(
-    buildBusinessSnapshot(noCostsLastMonth.current, noCostsLastMonth.previous, true).profit
-      .comparison,
-    null,
-  );
-});
-
-test("snapshot: cancelled and pending stays never reach the dashboard figures", () => {
-  const { current, previous } = metricsFor(
-    [stay({ status: "cancelled" }), stay({ status: "pending" })],
-    2,
-  );
-  const s = buildBusinessSnapshot(current, previous, true);
-  assert.equal(s.revenue.value, 0);
-  assert.equal(s.occupancy.occupiedNights, 0);
-});
-
-// ── open nights ─────────────────────────────────────────────────────────────
-test("countOpenNights: booked, pending and blocked nights are not open", () => {
-  const idx = buildCalendarIndex(
-    [
-      {
-        room_id: "r1",
-        status: "confirmed",
-        guest_name: "A",
-        check_in: "2026-11-19",
-        check_out: "2026-11-21",
-      }, // 19, 20
-      {
-        room_id: "r1",
-        status: "pending",
-        guest_name: "B",
-        check_in: "2026-11-22",
-        check_out: "2026-11-23",
-      }, // 22
+test("booking with extra charges: charges are added", () => {
+  const b = booking({
+    booking_charges: [
+      { qty: 2, unit_price: 250 },
+      { qty: 1, unit_price: 100 },
     ],
-    [{ room_id: "r1", date: "2026-11-24", note: "Painting" }], // blocked
-  );
-  const r = countOpenNights(idx, ["r1", "r2"], "2026-11-19", 7); // 19..25
-  assert.equal(r.total, 14);
-  assert.equal(r.open, 14 - 2 - 1 - 1); // r1 loses 4 nights, r2 is empty
+  });
+  assert.equal(bookingRevenue([b], [], NOV), 6600);
 });
 
-test("countOpenNights with no rooms is empty", () => {
-  assert.deepEqual(countOpenNights(buildCalendarIndex([], []), [], "2026-11-19", 14), {
-    open: 0,
-    total: 0,
+test("revenue equals computeBalance().netTotal for the same booking (one definition of a total)", () => {
+  const b = booking({ discount_amount: 700, booking_charges: [{ qty: 3, unit_price: 400 }] });
+  const expected = computeBalance({
+    roomTotal: 6000,
+    chargesTotal: chargesSum(b.booking_charges),
+    discount: 700,
+  }).netTotal;
+  assert.equal(bookingRevenue([b], [], NOV), expected);
+});
+
+test("discount larger than the bill never makes revenue negative", () => {
+  assert.equal(bookingRevenue([booking({ discount_amount: 99999 })], [], NOV), 0);
+});
+
+test("money stored as numeric strings is read correctly", () => {
+  const b = booking({
+    total_amount: "6000.00",
+    discount_amount: "500.00",
+    advance_amount: "1000.00",
+  });
+  assert.equal(bookingRevenue([b], [], NOV), 5500);
+  assert.equal(bookingCashCollected([b], [], NOV), 1000);
+});
+
+// ── cancelled and pending ───────────────────────────────────────────────────
+test("cancelled booking adds no revenue, cash, outstanding or occupancy", () => {
+  const b = booking({ status: "cancelled", advance_amount: 2000 });
+  const m = computeBusinessMetrics({ period: NOV, bookings: [b], roomCount: 5 });
+  assert.equal(m.revenue, 0);
+  assert.equal(m.cashCollected, 0);
+  assert.equal(m.outstanding, 0);
+  assert.equal(m.occupiedRoomNights, 0);
+  assert.equal(m.occupancyPercent, 0);
+});
+
+test("pending booking adds no revenue or occupancy", () => {
+  const m = computeBusinessMetrics({
+    period: NOV,
+    bookings: [booking({ status: "pending" })],
+    roomCount: 5,
+  });
+  assert.equal(m.revenue, 0);
+  assert.equal(m.occupiedRoomNights, 0);
+  assert.equal(m.outstanding, 0);
+});
+
+test("unknown or missing status is not counted", () => {
+  assert.equal(
+    bookingRevenue([booking({ status: null }), booking({ status: undefined })], [], NOV),
+    0,
+  );
+});
+
+// ── group / multi-room ──────────────────────────────────────────────────────
+function group(over: Partial<GroupLike> = {}): { group: GroupLike; rooms: BookingLike[] } {
+  const g: GroupLike = {
+    id: `g${++n}`,
+    check_in: "2026-11-10",
+    check_out: "2026-11-12",
+    status: "confirmed",
+    total_amount: 10000, // two rooms × 2 nights = 5000 + 5000
+    discount_amount: 1000,
+    advance_amount: 0,
+    booking_charges: [{ qty: 1, unit_price: 500 }],
+    ...over,
+  };
+  const rooms = [1, 2].map(() =>
+    booking({
+      group_id: g.id,
+      check_in: g.check_in,
+      check_out: g.check_out,
+      status: g.status,
+      total_amount: 5000,
+      discount_amount: 0,
+    }),
+  );
+  return { group: g, rooms };
+}
+
+test("multi-room booking is billed once from the group, never per room", () => {
+  const { group: g, rooms } = group();
+  const m = computeBusinessMetrics({ period: NOV, bookings: rooms, groups: [g], roomCount: 5 });
+  assert.equal(m.revenue, 9500); // 10000 + 500 extras − 1000 discount
+  assert.equal(m.occupiedRoomNights, 4); // 2 rooms × 2 nights
+  // ADR uses accommodation revenue: 10000 room total − 1000 discount, extras left out
+  assert.equal(m.accommodationRevenue, 9000);
+  assert.equal(m.adr, 2250);
+});
+
+test("a cancelled group takes its rooms with it, even if a room row still says confirmed", () => {
+  const { group: g, rooms } = group({ status: "cancelled" });
+  rooms.forEach((r) => (r.status = "confirmed"));
+  const m = computeBusinessMetrics({ period: NOV, bookings: rooms, groups: [g], roomCount: 5 });
+  assert.equal(m.revenue, 0);
+  assert.equal(m.occupiedRoomNights, 0);
+});
+
+test("a pending group adds nothing", () => {
+  const { group: g, rooms } = group({ status: "pending" });
+  assert.equal(
+    computeBusinessMetrics({ period: NOV, bookings: rooms, groups: [g], roomCount: 5 }).revenue,
+    0,
+  );
+});
+
+test("group and standalone bookings together are each counted once", () => {
+  const { group: g, rooms } = group();
+  const solo = booking();
+  const m = computeBusinessMetrics({
+    period: NOV,
+    bookings: [...rooms, solo],
+    groups: [g],
+    roomCount: 5,
+  });
+  assert.equal(m.revenue, 9500 + 6000);
+  assert.equal(m.occupiedRoomNights, 4 + 2);
+});
+
+test("a room whose group was not supplied is billed as a standalone booking (no double count, no loss)", () => {
+  const { rooms } = group();
+  const m = computeBusinessMetrics({ period: NOV, bookings: rooms, groups: [], roomCount: 5 });
+  assert.equal(m.revenue, 10000);
+  assert.equal(m.occupiedRoomNights, 4);
+});
+
+test("group partial payment: cash and outstanding come from the group's advance", () => {
+  const { group: g, rooms } = group({ advance_amount: 3000 });
+  assert.equal(bookingCashCollected(rooms, [g], NOV), 3000);
+  assert.equal(outstandingAmount(rooms, [g], NOV), 6500);
+});
+
+// ── zero cases ──────────────────────────────────────────────────────────────
+test("zero bookings: every figure is 0 (no NaN); only the available nights remain", () => {
+  const m = computeBusinessMetrics({ period: NOV, bookings: [], roomCount: 5 });
+  assert.deepEqual(m, {
+    revenue: 0,
+    cashCollected: 0,
+    outstanding: 0,
+    refundDue: 0,
+    occupiedRoomNights: 0,
+    availableRoomNights: 150,
+    occupancyPercent: 0,
+    accommodationRevenue: 0,
+    adr: 0,
+    revPar: 0,
+    totalExpenses: 0,
+    estimatedOperatingProfit: 0,
   });
 });
 
-// ── opportunities ───────────────────────────────────────────────────────────
-const base = {
-  hasBookingHistory: true,
-  openBalance: { count: 0, total: 0 },
-  openNights: { open: 0, total: 28 },
-  revenueThisMonth: 0,
-  expensesThisMonth: 0,
-};
-
-test("opportunities: nothing to say means an empty list", () => {
-  assert.deepEqual(buildOpportunities(base), []);
+test("zero available rooms: occupancy and RevPAR are 0, not Infinity or NaN", () => {
+  const m = computeBusinessMetrics({ period: NOV, bookings: [booking()], roomCount: 0 });
+  assert.equal(m.availableRoomNights, 0);
+  assert.equal(m.occupancyPercent, 0);
+  assert.equal(m.revPar, 0);
+  assert.equal(m.adr, 3000); // still defined: it needs sold nights, not rooms
+  for (const v of Object.values(m)) assert.ok(Number.isFinite(v));
 });
 
-test("opportunities: a new property with no history gets none", () => {
-  assert.deepEqual(
-    buildOpportunities({
-      ...base,
-      hasBookingHistory: false,
-      openBalance: { count: 2, total: 900 },
-      openNights: { open: 28, total: 28 },
-      revenueThisMonth: 1000,
-    }),
-    [],
+test("negative or invalid room count counts as no rooms", () => {
+  assert.equal(availableRoomNights(-3, NOV), 0);
+  assert.equal(availableRoomNights(Number.NaN, NOV), 0);
+});
+
+test("out-of-service nights reduce availability but never below 0", () => {
+  assert.equal(availableRoomNights(2, NOV, 10), 50);
+  assert.equal(availableRoomNights(1, NOV, 999), 0);
+});
+
+// ── payments ────────────────────────────────────────────────────────────────
+test("partial payment: cash collected and outstanding", () => {
+  const b = booking({ advance_amount: 2000 });
+  assert.equal(bookingCashCollected([b], [], NOV), 2000);
+  assert.equal(outstandingAmount([b], [], NOV), 4000);
+  assert.equal(refundDueAmount([b], [], NOV), 0);
+});
+
+test("fully paid: nothing outstanding", () => {
+  assert.equal(outstandingAmount([booking({ advance_amount: 6000 })], [], NOV), 0);
+});
+
+test("overpayment is refund due, not negative outstanding", () => {
+  const b = booking({ advance_amount: 7000 });
+  assert.equal(outstandingAmount([b], [], NOV), 0);
+  assert.equal(refundDueAmount([b], [], NOV), 1000);
+  assert.equal(bookingCashCollected([b], [], NOV), 7000);
+});
+
+test("outstanding accounts for discount and charges", () => {
+  const b = booking({
+    discount_amount: 500,
+    advance_amount: 1000,
+    booking_charges: [{ qty: 1, unit_price: 300 }],
+  });
+  assert.equal(outstandingAmount([b], [], NOV), 4800); // 6000 + 300 − 500 − 1000
+});
+
+test("a pending booking's advance is not counted as collected revenue-side cash", () => {
+  assert.equal(
+    bookingCashCollected([booking({ status: "pending", advance_amount: 500 })], [], NOV),
+    0,
   );
 });
 
-test("opportunity: outstanding payments carry the amount and link to Payments", () => {
-  const [o] = buildOpportunities({ ...base, openBalance: { count: 2, total: 8500 } });
-  assert.equal(o.id, "outstanding");
-  assert.equal(o.amount, 8500);
-  assert.equal(o.to, "/admin/payments");
-  assert.match(o.detail, /^2 stays have already started/);
+// ── month boundaries ────────────────────────────────────────────────────────
+test("stay crossing into the month is split by nights (30 Oct → 2 Nov = 3 nights, 1 in November)", () => {
+  const b = booking({
+    check_in: "2026-10-30",
+    check_out: "2026-11-02",
+    total_amount: 9000,
+    advance_amount: 3000,
+  });
+  assert.equal(nightsInPeriod(b.check_in, b.check_out, NOV), 1);
+  assert.equal(bookingRevenue([b], [], NOV), 3000);
+  assert.equal(bookingCashCollected([b], [], NOV), 1000);
+  assert.equal(outstandingAmount([b], [], NOV), 2000);
+  assert.equal(occupiedRoomNights([b], [], NOV), 1);
+});
+
+test("the two months of a split stay add back up to the whole stay", () => {
+  const b = booking({ check_in: "2026-10-30", check_out: "2026-11-02", total_amount: 9000 });
+  const oct: Period = { start: "2026-10-01", endExclusive: "2026-11-01" };
+  assert.equal(bookingRevenue([b], [], oct) + bookingRevenue([b], [], NOV), 9000);
+  assert.equal(occupiedRoomNights([b], [], oct) + occupiedRoomNights([b], [], NOV), 3);
+});
+
+test("check-out on the 1st of the next month: the check-out night is not in this month's stay", () => {
+  const b = booking({ check_in: "2026-11-28", check_out: "2026-12-01", total_amount: 3000 });
+  assert.equal(occupiedRoomNights([b], [], NOV), 3);
+  const dec: Period = { start: "2026-12-01", endExclusive: "2027-01-01" };
+  assert.equal(occupiedRoomNights([b], [], dec), 0);
+  assert.equal(bookingRevenue([b], [], dec), 0);
+});
+
+test("a stay entirely outside the period contributes nothing", () => {
+  const b = booking({ check_in: "2026-09-01", check_out: "2026-09-04" });
+  assert.equal(bookingRevenue([b], [], NOV), 0);
+  assert.equal(occupiedRoomNights([b], [], NOV), 0);
+});
+
+test("a stay covering the whole period counts only the period's nights", () => {
+  const b = booking({ check_in: "2026-10-25", check_out: "2026-12-05", total_amount: 41000 }); // 41 nights
+  assert.equal(nightsInPeriod(b.check_in, b.check_out, NOV), 30);
+  assert.equal(bookingRevenue([b], [], NOV), 30000);
+});
+
+test("days in the period follow the calendar: leap February, 31-day month", () => {
+  assert.equal(periodDays({ start: "2028-02-01", endExclusive: "2028-03-01" }), 29);
+  assert.equal(periodDays({ start: "2027-02-01", endExclusive: "2027-03-01" }), 28);
+  assert.equal(periodDays({ start: "2026-12-01", endExclusive: "2027-01-01" }), 31);
+  assert.equal(availableRoomNights(4, { start: "2028-02-01", endExclusive: "2028-03-01" }), 116);
+});
+
+test("timestamps are accepted as dates (only the date part is used)", () => {
+  assert.equal(nightsInPeriod("2026-11-10T18:30:00Z", "2026-11-12T00:00:00Z", NOV), 2);
+});
+
+test("a stay with no nights (check-in = check-out) is in the month of its check-in, once", () => {
+  assert.equal(periodShare("2026-11-30", "2026-11-30", NOV), 1);
+  assert.equal(periodShare("2026-12-01", "2026-12-01", NOV), 0);
+});
+
+// ── expenses and profit ─────────────────────────────────────────────────────
+test("total expenses counts the period only: first day in, next month's first day out", () => {
+  const expenses = [
+    { expense_date: "2026-10-31", amount: 111 },
+    { expense_date: "2026-11-01", amount: 1000 },
+    { expense_date: "2026-11-30", amount: 500.5 },
+    { expense_date: "2026-12-01", amount: 999 },
+  ];
+  assert.equal(totalExpenses(expenses, NOV), 1500.5);
+});
+
+test("estimated operating profit = revenue − expenses, and can be negative", () => {
+  const m = computeBusinessMetrics({
+    period: NOV,
+    bookings: [booking()],
+    roomCount: 5,
+    expenses: [{ expense_date: "2026-11-05", amount: 2500 }],
+  });
+  assert.equal(m.totalExpenses, 2500);
+  assert.equal(m.estimatedOperatingProfit, 3500);
+  assert.equal(estimatedOperatingProfit(1000, 2500), -1500);
+});
+
+test("expenses with no bookings give a loss; no expenses give profit = revenue", () => {
   assert.equal(
-    buildOpportunities({ ...base, openBalance: { count: 1, total: 100 } })[0].detail.startsWith(
-      "1 stay has",
+    computeBusinessMetrics({
+      period: NOV,
+      bookings: [],
+      roomCount: 3,
+      expenses: [{ expense_date: "2026-11-02", amount: 800 }],
+    }).estimatedOperatingProfit,
+    -800,
+  );
+  assert.equal(
+    computeBusinessMetrics({ period: NOV, bookings: [booking()], roomCount: 3 })
+      .estimatedOperatingProfit,
+    6000,
+  );
+});
+
+// ── the small ratio functions ───────────────────────────────────────────────
+test("ratio helpers", () => {
+  assert.equal(occupancyPercent(75, 150), 50);
+  assert.equal(occupancyPercent(5, 0), 0);
+  assert.equal(averageDailyRate(9000, 3), 3000);
+  assert.equal(averageDailyRate(9000, 0), 0);
+  assert.equal(revPar(9000, 150), 60);
+  assert.equal(revPar(9000, 0), 0);
+});
+
+// ── accommodation revenue (ADR / RevPAR) and open balances ──────────────────
+test("ADR and RevPAR use room revenue: extras do not inflate the nightly rate", () => {
+  const b = booking({ discount_amount: 500, booking_charges: [{ qty: 4, unit_price: 500 }] }); // room 6000, extras 2000
+  const m = computeBusinessMetrics({ period: NOV, bookings: [b], roomCount: 5 });
+  assert.equal(m.revenue, 7500); // 6000 + 2000 − 500
+  assert.equal(m.accommodationRevenue, 5500); // 6000 − 500
+  assert.equal(m.adr, 2750);
+  assert.equal(m.revPar, 36.67);
+});
+
+test("accommodation revenue is split by nights and ignores cancelled/pending like revenue", () => {
+  const split = booking({ check_in: "2026-10-30", check_out: "2026-11-02", total_amount: 9000 });
+  assert.equal(accommodationRevenue([split], [], NOV), 3000);
+  assert.equal(
+    accommodationRevenue(
+      [booking({ status: "cancelled" }), booking({ status: "pending" })],
+      [],
+      NOV,
     ),
-    true,
-  );
-});
-
-test("opportunity: open dates only when at least half the next two weeks is open, and with no invented amount", () => {
-  assert.equal(buildOpportunities({ ...base, openNights: { open: 13, total: 28 } }).length, 0);
-  const [o] = buildOpportunities({ ...base, openNights: { open: 14, total: 28 } });
-  assert.equal(o.id, "open-dates");
-  assert.equal(o.amount, undefined);
-  assert.equal(o.to, "/admin/calendar");
-  assert.match(o.detail, /14 of 28 room-nights/);
-});
-
-test("opportunity: missing expenses only when there is revenue and no expense recorded", () => {
-  assert.equal(
-    buildOpportunities({ ...base, revenueThisMonth: 5000, expensesThisMonth: 0 })[0].id,
-    "missing-expenses",
-  );
-  assert.equal(
-    buildOpportunities({ ...base, revenueThisMonth: 5000, expensesThisMonth: 100 }).length,
-    0,
-  );
-  assert.equal(
-    buildOpportunities({ ...base, revenueThisMonth: 0, expensesThisMonth: 0 }).length,
     0,
   );
 });
 
-test("opportunity: missing expenses is never claimed while expenses are loading or failed", () => {
-  assert.equal(
-    buildOpportunities({ ...base, revenueThisMonth: 5000, expensesKnown: false }).length,
-    0,
+test("openBalances: only started, counted stays with money still due", () => {
+  const started = booking({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 1000,
+  }); // 5000 due
+  const upcoming = booking({ check_in: "2026-11-25", check_out: "2026-11-27" }); // not due yet
+  const paid = booking({ check_in: "2026-11-01", check_out: "2026-11-02", advance_amount: 6000 });
+  const pending = booking({ status: "pending", check_in: "2026-11-03", check_out: "2026-11-04" });
+  const cancelled = booking({
+    status: "cancelled",
+    check_in: "2026-11-03",
+    check_out: "2026-11-04",
+  });
+  assert.deepEqual(openBalances([started, upcoming, paid, pending, cancelled], [], "2026-11-19"), {
+    count: 1,
+    total: 5000,
+  });
+});
+
+test("openBalances bills a group once and counts it from its own advance", () => {
+  const { group: g, rooms } = group({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 2500,
+  });
+  assert.deepEqual(openBalances(rooms, [g], "2026-11-19"), { count: 1, total: 7000 }); // 9500 − 2500
+});
+
+test("openBalances on nothing is zero", () => {
+  assert.deepEqual(openBalances([], [], "2026-11-19"), { count: 0, total: 0 });
+});
+
+// ── dedupeStays / outstandingBalances (used by Revenue Intelligence) ────────
+test("dedupeStays: each confirmed/completed stay once; groups replace their rooms; cancelled and pending out", () => {
+  const { group: g, rooms } = group();
+  const solo = booking();
+  const cancelled = booking({ status: "cancelled" });
+  const pending = booking({ status: "pending" });
+  const stays = dedupeStays([...rooms, solo, cancelled, pending], [g]);
+  assert.deepEqual(
+    stays.map((s) => s.id),
+    [g.id, solo.id],
+  );
+  assert.deepEqual(
+    dedupeStays(rooms, []).map((s) => s.id),
+    rooms.map((r) => r.id),
+  ); // group not supplied: rooms stand alone
+  assert.deepEqual(dedupeStays([], []), []);
+});
+
+test("dedupeStays keeps the caller's own fields", () => {
+  const withSource = [{ ...booking(), source: "direct" as const }];
+  assert.equal(dedupeStays(withSource, [])[0].source, "direct");
+});
+
+test("outstandingBalances: upcoming and started stays, split; cancelled and pending never", () => {
+  const started = booking({
+    check_in: "2026-11-05",
+    check_out: "2026-11-07",
+    advance_amount: 1000,
+  }); // 5000 due
+  const upcoming = booking({ check_in: "2026-11-25", check_out: "2026-11-27" }); // 6000 due
+  const paid = booking({ advance_amount: 6000 });
+  const cancelled = booking({ status: "cancelled" });
+  const pending = booking({ status: "pending" });
+  assert.deepEqual(
+    outstandingBalances([started, upcoming, paid, cancelled, pending], [], "2026-11-19"),
+    {
+      count: 2,
+      total: 11000,
+      startedCount: 1,
+      startedTotal: 5000,
+    },
   );
 });
 
-test("opportunities come in a stable order: money first", () => {
-  const ids = buildOpportunities({
-    ...base,
-    openBalance: { count: 1, total: 100 },
-    openNights: { open: 20, total: 28 },
-    revenueThisMonth: 100,
-  }).map((o) => o.id);
-  assert.deepEqual(ids, ["outstanding", "open-dates", "missing-expenses"]);
+test("outstandingBalances follows balance.ts: discount, charges, advance, and overpayment is not negative", () => {
+  const b = booking({
+    discount_amount: 500,
+    advance_amount: 1000,
+    booking_charges: [{ qty: 1, unit_price: 300 }],
+  });
+  assert.equal(outstandingBalances([b], [], "2026-11-19").total, 4800);
+  assert.equal(outstandingBalances([booking({ advance_amount: 9000 })], [], "2026-11-19").total, 0);
 });
 
-test("openBalances feeds the opportunity: only started, counted stays", () => {
-  const bal = openBalances(
-    [
-      stay({ check_in: "2026-11-05", check_out: "2026-11-07", advance_amount: 1000 }),
-      stay({ check_in: "2026-11-25", check_out: "2026-11-27" }),
-    ],
-    [],
-    "2026-11-19",
-  );
-  assert.deepEqual(bal, { count: 1, total: 5000 });
+test("outstandingBalances bills a group once and handles nothing", () => {
+  const { group: g, rooms } = group({ advance_amount: 2500 });
+  assert.deepEqual(outstandingBalances(rooms, [g], "2026-11-19"), {
+    count: 1,
+    total: 7000,
+    startedCount: 1, // the group's check-in (10 Nov) is before the 19 Nov "today"
+    startedTotal: 7000,
+  });
+  assert.deepEqual(outstandingBalances([], [], "2026-11-19"), {
+    count: 0,
+    total: 0,
+    startedCount: 0,
+    startedTotal: 0,
+  });
 });
