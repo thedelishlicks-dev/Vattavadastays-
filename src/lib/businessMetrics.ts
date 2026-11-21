@@ -1,4 +1,4 @@
-/**
+ /**
  * Business metrics (revenue, occupancy, ADR, RevPAR, expenses, estimated profit).
  *
  * Pure functions only (no React, no Supabase), unit-tested in businessMetrics.test.ts.
@@ -194,19 +194,32 @@ function unitFor(row: BookingLike | GroupLike): BillingUnit {
   };
 }
 
+/**
+ * The confirmed/completed stays, each exactly once: every counted group, plus every counted standalone
+ * booking. The room rows of a supplied group are left out (their group carries the money), and a room whose
+ * group was not supplied stands on its own. Cancelled and pending stays never appear.
+ * Generic, so callers keep the extra fields of their own rows (source, guest, …).
+ */
+export function dedupeStays<B extends BookingLike, G extends GroupLike>(
+  bookings: readonly B[],
+  groups: readonly G[],
+): (B | G)[] {
+  const groupIds = new Set(groups.map((g) => g.id));
+  const stays: (B | G)[] = [];
+  for (const g of groups) if (countsAsStay(g.status)) stays.push(g);
+  for (const b of bookings) {
+    const isMemberOfSuppliedGroup = !!b.group_id && groupIds.has(b.group_id);
+    if (!isMemberOfSuppliedGroup && countsAsStay(b.status)) stays.push(b);
+  }
+  return stays;
+}
+
 /** Standalone bookings and groups that count as stays: each is billed exactly once. */
 function billingUnits(
   bookings: readonly BookingLike[],
   groups: readonly GroupLike[],
 ): BillingUnit[] {
-  const groupIds = new Set(groups.map((g) => g.id));
-  const units: BillingUnit[] = [];
-  for (const g of groups) if (countsAsStay(g.status)) units.push(unitFor(g));
-  for (const b of bookings) {
-    const isMemberOfSuppliedGroup = !!b.group_id && groupIds.has(b.group_id);
-    if (!isMemberOfSuppliedGroup && countsAsStay(b.status)) units.push(unitFor(b));
-  }
-  return units;
+  return dedupeStays(bookings, groups).map(unitFor);
 }
 
 // ── The individual metrics ───────────────────────────────────────────────────
@@ -248,6 +261,27 @@ export function openBalances(
     (u) => u.balance > 0 && dayNumber(u.check_in) <= dayNumber(startedBy),
   );
   return { count: due.length, total: round2(due.reduce((s, u) => s + u.balance, 0)) };
+}
+
+/**
+ * Money still due on confirmed/completed stays, upcoming AND already started (never cancelled, never pending),
+ * from the same balance calculation as everywhere else (balance.ts). Whole balances, not split by month.
+ * `startedCount/startedTotal` is the part whose check-in is on or before `today`.
+ */
+export function outstandingBalances(
+  bookings: readonly BookingLike[],
+  groups: readonly GroupLike[],
+  today: string,
+): { count: number; total: number; startedCount: number; startedTotal: number } {
+  const due = billingUnits(bookings, groups).filter((u) => u.balance > 0);
+  const started = due.filter((u) => dayNumber(u.check_in) <= dayNumber(today));
+  const sum = (list: BillingUnit[]) => round2(list.reduce((t, u) => t + u.balance, 0));
+  return {
+    count: due.length,
+    total: sum(due),
+    startedCount: started.length,
+    startedTotal: sum(started),
+  };
 }
 
 /** Money received (advance_amount) on confirmed/completed stays, by nights in the period. */

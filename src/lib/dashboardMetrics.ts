@@ -4,13 +4,12 @@
  *
  * The numbers themselves come from businessMetrics.ts (which reuses balance.ts). This file only decides
  *  - which two months to compare,
- *  - whether a comparison is trustworthy enough to show, and how to word it,
- *  - which data-backed "opportunities" to surface.
+ *  - whether a comparison is trustworthy enough to show, and how to word it.
+ * (The "opportunities" rules live in revenueIntelligence.ts.)
  */
 
-import { stateOf, type CalIndex } from "./calendarState";
 import { monthRange } from "./expenses";
-import { dayNumber, type BusinessMetrics, type Period } from "./businessMetrics";
+import type { BusinessMetrics, Period } from "./businessMetrics";
 
 // ── Periods ──────────────────────────────────────────────────────────────────
 
@@ -148,103 +147,4 @@ export function buildBusinessSnapshot(
           : null,
     },
   };
-}
-
-// ── Open nights (from the calendar's own day states) ─────────────────────────
-
-/** YYYY-MM-DD `days` after `ymd`, timezone-proof. */
-export function addDays(ymd: string, days: number): string {
-  return new Date((dayNumber(ymd) + days) * 86_400_000).toISOString().slice(0, 10);
-}
-
-/**
- * Room-nights with nothing on them in the next `days` days from `startDate`, using the calendar's
- * single definition of a night's state (booked, pending hold, blocked, open). A pending hold and a
- * blocked night are NOT open. Check-out day counts as open: that night is free.
- */
-export function countOpenNights(
-  index: CalIndex,
-  roomIds: readonly string[],
-  startDate: string,
-  days: number,
-): { open: number; total: number } {
-  let open = 0;
-  for (const roomId of roomIds) {
-    for (let i = 0; i < days; i++) {
-      const state = stateOf(index, roomId, addDays(startDate, i)).state;
-      if (state === "open" || state === "checkout") open++;
-    }
-  }
-  return { open, total: roomIds.length * Math.max(0, days) };
-}
-
-// ── Revenue opportunities ────────────────────────────────────────────────────
-
-export interface Opportunity {
-  id: "outstanding" | "open-dates" | "missing-expenses";
-  title: string;
-  /** One sentence. Only states what the data shows. */
-  detail: string;
-  /** Rupees, when the data gives an honest figure. */
-  amount?: number;
-  /** In-app route. */
-  to: "/admin/payments" | "/admin/calendar" | "/admin/expenses";
-  actionLabel: string;
-}
-
-/** Share of the next-two-weeks room-nights that must be open before it is worth a mention. */
-export const OPEN_NIGHTS_SHARE_THRESHOLD = 0.5;
-export const OPEN_NIGHTS_WINDOW_DAYS = 14;
-
-export interface OpportunityInput {
-  hasBookingHistory: boolean;
-  /** Unpaid balance of stays that already started (businessMetrics.openBalances). */
-  openBalance: { count: number; total: number };
-  openNights: { open: number; total: number };
-  /** Current month, from businessMetrics. */
-  revenueThisMonth: number;
-  expensesThisMonth: number;
-  /** false while expenses are loading or failed to load: "no expenses" must not be guessed. Default true. */
-  expensesKnown?: boolean;
-}
-
-export function buildOpportunities(input: OpportunityInput): Opportunity[] {
-  if (!input.hasBookingHistory) return [];
-  const out: Opportunity[] = [];
-
-  if (input.openBalance.count > 0 && input.openBalance.total > 0) {
-    const n = input.openBalance.count;
-    out.push({
-      id: "outstanding",
-      title: "Collect unpaid balances",
-      detail: `${n} ${n === 1 ? "stay has" : "stays have"} already started with money still unpaid (stays from last month onward).`,
-      amount: input.openBalance.total,
-      to: "/admin/payments",
-      actionLabel: "Open payments",
-    });
-  }
-
-  const { open, total } = input.openNights;
-  if (total > 0 && open >= 1 && open / total >= OPEN_NIGHTS_SHARE_THRESHOLD) {
-    out.push({
-      id: "open-dates",
-      title: "Open dates coming up",
-      detail: `${open} of ${total} room-nights in the next ${OPEN_NIGHTS_WINDOW_DAYS} days have no booking or block.`,
-      to: "/admin/calendar",
-      actionLabel: "View calendar",
-    });
-  }
-
-  if ((input.expensesKnown ?? true) && input.revenueThisMonth > 0 && input.expensesThisMonth <= 0) {
-    out.push({
-      id: "missing-expenses",
-      title: "Add this month’s expenses",
-      detail:
-        "You have confirmed stays this month but no recorded expenses, so profit can’t be estimated yet.",
-      to: "/admin/expenses",
-      actionLabel: "Add expenses",
-    });
-  }
-
-  return out;
 }
