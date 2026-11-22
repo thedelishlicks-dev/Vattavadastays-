@@ -72,7 +72,7 @@ test("source line on the booking: reads what is stored, never infers", () => {
 });
 
 // ── what an edit does downstream ────────────────────────────────────────────
-type Row = RuleBooking & { id: string };
+type Row = RuleBooking & { id: string; guest_phone?: string | null; is_paid?: boolean };
 let n = 0;
 const row = (over: Partial<Row> = {}): Row => ({
   id: `b${++n}`,
