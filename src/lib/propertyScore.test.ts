@@ -841,3 +841,14 @@ test("bands and messages are exactly the agreed ones", () => {
     ],
   );
 });
+
+// ── guest identity (Sprint 6): reviewed, deliberately not scored ─────────────
+test("repeat guests: guests are now recognised, but repeat status stays unscored (an outcome, not setup), so the scoring is unchanged", () => {
+  const repeat = NOT_MEASURED.find((n) => n.id === "repeat_guests")!;
+  assert.match(repeat.reason, /recognised across bookings/);
+  assert.doesNotMatch(repeat.reason, /no identity record/);
+  // no item reads guests, repeat status or guest identity, and the weights still add up to exactly 100
+  const r = computePropertyScore(FULL, SIGNALS_FULL);
+  assert.ok(!r.items.some((i) => /repeat|guest_identity|returning/.test(i.id)));
+  assert.equal(r.measurablePoints, 100);
+});
