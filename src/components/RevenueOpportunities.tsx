@@ -25,10 +25,16 @@ const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 export function RevenueOpportunities({
   opportunities,
   max = DASHBOARD_MAX_OPPORTUNITIES,
+  heading = "Opportunities",
+  note,
 }: {
   /** All of them, in display order (from useRevenueIntelligence). */
   opportunities: RevenueOpportunity[];
   max?: number;
+  /** The section title (the Monthly report says "Current opportunities"). */
+  heading?: string;
+  /** One quiet line under the title. */
+  note?: string;
 }) {
   const navigate = useNavigate();
   const [showAll, setShowAll] = useState(false);
@@ -43,7 +49,8 @@ export function RevenueOpportunities({
 
   return (
     <section aria-label="Opportunities" className="space-y-2">
-      <h2 className="text-base font-semibold">Opportunities</h2>
+      <h2 className="text-base font-semibold">{heading}</h2>
+      {note && <p className="text-xs text-muted-foreground">{note}</p>}
       <ul className="space-y-3">
         {visible.map((o) => {
           const Icon = ICONS[o.type];

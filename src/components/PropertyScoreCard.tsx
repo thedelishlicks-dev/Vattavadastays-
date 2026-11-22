@@ -9,10 +9,13 @@ export function PropertyScoreCard({
   result,
   isLoading = false,
   loadFailed = false,
+  title = "Property Score",
 }: {
   result: PropertyScoreResult | null;
   isLoading?: boolean;
   loadFailed?: boolean;
+  /** The Monthly report says "Current Property Score". */
+  title?: string;
 }) {
   if (isLoading || !result) {
     return (
@@ -43,7 +46,7 @@ export function PropertyScoreCard({
       <div className="p-4 space-y-3">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <h2 className="text-xs text-muted-foreground">Property Score</h2>
+            <h2 className="text-xs text-muted-foreground">{title}</h2>
             <p className="mt-1 text-3xl font-bold tabular-nums leading-none">
               {score}
               <span className="text-base font-medium text-muted-foreground"> / 100</span>

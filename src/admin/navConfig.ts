@@ -6,7 +6,7 @@
 // dashboard-checklist links keep working. Sections are purely a navigation
 // layer on top of the existing routes.
 //
-//   Daily   → Home · Calendar · Bookings(+Quotes) · Money(Overview + Payments + Agents & Commissions + Expenses)
+//   Daily   → Home · Calendar · Bookings(+Quotes) · Money(Overview + Monthly report + Payments + Agents & Commissions + Expenses)
 //   Setup   → Rooms & Pricing · Property(Settings/Amenities/Meals/Add-ons/Policies)
 //
 // Retired URLs that now redirect: /admin/pricing → /admin/rooms,
@@ -69,6 +69,7 @@ export const NAV_SECTIONS: NavSection[] = [
     bold: true,
     tabs: [
       { to: "/admin/money", label: "Overview" },
+      { to: "/admin/report", label: "Monthly report" },
       { to: "/admin/payments", label: "Payments" },
       { to: "/admin/agents", label: "Agents & Commissions" },
       { to: "/admin/expenses", label: "Expenses" },
