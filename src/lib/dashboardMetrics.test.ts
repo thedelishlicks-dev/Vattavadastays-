@@ -515,3 +515,28 @@ test("outstandingBalances bills a group once and handles nothing", () => {
     startedTotal: 0,
   });
 });
+
+// ── Was the property set up for the whole period? (shared by Home and the Monthly report) ──────────────────
+import { firstRoomDay, historyCoversPeriod } from "./dashboardMetrics";
+
+test("firstRoomDay: the earliest room decides; plain dates are used as they are; nothing usable is null", () => {
+  assert.equal(
+    firstRoomDay([{ created_at: "2026-10-25" }, { created_at: "2026-02-01" }]),
+    "2026-02-01",
+  );
+  assert.equal(firstRoomDay([]), null);
+  assert.equal(firstRoomDay([{ created_at: null }, {}, { created_at: "not a date" }]), null);
+});
+
+test("firstRoomDay: a timestamp becomes its LOCAL date, not the UTC date a slice(0, 10) would give", () => {
+  // Built from local parts, so it is 2 Sep 03:00 local on any machine; its UTC date can differ (IST is ahead).
+  const createdAt = new Date(2026, 8, 2, 3, 0).toISOString();
+  assert.equal(firstRoomDay([{ created_at: createdAt }]), "2026-09-02");
+});
+
+test("historyCoversPeriod: true only when a room existed by the first day of the period", () => {
+  assert.equal(historyCoversPeriod([{ created_at: "2026-09-01" }], "2026-09-01"), true); // same day counts
+  assert.equal(historyCoversPeriod([{ created_at: "2026-09-02" }], "2026-09-01"), false);
+  assert.equal(historyCoversPeriod([{ created_at: "2026-01-01" }], "2026-09-01"), true);
+  assert.equal(historyCoversPeriod([], "2026-09-01"), false); // no rooms: no history to trust
+});
