@@ -20,11 +20,11 @@ create table public.agents (id uuid primary key, property_id uuid, name text);
 create table public.bookings (id uuid primary key default gen_random_uuid(), property_id uuid, room_id uuid, group_id uuid, guest_name text, guest_phone text,
   guest_count int, check_in date, check_out date, room_price numeric, extra_guest_charge numeric, total_amount numeric, advance_amount numeric default 0,
   discount_amount numeric default 0, discount_reason text, status text, is_paid boolean default false, payment_method text, source text default 'direct',
-  agent_id uuid, commission_amount numeric, commission_paid boolean default false, commission_paid_date date, hold_expires_at timestamptz);
+  agent_id uuid, commission_amount numeric, commission_paid boolean default false, commission_paid_date date, hold_expires_at timestamptz, guest_email text, created_at timestamptz default now());
 create table public.booking_groups (id uuid primary key default gen_random_uuid(), property_id uuid, group_reference text, guest_name text, guest_phone text,
   guest_count int, check_in date, check_out date, total_amount numeric, advance_amount numeric default 0, discount_amount numeric default 0, discount_reason text,
   status text, is_paid boolean default false, source text default 'direct', agent_id uuid, commission_amount numeric, commission_paid boolean default false,
-  commission_paid_date date, hold_expires_at timestamptz);
+  commission_paid_date date, hold_expires_at timestamptz, guest_email text, created_at timestamptz default now());
 
 create table public.addons (id uuid primary key default gen_random_uuid(), property_id uuid references public.properties, name text not null, is_active boolean not null default true);
 create table public.packages (id uuid primary key default gen_random_uuid(), property_id uuid references public.properties, name text not null, is_active boolean not null default true);
