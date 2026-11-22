@@ -200,7 +200,10 @@ export const NOT_MEASURED: readonly { id: string; label: string; reason: string 
   {
     id: "repeat_guests",
     label: "Repeat guest tracking",
-    reason: "Guests have no identity record across bookings, only a free-text source tag.",
+    reason:
+      "Guests are now recognised across bookings (by phone, within the property), but having repeat guests " +
+      "depends on how long a property has traded, not on how it is set up. Scoring it would mark new " +
+      "properties down for something they cannot fix, so it is shown on the guest history instead.",
   },
   {
     id: "direct_usage",
