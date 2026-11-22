@@ -8,7 +8,7 @@
  * (The "opportunities" rules live in revenueIntelligence.ts.)
  */
 
-import { monthRange } from "./expenses";
+import { localDateString, monthRange } from "./expenses";
 import type { BusinessMetrics, Period } from "./businessMetrics";
 
 // ── Periods ──────────────────────────────────────────────────────────────────
@@ -32,6 +32,39 @@ export function monthPeriods(now: Date): MonthPeriods {
     currentLastDay: cur.lastDay,
     previousStart: prev.start,
   };
+}
+
+// ── Was the property set up for the whole period? ────────────────────────────
+
+/**
+ * The local "YYYY-MM-DD" on which the first room was set up, or null when there is no room (or no usable date).
+ * `created_at` is a timestamp: its LOCAL date is used, never `slice(0, 10)` (that is the UTC date, a day early
+ * in India). A plain "YYYY-MM-DD" is already a local date and is used as it is.
+ */
+export function firstRoomDay(rooms: readonly { created_at?: string | null }[]): string | null {
+  const days = rooms
+    .map((r) => {
+      const raw = (r.created_at ?? "").trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+      const t = raw ? new Date(raw) : null;
+      return t && Number.isFinite(t.getTime()) ? localDateString(t) : "";
+    })
+    .filter(Boolean)
+    .sort();
+  return days[0] ?? null;
+}
+
+/**
+ * Was the property already set up on the first day of the period? When it was not, stays before the app was
+ * in use may never have been entered, so that period is a partial one and a comparison against it would mislead
+ * ("↑ 300%" against half a month). Shared by the Home snapshot and the Monthly report.
+ */
+export function historyCoversPeriod(
+  rooms: readonly { created_at?: string | null }[],
+  periodStart: string,
+): boolean {
+  const first = firstRoomDay(rooms);
+  return first !== null && first <= periodStart;
 }
 
 // ── Comparisons ──────────────────────────────────────────────────────────────
