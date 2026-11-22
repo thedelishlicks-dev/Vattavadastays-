@@ -26,6 +26,9 @@ import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
 import { AddBookingModal } from "@/components/AddBookingModal";
+import { GuestPanel } from "@/components/GuestPanel";
+import { EditSourceModal } from "@/components/EditSourceModal";
+import { sourceSummary } from "@/lib/bookingSourceEdit";
 import { Modal, ModalActions, ModalTab, Button, fieldCls } from "@/components/ds";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { LoadFailed } from "@/components/LoadFailed";
@@ -369,6 +372,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showDiscountForm, setShowDiscountForm] = useState(false);
   const [showEditGroupGuest, setShowEditGroupGuest] = useState(false);
+  const [showEditGroupSource, setShowEditGroupSource] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [actionError, setActionError] = useState("");
   const queryClient = useQueryClient();
@@ -485,9 +489,11 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
       >
             {tab === "overview" && (
               <div className="p-5 space-y-4">
+                <GuestPanel propertyId={group.property_id} guestId={group.guest_id} name={group.guest_name} phone={group.guest_phone} email={group.guest_email} />
                 <Section title="Stay details">
                   <Row label="Check-in" value={group.check_in} /><Row label="Check-out" value={group.check_out} /><Row label="Guests" value={`${group.guest_count}`} />
-                  {group.guest_phone && <Row label="Phone" value={group.guest_phone} />}{group.guest_email && <Row label="Email" value={group.guest_email} />}
+                  <Row label="Source" value={sourceSummary(group)} />
+                  <button type="button" onClick={() => setShowEditGroupSource(true)} className="text-xs font-medium text-primary">Change source</button>
                 </Section>
                 <Section title={`Rooms (${bookings.length})`}>
                   {bookings.map((b, i) => (
@@ -544,6 +550,7 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
               </div>
             )}
       </Modal>
+      {showEditGroupSource && <EditSourceModal kind="group" id={group.id} source={group.source} detail={group.booking_source_detail} onClose={() => setShowEditGroupSource(false)} onSaved={() => { setShowEditGroupSource(false); onRefresh(); }} />}
       {showEditGroupGuest && <EditGroupGuestModal group={group} onClose={() => setShowEditGroupGuest(false)} onSaved={() => { setShowEditGroupGuest(false); onRefresh(); }} />}
     </>
   );
@@ -659,7 +666,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
   rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
   property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onStatusChange: (id: string, status: string) => Promise<void>; onPaymentSaved: (confirmed?: boolean) => void;
 }) {
-  const [tab, setTab] = useState<ModalTab>("overview"); const [updating, setUpdating] = useState(false); const [showEditGuest, setShowEditGuest] = useState(false); const [showEditStay, setShowEditStay] = useState(false);
+  const [tab, setTab] = useState<ModalTab>("overview"); const [updating, setUpdating] = useState(false); const [showEditGuest, setShowEditGuest] = useState(false); const [showEditStay, setShowEditStay] = useState(false); const [showEditSource, setShowEditSource] = useState(false);
   const { data: charges = [] } = useBookingCharges(booking.id); const { mutateAsync: deleteCharge } = useDeleteCharge();
   const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0); const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
   const ownerPhone = property?.owner_phone ?? ""; const lat = property?.location_lat; const lng = property?.location_lng; const canEditStay = !["completed", "cancelled"].includes(booking.status);
@@ -701,7 +708,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
           ))
         }
       >
-            {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
+            {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} onEditSource={() => setShowEditSource(true)} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
             {tab === "charges" && (
               <div className="p-5 space-y-4">
                 <div className="grid grid-cols-3 gap-2">
@@ -716,6 +723,7 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
             {tab === "invoice" && <div className="p-5"><BookingInvoice booking={booking} roomName={roomName} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} /></div>}
       </Modal>
       {showEditGuest && <EditGuestModal booking={booking} onClose={() => setShowEditGuest(false)} onSaved={() => { setShowEditGuest(false); onPaymentSaved(); }} />}
+      {showEditSource && <EditSourceModal kind="booking" id={booking.id} source={booking.source} detail={booking.booking_source_detail} onClose={() => setShowEditSource(false)} onSaved={() => { setShowEditSource(false); onPaymentSaved(); }} />}
       {showEditStay && <EditStayModal booking={booking} rooms={rooms} property={property} onClose={() => setShowEditStay(false)} onSaved={() => { setShowEditStay(false); onPaymentSaved(); }} />}
     </>
   );
@@ -884,16 +892,18 @@ function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booki
   );
 }
 
-function OverviewTab({ booking, roomName, property, advance, discount, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: {
-  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: (confirmed?: boolean) => void; ownerPhone: string; upiId?: string;
+function OverviewTab({ booking, roomName, property, onEditSource, advance, discount, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: {
+  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; onEditSource: () => void; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: (confirmed?: boolean) => void; ownerPhone: string; upiId?: string;
 }) {
   const [showPaymentForm, setShowPaymentForm] = useState(false); const [showDiscountForm, setShowDiscountForm] = useState(false);
   const { refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
   return (
     <div className="p-5 space-y-4">
+      <GuestPanel propertyId={booking.property_id} guestId={booking.guest_id} name={booking.guest_name} phone={booking.guest_phone} email={booking.guest_email} />
       <Section title="Stay details">
         <Row label="Room" value={roomName} /><Row label="Check-in" value={booking.check_in} /><Row label="Check-out" value={booking.check_out} /><Row label="Nights" value={`${booking.nights}`} /><Row label="Guests" value={`${booking.guest_count}`} />
-        {booking.guest_phone && <Row label="Phone" value={booking.guest_phone} />}{booking.guest_email && <Row label="Email" value={booking.guest_email} />}
+        <Row label="Source" value={sourceSummary(booking)} />
+        <button type="button" onClick={onEditSource} className="text-xs font-medium text-primary">Change source</button>
         {booking.payment_method && <Row label="Payment method" value={booking.payment_method} />}
         {booking.checked_in_at && <Row label="Checked in at" value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
         {booking.checked_out_at && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
