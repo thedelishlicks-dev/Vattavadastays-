@@ -32,7 +32,7 @@ import { usePropertyScore } from "@/hooks/usePropertyScore";
 import { useRevenueIntelligence } from "@/hooks/useRevenueIntelligence";
 import { useExpenses } from "@/hooks/useExpenses";
 import { computeBusinessMetrics } from "@/lib/businessMetrics";
-import { buildBusinessSnapshot, monthPeriods } from "@/lib/dashboardMetrics";
+import { buildBusinessSnapshot, historyCoversPeriod, monthPeriods } from "@/lib/dashboardMetrics";
 import { extractUPIId } from "@/utils/upi";
 import type { Property } from "@/hooks/useProperty";
 
@@ -593,11 +593,7 @@ function DashboardPage() {
     const current = computeBusinessMetrics({ ...common, period: periods.current });
     const previous = computeBusinessMetrics({ ...common, period: periods.previous });
     // Last month is only a fair baseline if the property was already set up for all of it.
-    const firstRoom = (property?.rooms ?? [])
-      .map((r) => (r.created_at ?? "").slice(0, 10))
-      .filter(Boolean)
-      .sort()[0];
-    const historyCoversPrevious = !!firstRoom && firstRoom <= periods.previousStart;
+    const historyCoversPrevious = historyCoversPeriod(property?.rooms ?? [], periods.previousStart);
     return { current, data: buildBusinessSnapshot(current, previous, historyCoversPrevious) };
   }, [bookings, groups, activeRooms.length, expensesForMetrics, periods, property?.rooms]);
 
