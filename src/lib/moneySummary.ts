@@ -53,8 +53,12 @@ export const PERIOD_OPTIONS: { key: PeriodKey; label: string }[] = [
 
 export const DEFAULT_PERIOD: PeriodKey = "this_month";
 
-export interface ReportingPeriod {
-  key: PeriodKey;
+/**
+ * A period, the one before it, and their labels: everything a screen needs to LOAD and compare a period.
+ * `ReportingPeriod` (Money overview) and `monthWindow` (Monthly report) both produce one, so both screens
+ * load their data through the same hook (`usePeriodData`) with the same query keys.
+ */
+export interface PeriodWindow {
   /** "November 2026" / "2026". */
   label: string;
   period: Period;
@@ -63,8 +67,12 @@ export interface ReportingPeriod {
   /** The period it is compared with: the month before, or the year before. */
   previous: Period;
   previousLastDay: string;
-  /** Completes "vs …": "last month", "the month before", "last year". */
+  /** Completes "vs …": "last month", "the month before", "last year", or "September 2026". */
   comparisonLabel: string;
+}
+
+export interface ReportingPeriod extends PeriodWindow {
+  key: PeriodKey;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -79,6 +87,44 @@ function yearPeriod(year: number) {
   return {
     period: { start: `${year}-01-01`, endExclusive: `${year + 1}-01-01` },
     lastDay: `${year}-12-31`,
+  };
+}
+
+export const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/** "October 2026" from LOCAL date parts. Not Intl: the same text on every device and in tests. */
+export function monthLabelOf(year: number, monthIndex: number): string {
+  const d = new Date(year, monthIndex, 1); // normalises a month outside 0–11
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/**
+ * One calendar month (any month, not only the current one) and the month before it. `monthIndex` is 0–11 and
+ * may overflow either way, so January's previous month is December of the year before.
+ */
+export function monthWindow(year: number, monthIndex: number): PeriodWindow {
+  const cur = monthPeriod(year, monthIndex);
+  const prev = monthPeriod(year, monthIndex - 1);
+  return {
+    label: monthLabelOf(year, monthIndex),
+    period: cur.period,
+    lastDay: cur.lastDay,
+    previous: prev.period,
+    previousLastDay: prev.lastDay,
+    comparisonLabel: monthLabelOf(year, monthIndex - 1),
   };
 }
 
