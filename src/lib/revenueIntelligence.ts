@@ -292,8 +292,8 @@ export function missingBookingSourceRule(input: RevenueIntelligenceInput): Reven
       type: "missing_booking_source",
       severity: "info",
       title: `${plural(missing, "booking")} without a source`,
-      // The honest limits, in the description: capture is at creation only, and guest-made bookings cannot be told apart.
-      description: `You haven't recorded how ${missing} recent ${missing === 1 ? "booking" : "bookings"} found you. A source can only be recorded when you add a booking, not afterwards, and bookings made through your booking page are counted here too.`,
+      // The honest limit, in the description: guest-made bookings carry no source until the owner records one (Change source).
+      description: `You haven't recorded how ${missing} recent ${missing === 1 ? "booking" : "bookings"} found you. Open a booking and tap Change source to record it. Bookings made through your booking page are counted here too, since guests don't say how they found you.`,
       href: BOOKINGS,
       actionLabel: "Review bookings",
     },

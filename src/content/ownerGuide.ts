@@ -190,6 +190,8 @@ export const SITUATIONS: GuideSection[] = [
         ],
       },
       shot("07-add-booking.webp", "Add Booking form with guest details, how the booking came in, and room selection", "**1** Guest name and phone. **2** How the booking came in. **3** Tap a room. **4** Tap Add booking."),
+      { type: "note", label: "Forgot how they found you?", text: "Open the booking, then on **Overview** tap **Change source** (next to **Source**). Pick **Direct** or **Walk-in**, and tap how the guest found you (WhatsApp, Instagram, Google…). Tap **Clear source detail** to remove it. Only the source changes: the price, payments, dates and room stay as they are. An **Agent** booking keeps its agent and commission; you can still add how the guest found you. Bookings your guests make on your booking page start with no source, so you can fill them in here too." },
+      { type: "note", label: "Returning guests", text: "When you open a booking, the **Guest** box at the top of **Overview** shows the name, phone and email. If the same phone number has stayed with you before, it says **Returning guest · 3 stays**. Tap **Guest history** for the first stay, last stay and what their stays were worth. Only confirmed and completed stays count (a booking of several rooms counts once). Guests are matched by phone number, within your property only, so a booking with no phone number is not matched." },
     ],
   },
   {

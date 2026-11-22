@@ -194,6 +194,11 @@ function unitFor(row: BookingLike | GroupLike): BillingUnit {
   };
 }
 
+/** Net value of ONE stay (room + extras − discount, never below 0) from balance.ts; the whole stay, not split by period. */
+export function stayNetTotal(row: BookingLike | GroupLike): number {
+  return unitFor(row).net;
+}
+
 /**
  * The confirmed/completed stays, each exactly once: every counted group, plus every counted standalone
  * booking. The room rows of a supplied group are left out (their group carries the money), and a room whose

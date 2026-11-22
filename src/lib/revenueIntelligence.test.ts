@@ -328,7 +328,7 @@ test("missing source: three or more recent stays without a source are reported, 
   assert.equal(o.severity, "info");
   assert.equal(o.title, "5 bookings without a source");
   assert.match(o.description, /^You haven't recorded how 5 recent bookings found you\./);
-  assert.match(o.description, /only be recorded when you add a booking, not afterwards/);
+  assert.match(o.description, /tap Change source to record it/);
   assert.match(o.description, /booking page are counted here too/);
   assert.equal(o.actionLabel, "Review bookings");
   assert.equal(o.href, "/admin/bookings");

@@ -104,3 +104,23 @@ select p.subdomain,
  order by p.subdomain;
 -- The old-vs-new price comparison for one property is supabase/season_price_check.sql
 -- (0 rows = safe to switch).
+
+-- 12. Guest identity (Sprint 6, migration 20261121000000_guests.sql). Read-only.
+--     a) Guests per property and how many of their bookings are linked.
+select p.subdomain,
+       (select count(*) from public.guests g where g.property_id = p.id)                         as guests,
+       (select count(*) from public.bookings b where b.property_id = p.id)                       as bookings,
+       (select count(*) from public.bookings b where b.property_id = p.id and b.guest_id is not null) as linked
+  from public.properties p
+ order by p.subdomain;
+--     b) Must return 0 rows: a booking linked to a guest of ANOTHER property.
+select b.id as booking_id
+  from public.bookings b
+  join public.guests g on g.id = b.guest_id
+ where g.property_id <> b.property_id;
+--     c) Must return 0 rows: bookings with a usable phone that are not linked yet (the trigger and the backfill
+--        link every such booking; a row here means a write bypassed the trigger).
+select b.id as booking_id, b.guest_phone
+  from public.bookings b
+ where b.guest_id is null
+   and public.normalize_phone_key(b.guest_phone) is not null;

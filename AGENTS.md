@@ -159,6 +159,7 @@ Key tables (short form):
 - `bookings`: `id, property_id, room_id, group_id, guest_name, guest_phone, check_in, check_out, nights (generated), room_price, extra_guest_charge, total_amount, status, advance_amount, is_paid, hold_expires_at, agent_id, commission_amount, commission_paid, source, …`
   - Statuses: `pending`, `confirmed`, `cancelled`, `completed`.
   - Exclusion constraint `bookings_no_overlap` blocks overlapping active stays.
+- `guests`: `id, property_id, name, phone, phone_key (generated), email`. One row per normalized phone per property (unique `(property_id, phone_key)`); never a cross-property directory. `bookings.guest_id` / `booking_groups.guest_id` are set by the `link_booking_guest` trigger (no usable phone = null). Owners read it through RLS; anon has no access. Stats come from `src/lib/guestIdentity.ts` (canonical revenue rules).
 - `booking_groups`, `booking_charges`, `agents`, `quotes`, `leads`, `client_errors`, `room_ical_feeds`, `invite_tokens`: see baseline.
 
 ---
