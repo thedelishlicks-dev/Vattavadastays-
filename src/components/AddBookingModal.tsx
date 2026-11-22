@@ -17,7 +17,8 @@ import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
 import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
 import { extractUPIId } from "@/utils/upi";
 import { Modal, ModalActions, Button } from "@/components/ds";
-import type { BookingStatus, BookingSource, Agent } from "@/types/database";
+import { SourceDetailPicker } from "@/components/SourceDetailPicker";
+import type { BookingStatus, BookingSource, BookingSourceDetail, Agent } from "@/types/database";
 
 const inputCls = "w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] placeholder:text-muted-foreground/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
@@ -92,6 +93,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
     // one-tap choice for the genuine walk-in/cash-on-arrival case.
     status: "pending" as BookingStatus,
     source: "direct" as BookingSource,
+    // "How did this guest find you?" Optional; "" = not recorded (stored as NULL).
+    source_detail: "" as BookingSourceDetail,
     agent_id: "" as string,
   });
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>(() => {
@@ -281,6 +284,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       }
 
       const isAgentBooking = form.source === "agent" && !!form.agent_id;
+      // Only sent when the owner picked one, so a booking saved without it is exactly what it was before.
+      const sourceDetailPatch = form.source_detail ? { booking_source_detail: form.source_detail } : {};
       const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
       const finalDiscountReason = discountAmt > 0 ? (discountReason.trim() || null) : null;
       // A "pending" booking already blocks its dates the moment it's saved
@@ -305,6 +310,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           discount_reason: finalDiscountReason,
           status: form.status, is_paid: false,
           source: form.source,
+          ...sourceDetailPatch,
           agent_id: isAgentBooking ? form.agent_id : null,
           commission_amount: finalCommission,
           commission_paid: false,
@@ -334,6 +340,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             discount_reason: finalDiscountReason,
             status: form.status, is_paid: false,
             source: form.source,
+            ...sourceDetailPatch,
             agent_id: isAgentBooking ? form.agent_id : null,
             commission_amount: finalCommission,
             commission_paid: false,
@@ -352,6 +359,7 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           total_amount: rt.total, advance_amount: 0, discount_amount: 0,
           status: form.status, is_paid: false, group_id: groupData.id, tracking_token: trackingToken,
           source: form.source,
+          ...sourceDetailPatch,
           agent_id: isAgentBooking ? form.agent_id : null,
           commission_amount: null,
           commission_paid: false,
@@ -524,6 +532,8 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
                 </button>
               ))}
             </div>
+
+            <SourceDetailPicker value={form.source_detail} onChange={(v) => set("source_detail", v)} />
 
             {form.source === "agent" && (
               <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">

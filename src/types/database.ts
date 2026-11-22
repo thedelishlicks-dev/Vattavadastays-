@@ -1,4 +1,4 @@
-export type SubscriptionStatus = "trial" | "active" | "suspended";
+  type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
 
 export interface Property {
@@ -100,6 +100,8 @@ export interface Booking {
   checked_out_at?: string;
   invoice_notes?: string;
   source: BookingSource;
+  /** "How did this guest find you?" Optional detail beside `source`. Null = not recorded. */
+  booking_source_detail?: BookingSourceDetail | null;
   agent_id?: string | null;
   commission_amount?: number | null;
   commission_paid: boolean;
@@ -108,6 +110,9 @@ export interface Booking {
    * job (see supabase/migrations) will cancel and release past this time
    * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
   hold_expires_at?: string | null;
+  /** The guest (public.guests) this stay belongs to, set by the database from the normalized phone within
+   * the property. Null = no usable phone, or a booking from before guest identity. */
+  guest_id?: string | null;
   created_at: string;
   /** Joined via useBookings() for list-level amount-due calculations. */
   booking_charges?: BookingCharge[];
@@ -115,6 +120,25 @@ export interface Booking {
 
 export type BookingStatus = "pending" | "confirmed" | "completed" | "cancelled";
 export type BookingSource = "direct" | "agent" | "walk_in";
+/**
+ * How the guest found the property. Stored as free text in the DB (suggested values only), so a row
+ * written by something else is still readable: the `(string & {})` keeps autocomplete for the known
+ * values without rejecting others.
+ */
+export type BookingSourceDetail =
+  | "whatsapp"
+  | "instagram"
+  | "google"
+  | "website"
+  | "phone"
+  | "walk_in"
+  | "repeat_guest"
+  | "airbnb"
+  | "booking_com"
+  | "makemytrip"
+  | "agoda"
+  | "other"
+  | (string & {});
 export type CommissionType = "percentage" | "flat";
 
 export interface Agent {
@@ -158,6 +182,8 @@ export interface BookingGroup {
   payment_reference?: string;
   is_paid: boolean;
   source: BookingSource;
+  /** See Booking.booking_source_detail. */
+  booking_source_detail?: BookingSourceDetail | null;
   agent_id?: string | null;
   commission_amount?: number | null;
   commission_paid: boolean;
@@ -166,8 +192,51 @@ export interface BookingGroup {
    * job (see supabase/migrations) will cancel and release past this time
    * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
   hold_expires_at?: string | null;
+  /** See Booking.guest_id. */
+  guest_id?: string | null;
   created_at: string;
   bookings?: Booking[];
   /** Joined via useBookingGroups() for list-level amount-due calculations. */
   booking_charges?: BookingCharge[];
+}
+
+/** A guest of ONE property (public.guests). Identity is the normalized phone within the property. */
+export interface Guest {
+  id: string;
+  property_id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ExpenseCategory =
+  | "electricity"
+  | "cleaning"
+  | "staff"
+  | "maintenance"
+  | "supplies"
+  | "food"
+  | "ota_commission"
+  | "property_tax"
+  | "internet"
+  | "marketing"
+  | "transport"
+  | "other";
+
+/** A cost the owner recorded (public.expenses). `amount` is always > 0. */
+export interface Expense {
+  id: string;
+  property_id: string;
+  /** YYYY-MM-DD */
+  expense_date: string;
+  category: ExpenseCategory;
+  description?: string | null;
+  amount: number;
+  payment_method?: string | null;
+  booking_id?: string | null;
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
 }

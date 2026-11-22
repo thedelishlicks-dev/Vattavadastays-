@@ -54,12 +54,12 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | File | Shows | Used in |
 |---|---|---|
 | `01-home-needs-attention` | Home, a pending request | `guest-request` |
-| `02-booking-record-payment` | Booking: Confirm, Amount received | `guest-request`, `guest-says-paid` |
+| `02-booking-record-payment` | Booking: Confirm, Amount received (**retake**: Overview now starts with a Guest box and has a Source line with Change source) | `guest-request`, `guest-says-paid` |
 | `03-room-photos-and-guests` | Room editor: photos, guests | `setup-rooms` |
 | `04-room-pricing` | Base, extra guest, weekend, preview | `seasonal-rates` |
 | `07-add-booking` | Add booking form | `phone-booking` |
 | `08`, `09`, `10` quote: guest + stay, rooms + add-ons, discount + send | New quote | `guest-asks-price` |
-| `11-money-payments-summary` | Money → Payments monthly chart | `check-out-day` |
+| `11-money-payments-summary` | Money → Payments monthly chart (**retake**: Money now has an Overview tab first and a Monthly report tab) | `check-out-day` |
 | `12-agents-commissions` | Agents & Commissions | `agent-guest` |
 | `13-payments-overview` | Collected / Outstanding / Total billed | `problem-money` |
 | `14-edit-stay` | Edit Stay Details | `change-or-leave-early` |
@@ -68,7 +68,7 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `21-quote-convert-booking`, `22-quotes-list` | Quotes list, convert | `guest-asks-price` |
 | `24-policies` | Policies | `setup-policies` |
 | `25-payment-setup` (UPI ID blurred) | Payment setup | `setup-payments` |
-| `26-charges-tab`, `28-checkout-summary`, `27-correct-collected` | Charges, a completed booking, correct amount | `check-out-day` |
+| `26-charges-tab`, `28-checkout-summary`, `27-correct-collected` | Charges, a completed booking (**28: retake**, Overview now has the Guest box and Source line), correct amount | `check-out-day` |
 | `29-block-dates` | Block dates | `block-dates` |
 | `30-booking-confirmed-prompt` | "Booking confirmed" prompt | `guest-request` |
 | `31-calendar-single-room` | Single-room calendar bars | `read-calendar` |

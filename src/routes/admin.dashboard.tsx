@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   CalendarDays,
-  IndianRupee,
   MessageSquare,
   Ban,
   Plus,
@@ -26,6 +25,14 @@ import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { WhatsAppReminderModal } from "@/components/WhatsAppReminderModal";
+import { BusinessSnapshot } from "@/components/BusinessSnapshot";
+import { RevenueOpportunities } from "@/components/RevenueOpportunities";
+import { PropertyScoreCard } from "@/components/PropertyScoreCard";
+import { usePropertyScore } from "@/hooks/usePropertyScore";
+import { useRevenueIntelligence } from "@/hooks/useRevenueIntelligence";
+import { useExpenses } from "@/hooks/useExpenses";
+import { computeBusinessMetrics } from "@/lib/businessMetrics";
+import { buildBusinessSnapshot, historyCoversPeriod, monthPeriods } from "@/lib/dashboardMetrics";
 import { extractUPIId } from "@/utils/upi";
 import type { Property } from "@/hooks/useProperty";
 
@@ -473,6 +480,8 @@ function RecentBookings({
 // Dashboard page
 // ---------------------------------------------------------------------------
 
+const NO_EXPENSES: never[] = [];
+
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
   useIcalAutoSync(property?.id);
@@ -509,30 +518,12 @@ function DashboardPage() {
     [bookings, groupBookingIds],
   );
 
-  const stats = useMemo(() => {
-    const thisMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-    const revenueOf = (b: {
-      check_in?: string;
-      status: string;
-      total_amount: number;
-      discount_amount?: number;
-      booking_charges?: ChargeLine[] | null;
-    }) => {
-      if (b.check_in?.slice(0, 7) !== thisMonth) return 0;
-      if (b.status !== "confirmed" && b.status !== "completed") return 0;
-      return Math.max(0, Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0));
-    };
-
-    const upcoming =
+  const upcoming = useMemo(
+    () =>
       standaloneBookings.filter((b) => b.check_in >= today && b.status !== "cancelled").length +
-      groups.filter((g) => g.check_in >= today && g.status !== "cancelled").length;
-
-    const monthlyRevenue =
-      standaloneBookings.reduce((sum, b) => sum + revenueOf(b), 0) +
-      groups.reduce((sum, g) => sum + revenueOf(g), 0);
-
-    return { upcoming, monthlyRevenue };
-  }, [standaloneBookings, groups, today]);
+      groups.filter((g) => g.check_in >= today && g.status !== "cancelled").length,
+    [standaloneBookings, groups, today],
+  );
 
   // Standalone bookings only: the rooms of a multi-room booking are represented by
   // the group row, so listing them too showed one booking three times.
@@ -582,6 +573,37 @@ function DashboardPage() {
     [property],
   );
 
+  // ── Business snapshot ──────────────────────────────────────────────────────
+  // Revenue, occupancy, ADR and profit are computed by lib/businessMetrics.ts from the SAME bookings and
+  // groups already loaded above (the window starts at last month, so both months are covered; a stay of
+  // more than a month that began before last month is the one thing it can miss). Only the expenses
+  // of the two months are an extra, small query.
+  const periods = useMemo(() => monthPeriods(new Date()), []);
+  const monthLabel = new Date().toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  const {
+    data: expenses,
+    isLoading: expensesLoading,
+    isError: expensesError,
+  } = useExpenses(property?.id ?? "", { startDate: periods.previousStart, endDate: periods.currentLastDay });
+  const expensesStatus = expensesError ? "error" : expensesLoading ? "loading" : "ready";
+  const expensesForMetrics = expensesStatus === "ready" && expenses ? expenses : NO_EXPENSES; // stable reference keeps the memo below from re-running every render
+
+  const snapshot = useMemo(() => {
+    const common = { bookings, groups, roomCount: activeRooms.length, expenses: expensesForMetrics };
+    const current = computeBusinessMetrics({ ...common, period: periods.current });
+    const previous = computeBusinessMetrics({ ...common, period: periods.previous });
+    // Last month is only a fair baseline if the property was already set up for all of it.
+    const historyCoversPrevious = historyCoversPeriod(property?.rooms ?? [], periods.previousStart);
+    return { current, data: buildBusinessSnapshot(current, previous, historyCoversPrevious) };
+  }, [bookings, groups, activeRooms.length, expensesForMetrics, periods, property?.rooms]);
+
+  // Revenue Intelligence: the rules live in lib/revenueIntelligence.ts, not here. The hook reads the same cached
+  // queries as everything above plus one small blocked-nights request.
+  const revenueIntel = useRevenueIntelligence(property);
+
+  // Property Score: reads the same cached queries as everything above (no extra requests).
+  const propertyScore = usePropertyScore(property);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -609,13 +631,17 @@ function DashboardPage() {
       <div>
         <h1 className="text-[28px] leading-tight font-bold tracking-tight">Home</h1>
         <p className="text-sm text-muted-foreground">
-          Snapshot of bookings, revenue, and inquiries.
+          {property?.name ? `${property.name}${property.area ? ` · ${property.area}` : ""}` : "Your property at a glance."}
         </p>
       </div>
 
-      <OnboardingChecklist property={property as Property | undefined} />
+      {hasBookingHistory && (
+        <BusinessSnapshot data={snapshot.data} monthLabel={monthLabel} expensesStatus={expensesStatus} />
+      )}
 
       <AttentionSection rows={attentionRows} />
+
+      <RevenueOpportunities opportunities={revenueIntel.opportunities} />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
         <div className="text-xs  text-muted-foreground mb-3">
@@ -632,6 +658,14 @@ function DashboardPage() {
         </div>
       </div>
 
+      <PropertyScoreCard
+        result={propertyScore.result}
+        isLoading={propertyScore.isLoading}
+        loadFailed={propertyScore.loadFailed}
+      />
+
+      <OnboardingChecklist property={property as Property | undefined} />
+
       {hasBookingHistory && (
         <div className="bg-card border border-border/60 rounded-3xl p-4">
           <div className="flex divide-x divide-border">
@@ -639,15 +673,7 @@ function DashboardPage() {
               <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
                 <CalendarDays className="h-3.5 w-3.5" /> Upcoming
               </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">{stats.upcoming}</div>
-            </div>
-            <div className="flex-1 px-4">
-              <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">
-                <IndianRupee className="h-3.5 w-3.5" /> This month
-              </div>
-              <div className="mt-1.5 text-xl font-bold tabular-nums">
-                ₹{stats.monthlyRevenue.toLocaleString("en-IN")}
-              </div>
+              <div className="mt-1.5 text-xl font-bold tabular-nums">{upcoming}</div>
             </div>
             <div className="flex-1 pl-4">
               <div className="flex items-center gap-1.5 text-xs  text-muted-foreground">

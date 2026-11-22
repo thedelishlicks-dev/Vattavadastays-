@@ -190,6 +190,8 @@ export const SITUATIONS: GuideSection[] = [
         ],
       },
       shot("07-add-booking.webp", "Add Booking form with guest details, how the booking came in, and room selection", "**1** Guest name and phone. **2** How the booking came in. **3** Tap a room. **4** Tap Add booking."),
+      { type: "note", label: "Forgot how they found you?", text: "Open the booking, then on **Overview** tap **Change source** (next to **Source**). Pick **Direct** or **Walk-in**, and tap how the guest found you (WhatsApp, Instagram, Google…). Tap **Clear source detail** to remove it. Only the source changes: the price, payments, dates and room stay as they are. An **Agent** booking keeps its agent and commission; you can still add how the guest found you. Bookings your guests make on your booking page start with no source, so you can fill them in here too." },
+      { type: "note", label: "Returning guests", text: "When you open a booking, the **Guest** box at the top of **Overview** shows the name, phone and email. If the same phone number has stayed with you before, it says **Returning guest · 3 stays**. Tap **Guest history** for the first stay, last stay and what their stays were worth. Only confirmed and completed stays count (a booking of several rooms counts once). Guests are matched by phone number, within your property only, so a booking with no phone number is not matched." },
     ],
   },
   {
@@ -258,7 +260,7 @@ export const SITUATIONS: GuideSection[] = [
       },
       shot("26-charges-tab.webp", "Charges tab with the catalog dropdown and the box for your own charge", "**1** Choose an add-on or package from your catalog. Once you pick one, its **Option** (if it has one), **People** or **Qty**, and **Add to extras** appear. **2** Or add your own charge: a description, a number, a price, then **Add**."),
       shot("28-checkout-summary.webp", "A completed booking with its payment summary showing Fully paid", "**1** The Charges tab shows a number when extras were added. **2** The payment summary. **3** **Fully paid** means nothing is left to collect."),
-      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** Money has two tabs: Payments and Agents & Commissions. **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
+      shot("11-money-payments-summary.webp", "Money page showing the Payments tab and the monthly summary chart", "**1** This is the **Payments** tab of Money (Money also has Overview, Monthly report, Agents & Commissions and Expenses). **2** Each month shows what you collected (dark) and what is still outstanding (red). **3** Tap **View … in the list →** to see each booking and its balance."),
       { type: "note", label: "Mistake in an amount?", text: "On the **Payments** page, find the booking and tap the **pencil** button (**Correct collected amount**) on its row. Enter the right figure." },
       shot("27-correct-collected.webp", "Correct collected amount form on the Payments page", "**1** Type the **total** amount actually received. Set it to 0 to mark the booking unpaid. **2** Tap Save."),
     ],
@@ -485,7 +487,7 @@ export const PROBLEMS: GuideSection[] = [
     title: "Money problems",
     summary: "Wrong amount, refund due, commission looks wrong.",
     blocks: [
-      { type: "p", text: "Open **Money → Payments** to see where you stand." },
+      { type: "p", text: "Open **Money → Overview** for the month at a glance: **Revenue**, **Collected**, **Outstanding**, **Expenses** and **Estimated operating profit**. Pick **This month**, **Last month** or **This year**. **Collected** here is the money recorded on that period's stays (the app does not keep payment dates), and the profit is an estimate from the expenses you recorded. Open **Money → Monthly report** for a one-page summary of a finished month: the same figures plus **Occupancy**, **ADR**, **RevPAR**, revenue by source, expenses, guests and a comparison with the month before. It opens on the **last completed month**; use the arrows to go back. The **Property Score** and **Current opportunities** on it describe your property today, not that month. Open **Money → Payments** to see where you stand booking by booking." },
       shot("13-payments-overview.webp", "Payments page with the Collected, Outstanding and Total billed cards", "**1** Collected so far, and how many bookings are fully or part paid. **2** Outstanding balance, and how many have not started paying. **3** Total billed: room total plus charges minus discounts."),
       {
         type: "list",

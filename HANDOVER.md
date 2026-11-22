@@ -266,6 +266,7 @@ Rules: filter `__` entries before showing tags to guests; value = `encodeURIComp
 | Quote calendar | Partly booked days show amber ("Some rooms booked"); load failure shows an alert | #496, `RoomAvailabilityCalendar.tsx` |
 | Pricing | Add booking, Quote builder, Edit Stay wait for seasonal rates | #497, rule 37 |
 | Errors | Explicit load-failure screens on admin pages and the guest page; query errors logged | #499, rule 36 |
+| Reports | **Monthly Business Report** (Money → Monthly report, `/admin/report`): default = last completed month, step back up to 24. Composes Money Intelligence, `businessMetrics`, guest identity, Property Score and Revenue Intelligence; no new migration. Score and opportunities are current-state and labelled so. Period loading is shared with Money (`usePeriodData`); guest history is one chunked `guest_id IN (…)` query per table (`guestHistory.ts`) | Sprint 7, `monthlyReport.ts`, `useMonthlyReport.ts`, `MonthlyReport.tsx` |
 
 ---
 
