@@ -59,7 +59,7 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 | `04-room-pricing` | Base, extra guest, weekend, preview | `seasonal-rates` |
 | `07-add-booking` | Add booking form | `phone-booking` |
 | `08`, `09`, `10` quote: guest + stay, rooms + add-ons, discount + send | New quote | `guest-asks-price` |
-| `11-money-payments-summary` | Money → Payments monthly chart (**retake**: Money now has an Overview tab first) | `check-out-day` |
+| `11-money-payments-summary` | Money → Payments monthly chart (**retake**: Money now has an Overview tab first and a Monthly report tab) | `check-out-day` |
 | `12-agents-commissions` | Agents & Commissions | `agent-guest` |
 | `13-payments-overview` | Collected / Outstanding / Total billed | `problem-money` |
 | `14-edit-stay` | Edit Stay Details | `change-or-leave-early` |
