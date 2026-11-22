@@ -110,6 +110,9 @@ export interface Booking {
    * job (see supabase/migrations) will cancel and release past this time
    * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
   hold_expires_at?: string | null;
+  /** The guest (public.guests) this stay belongs to, set by the database from the normalized phone within
+   * the property. Null = no usable phone, or a booking from before guest identity. */
+  guest_id?: string | null;
   created_at: string;
   /** Joined via useBookings() for list-level amount-due calculations. */
   booking_charges?: BookingCharge[];
@@ -189,10 +192,23 @@ export interface BookingGroup {
    * job (see supabase/migrations) will cancel and release past this time
    * if it's never confirmed. Null for confirmed/completed/cancelled rows. */
   hold_expires_at?: string | null;
+  /** See Booking.guest_id. */
+  guest_id?: string | null;
   created_at: string;
   bookings?: Booking[];
   /** Joined via useBookingGroups() for list-level amount-due calculations. */
   booking_charges?: BookingCharge[];
+}
+
+/** A guest of ONE property (public.guests). Identity is the normalized phone within the property. */
+export interface Guest {
+  id: string;
+  property_id: string;
+  name: string;
+  phone: string;
+  email?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ExpenseCategory =
