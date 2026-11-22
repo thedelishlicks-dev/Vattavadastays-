@@ -23,7 +23,7 @@ export interface SourcePatch {
 }
 
 export interface SourceFields {
-  source: string | null | undefined;
+  source?: string | null;
   booking_source_detail?: string | null;
 }
 
