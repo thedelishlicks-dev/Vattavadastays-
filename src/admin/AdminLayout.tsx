@@ -21,10 +21,11 @@ import { SectionContext } from "@/admin/sectionContext";
 const NAV_GROUP_DEFS: { label: string; group: NavSection["group"] }[] = [
   { label: "Daily", group: "daily" },
   { label: "Setup", group: "setup" },
+  { label: "Learn", group: "learn" },
 ];
 
-// The mobile bottom bar shows the four daily sections + More. Rooms & Pricing
-// and Property (set-once configuration) live under More.
+// The mobile bottom bar shows the four daily sections + More. Rooms & Pricing,
+// Property (set-once configuration) and Education live under More.
 const BOTTOM_NAV: NavSection[] = ["home", "calendar", "bookings", "money"].map(sectionByKey);
 
 function getPropertyParam(): string {
@@ -90,6 +91,8 @@ export function AdminLayout() {
   const { data: property } = useOwnerProperty();
 
   const activeSection = sectionForPath(path);
+  // Setup and Learn sections live under More on the phone bottom bar, so More is the highlighted item.
+  const inMore = !!activeSection && activeSection.group !== "daily";
   const propertyParam = getPropertyParam();
   const search = propertyParam ? `?property=${encodeURIComponent(propertyParam)}` : "";
 
@@ -203,15 +206,15 @@ export function AdminLayout() {
               </a>
             );
           })}
-          <button onClick={() => setMobileOpen(true)} data-section={activeSection?.group === "setup" ? activeSection.key : undefined} className={[
+          <button onClick={() => setMobileOpen(true)} data-section={inMore ? activeSection?.key : undefined} className={[
               "flex flex-col items-center justify-center gap-0.5 py-2 text-[10px]",
-              activeSection?.group === "setup" ? "text-[var(--section-ink)] font-medium" : "text-muted-foreground",
+              inMore ? "text-[var(--section-ink)] font-medium" : "text-muted-foreground",
             ].join(" ")}
           >
             <span
               className={[
                 "flex items-center justify-center h-7 w-10 rounded-full",
-                activeSection?.group === "setup" ? "bg-[var(--section-soft)]" : "",
+                inMore ? "bg-[var(--section-soft)]" : "",
               ].join(" ")}
             >
               <Menu className="h-5 w-5" />

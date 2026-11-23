@@ -1,6 +1,6 @@
 // src/admin/navConfig.ts
 //
-// The admin area is organised into 6 sections. Each section owns one or
+// The admin area is organised into 7 sections. Each section owns one or
 // more existing pages ("tabs"). NO routes are added, removed or renamed —
 // every page keeps its original URL, so old bookmarks, WhatsApp links and
 // dashboard-checklist links keep working. Sections are purely a navigation
@@ -8,6 +8,7 @@
 //
 //   Daily   → Home · Calendar · Bookings(+Quotes) · Money(Overview + Monthly report + Payments + Agents & Commissions + Expenses)
 //   Setup   → Rooms & Pricing · Property(Settings/Amenities/Meals/Add-ons/Policies)
+//   Learn   → Education (lessons that end in an action on one of the pages above)
 //
 // Retired URLs that now redirect: /admin/pricing → /admin/rooms,
 // /admin/commissions → /admin/agents.
@@ -19,6 +20,7 @@ import {
   Wallet,
   BedDouble,
   Building2,
+  GraduationCap,
 } from "lucide-react";
 
 export type NavTab = { to: string; label: string };
@@ -27,8 +29,8 @@ export type NavSection = {
   key: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  /** "daily" = used every day; "setup" = configured once, tweaked occasionally. */
-  group: "daily" | "setup";
+  /** "daily" = used every day; "setup" = configured once, tweaked occasionally; "learn" = Education. */
+  group: "daily" | "setup" | "learn";
   /** First tab is the section's landing page. A single tab = no tab bar. */
   tabs: NavTab[];
   /** Goes beyond the quiet accent: tinted page background and card borders (see styles.css). */
@@ -95,6 +97,14 @@ export const NAV_SECTIONS: NavSection[] = [
       { to: "/admin/addons", label: "Add-ons" },
       { to: "/admin/policies", label: "Policies" },
     ],
+  },
+  {
+    key: "education",
+    label: "Education",
+    icon: GraduationCap,
+    group: "learn",
+    // A single page: the lesson pages under /admin/education/<slug> belong to it (see sectionForPath).
+    tabs: [{ to: "/admin/education", label: "Education" }],
   },
 ];
 

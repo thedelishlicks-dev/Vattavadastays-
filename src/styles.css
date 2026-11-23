@@ -178,6 +178,7 @@
 [data-section="money"]    { --section: oklch(0.64 0.14 75);   --section-soft: oklch(0.955 0.03 75);   --section-ink: oklch(0.4 0.085 75);  --section-wash: oklch(0.965 0.014 80); --section-on: oklch(0.2 0.03 70); }
 [data-section="rooms"]    { --section: oklch(0.55 0.14 40);   --section-soft: oklch(0.955 0.03 40);   --section-ink: oklch(0.4 0.09 40);   --section-wash: oklch(0.965 0.006 40); --section-on: oklch(1 0 0); }
 [data-section="property"] { --section: oklch(0.55 0.04 250);  --section-soft: oklch(0.955 0.008 250); --section-ink: oklch(0.4 0.03 250);  --section-wash: oklch(0.965 0.003 250); --section-on: oklch(1 0 0); }
+[data-section="education"] { --section: oklch(0.55 0.14 320);  --section-soft: oklch(0.955 0.03 320);  --section-ink: oklch(0.4 0.09 320);  --section-wash: oklch(0.965 0.006 320); --section-on: oklch(1 0 0); }
 
 /* Bolder sections (navConfig `bold`): cards pick up a hint of the section colour in their border.
    Money also gets aligned digits everywhere, so columns of rupees line up like a ledger. */
@@ -190,6 +191,7 @@ main[data-bold] .border-border { border-color: color-mix(in oklab, var(--section
 .dark [data-section="money"]    { --section: oklch(0.74 0.13 75);  --section-soft: oklch(0.3 0.045 75);  --section-ink: oklch(0.86 0.08 75);  --section-wash: oklch(0.2 0.025 75); --section-on: oklch(0.18 0.02 150); }
 .dark [data-section="rooms"]    { --section: oklch(0.72 0.13 40);  --section-soft: oklch(0.3 0.045 40);  --section-ink: oklch(0.86 0.08 40);  --section-wash: oklch(0.2 0.02 40); --section-on: oklch(0.18 0.02 150); }
 .dark [data-section="property"] { --section: oklch(0.72 0.04 250); --section-soft: oklch(0.3 0.012 250); --section-ink: oklch(0.86 0.025 250); --section-wash: oklch(0.2 0.01 250); --section-on: oklch(0.18 0.02 150); }
+.dark [data-section="education"] { --section: oklch(0.72 0.13 320); --section-soft: oklch(0.3 0.045 320); --section-ink: oklch(0.86 0.08 320); --section-wash: oklch(0.2 0.02 320); --section-on: oklch(0.18 0.02 150); }
 
 @utility neu-raised {
   box-shadow: var(--shadow-neu-raised);
