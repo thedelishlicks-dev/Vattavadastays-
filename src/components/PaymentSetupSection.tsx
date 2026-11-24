@@ -118,7 +118,9 @@ export function PaymentSetupSection() {
                 onClick={() => toggleMethod(m)}
                 className={[
                   "text-sm px-3 py-1.5 rounded-full border transition-colors",
-                  active ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border hover:bg-muted",
                 ].join(" ")}
               >
                 {active && <Check className="inline h-3 w-3 mr-1" />}

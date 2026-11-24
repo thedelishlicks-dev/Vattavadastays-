@@ -20,7 +20,11 @@ export interface BookedRange {
  * inclusive on both ends, matching the previous bookings query:
  * check_out >= from AND check_in <= to.
  */
-async function fetchBookedRanges(roomIds: string[], from: string, to: string): Promise<BookedRange[]> {
+async function fetchBookedRanges(
+  roomIds: string[],
+  from: string,
+  to: string,
+): Promise<BookedRange[]> {
   const { data, error } = await supabase.rpc("room_booked_ranges", {
     p_room_ids: roomIds,
     p_from: from,
@@ -280,7 +284,10 @@ export async function getBlockedDatesForRooms(
   const ownNights = new Set(exclude ? eachDate(exclude.checkIn, exclude.checkOut) : []);
   availRows.forEach((row) => {
     const isOwnNight =
-      !!exclude && row.room_id === exclude.roomId && ownNights.has(row.date) && !coveredByOthers[row.room_id]?.has(row.date);
+      !!exclude &&
+      row.room_id === exclude.roomId &&
+      ownNights.has(row.date) &&
+      !coveredByOthers[row.room_id]?.has(row.date);
     if (isOwnNight) return;
     blocked[row.room_id]?.add(row.date);
   });
@@ -298,11 +305,17 @@ export async function getBlockedDatesForRooms(
  * straight over an owner-added reservation. Mirrors the upsert
  * useCreateBooking.ts already does on the guest-booking path.
  */
-export async function markDatesUnavailable(roomId: string, checkIn: string, checkOut: string): Promise<void> {
+export async function markDatesUnavailable(
+  roomId: string,
+  checkIn: string,
+  checkOut: string,
+): Promise<void> {
   const dates = eachDate(checkIn, checkOut);
   if (dates.length === 0) return;
   const rows = dates.map((date) => ({ room_id: roomId, date, is_available: false }));
-  const { error } = await supabase.from("availability").upsert(rows, { onConflict: "room_id,date" });
+  const { error } = await supabase
+    .from("availability")
+    .upsert(rows, { onConflict: "room_id,date" });
   if (error) throw error;
 }
 
@@ -377,7 +390,9 @@ export async function getConflictingDates(
   ]);
   if (availErr) throw availErr;
   // Editing an existing booking: ignore its own current row.
-  const bookings = excludeBookingId ? bookingRows.filter((b) => b.id !== excludeBookingId) : bookingRows;
+  const bookings = excludeBookingId
+    ? bookingRows.filter((b) => b.id !== excludeBookingId)
+    : bookingRows;
 
   const blockedNights = new Set<string>();
   // Other bookings' occupied nights are widened through THEIR OWN checkout
@@ -386,7 +401,9 @@ export async function getConflictingDates(
   // check-in would wrongly be allowed even when turnover isn't safe: it's
   // the same rule applied from the other direction (our check-in touching
   // their checkout, instead of our checkout touching their check-in).
-  (bookings ?? []).forEach((b) => eachDate(b.check_in, widen(b.check_out)).forEach((d) => blockedNights.add(d)));
+  (bookings ?? []).forEach((b) =>
+    eachDate(b.check_in, widen(b.check_out)).forEach((d) => blockedNights.add(d)),
+  );
   (availRows ?? []).forEach((row) => blockedNights.add(row.date));
 
   // Only ever report a conflict that actually falls within the nights we're
@@ -414,7 +431,11 @@ export async function getConflictingDates(
  * that ever happens. A proper fix would add a `source` column to
  * `availability` to distinguish the two; out of scope for this change.
  */
-export async function releaseDatesIfUnblocked(roomId: string, checkIn: string, checkOut: string): Promise<void> {
+export async function releaseDatesIfUnblocked(
+  roomId: string,
+  checkIn: string,
+  checkOut: string,
+): Promise<void> {
   const nights = eachDate(checkIn, checkOut);
   if (nights.length === 0) return;
 
@@ -426,7 +447,9 @@ export async function releaseDatesIfUnblocked(roomId: string, checkIn: string, c
   if (error) throw error;
 
   const stillOccupied = new Set<string>();
-  (stillActive ?? []).forEach((b) => eachDate(b.check_in, b.check_out).forEach((d) => stillOccupied.add(d)));
+  (stillActive ?? []).forEach((b) =>
+    eachDate(b.check_in, b.check_out).forEach((d) => stillOccupied.add(d)),
+  );
 
   const toRelease = nights.filter((d) => !stillOccupied.has(d));
   if (toRelease.length === 0) return;

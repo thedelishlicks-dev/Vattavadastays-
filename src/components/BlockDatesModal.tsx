@@ -16,9 +16,20 @@ import {
 import { Modal, ModalActions, Button, fieldCls } from "@/components/ds";
 import { supabase } from "@/lib/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { eachDate, addOneDay, isSameDayTurnoverSafe, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
+import {
+  eachDate,
+  addOneDay,
+  isSameDayTurnoverSafe,
+  type TurnoverPolicyInput,
+} from "@/lib/bookingAvailability";
 import { saveFailMessage } from "@/lib/bookingActions";
-import { blockRows, chunk, datesBetween, findBlockConflicts, partialSaveMessage } from "@/lib/blockDates";
+import {
+  blockRows,
+  chunk,
+  datesBetween,
+  findBlockConflicts,
+  partialSaveMessage,
+} from "@/lib/blockDates";
 
 interface Props {
   propertyId: string;
@@ -87,7 +98,9 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
         const set = (byRoom[b.room_id] ??= new Set<string>());
         eachDate(b.check_in, effectiveCheckOut).forEach((d) => set.add(d));
       });
-      return Object.fromEntries(Object.entries(byRoom).map(([k, v]) => [k, Array.from(v)])) as Record<string, string[]>;
+      return Object.fromEntries(
+        Object.entries(byRoom).map(([k, v]) => [k, Array.from(v)]),
+      ) as Record<string, string[]>;
     },
   });
   const bookedAny = useMemo(() => new Set(Object.values(bookedByRoom).flat()), [bookedByRoom]);
@@ -103,13 +116,17 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
   const toggleRoom = (id: string) => {
     setRoomIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) { if (next.size > 1) next.delete(id); } else next.add(id);   // always keep at least one room
+      if (next.has(id)) {
+        if (next.size > 1) next.delete(id);
+      } else next.add(id); // always keep at least one room
       return next;
     });
     setAcknowledgedConflict(false);
   };
   const toggleAllRooms = () => {
-    setRoomIds(allSelected ? new Set(rooms[0] ? [rooms[0].id] : []) : new Set(rooms.map((r) => r.id)));
+    setRoomIds(
+      allSelected ? new Set(rooms[0] ? [rooms[0].id] : []) : new Set(rooms.map((r) => r.id)),
+    );
     setAcknowledgedConflict(false);
   };
 
@@ -119,12 +136,18 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
     const key = format(d, "yyyy-MM-dd");
     setAcknowledgedConflict(false);
     if (rangeMode) {
-      if (!anchor) { setAnchor(key); setSelected((prev) => new Set(prev).add(key)); return; }
+      if (!anchor) {
+        setAnchor(key);
+        setSelected((prev) => new Set(prev).add(key));
+        return;
+      }
       // second tap: add every day between the two taps
       const todayKey = format(today, "yyyy-MM-dd");
       setSelected((prev) => {
         const next = new Set(prev);
-        datesBetween(anchor, key).filter((x) => x >= todayKey).forEach((x) => next.add(x));
+        datesBetween(anchor, key)
+          .filter((x) => x >= todayKey)
+          .forEach((x) => next.add(x));
         return next;
       });
       setAnchor(null);
@@ -132,7 +155,8 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
     }
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -144,7 +168,9 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
     setAcknowledgedConflict(false);
     setSelected((prev) => {
       const next = new Set(prev);
-      datesBetween(first, last).filter((x) => x >= todayKey).forEach((x) => next.add(x));
+      datesBetween(first, last)
+        .filter((x) => x >= todayKey)
+        .forEach((x) => next.add(x));
       return next;
     });
   };
@@ -158,7 +184,9 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
     let saved = 0;
     try {
       for (const part of chunk(rows)) {
-        const { error: err } = await supabase.from("availability").upsert(part, { onConflict: "room_id,date" });
+        const { error: err } = await supabase
+          .from("availability")
+          .upsert(part, { onConflict: "room_id,date" });
         if (err) throw err;
         saved += part.length;
       }
@@ -184,13 +212,20 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
       onClose={onClose}
       footer={
         <ModalActions>
-          <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+          <Button variant="soft" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
           <Button
             variant="danger"
             size="lg"
             className="flex-1"
             onClick={handleSave}
-            disabled={selected.size === 0 || selectedRoomIds.length === 0 || done || (conflicts.length > 0 && !acknowledgedConflict)}
+            disabled={
+              selected.size === 0 ||
+              selectedRoomIds.length === 0 ||
+              done ||
+              (conflicts.length > 0 && !acknowledgedConflict)
+            }
             loading={saving}
           >
             {done
@@ -200,176 +235,207 @@ export function BlockDatesModal({ propertyId, rooms, property, onClose }: Props)
         </ModalActions>
       }
     >
-          {/* Rooms */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">
-              Rooms
-            </label>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {rooms.length > 1 && (
-                <button
-                  type="button"
-                  onClick={toggleAllRooms}
-                  className={["press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", allSelected ? "bg-primary text-primary-foreground border-primary" : "border-border hover:bg-muted"].join(" ")}
-                >
-                  All rooms
-                </button>
-              )}
-              {rooms.map((r) => {
-                const on = roomIds.has(r.id);
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => toggleRoom(r.id)}
-                    aria-pressed={on}
-                    className={["press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors", on ? "bg-primary/10 text-primary border-primary" : "border-border text-muted-foreground hover:bg-muted"].join(" ")}
-                  >
-                    {r.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Mini calendar */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
+      {/* Rooms */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Rooms</label>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {rooms.length > 1 && (
+            <button
+              type="button"
+              onClick={toggleAllRooms}
+              className={[
+                "press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                allSelected
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border hover:bg-muted",
+              ].join(" ")}
+            >
+              All rooms
+            </button>
+          )}
+          {rooms.map((r) => {
+            const on = roomIds.has(r.id);
+            return (
               <button
-                onClick={() => setMonth(addMonths(month, -1))}
-                className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                aria-label="Previous month"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <span className="text-sm font-medium">{format(month, "MMMM yyyy")}</span>
-              <button
-                onClick={() => setMonth(addMonths(month, 1))}
-                className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-                aria-label="Next month"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-            {/* Shortcuts */}
-            <div className="flex flex-wrap gap-2 mb-2">
-              <button
+                key={r.id}
                 type="button"
-                onClick={() => { setRangeMode((v) => !v); setAnchor(null); }}
-                aria-pressed={rangeMode}
-                className={["press-scale rounded-full border px-3 py-1 text-xs font-medium transition-colors", rangeMode ? "bg-primary/10 text-primary border-primary" : "border-border hover:bg-muted"].join(" ")}
+                onClick={() => toggleRoom(r.id)}
+                aria-pressed={on}
+                className={[
+                  "press-scale rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  on
+                    ? "bg-primary/10 text-primary border-primary"
+                    : "border-border text-muted-foreground hover:bg-muted",
+                ].join(" ")}
               >
-                {rangeMode ? (anchor ? "Tap the last day" : "Tap the first day") : "Select a range"}
+                {r.name}
               </button>
-              <button type="button" onClick={selectWholeMonth} className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors">
-                Whole month
-              </button>
-              {selected.size > 0 && (
-                <button type="button" onClick={() => { setSelected(new Set()); setAnchor(null); setAcknowledgedConflict(false); }} className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">
-                  Clear
-                </button>
-              )}
-            </div>
-            <div className="grid grid-cols-7 gap-0.5 text-center text-xs text-muted-foreground mb-1">
-              {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                <div key={d} className="py-1">
-                  {d}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-0.5">
-              {days.map((d, i) => {
-                const isPast = isBefore(d, today);
-                const outOfMonth = !isSameMonth(d, month);
-                const key = format(d, "yyyy-MM-dd");
-                const isSelected = selected.has(key);
-                const isBooked = bookedAny.has(key);
-                const isAnchor = anchor === key;
-                return (
-                  <button
-                    key={i}
-                    disabled={isPast || outOfMonth}
-                    onClick={() => toggleDay(d)}
-                    title={isBooked ? "Already has a booking on a chosen room" : undefined}
-                    className={[
-                      "relative aspect-square rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
-                      outOfMonth ? "opacity-0 pointer-events-none" : "",
-                      isPast ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
-                      isSelected
-                        ? "press-scale bg-red-500 text-white animate-in zoom-in-95 fade-in duration-200 [--tw-ease:var(--ease-smooth)]"
-                        : !isPast && !outOfMonth
-                          ? "press-scale hover:bg-muted"
-                          : "",
-                      isAnchor && !isSelected ? "ring-2 ring-red-400" : "",
-                      isBooked && !isSelected ? "text-amber-700" : "",
-                    ].join(" ")}
-                  >
-                    {format(d, "d")}
-                    {isBooked && (
-                      <span
-                        className={[
-                          "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
-                          isSelected ? "bg-white" : "bg-amber-500",
-                        ].join(" ")}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+            );
+          })}
+        </div>
+      </div>
 
-          {/* Selected count */}
+      {/* Mini calendar */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={() => setMonth(addMonths(month, -1))}
+            className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-medium">{format(month, "MMMM yyyy")}</span>
+          <button
+            onClick={() => setMonth(addMonths(month, 1))}
+            className="press-scale h-8 w-8 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        {/* Shortcuts */}
+        <div className="flex flex-wrap gap-2 mb-2">
+          <button
+            type="button"
+            onClick={() => {
+              setRangeMode((v) => !v);
+              setAnchor(null);
+            }}
+            aria-pressed={rangeMode}
+            className={[
+              "press-scale rounded-full border px-3 py-1 text-xs font-medium transition-colors",
+              rangeMode
+                ? "bg-primary/10 text-primary border-primary"
+                : "border-border hover:bg-muted",
+            ].join(" ")}
+          >
+            {rangeMode ? (anchor ? "Tap the last day" : "Tap the first day") : "Select a range"}
+          </button>
+          <button
+            type="button"
+            onClick={selectWholeMonth}
+            className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors"
+          >
+            Whole month
+          </button>
           {selected.size > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {selected.size} date{selected.size > 1 ? "s" : ""}
-              {selectedRoomIds.length > 1 ? ` × ${selectedRoomIds.length} rooms` : ""} will be marked unavailable
-              {bookedAny.size > 0 && (
-                <span className="inline-flex items-center gap-1 ml-1.5">
-                  <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" /> = already booked
-                </span>
-              )}
-            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSelected(new Set());
+                setAnchor(null);
+                setAcknowledgedConflict(false);
+              }}
+              className="press-scale rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Clear
+            </button>
           )}
-
-          {conflicts.length > 0 && (
-            <div className="rounded-2xl bg-amber-50 p-3.5 space-y-2">
-              <div className="flex items-start gap-2 text-xs text-amber-800">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                <span>
-                  Some of these dates already have a booking:{" "}
-                  {conflicts.map((c) => `${roomName(c.roomId)} (${c.dates.join(", ")})`).join("; ")}.
-                  Blocking a date doesn't cancel that booking — if you meant to free up the room, open that
-                  booking instead. Only continue if you're intentionally flagging it (e.g. sorting out a
-                  double-booking).
-                </span>
-              </div>
-              <label className="flex items-center gap-2 text-xs text-amber-800 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={acknowledgedConflict}
-                  onChange={(e) => setAcknowledgedConflict(e.target.checked)}
-                  className="h-3.5 w-3.5"
-                />
-                Block anyway
-              </label>
+        </div>
+        <div className="grid grid-cols-7 gap-0.5 text-center text-xs text-muted-foreground mb-1">
+          {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+            <div key={d} className="py-1">
+              {d}
             </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-0.5">
+          {days.map((d, i) => {
+            const isPast = isBefore(d, today);
+            const outOfMonth = !isSameMonth(d, month);
+            const key = format(d, "yyyy-MM-dd");
+            const isSelected = selected.has(key);
+            const isBooked = bookedAny.has(key);
+            const isAnchor = anchor === key;
+            return (
+              <button
+                key={i}
+                disabled={isPast || outOfMonth}
+                onClick={() => toggleDay(d)}
+                title={isBooked ? "Already has a booking on a chosen room" : undefined}
+                className={[
+                  "relative aspect-square rounded-md text-xs font-medium transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)]",
+                  outOfMonth ? "opacity-0 pointer-events-none" : "",
+                  isPast ? "text-muted-foreground/40 cursor-not-allowed line-through" : "",
+                  isSelected
+                    ? "press-scale bg-red-500 text-white animate-in zoom-in-95 fade-in duration-200 [--tw-ease:var(--ease-smooth)]"
+                    : !isPast && !outOfMonth
+                      ? "press-scale hover:bg-muted"
+                      : "",
+                  isAnchor && !isSelected ? "ring-2 ring-red-400" : "",
+                  isBooked && !isSelected ? "text-amber-700" : "",
+                ].join(" ")}
+              >
+                {format(d, "d")}
+                {isBooked && (
+                  <span
+                    className={[
+                      "absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full",
+                      isSelected ? "bg-white" : "bg-amber-500",
+                    ].join(" ")}
+                  />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected count */}
+      {selected.size > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {selected.size} date{selected.size > 1 ? "s" : ""}
+          {selectedRoomIds.length > 1 ? ` × ${selectedRoomIds.length} rooms` : ""} will be marked
+          unavailable
+          {bookedAny.size > 0 && (
+            <span className="inline-flex items-center gap-1 ml-1.5">
+              <span className="w-1 h-1 rounded-full bg-amber-500 inline-block" /> = already booked
+            </span>
           )}
+        </p>
+      )}
 
-          {/* Note */}
-          <div>
-            <label className="text-xs font-medium text-muted-foreground">
-              Note (optional)
-            </label>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="e.g. Maintenance, personal use…"
-              className={`mt-1.5 ${fieldCls}`}
-            />
+      {conflicts.length > 0 && (
+        <div className="rounded-2xl bg-amber-50 p-3.5 space-y-2">
+          <div className="flex items-start gap-2 text-xs text-amber-800">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <span>
+              Some of these dates already have a booking:{" "}
+              {conflicts.map((c) => `${roomName(c.roomId)} (${c.dates.join(", ")})`).join("; ")}.
+              Blocking a date doesn't cancel that booking — if you meant to free up the room, open
+              that booking instead. Only continue if you're intentionally flagging it (e.g. sorting
+              out a double-booking).
+            </span>
           </div>
+          <label className="flex items-center gap-2 text-xs text-amber-800 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={acknowledgedConflict}
+              onChange={(e) => setAcknowledgedConflict(e.target.checked)}
+              className="h-3.5 w-3.5"
+            />
+            Block anyway
+          </label>
+        </div>
+      )}
 
-          {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
+      {/* Note */}
+      <div>
+        <label className="text-xs font-medium text-muted-foreground">Note (optional)</label>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Maintenance, personal use…"
+          className={`mt-1.5 ${fieldCls}`}
+        />
+      </div>
+
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </Modal>
   );
 }

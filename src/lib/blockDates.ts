@@ -23,7 +23,8 @@ export function datesBetween(a: string, b: string): string[] {
 export function blockRows(roomIds: string[], dates: string[], note: string) {
   const n = note.trim() || null;
   const rows: { room_id: string; date: string; is_available: false; note: string | null }[] = [];
-  for (const room_id of roomIds) for (const date of dates) rows.push({ room_id, date, is_available: false, note: n });
+  for (const room_id of roomIds)
+    for (const date of dates) rows.push({ room_id, date, is_available: false, note: n });
   return rows;
 }
 

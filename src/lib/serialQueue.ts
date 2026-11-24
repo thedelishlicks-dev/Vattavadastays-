@@ -1,4 +1,4 @@
- // src/lib/serialQueue.ts — run async tasks one after another, in the order they were queued.
+// src/lib/serialQueue.ts — run async tasks one after another, in the order they were queued.
 //
 // Used for saving a quote: a second tap while the first save is still running must wait and
 // then UPDATE the quote the first one created (its id is only known once the first save

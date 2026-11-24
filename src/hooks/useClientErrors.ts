@@ -1,4 +1,4 @@
- // src/hooks/useClientErrors.ts
+// src/hooks/useClientErrors.ts
 //
 // Reads the client error log for the superadmin Errors tab.
 // RLS: only the superadmin's session can SELECT/DELETE (see migration

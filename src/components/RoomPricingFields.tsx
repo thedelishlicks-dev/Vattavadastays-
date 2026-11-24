@@ -44,8 +44,10 @@ export type ParsedPricing = { ok: true; values: PricingValues } | { ok: false; e
 /** Single source of truth for pricing validation. Whole-rupee prices. */
 export function parsePricing(text: PricingText): ParsedPricing {
   const base = Math.round(parseFloat(text.base_price));
-  const extra = text.extra_guest_price.trim() === "" ? 0 : Math.round(parseFloat(text.extra_guest_price));
-  const multiplierRaw = text.weekend_multiplier.trim() === "" ? 1 : parseFloat(text.weekend_multiplier);
+  const extra =
+    text.extra_guest_price.trim() === "" ? 0 : Math.round(parseFloat(text.extra_guest_price));
+  const multiplierRaw =
+    text.weekend_multiplier.trim() === "" ? 1 : parseFloat(text.weekend_multiplier);
 
   if (!base || base <= 0) return { ok: false, error: "Base price must be greater than 0" };
   if (isNaN(extra) || extra < 0) return { ok: false, error: "Extra guest price must be 0 or more" };
@@ -77,7 +79,9 @@ export function RoomPricingFields({
   showPreview?: boolean;
 }) {
   const parsed = parsePricing(value);
-  const weekday = parsed.ok ? parsed.values.base_price : Math.round(parseFloat(value.base_price)) || 0;
+  const weekday = parsed.ok
+    ? parsed.values.base_price
+    : Math.round(parseFloat(value.base_price)) || 0;
   const multiplier = parsed.ok ? parsed.values.weekend_multiplier : 1;
   const extra = parsed.ok ? parsed.values.extra_guest_price : 0;
   const weekend = Math.round(weekday * multiplier);

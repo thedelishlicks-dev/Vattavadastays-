@@ -5,7 +5,8 @@ import { validateAndCompress } from "@/lib/imageUtils";
 import { MAX_GALLERY_PHOTOS, normalizeInstagram, thumbPath, thumbUrl } from "@/lib/gallery";
 
 const BUCKET = "hero-images";
-const inputCls = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
+const inputCls =
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40";
 
 type Props = {
   propertyId: string;
@@ -33,19 +34,29 @@ export function GalleryManager({ propertyId, photos, onChange }: Props) {
     for (let i = 0; i < files.length; i++) {
       setProgress(`Uploading ${i + 1} of ${files.length}…`);
       try {
-        const [full, thumb] = await Promise.all([validateAndCompress(files[i], "gallery"), validateAndCompress(files[i], "galleryThumb")]);
+        const [full, thumb] = await Promise.all([
+          validateAndCompress(files[i], "gallery"),
+          validateAndCompress(files[i], "galleryThumb"),
+        ]);
         const path = `${propertyId}/gallery-${Date.now()}-${i}.webp`;
-        const up = await supabase.storage.from(BUCKET).upload(path, full.file, { upsert: true, contentType: "image/webp" });
+        const up = await supabase.storage
+          .from(BUCKET)
+          .upload(path, full.file, { upsert: true, contentType: "image/webp" });
         if (up.error) throw up.error;
-        const upThumb = await supabase.storage.from(BUCKET).upload(thumbPath(path), thumb.file, { upsert: true, contentType: "image/webp" });
+        const upThumb = await supabase.storage
+          .from(BUCKET)
+          .upload(thumbPath(path), thumb.file, { upsert: true, contentType: "image/webp" });
         if (upThumb.error) throw upThumb.error;
         current = [...current, supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl];
         await onChange(current); // saved one by one, so a later failure never loses earlier photos
       } catch (err) {
-        problems.push(`${files[i].name}: ${typeof err === "string" ? err : (err as Error).message ?? "upload failed"}`);
+        problems.push(
+          `${files[i].name}: ${typeof err === "string" ? err : ((err as Error).message ?? "upload failed")}`,
+        );
       }
     }
-    if (e.target.files && Array.from(e.target.files).length > room) problems.push(`Only ${MAX_GALLERY_PHOTOS} photos fit; the rest were skipped.`);
+    if (e.target.files && Array.from(e.target.files).length > room)
+      problems.push(`Only ${MAX_GALLERY_PHOTOS} photos fit; the rest were skipped.`);
     setError(problems.join(" · "));
     setProgress("");
     setBusy(false);
@@ -79,9 +90,13 @@ export function GalleryManager({ propertyId, photos, onChange }: Props) {
   return (
     <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-4">
       <div>
-        <h2 className="text-sm font-semibold">Gallery ({photos.length}/{MAX_GALLERY_PHOTOS})</h2>
+        <h2 className="text-sm font-semibold">
+          Gallery ({photos.length}/{MAX_GALLERY_PHOTOS})
+        </h2>
         <p className="text-xs text-muted-foreground mt-0.5">
-          Your best photos of the property, the views and the food. The first photo is shown large. Each photo is made small automatically (about 140 KB, with a 30 KB preview) so the page stays quick on mobile.
+          Your best photos of the property, the views and the food. The first photo is shown large.
+          Each photo is made small automatically (about 140 KB, with a 30 KB preview) so the page
+          stays quick on mobile.
         </p>
       </div>
 
@@ -94,25 +109,63 @@ export function GalleryManager({ propertyId, photos, onChange }: Props) {
                 alt={`Gallery photo ${i + 1}`}
                 loading="lazy"
                 className="h-full w-full object-cover"
-                onError={(ev) => { const img = ev.currentTarget; if (img.dataset.fb !== "1") { img.dataset.fb = "1"; img.src = url; } }}
+                onError={(ev) => {
+                  const img = ev.currentTarget;
+                  if (img.dataset.fb !== "1") {
+                    img.dataset.fb = "1";
+                    img.src = url;
+                  }
+                }}
               />
-              <button type="button" onClick={() => remove(url)} aria-label="Remove photo" className="absolute top-1 right-1 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"><X className="h-3.5 w-3.5" /></button>
+              <button
+                type="button"
+                onClick={() => remove(url)}
+                aria-label="Remove photo"
+                className="absolute top-1 right-1 h-7 w-7 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
               {i === 0 ? (
-                <span className="absolute bottom-1 left-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">Large</span>
+                <span className="absolute bottom-1 left-1 rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                  Large
+                </span>
               ) : (
-                <button type="button" onClick={() => makeFirst(url)} aria-label="Make this the large photo" className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white hover:bg-black/80"><Star className="h-3 w-3" /> Make first</button>
+                <button
+                  type="button"
+                  onClick={() => makeFirst(url)}
+                  aria-label="Make this the large photo"
+                  className="absolute bottom-1 left-1 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[10px] text-white hover:bg-black/80"
+                >
+                  <Star className="h-3 w-3" /> Make first
+                </button>
               )}
             </div>
           ))}
         </div>
       )}
 
-      <button type="button" disabled={busy || room <= 0} onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-2 text-sm font-medium text-primary hover:bg-primary-light disabled:opacity-40">
+      <button
+        type="button"
+        disabled={busy || room <= 0}
+        onClick={() => inputRef.current?.click()}
+        className="inline-flex items-center gap-2 rounded-full border border-primary/40 px-4 py-2 text-sm font-medium text-primary hover:bg-primary-light disabled:opacity-40"
+      >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
         {busy ? progress : room <= 0 ? "Gallery is full" : "Add photos"}
       </button>
-      <input ref={inputRef} type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic" className="hidden" onChange={handleFiles} />
-      {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp,image/heic"
+        className="hidden"
+        onChange={handleFiles}
+      />
+      {error && (
+        <p role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -127,7 +180,12 @@ export function InstagramField({ value, onSave }: IgProps) {
 
   const save = async () => {
     const n = normalizeInstagram(text);
-    if (n === "invalid") { setError("Use only your Instagram username (letters, numbers, . and _), or paste your profile link."); return; }
+    if (n === "invalid") {
+      setError(
+        "Use only your Instagram username (letters, numbers, . and _), or paste your profile link.",
+      );
+      return;
+    }
     setError("");
     setState("saving");
     try {
@@ -145,16 +203,43 @@ export function InstagramField({ value, onSave }: IgProps) {
     <div className="bg-card border border-border/60 rounded-3xl p-5 space-y-3">
       <div>
         <h2 className="text-sm font-semibold">Instagram</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Your username or profile link. Guests see a "Follow" button in the gallery and in the page footer. Leave empty to hide it.</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Your username or profile link. Guests see a "Follow" button in the gallery and in the page
+          footer. Leave empty to hide it.
+        </p>
       </div>
       <div className="flex gap-2">
-        <input type="text" value={text} onChange={(e) => { setText(e.target.value); setState("idle"); }} placeholder="@yourstay" autoCapitalize="none" autoCorrect="off" className={inputCls} />
-        <button type="button" onClick={save} disabled={state === "saving"} className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
-          {state === "saving" ? <Loader2 className="h-4 w-4 animate-spin" /> : state === "saved" ? <Check className="h-4 w-4" /> : null}
+        <input
+          type="text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            setState("idle");
+          }}
+          placeholder="@yourstay"
+          autoCapitalize="none"
+          autoCorrect="off"
+          className={inputCls}
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={state === "saving"}
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        >
+          {state === "saving" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : state === "saved" ? (
+            <Check className="h-4 w-4" />
+          ) : null}
           {state === "saved" ? "Saved" : "Save"}
         </button>
       </div>
-      {error && <p role="alert" className="text-xs text-red-600">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-red-600">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

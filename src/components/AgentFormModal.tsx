@@ -24,7 +24,8 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
     notes: agent?.notes ?? "",
   });
   const [error, setError] = useState("");
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   const saving = createAgent.isPending || updateAgent.isPending;
 
@@ -37,7 +38,8 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
     // person is mid-edit (e.g. clearing the value to type a new one) and
     // that must never be allowed to reach the DB as NaN/null, since
     // default_commission_value is a NOT NULL column.
-    const commissionValue = form.default_commission_value === "" ? 0 : form.default_commission_value;
+    const commissionValue =
+      form.default_commission_value === "" ? 0 : form.default_commission_value;
     if (Number.isNaN(commissionValue) || commissionValue < 0) {
       setError("Enter a valid commission value");
       return;
@@ -68,17 +70,30 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} loading={saving}>{isEdit ? "Save changes" : "Add agent"}</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} loading={saving}>
+              {isEdit ? "Save changes" : "Add agent"}
+            </Button>
           </ModalActions>
         </>
       }
     >
       <Field label="Name *">
-        <TextInput value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Agent or agency name" />
+        <TextInput
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          placeholder="Agent or agency name"
+        />
       </Field>
       <Field label="Phone">
-        <TextInput type="tel" value={form.phone} onChange={(e) => set("phone", e.target.value)} placeholder="Optional" />
+        <TextInput
+          type="tel"
+          value={form.phone}
+          onChange={(e) => set("phone", e.target.value)}
+          placeholder="Optional"
+        />
       </Field>
 
       <div className="space-y-2">
@@ -92,7 +107,9 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
                 onClick={() => set("default_commission_type", t)}
                 className={[
                   "rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-                  form.default_commission_type === t ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60",
+                  form.default_commission_type === t
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/80 hover:bg-card/60",
                 ].join(" ")}
               >
                 {t === "percentage" ? "%" : "₹ flat"}
@@ -125,7 +142,12 @@ export function AgentFormModal({ propertyId, agent, onClose, onSaved }: AgentFor
       </div>
 
       <Field label="Notes">
-        <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)} className={`${fieldCls} min-h-[84px] resize-none`} placeholder="Optional" />
+        <textarea
+          value={form.notes}
+          onChange={(e) => set("notes", e.target.value)}
+          className={`${fieldCls} min-h-[84px] resize-none`}
+          placeholder="Optional"
+        />
       </Field>
     </Modal>
   );

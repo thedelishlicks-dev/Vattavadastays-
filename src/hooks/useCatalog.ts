@@ -39,6 +39,8 @@ function normalizeVariants(raw: unknown): PriceVariant[] {
   }));
 }
 
+// Row is the raw JSONB-bearing table row; each caller's normalize() defensively reads it field by field.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function useCatalogQuery<T>(table: CatalogTable, propertyId: string, normalize: (row: any) => T) {
   const { isAuthenticated } = useAuth();
   return useQuery({
@@ -95,18 +97,27 @@ export const usePackages = (propertyId: string) =>
 export function useSaveRow(table: CatalogTable) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { propertyId: string; id?: string; values: Record<string, unknown> }) => {
+    mutationFn: async (input: {
+      propertyId: string;
+      id?: string;
+      values: Record<string, unknown>;
+    }) => {
       const values =
-        table === "price_seasons" ? input.values : { ...input.values, updated_at: new Date().toISOString() };
+        table === "price_seasons"
+          ? input.values
+          : { ...input.values, updated_at: new Date().toISOString() };
       if (input.id) {
         const { error } = await supabase.from(table).update(values).eq("id", input.id);
         if (error) throw asError(error);
       } else {
-        const { error } = await supabase.from(table).insert({ ...values, property_id: input.propertyId });
+        const { error } = await supabase
+          .from(table)
+          .insert({ ...values, property_id: input.propertyId });
         if (error) throw asError(error);
       }
     },
-    onSuccess: (_d, v) => queryClient.invalidateQueries({ queryKey: [QUERY_KEY[table], v.propertyId] }),
+    onSuccess: (_d, v) =>
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY[table], v.propertyId] }),
   });
 }
 
@@ -145,7 +156,9 @@ export function useBulkFillSeason() {
         for (const row of rows) {
           const next = bulkFillVariants(row.variants, input.seasonId, input.mode);
           if (JSON.stringify(next) === JSON.stringify(row.variants)) continue;
-          jobs.push(supabase.from(table).update({ variants: next, updated_at: now }).eq("id", row.id));
+          jobs.push(
+            supabase.from(table).update({ variants: next, updated_at: now }).eq("id", row.id),
+          );
         }
       }
       const results = await Promise.all(jobs);

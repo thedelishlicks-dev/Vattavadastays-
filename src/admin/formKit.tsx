@@ -33,7 +33,7 @@ export function Section({
   description?: string;
   children: React.ReactNode;
 }) {
-    return (
+  return (
     <div className="bg-card border border-border/60 rounded-3xl p-5 md:p-6 space-y-4">
       <div>
         <h2 className="text-base font-semibold">{title}</h2>

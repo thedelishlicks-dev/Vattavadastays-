@@ -3,12 +3,22 @@ import assert from "node:assert/strict";
 import { instagramUrl, normalizeInstagram, thumbUrl } from "./gallery";
 
 test("thumbnail sits next to the photo", () => {
-  assert.equal(thumbUrl("https://x.supabase.co/storage/v1/object/public/hero-images/p1/gallery-1700.webp"), "https://x.supabase.co/storage/v1/object/public/hero-images/p1/gallery-1700-t.webp");
+  assert.equal(
+    thumbUrl("https://x.supabase.co/storage/v1/object/public/hero-images/p1/gallery-1700.webp"),
+    "https://x.supabase.co/storage/v1/object/public/hero-images/p1/gallery-1700-t.webp",
+  );
   assert.equal(thumbUrl("https://x/y/gallery-1.webp?v=2"), "https://x/y/gallery-1-t.webp?v=2");
 });
 
 test("instagram: handle, @handle or link all become the handle", () => {
-  for (const v of ["hillview", "@hillview", " @hillview ", "https://www.instagram.com/hillview/", "instagram.com/hillview?igsh=abc", "https://instagram.com/hillview/reels/"]) {
+  for (const v of [
+    "hillview",
+    "@hillview",
+    " @hillview ",
+    "https://www.instagram.com/hillview/",
+    "instagram.com/hillview?igsh=abc",
+    "https://instagram.com/hillview/reels/",
+  ]) {
     assert.equal(normalizeInstagram(v), "hillview", v);
   }
   assert.equal(normalizeInstagram("hill.view_1"), "hill.view_1");

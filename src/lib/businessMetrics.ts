@@ -1,4 +1,4 @@
- /**
+/**
  * Business metrics (revenue, occupancy, ADR, RevPAR, expenses, estimated profit).
  *
  * Pure functions only (no React, no Supabase), unit-tested in businessMetrics.test.ts.

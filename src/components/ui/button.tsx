@@ -11,8 +11,7 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary text-primary-foreground shadow-[var(--shadow-neu-raised)] hover:bg-primary/90 hover:-translate-y-0.5 active:shadow-[var(--shadow-neu-pressed)] active:translate-y-0",
-        destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
         outline:
           "border border-input bg-background shadow-[var(--shadow-neu-flat)] hover:bg-accent hover:text-accent-foreground hover:-translate-y-0.5 active:shadow-[var(--shadow-neu-pressed)] active:translate-y-0",
         secondary:

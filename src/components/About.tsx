@@ -31,31 +31,37 @@ export function About({ property }: AboutProps) {
 
   return (
     <section id="about" className="py-20 md:py-28 bg-background">
-      <div className={aboutImage ? "mx-auto max-w-6xl px-4 md:px-8 grid md:grid-cols-2 gap-12 items-center" : "mx-auto max-w-3xl px-4 md:px-8"}>
+      <div
+        className={
+          aboutImage
+            ? "mx-auto max-w-6xl px-4 md:px-8 grid md:grid-cols-2 gap-12 items-center"
+            : "mx-auto max-w-3xl px-4 md:px-8"
+        }
+      >
         {aboutImage && (
-        <div className="relative">
-          <img
-            src={aboutImage}
-            alt={`${property.name} exterior`}
-            width={1280}
-            height={960}
-            loading="lazy"
-            className="rounded-2xl shadow-[var(--shadow-elevated)] w-full"
-          />
-          {property.owner_name && (
-          <div className="absolute -bottom-6 -right-4 md:-right-6 bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-soft)] max-w-[220px]">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display text-lg font-semibold">
-                {ownerInitial}
+          <div className="relative">
+            <img
+              src={aboutImage}
+              alt={`${property.name} exterior`}
+              width={1280}
+              height={960}
+              loading="lazy"
+              className="rounded-2xl shadow-[var(--shadow-elevated)] w-full"
+            />
+            {property.owner_name && (
+              <div className="absolute -bottom-6 -right-4 md:-right-6 bg-card border border-border rounded-xl p-5 shadow-[var(--shadow-soft)] max-w-[220px]">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display text-lg font-semibold">
+                    {ownerInitial}
+                  </div>
+                  <div>
+                    <div className="font-medium text-sm">{property.owner_name ?? "Host"}</div>
+                    <div className="text-xs text-muted-foreground">Your host</div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="font-medium text-sm">{property.owner_name ?? "Host"}</div>
-                <div className="text-xs text-muted-foreground">Your host</div>
-              </div>
-            </div>
+            )}
           </div>
-          )}
-        </div>
         )}
 
         <div>
@@ -71,24 +77,27 @@ export function About({ property }: AboutProps) {
             </div>
           )}
           <p className="mt-5 text-muted-foreground leading-relaxed">
-            {property.description ?? `Welcome to ${property.name}${area ? `, a stay in ${area}` : ""}.`}
+            {property.description ??
+              `Welcome to ${property.name}${area ? `, a stay in ${area}` : ""}.`}
           </p>
 
           {stats.length > 0 && (
-          <div className="mt-8 grid grid-cols-3 gap-3">
-            {stats.map(({ icon: Icon, label, value }) => (
-              <div
-                key={label}
-                className="rounded-xl bg-primary-light/60 border border-border p-4 flex flex-col items-center justify-center text-center overflow-hidden"
-              >
-                <Icon className="h-5 w-5 text-primary shrink-0" />
-                <div className="mt-2 font-display text-lg md:text-2xl font-semibold text-foreground leading-tight break-words w-full">
-                  {value}
+            <div className="mt-8 grid grid-cols-3 gap-3">
+              {stats.map(({ icon: Icon, label, value }) => (
+                <div
+                  key={label}
+                  className="rounded-xl bg-primary-light/60 border border-border p-4 flex flex-col items-center justify-center text-center overflow-hidden"
+                >
+                  <Icon className="h-5 w-5 text-primary shrink-0" />
+                  <div className="mt-2 font-display text-lg md:text-2xl font-semibold text-foreground leading-tight break-words w-full">
+                    {value}
+                  </div>
+                  <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider mt-1">
+                    {label}
+                  </div>
                 </div>
-                <div className="text-[10px] md:text-xs text-muted-foreground uppercase tracking-wider mt-1">{label}</div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           )}
         </div>
       </div>

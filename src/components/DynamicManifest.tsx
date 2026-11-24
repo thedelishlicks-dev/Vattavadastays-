@@ -14,9 +14,7 @@ export function DynamicManifest() {
 
     const manifest = {
       name: property.name,
-      short_name: property.name.length > 12
-        ? property.name.slice(0, 12)
-        : property.name,
+      short_name: property.name.length > 12 ? property.name.slice(0, 12) : property.name,
       description: `Manage bookings for ${property.name}`,
       start_url: "/admin/dashboard",
       scope: "/admin",

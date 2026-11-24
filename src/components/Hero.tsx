@@ -84,17 +84,27 @@ export function Hero() {
         </div>
 
         <div className="flex flex-col items-center gap-4 mt-4">
-          <a href="#availability" className="inline-flex items-center justify-center rounded-full bg-primary px-10 py-4 text-sm md:text-base font-semibold text-primary-foreground shadow-2xl hover:scale-[1.05] active:scale-95 transition-all duration-300">Check Availability</a>
+          <a
+            href="#availability"
+            className="inline-flex items-center justify-center rounded-full bg-primary px-10 py-4 text-sm md:text-base font-semibold text-primary-foreground shadow-2xl hover:scale-[1.05] active:scale-95 transition-all duration-300"
+          >
+            Check Availability
+          </a>
 
           <div className="flex flex-col items-center gap-3 animate-in fade-in duration-1000 delay-500">
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-4 py-1.5 text-xs backdrop-blur-md" title={area ? `Local time in ${area}` : "Local time"}>
+            <span
+              className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/20 px-4 py-1.5 text-xs backdrop-blur-md"
+              title={area ? `Local time in ${area}` : "Local time"}
+            >
               <span>{formatLiveDate(now)}</span>
               <span className="opacity-40">|</span>
               <span>{formatLiveTime(now)}</span>
               {weather && (
                 <>
                   <span className="opacity-40">|</span>
-                  <span title="Forecast for the next 24 hours">{wx?.emoji} {formatRange(weather.min, weather.max)}</span>
+                  <span title="Forecast for the next 24 hours">
+                    {wx?.emoji} {formatRange(weather.min, weather.max)}
+                  </span>
                 </>
               )}
             </span>

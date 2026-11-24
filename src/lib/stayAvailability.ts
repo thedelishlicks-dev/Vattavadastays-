@@ -6,13 +6,17 @@
 // first nights, room B the last). The guest then saw every room "Not available" with
 // no explanation. This lets the picker say so up front.
 
-export interface StayDates { checkIn: string; checkOut: string } // yyyy-MM-dd
+export interface StayDates {
+  checkIn: string;
+  checkOut: string;
+} // yyyy-MM-dd
 
 function eachNight(checkIn: string, checkOut: string, includeCheckoutDay: boolean): string[] {
   const out: string[] = [];
   const start = Date.parse(`${checkIn}T00:00:00Z`);
   const end = Date.parse(`${checkOut}T00:00:00Z`);
-  for (let t = start; includeCheckoutDay ? t <= end : t < end; t += 86400000) out.push(new Date(t).toISOString().slice(0, 10));
+  for (let t = start; includeCheckoutDay ? t <= end : t < end; t += 86400000)
+    out.push(new Date(t).toISOString().slice(0, 10));
   return out;
 }
 

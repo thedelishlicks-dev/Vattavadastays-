@@ -22,10 +22,21 @@ export function exportFeedUrl(origin: string, roomId: string): string {
   return `${origin}/api/ical?room=${roomId}`;
 }
 
-export interface SyncResult { feed_id: string; room_id: string; ok: boolean; message: string; nights?: number; conflicts?: number }
+export interface SyncResult {
+  feed_id: string;
+  room_id: string;
+  ok: boolean;
+  message: string;
+  nights?: number;
+  conflicts?: number;
+}
 
 /** Ask the server to sync feeds for a room / property / single feed, as the signed-in owner. */
-export async function syncIcalFeeds(scope: { room_id?: string; feed_id?: string; property_id?: string }): Promise<SyncResult[]> {
+export async function syncIcalFeeds(scope: {
+  room_id?: string;
+  feed_id?: string;
+  property_id?: string;
+}): Promise<SyncResult[]> {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token;
   if (!token) throw new Error("Please sign in again.");

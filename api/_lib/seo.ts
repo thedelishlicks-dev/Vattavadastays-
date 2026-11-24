@@ -93,18 +93,29 @@ export function buildSeo(p: SeoProperty, baseUrl: string): Seo {
 
 // ── HTML injection (server side) ────────────────────────────────────────────
 
-const escAttr = (s: string) => s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const escAttr = (s: string) =>
+  s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const escText = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 /** JSON inside <script>: "<" must not be able to close the tag. */
-const safeJson = (o: unknown) => JSON.stringify(o).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+const safeJson = (o: unknown) =>
+  JSON.stringify(o)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
 
 /** Replace the first <meta> whose name/property equals `key` (any attribute order), else add one before </head>. */
 function setMeta(html: string, attr: "name" | "property", key: string, content: string): string {
   const tag = `<meta ${attr}="${key}" content="${escAttr(content)}" />`;
-  const keyRe = new RegExp(`\\b(?:name|property)\\s*=\\s*["']${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`, "i");
+  const keyRe = new RegExp(
+    `\\b(?:name|property)\\s*=\\s*["']${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`,
+    "i",
+  );
   let replaced = false;
   const out = html.replace(/<meta\b[^>]*>/gi, (m) => {
-    if (!replaced && keyRe.test(m)) { replaced = true; return tag; }
+    if (!replaced && keyRe.test(m)) {
+      replaced = true;
+      return tag;
+    }
     return m;
   });
   return replaced ? out : out.replace(/<\/head>/i, `    ${tag}\n  </head>`);
@@ -112,7 +123,8 @@ function setMeta(html: string, attr: "name" | "property", key: string, content: 
 
 export function injectSeo(html: string, seo: Seo): string {
   let out = html;
-  if (/<title>[\s\S]*?<\/title>/i.test(out)) out = out.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escText(seo.title)}</title>`);
+  if (/<title>[\s\S]*?<\/title>/i.test(out))
+    out = out.replace(/<title>[\s\S]*?<\/title>/i, `<title>${escText(seo.title)}</title>`);
   else out = out.replace(/<\/head>/i, `    <title>${escText(seo.title)}</title>\n  </head>`);
 
   out = setMeta(out, "name", "description", seo.description);

@@ -21,7 +21,12 @@ export function windowStart(now: Date, monthsBack: number): string {
  * number of steps (6 months). Rounding means stepping back month by month re-fetches only every
  * 6th step, not on every tap. Never later than the default window.
  */
-export function windowStartForMonth(now: Date, year: number, month0: number, step: number = WINDOW_STEP_MONTHS): string {
+export function windowStartForMonth(
+  now: Date,
+  year: number,
+  month0: number,
+  step: number = WINDOW_STEP_MONTHS,
+): string {
   const needed = (now.getFullYear() - year) * 12 + (now.getMonth() - month0) + 1;
   return windowStart(now, Math.max(step, Math.ceil(needed / step) * step));
 }
@@ -34,5 +39,9 @@ export function inWindow(checkIn: string, from: string | undefined): boolean {
 /** "1 May 2026" for the "showing stays since" line. */
 export function sinceLabel(from: string): string {
   const [y, m, d] = from.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+  return new Date(y, m - 1, d).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }

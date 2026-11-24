@@ -18,7 +18,9 @@ export function Header() {
   const { data: property } = useProperty(subdomain);
 
   const hasGallery = (property?.gallery_images?.length ?? 0) > 0;
-  const links = hasGallery ? [...baseLinks.slice(0, 2), { href: "#gallery", label: "Gallery" }, ...baseLinks.slice(2)] : baseLinks;
+  const links = hasGallery
+    ? [...baseLinks.slice(0, 2), { href: "#gallery", label: "Gallery" }, ...baseLinks.slice(2)]
+    : baseLinks;
   const logoUrl = property?.logo_url ?? null;
   const propertyName = property?.name ?? "Loading...";
   const propertyNameMl = property?.name_ml ?? null;

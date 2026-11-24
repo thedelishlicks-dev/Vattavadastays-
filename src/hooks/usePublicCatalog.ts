@@ -16,12 +16,26 @@ export function usePublicCatalog(propertyId: string | undefined) {
     retry: false,
     queryFn: async () => {
       const [a, p] = await Promise.all([
-        supabase.from("addons").select("id, name, category, unit, variants, is_active, sort_order").eq("property_id", propertyId as string).eq("is_active", true).order("sort_order", { ascending: true }),
-        supabase.from("packages").select("id, name, description, unit, included, variants, is_active, sort_order").eq("property_id", propertyId as string).eq("is_active", true).order("sort_order", { ascending: true }),
+        supabase
+          .from("addons")
+          .select("id, name, category, unit, variants, is_active, sort_order")
+          .eq("property_id", propertyId as string)
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
+        supabase
+          .from("packages")
+          .select("id, name, description, unit, included, variants, is_active, sort_order")
+          .eq("property_id", propertyId as string)
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true }),
       ]);
       if (a.error) throw a.error;
       if (p.error) throw p.error;
-      const addons = (a.data ?? []).map((r) => ({ ...r, variants: safeVariants(r.variants), sort_order: Number(r.sort_order ?? 0) })) as Addon[];
+      const addons = (a.data ?? []).map((r) => ({
+        ...r,
+        variants: safeVariants(r.variants),
+        sort_order: Number(r.sort_order ?? 0),
+      })) as Addon[];
       const packages = (p.data ?? []).map((r) => ({
         ...r,
         variants: safeVariants(r.variants),

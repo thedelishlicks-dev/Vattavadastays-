@@ -18,7 +18,13 @@
  *  - Repeat guest: more than one qualifying stay at the same property. Nothing else (no name, email, device…).
  */
 
-import { dedupeStays, dayNumber, stayNetTotal, type BookingLike, type GroupLike } from "./businessMetrics";
+import {
+  dedupeStays,
+  dayNumber,
+  stayNetTotal,
+  type BookingLike,
+  type GroupLike,
+} from "./businessMetrics";
 import { nationalDigits } from "./phone";
 
 /**

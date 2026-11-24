@@ -4,7 +4,14 @@
 // price. Information only: nothing here is booked or charged (extras are added by the owner,
 // see catalogExtras.ts). Pure functions so the wording rules are testable.
 
-import { CATEGORY_LABELS, UNIT_LABELS, type Addon, type AddonCategory, type Package, type PriceVariant } from "./quotes";
+import {
+  CATEGORY_LABELS,
+  UNIT_LABELS,
+  type Addon,
+  type AddonCategory,
+  type Package,
+  type PriceVariant,
+} from "./quotes";
 
 /** JSON from the database may predate a field; make it safe to read. */
 export function safeVariants(raw: unknown): PriceVariant[] {
@@ -30,8 +37,18 @@ export function priceText(variants: PriceVariant[], unit: keyof typeof UNIT_LABE
   return `${p.several ? "from " : ""}₹${p.amount.toLocaleString("en-IN")} ${UNIT_LABELS[unit] ?? ""}`.trim();
 }
 
-export type GuestPackage = { id: string; name: string; description: string | null; price: string; included: string[] };
-export type GuestAddonGroup = { category: AddonCategory; label: string; items: { id: string; name: string; price: string }[] };
+export type GuestPackage = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: string;
+  included: string[];
+};
+export type GuestAddonGroup = {
+  category: AddonCategory;
+  label: string;
+  items: { id: string; name: string; price: string }[];
+};
 
 /** Packages, each with the names of what it includes (items that are no longer active are skipped). */
 export function guestPackages(packages: Package[], addons: Addon[]): GuestPackage[] {

@@ -10,7 +10,11 @@ import { returningLabel } from "@/lib/guestIdentity";
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const date = (ymd: string | null) =>
   ymd
-    ? new Date(`${ymd}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+    ? new Date(`${ymd}T00:00:00`).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
     : "—";
 
 export function GuestPanel({
@@ -39,7 +43,9 @@ export function GuestPanel({
           <p className="font-semibold truncate">{name}</p>
         </div>
         {label && (
-          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">{label}</span>
+          <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+            {label}
+          </span>
         )}
       </div>
       {(phone || email) && (
@@ -49,9 +55,17 @@ export function GuestPanel({
           {email && <span>{email}</span>}
         </p>
       )}
-      {!guestId && <p className="text-xs text-muted-foreground">No phone number, so stays can't be matched to this guest.</p>}
-      {guestId && isLoading && <p className="text-xs text-muted-foreground">Checking previous stays…</p>}
-      {guestId && isError && <p className="text-xs text-muted-foreground">Couldn't load this guest's history.</p>}
+      {!guestId && (
+        <p className="text-xs text-muted-foreground">
+          No phone number, so stays can't be matched to this guest.
+        </p>
+      )}
+      {guestId && isLoading && (
+        <p className="text-xs text-muted-foreground">Checking previous stays…</p>
+      )}
+      {guestId && isError && (
+        <p className="text-xs text-muted-foreground">Couldn't load this guest's history.</p>
+      )}
       {stats && stats.stays > 0 && (
         <>
           <button
@@ -60,7 +74,8 @@ export function GuestPanel({
             aria-expanded={open}
             className="inline-flex items-center gap-1 text-xs font-medium text-primary"
           >
-            Guest history {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            Guest history{" "}
+            {open ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           {open && (
             <dl className="grid grid-cols-2 gap-x-4 gap-y-2 pt-1 text-sm">
@@ -81,7 +96,8 @@ export function GuestPanel({
                 <dd>{date(stats.lastStay)}</dd>
               </div>
               <p className="col-span-2 text-[11px] text-muted-foreground">
-                Confirmed and completed stays only (a multi-room booking counts once). Revenue is what the stays were worth, not what has been paid.
+                Confirmed and completed stays only (a multi-room booking counts once). Revenue is
+                what the stays were worth, not what has been paid.
               </p>
             </dl>
           )}

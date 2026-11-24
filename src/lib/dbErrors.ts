@@ -1,4 +1,4 @@
- // src/lib/dbErrors.ts
+// src/lib/dbErrors.ts
 //
 // Turns Supabase/Postgres errors into messages people can act on.
 // Supabase returns plain objects ({ code, message }), not Error instances, so
@@ -27,7 +27,10 @@ export const OVERLAP_MESSAGE =
  * reported to the superadmin error log (the page URL recorded with the report
  * says which screen it was). Overlap conflicts are expected and never logged.
  */
-export function friendlyDbError(e: unknown, fallback = "Something went wrong. Please try again."): string {
+export function friendlyDbError(
+  e: unknown,
+  fallback = "Something went wrong. Please try again.",
+): string {
   if (isOverlapError(e)) return OVERLAP_MESSAGE;
   logClientError({ source: "admin", error: e });
   if (e instanceof Error && e.message) return e.message;

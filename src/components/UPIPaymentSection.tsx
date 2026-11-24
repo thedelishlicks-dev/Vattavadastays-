@@ -1,20 +1,20 @@
-import { useState, useMemo, useEffect } from 'react'
-import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from 'lucide-react'
-import { buildUPILink } from '@/utils/upi'
-import { waDigits } from '@/lib/phone'
+import { useState, useMemo, useEffect } from "react";
+import { Smartphone, Copy, Check, MessageCircle, IndianRupee } from "lucide-react";
+import { buildUPILink } from "@/utils/upi";
+import { waDigits } from "@/lib/phone";
 
 interface UPIPaymentSectionProps {
-  upiId: string
-  payeeName: string
-  totalAmount: number
-  advancePaid: number
-  bookingNote: string
-  ownerWhatsapp: string
-  guestName: string
-  propertyName: string
-  roomName: string
-  checkIn: string
-  bookingId?: string
+  upiId: string;
+  payeeName: string;
+  totalAmount: number;
+  advancePaid: number;
+  bookingNote: string;
+  ownerWhatsapp: string;
+  guestName: string;
+  propertyName: string;
+  roomName: string;
+  checkIn: string;
+  bookingId?: string;
 }
 
 export function UPIPaymentSection({
@@ -30,64 +30,69 @@ export function UPIPaymentSection({
   checkIn,
   bookingId,
 }: UPIPaymentSectionProps) {
-  const isFirstPayment = advancePaid === 0
-  const remaining = totalAmount - advancePaid
+  const isFirstPayment = advancePaid === 0;
+  const remaining = totalAmount - advancePaid;
 
-  const defaultAmount = isFirstPayment ? Math.round(totalAmount * 0.25) : remaining
+  const defaultAmount = isFirstPayment ? Math.round(totalAmount * 0.25) : remaining;
 
-  const [selectedAmount, setSelectedAmount] = useState(defaultAmount)
-  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [selectedAmount, setSelectedAmount] = useState(defaultAmount);
+  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Reset selected amount whenever totalAmount or advancePaid changes
   // This fixes the stale amount shown when re-opening the payment modal
   useEffect(() => {
-    setSelectedAmount(isFirstPayment ? Math.round(totalAmount * 0.25) : remaining)
-    setShowWhatsAppPrompt(false)
-  }, [totalAmount, advancePaid])
+    setSelectedAmount(isFirstPayment ? Math.round(totalAmount * 0.25) : remaining);
+    setShowWhatsAppPrompt(false);
+  }, [totalAmount, advancePaid]);
 
-  const upiLink = useMemo(() => buildUPILink({
-    upiId,
-    payeeName,
-    amount: selectedAmount,
-    note: bookingNote,
-  }), [upiId, payeeName, selectedAmount, bookingNote])
+  const upiLink = useMemo(
+    () =>
+      buildUPILink({
+        upiId,
+        payeeName,
+        amount: selectedAmount,
+        note: bookingNote,
+      }),
+    [upiId, payeeName, selectedAmount, bookingNote],
+  );
 
-  const shortId = bookingId ? `Ref: #${bookingId.slice(0, 8).toUpperCase()}` : ''
+  const shortId = bookingId ? `Ref: #${bookingId.slice(0, 8).toUpperCase()}` : "";
 
-  const whatsappMessage = useMemo(() =>
-    `Hi, I just paid ₹${selectedAmount.toLocaleString('en-IN')} via UPI for my booking at ${propertyName}.\n\n` +
-    `Details:\n` +
-    `- Guest: ${guestName}\n` +
-    `- Room: ${roomName}\n` +
-    `- Check-in: ${checkIn}\n` +
-    `${shortId}\n\n` +
-    `Please find my payment screenshot attached.`,
-    [selectedAmount, propertyName, guestName, roomName, checkIn, shortId]
-  )
+  const whatsappMessage = useMemo(
+    () =>
+      `Hi, I just paid ₹${selectedAmount.toLocaleString("en-IN")} via UPI for my booking at ${propertyName}.\n\n` +
+      `Details:\n` +
+      `- Guest: ${guestName}\n` +
+      `- Room: ${roomName}\n` +
+      `- Check-in: ${checkIn}\n` +
+      `${shortId}\n\n` +
+      `Please find my payment screenshot attached.`,
+    [selectedAmount, propertyName, guestName, roomName, checkIn, shortId],
+  );
 
-  const whatsappLink = `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(whatsappMessage)}`
+  const whatsappLink = `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(whatsappMessage)}`;
 
   const handleCopyUPI = () => {
-    navigator.clipboard.writeText(upiId)
-    setCopied(true)
-    setShowWhatsAppPrompt(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+    navigator.clipboard.writeText(upiId);
+    setCopied(true);
+    setShowWhatsAppPrompt(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleUPIClick = () => {
-    setShowWhatsAppPrompt(true)
-  }
+    setShowWhatsAppPrompt(true);
+  };
 
   const chips = isFirstPayment
     ? [
-        { label: '25%', amount: Math.round(totalAmount * 0.25) },
-        { label: '50%', amount: Math.round(totalAmount * 0.5) },
-        { label: 'Full', amount: totalAmount },
+        { label: "25%", amount: Math.round(totalAmount * 0.25) },
+        { label: "50%", amount: Math.round(totalAmount * 0.5) },
+        { label: "Full", amount: totalAmount },
       ]
-    : []
+    : [];
 
-  if (remaining <= 0) return null
+  if (remaining <= 0) return null;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4 shadow-[var(--shadow-soft)]">
@@ -112,8 +117,10 @@ export function UPIPaymentSection({
                     : "bg-background border-border hover:bg-accent",
                 ].join(" ")}
               >
-                <div className="text-[10px] uppercase opacity-70 leading-none mb-1">{chip.label}</div>
-                <div>₹{chip.amount.toLocaleString('en-IN')}</div>
+                <div className="text-[10px] uppercase opacity-70 leading-none mb-1">
+                  {chip.label}
+                </div>
+                <div>₹{chip.amount.toLocaleString("en-IN")}</div>
               </button>
             ))}
           </div>
@@ -121,7 +128,7 @@ export function UPIPaymentSection({
       ) : (
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground">Balance due</div>
-          <div className="text-2xl font-semibold">₹{remaining.toLocaleString('en-IN')}</div>
+          <div className="text-2xl font-semibold">₹{remaining.toLocaleString("en-IN")}</div>
         </div>
       )}
 
@@ -132,8 +139,8 @@ export function UPIPaymentSection({
       >
         <Smartphone className="h-4 w-4" />
         {isFirstPayment
-          ? `Pay ₹${selectedAmount.toLocaleString('en-IN')} via GPay / Paytm / PhonePe`
-          : `Pay ₹${remaining.toLocaleString('en-IN')} balance via UPI`}
+          ? `Pay ₹${selectedAmount.toLocaleString("en-IN")} via GPay / Paytm / PhonePe`
+          : `Pay ₹${remaining.toLocaleString("en-IN")} balance via UPI`}
       </a>
 
       <div className="space-y-2">
@@ -146,9 +153,15 @@ export function UPIPaymentSection({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background hover:bg-accent transition-colors text-xs font-medium shrink-0"
           >
             {copied ? (
-              <><Check className="h-3.5 w-3.5 text-primary" />Copied!</>
+              <>
+                <Check className="h-3.5 w-3.5 text-primary" />
+                Copied!
+              </>
             ) : (
-              <><Copy className="h-3.5 w-3.5" />Copy</>
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                Copy
+              </>
             )}
           </button>
         </div>
@@ -158,7 +171,8 @@ export function UPIPaymentSection({
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-3">
             <p className="text-xs text-muted-foreground leading-relaxed text-center">
-              After paying, send your payment screenshot to the owner on WhatsApp so they can confirm your booking.
+              After paying, send your payment screenshot to the owner on WhatsApp so they can
+              confirm your booking.
             </p>
             <a
               href={whatsappLink}
@@ -173,5 +187,5 @@ export function UPIPaymentSection({
         </div>
       )}
     </div>
-  )
+  );
 }

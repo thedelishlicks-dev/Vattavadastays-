@@ -28,7 +28,11 @@ test("range text", () => {
 });
 
 test("only a complete, sane answer shows a temperature", () => {
-  assert.deepEqual(parseWeather({ available: true, min: 12, max: 18, symbol: "cloudy" }), { min: 12, max: 18, symbol: "cloudy" });
+  assert.deepEqual(parseWeather({ available: true, min: 12, max: 18, symbol: "cloudy" }), {
+    min: 12,
+    max: 18,
+    symbol: "cloudy",
+  });
   assert.equal(parseWeather({ available: false }), null);
   assert.equal(parseWeather(null), null);
   assert.equal(parseWeather({ available: true, min: "abc", max: 18 }), null);

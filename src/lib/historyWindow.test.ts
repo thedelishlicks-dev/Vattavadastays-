@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { windowStart, windowStartForMonth, inWindow, sinceLabel, WINDOW_STEP_MONTHS } from "./historyWindow";
+import {
+  windowStart,
+  windowStartForMonth,
+  inWindow,
+  sinceLabel,
+  WINDOW_STEP_MONTHS,
+} from "./historyWindow";
 
 test("the window starts on the 1st of the month N months back", () => {
   assert.equal(windowStart(new Date(2026, 10, 14), 6), "2026-05-01");

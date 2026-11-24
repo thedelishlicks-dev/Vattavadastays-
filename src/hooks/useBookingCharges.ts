@@ -22,12 +22,20 @@ export const useBookingCharges = (bookingId: string) => {
 export const useAddCharge = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (charge: { booking_id: string; description: string; qty: number; unit_price: number }) => {
+    mutationFn: async (charge: {
+      booking_id: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+    }) => {
       const { error } = await supabase.from("booking_charges").insert(charge);
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.booking_id], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: ["bookingCharges", variables.booking_id],
+        exact: false,
+      });
     },
   });
 };
@@ -51,8 +59,16 @@ export const useAddChargeRows = () => {
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
-      if ("booking_id" in variables.target) queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.target.booking_id], exact: false });
-      if ("group_id" in variables.target) queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.target.group_id], exact: false });
+      if ("booking_id" in variables.target)
+        queryClient.invalidateQueries({
+          queryKey: ["bookingCharges", variables.target.booking_id],
+          exact: false,
+        });
+      if ("group_id" in variables.target)
+        queryClient.invalidateQueries({
+          queryKey: ["groupCharges", variables.target.group_id],
+          exact: false,
+        });
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     },
@@ -68,8 +84,16 @@ export const useDeleteCharge = () => {
       return { id, bookingId };
     },
     onSuccess: (_data, variables) => {
-      if (variables.bookingId) queryClient.invalidateQueries({ queryKey: ["bookingCharges", variables.bookingId], exact: false });
-      if (variables.groupId) queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.groupId], exact: false });
+      if (variables.bookingId)
+        queryClient.invalidateQueries({
+          queryKey: ["bookingCharges", variables.bookingId],
+          exact: false,
+        });
+      if (variables.groupId)
+        queryClient.invalidateQueries({
+          queryKey: ["groupCharges", variables.groupId],
+          exact: false,
+        });
     },
   });
 };
@@ -95,12 +119,20 @@ export const useGroupCharges = (groupId: string) => {
 export const useAddGroupCharge = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (charge: { group_id: string; description: string; qty: number; unit_price: number }) => {
+    mutationFn: async (charge: {
+      group_id: string;
+      description: string;
+      qty: number;
+      unit_price: number;
+    }) => {
       const { error } = await supabase.from("booking_charges").insert(charge);
       if (error) throw error;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.group_id], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: ["groupCharges", variables.group_id],
+        exact: false,
+      });
     },
   });
 };
@@ -114,7 +146,10 @@ export const useDeleteGroupCharge = () => {
       return { id, groupId };
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["groupCharges", variables.groupId], exact: false });
+      queryClient.invalidateQueries({
+        queryKey: ["groupCharges", variables.groupId],
+        exact: false,
+      });
     },
   });
 };

@@ -4,7 +4,7 @@ import { supabase } from "../lib/supabase";
 export const useAvailabilityRange = (
   roomId: string,
   startDate: string, // "YYYY-MM-DD"
-  endDate: string    // "YYYY-MM-DD"
+  endDate: string, // "YYYY-MM-DD"
 ) => {
   return useQuery({
     queryKey: ["availability-range", roomId, startDate, endDate],

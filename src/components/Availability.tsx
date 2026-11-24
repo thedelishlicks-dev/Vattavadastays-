@@ -47,7 +47,14 @@ type Props = {
 /** How far ahead guests can book. The data below is loaded for exactly this window, so the calendar must not go past it. */
 const BOOKING_HORIZON_MONTHS = 12;
 
-export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party, onPartyChange }: Props) {
+export function Availability({
+  checkIn,
+  checkOut,
+  setCheckIn,
+  setCheckOut,
+  party,
+  onPartyChange,
+}: Props) {
   const [month, setMonth] = useState(new Date());
   const days = useMemo(() => buildMonthDays(month), [month]);
   const today = new Date();
@@ -64,7 +71,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
 
   const activeRoomIds = useMemo(
     () => (property?.rooms ?? []).filter((r) => r.is_active).map((r) => r.id),
-    [property]
+    [property],
   );
 
   // Dates the owner has manually blocked (maintenance, personal use, etc. —
@@ -110,7 +117,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
     const d = date;
     d.setHours(0, 0, 0, 0);
     if (isBefore(d, today)) return "past";
-    if (isAfter(d, horizonEnd)) return "past";   // beyond the loaded window: not bookable here
+    if (isAfter(d, horizonEnd)) return "past"; // beyond the loaded window: not bookable here
     if (totalRooms === 0) return "available";
     const bookedCount = bookedDateCounts[format(date, "yyyy-MM-dd")]?.size ?? 0;
     if (bookedCount === 0) return "available";
@@ -170,14 +177,15 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
     return isSameDay(d, checkIn);
   };
 
-  const nights =
-    checkIn && checkOut ? Math.max(0, differenceInCalendarDays(checkOut, checkIn)) : 0;
+  const nights = checkIn && checkOut ? Math.max(0, differenceInCalendarDays(checkOut, checkIn)) : 0;
 
   // A stay can pass the per-night check above and still have no ONE room free for every night
   // (room A taken the first nights, room B the last). Say so here, instead of leaving the guest
   // with a list of rooms that all say "Not available".
   const noRoomFree =
-    !!checkIn && !!checkOut && totalRooms > 0 &&
+    !!checkIn &&
+    !!checkOut &&
+    totalRooms > 0 &&
     roomsFreeForStay(
       activeRoomIds,
       blockedByRoom,
@@ -206,9 +214,7 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
               >
                 <ChevronLeft className="h-4 w-4" />
               </button>
-              <div className="font-display text-xl font-semibold">
-                {format(month, "MMMM yyyy")}
-              </div>
+              <div className="font-display text-xl font-semibold">{format(month, "MMMM yyyy")}</div>
               <button
                 onClick={() => setMonth(addMonths(month, 1))}
                 disabled={!canGoNext}
@@ -221,7 +227,9 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
 
             <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted-foreground mb-2">
               {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
-                <div key={d} className="py-2">{d}</div>
+                <div key={d} className="py-2">
+                  {d}
+                </div>
               ))}
             </div>
 
@@ -230,14 +238,16 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
                 const rawState = getDateState(d);
                 const isStart = checkIn && isSameDay(d, checkIn);
                 const isEnd = checkOut && isSameDay(d, checkOut);
-                const isCandidateCheckout = turnoverSafe && !!checkIn && !checkOut && isAfter(d, checkIn);
+                const isCandidateCheckout =
+                  turnoverSafe && !!checkIn && !checkOut && isAfter(d, checkIn);
                 // A day showing "fully booked" only because every room
                 // happens to have a new stay starting then is still a
                 // valid checkout date for a different existing stay
                 // (same-day turnover, when the property's times allow it).
                 // Don't show it as blocked while it's a checkout candidate —
                 // handlePick's interior-range scan decides the real answer.
-                const state: DateState = rawState === "booked" && isCandidateCheckout ? "available" : rawState;
+                const state: DateState =
+                  rawState === "booked" && isCandidateCheckout ? "available" : rawState;
                 const selected = inRange(d);
                 const isSelectable = state === "available" || state === "partial";
 
@@ -254,13 +264,15 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
                 } else if (isStart || isEnd) {
                   // Selected start/end — primary green. Ease-out (decelerate, no overshoot)
                   // reads calmer here than the snappy/bouncy curve used for button presses.
-                  cellCls += "press-scale bg-primary text-primary-foreground hover:bg-primary cursor-pointer shadow-[var(--shadow-neu-flat)] animate-in zoom-in-95 fade-in duration-250 [--tw-ease:var(--ease-smooth)]";
+                  cellCls +=
+                    "press-scale bg-primary text-primary-foreground hover:bg-primary cursor-pointer shadow-[var(--shadow-neu-flat)] animate-in zoom-in-95 fade-in duration-250 [--tw-ease:var(--ease-smooth)]";
                 } else if (selected) {
                   // In-range highlight
                   cellCls += "press-scale bg-primary-light text-primary cursor-pointer";
                 } else if (state === "partial") {
                   // Amber — some rooms available
-                  cellCls += "press-scale bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer";
+                  cellCls +=
+                    "press-scale bg-amber-50 text-amber-700 hover:bg-amber-100 cursor-pointer";
                 } else {
                   // Green — fully available
                   cellCls += "press-scale text-foreground hover:bg-primary-light cursor-pointer";
@@ -275,8 +287,8 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
                       state === "booked" && !isStart && !isEnd
                         ? "Fully booked"
                         : state === "partial"
-                        ? "Some rooms available"
-                        : undefined
+                          ? "Some rooms available"
+                          : undefined
                     }
                     className={cellCls}
                   >
@@ -291,7 +303,8 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
             </div>
 
             <p className="mt-4 text-xs text-muted-foreground">
-              Bookings open up to {BOOKING_HORIZON_MONTHS} months ahead. For later dates, please contact the host.
+              Bookings open up to {BOOKING_HORIZON_MONTHS} months ahead. For later dates, please
+              contact the host.
             </p>
 
             {/* Legend */}
@@ -336,26 +349,58 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
             </div>
 
             <div className="mt-5 rounded-xl border border-border p-4 space-y-3">
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Guests</div>
-              <GuestStepper label="Adults" value={party.adults} min={1} max={20} onChange={(n) => onPartyChange({ ...party, adults: n })} />
-              <GuestStepper label="Children" value={party.children} min={0} max={10} onChange={(n) => onPartyChange({ ...party, children: n })} />
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Guests
+              </div>
+              <GuestStepper
+                label="Adults"
+                value={party.adults}
+                min={1}
+                max={20}
+                onChange={(n) => onPartyChange({ ...party, adults: n })}
+              />
+              <GuestStepper
+                label="Children"
+                value={party.children}
+                min={0}
+                max={10}
+                onChange={(n) => onPartyChange({ ...party, children: n })}
+              />
             </div>
 
             <div className="mt-4 text-sm font-medium text-foreground">
-              {nights ? `${nights} night${nights > 1 ? "s" : ""} · ${party.adults + party.children} guest${party.adults + party.children > 1 ? "s" : ""}` : "Select your check-in and check-out dates"}
+              {nights
+                ? `${nights} night${nights > 1 ? "s" : ""} · ${party.adults + party.children} guest${party.adults + party.children > 1 ? "s" : ""}`
+                : "Select your check-in and check-out dates"}
             </div>
 
             {noRoomFree && (
-              <div role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
-                <span className="font-medium">No single room is free for all {nights} night{nights > 1 ? "s" : ""}.</span>{" "}
+              <div
+                role="alert"
+                className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800"
+              >
+                <span className="font-medium">
+                  No single room is free for all {nights} night{nights > 1 ? "s" : ""}.
+                </span>{" "}
                 Try fewer nights or different dates, or book separate stays.
               </div>
             )}
 
             {nights > 0 && !noRoomFree ? (
-              <a href="#rooms" className="mt-4 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">See available rooms</a>
+              <a
+                href="#rooms"
+                className="mt-4 block text-center w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+              >
+                See available rooms
+              </a>
             ) : (
-              <button type="button" disabled className="mt-4 block w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground opacity-40">See available rooms</button>
+              <button
+                type="button"
+                disabled
+                className="mt-4 block w-full rounded-full bg-primary py-3 text-sm font-medium text-primary-foreground opacity-40"
+              >
+                See available rooms
+              </button>
             )}
           </div>
         </div>
@@ -364,16 +409,40 @@ export function Availability({ checkIn, checkOut, setCheckIn, setCheckOut, party
   );
 }
 
-function GuestStepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+function GuestStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+}) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-sm">{label}</span>
       <div className="flex items-center gap-2">
-        <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Fewer ${label.toLowerCase()}`} className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, value - 1))}
+          disabled={value <= min}
+          aria-label={`Fewer ${label.toLowerCase()}`}
+          className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30"
+        >
           <Minus className="h-3.5 w-3.5" />
         </button>
         <span className="w-6 text-center text-sm font-medium">{value}</span>
-        <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`More ${label.toLowerCase()}`} className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, value + 1))}
+          disabled={value >= max}
+          aria-label={`More ${label.toLowerCase()}`}
+          className="h-9 w-9 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30"
+        >
           <Plus className="h-3.5 w-3.5" />
         </button>
       </div>

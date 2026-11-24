@@ -233,7 +233,9 @@ function OnboardingChecklist({ property }: { property: Property | undefined }) {
         {allEssentialsDone && bookingUrl ? (
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">Your booking page — share it with guests</p>
+              <p className="text-xs text-muted-foreground">
+                Your booking page — share it with guests
+              </p>
               <p className="text-sm font-medium truncate">{bookingUrl.replace("https://", "")}</p>
             </div>
             <button
@@ -355,10 +357,12 @@ function AttentionSection({ rows }: { rows: AttentionRow[] }) {
             <Link
               key={`${row.kind}-${row.id}`}
               to="/admin/bookings"
-              search={{
-                ...(prop ? { property: prop } : {}),
-                ...(row.isGroup ? { groupId: row.id } : { bookingId: row.id }),
-              } as never}
+              search={
+                {
+                  ...(prop ? { property: prop } : {}),
+                  ...(row.isGroup ? { groupId: row.id } : { bookingId: row.id }),
+                } as never
+              }
               className="flex items-center gap-3 px-4 py-3 transition-all duration-[var(--duration-fast)] ease-[var(--ease-smooth)] hover:bg-muted/40 hover:pl-5"
             >
               <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -436,23 +440,27 @@ function RecentBookings({
       </div>
 
       {recent.length === 0 ? (
-        <div className="px-4 py-10 text-center text-muted-foreground text-sm">
-          No bookings yet.
-        </div>
+        <div className="px-4 py-10 text-center text-muted-foreground text-sm">No bookings yet.</div>
       ) : (
         <div className="divide-y divide-border">
           {recent.map((b) => {
             const netAmount = Math.max(
               0,
-              Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0),
+              Number(b.total_amount) +
+                chargesSum(b.booking_charges) -
+                Number(b.discount_amount ?? 0),
             );
             return (
-              <div key={b.id} className="px-4 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-muted/30">
+              <div
+                key={b.id}
+                className="px-4 py-3 transition-colors duration-[var(--duration-fast)] hover:bg-muted/30"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="font-medium text-sm truncate">{b.guest_name}</div>
                     <div className="text-xs text-muted-foreground mt-0.5">
-                      {b.roomLabel ?? roomNameMap[b.room_id ?? ""] ?? "—"} · {b.check_in} → {b.check_out}
+                      {b.roomLabel ?? roomNameMap[b.room_id ?? ""] ?? "—"} · {b.check_in} →{" "}
+                      {b.check_out}
                     </div>
                   </div>
                   <div className="text-right shrink-0">
@@ -493,8 +501,20 @@ function DashboardPage() {
     const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1);
     return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-01`;
   }, []);
-  const { data: bookings = [], isLoading: bookLoading, isFetched: bookFetched, isError: bookError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: windowFrom });
-  const { data: groups = [], isLoading: groupsLoading, isFetched: groupsFetched, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
+  const {
+    data: bookings = [],
+    isLoading: bookLoading,
+    isFetched: bookFetched,
+    isError: bookError,
+    refetch: refetchBookings,
+  } = useBookings(property?.id ?? "", { from: windowFrom });
+  const {
+    data: groups = [],
+    isLoading: groupsLoading,
+    isFetched: groupsFetched,
+    isError: groupsError,
+    refetch: refetchGroups,
+  } = useBookingGroups(property?.id ?? "", { from: windowFrom, slim: true });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const [modal, setModal] = useState<Modal>(null);
 
@@ -548,7 +568,11 @@ function DashboardPage() {
   // Also wait for the FIRST fetch of both lists once the property is known. While the
   // property resolves the booking queries are disabled and report "not loading" with
   // empty data, which flashed the empty/onboarding dashboard before the real one.
-  const isLoading = propLoading || bookLoading || groupsLoading || (!!property?.id && (!bookFetched || !groupsFetched));
+  const isLoading =
+    propLoading ||
+    bookLoading ||
+    groupsLoading ||
+    (!!property?.id && (!bookFetched || !groupsFetched));
 
   const roomNameMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -584,12 +608,20 @@ function DashboardPage() {
     data: expenses,
     isLoading: expensesLoading,
     isError: expensesError,
-  } = useExpenses(property?.id ?? "", { startDate: periods.previousStart, endDate: periods.currentLastDay });
+  } = useExpenses(property?.id ?? "", {
+    startDate: periods.previousStart,
+    endDate: periods.currentLastDay,
+  });
   const expensesStatus = expensesError ? "error" : expensesLoading ? "loading" : "ready";
   const expensesForMetrics = expensesStatus === "ready" && expenses ? expenses : NO_EXPENSES; // stable reference keeps the memo below from re-running every render
 
   const snapshot = useMemo(() => {
-    const common = { bookings, groups, roomCount: activeRooms.length, expenses: expensesForMetrics };
+    const common = {
+      bookings,
+      groups,
+      roomCount: activeRooms.length,
+      expenses: expensesForMetrics,
+    };
     const current = computeBusinessMetrics({ ...common, period: periods.current });
     const previous = computeBusinessMetrics({ ...common, period: periods.previous });
     // Last month is only a fair baseline if the property was already set up for all of it.
@@ -615,7 +647,15 @@ function DashboardPage() {
   }
 
   if (bookError || groupsError) {
-    return <LoadFailed title="Couldn't load your bookings" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
+    return (
+      <LoadFailed
+        title="Couldn't load your bookings"
+        onRetry={() => {
+          void refetchBookings();
+          void refetchGroups();
+        }}
+      />
+    );
   }
 
   // Only show the stats strip once there's real booking history — an empty
@@ -631,12 +671,18 @@ function DashboardPage() {
       <div>
         <h1 className="text-[28px] leading-tight font-bold tracking-tight">Home</h1>
         <p className="text-sm text-muted-foreground">
-          {property?.name ? `${property.name}${property.area ? ` · ${property.area}` : ""}` : "Your property at a glance."}
+          {property?.name
+            ? `${property.name}${property.area ? ` · ${property.area}` : ""}`
+            : "Your property at a glance."}
         </p>
       </div>
 
       {hasBookingHistory && (
-        <BusinessSnapshot data={snapshot.data} monthLabel={monthLabel} expensesStatus={expensesStatus} />
+        <BusinessSnapshot
+          data={snapshot.data}
+          monthLabel={monthLabel}
+          expensesStatus={expensesStatus}
+        />
       )}
 
       <AttentionSection rows={attentionRows} />
@@ -644,9 +690,7 @@ function DashboardPage() {
       <RevenueOpportunities opportunities={revenueIntel.opportunities} />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
-        <div className="text-xs  text-muted-foreground mb-3">
-          Quick actions
-        </div>
+        <div className="text-xs  text-muted-foreground mb-3">Quick actions</div>
         <div className="flex flex-wrap gap-2">
           <ActionBtn icon={Ban} label="Block dates" onClick={() => setModal("block")} />
           <ActionBtn icon={Plus} label="Add booking" onClick={() => setModal("add")} />

@@ -7,11 +7,21 @@
 export const PROPERTY_TIME_ZONE = "Asia/Kolkata";
 
 export function formatLiveDate(now: Date): string {
-  return new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: PROPERTY_TIME_ZONE }).format(now);
+  return new Intl.DateTimeFormat("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: PROPERTY_TIME_ZONE,
+  }).format(now);
 }
 
 export function formatLiveTime(now: Date): string {
-  return new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: PROPERTY_TIME_ZONE })
+  return new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: PROPERTY_TIME_ZONE,
+  })
     .format(now)
     .replace(/\s?([ap])m$/i, (_, m: string) => ` ${m.toLowerCase()}m`);
 }
@@ -46,6 +56,7 @@ export function parseWeather(raw: unknown): { min: number; max: number; symbol: 
   if (!r || r.available !== true) return null;
   const min = Number(r.min);
   const max = Number(r.max);
-  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max || min < -60 || max > 60) return null;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max || min < -60 || max > 60)
+    return null;
   return { min, max, symbol: typeof r.symbol === "string" ? r.symbol : "" };
 }

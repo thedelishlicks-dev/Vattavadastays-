@@ -85,5 +85,7 @@ export function encodeMealsConfig(config: MealsConfig, existing: string[]): stri
 
 /** True if there's anything worth showing a guest at all. */
 export function hasMealInfo(config: MealsConfig): boolean {
-  return config.breakfast !== "unavailable" || config.kitchen_available || config.delivery_available;
+  return (
+    config.breakfast !== "unavailable" || config.kitchen_available || config.delivery_available
+  );
 }

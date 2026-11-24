@@ -5,7 +5,13 @@ import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { useAuth } from "@/hooks/useAuth";
 import { updateSharedAmenities } from "@/lib/propertyConfig";
 import { useQueryClient } from "@tanstack/react-query";
-import { type MealsConfig, type BreakfastPlan, parseMealsConfig, encodeMealsConfig, defaultMealsConfig } from "@/lib/meals";
+import {
+  type MealsConfig,
+  type BreakfastPlan,
+  parseMealsConfig,
+  encodeMealsConfig,
+  defaultMealsConfig,
+} from "@/lib/meals";
 
 export const Route = createFileRoute("/admin/meals")({
   component: AdminMeals,
@@ -65,11 +71,10 @@ function AdminMeals() {
       <div>
         <h1 className="text-2xl md:text-3xl font-semibold">Meals</h1>
         <p className="text-sm text-muted-foreground">
-          Let guests know what's on offer before they book. This is informational only —
-          when a guest actually orders food during their stay, add it as a charge on that
-          booking's <span className="font-medium text-foreground">Extras</span> tab, same as
-          any other add-on. Prices here are just what guests see up front; nothing is
-          auto-charged.
+          Let guests know what's on offer before they book. This is informational only — when a
+          guest actually orders food during their stay, add it as a charge on that booking's{" "}
+          <span className="font-medium text-foreground">Extras</span> tab, same as any other add-on.
+          Prices here are just what guests see up front; nothing is auto-charged.
         </p>
       </div>
 

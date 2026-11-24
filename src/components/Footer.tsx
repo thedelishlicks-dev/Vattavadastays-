@@ -15,7 +15,13 @@ export function Footer({ subdomain }: { subdomain: string }) {
   const propertyName = property?.name ?? "stayidom.in";
   const ownerName = property?.owner_name ?? "the host";
 
-  const mapsUrl = directionsUrl({ lat, lng, name: property?.name, area: property?.area, byName: property?.directions_by_name });
+  const mapsUrl = directionsUrl({
+    lat,
+    lng,
+    name: property?.name,
+    area: property?.area,
+    byName: property?.directions_by_name,
+  });
 
   function cleanDigits(p: string): string {
     const d = p.replace(/\D/g, "");
@@ -105,12 +111,15 @@ export function Footer({ subdomain }: { subdomain: string }) {
                 </a>
               )}
               {igLink && (
-                <a href={igLink} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors">
-                  <Instagram className="h-4 w-4" />
-                  @{property?.instagram_handle?.replace(/^@/, "")}
+                <a
+                  href={igLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-3 rounded-full bg-background/10 hover:bg-background/15 px-5 py-3 text-sm font-medium transition-colors"
+                >
+                  <Instagram className="h-4 w-4" />@{property?.instagram_handle?.replace(/^@/, "")}
                 </a>
               )}
-
             </div>
           </div>
         </div>
@@ -121,7 +130,16 @@ export function Footer({ subdomain }: { subdomain: string }) {
               © {new Date().getFullYear()} {propertyName}. All rights reserved.
             </span>
             {ownerName && <span>Hosted by {ownerName}</span>}
-            {weather && <a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline underline-offset-2">Weather data from MET Norway</a>}
+            {weather && (
+              <a
+                href="https://api.met.no/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                Weather data from MET Norway
+              </a>
+            )}
           </div>
           <span className="font-medium text-primary">Powered by stayidom.in</span>
         </div>

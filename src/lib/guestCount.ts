@@ -23,7 +23,9 @@ export const MAX_CHILDREN = 4;
  * The database applies the same rule when a guest booking is saved.
  */
 export function maxGuestsFor(included: number, maxOccupancy?: number | null): number {
-  return maxOccupancy != null && maxOccupancy >= included ? maxOccupancy : included + EXTRA_GUEST_ALLOWANCE;
+  return maxOccupancy != null && maxOccupancy >= included
+    ? maxOccupancy
+    : included + EXTRA_GUEST_ALLOWANCE;
 }
 
 /** Guests who pay the extra-guest charge. */
@@ -32,7 +34,12 @@ export function extraGuestCount(totalGuests: number, included: number): number {
 }
 
 /** Highest value each stepper may reach given the other one, so the total can never exceed the cap. */
-export function stepperLimits(included: number, adults: number, children: number, maxOccupancy?: number | null): { maxAdults: number; maxChildren: number } {
+export function stepperLimits(
+  included: number,
+  adults: number,
+  children: number,
+  maxOccupancy?: number | null,
+): { maxAdults: number; maxChildren: number } {
   const cap = maxGuestsFor(included, maxOccupancy);
   return {
     maxAdults: Math.max(1, cap - children),
@@ -41,7 +48,12 @@ export function stepperLimits(included: number, adults: number, children: number
 }
 
 /** Bring a (possibly stale) selection inside the limits: at least 1 adult, total within the cap. */
-export function clampParty(included: number, adults: number, children: number, maxOccupancy?: number | null): { adults: number; children: number } {
+export function clampParty(
+  included: number,
+  adults: number,
+  children: number,
+  maxOccupancy?: number | null,
+): { adults: number; children: number } {
   const cap = maxGuestsFor(included, maxOccupancy);
   const a = Math.min(Math.max(1, adults), cap);
   const c = Math.min(Math.max(0, children), MAX_CHILDREN, cap - a);

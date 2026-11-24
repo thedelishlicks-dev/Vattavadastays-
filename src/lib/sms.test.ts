@@ -10,12 +10,16 @@ test("no & or # survives into the message", () => {
 });
 
 test("lines and links are left alone", () => {
-  const body = "Directions to Mist Valley:\nGoogle Maps: https://mistvalley.stayidom.in/api/directions\nSee you soon!";
+  const body =
+    "Directions to Mist Valley:\nGoogle Maps: https://mistvalley.stayidom.in/api/directions\nSee you soon!";
   assert.equal(smsSafe(body), body);
 });
 
 test("the sms link decodes back to the cleaned text", () => {
   const link = smsLink("Hello & welcome\nPlot #5");
   assert.ok(link.startsWith("sms:?body="));
-  assert.equal(decodeURIComponent(link.slice("sms:?body=".length)), "Hello and welcome\nPlot No. 5");
+  assert.equal(
+    decodeURIComponent(link.slice("sms:?body=".length)),
+    "Hello and welcome\nPlot No. 5",
+  );
 });

@@ -4,20 +4,20 @@
  * localhost → falls back to VITE_PROPERTY_SUBDOMAIN env var
  */
 export function getSubdomain(): string {
-  const hostname = window.location.hostname
+  const hostname = window.location.hostname;
 
   // Production: {subdomain}.stayidom.in
-  if (hostname.endsWith('.stayidom.in')) {
-    return hostname.split('.')[0]
+  if (hostname.endsWith(".stayidom.in")) {
+    return hostname.split(".")[0];
   }
 
   // Vercel preview: use ?slug= query param if present
-  const params = new URLSearchParams(window.location.search)
-  const slug = params.get('slug')
-  if (slug) return slug
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get("slug");
+  if (slug) return slug;
 
   // Final fallback to env var
-  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? 'bleafmudhouse'
+  return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
 }
 
 /**
@@ -25,6 +25,6 @@ export function getSubdomain(): string {
  * Called after auth is confirmed.
  */
 export function isSuperAdminEmail(email: string | undefined): boolean {
-  if (!email) return false
-  return email === import.meta.env.VITE_SUPERADMIN_EMAIL
+  if (!email) return false;
+  return email === import.meta.env.VITE_SUPERADMIN_EMAIL;
 }

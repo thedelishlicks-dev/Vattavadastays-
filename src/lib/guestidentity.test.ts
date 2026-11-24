@@ -27,13 +27,22 @@ test("phone key: every shared case agrees with the database function", () => {
   for (const c of cases) assert.equal(phoneKey(c.raw), c.key, `phoneKey(${JSON.stringify(c.raw)})`);
 });
 test("phone key: formatting differences resolve to the same key", () => {
-  const same = ["+91 98765 43210", "98765 43210", "919876543210", "09876543210", "0091 98765 43210", "98765-43210", "(+91) 98765.43210"];
+  const same = [
+    "+91 98765 43210",
+    "98765 43210",
+    "919876543210",
+    "09876543210",
+    "0091 98765 43210",
+    "98765-43210",
+    "(+91) 98765.43210",
+  ];
   assert.equal(new Set(same.map(phoneKey)).size, 1);
   assert.equal(phoneKey(same[0]), "9876543210");
 });
 test("phone key: different numbers differ; nothing usable gives null (no fake identity)", () => {
   assert.notEqual(phoneKey("98765 43210"), phoneKey("98765 43211"));
-  for (const bad of [null, undefined, "", "   ", "abc", "12345", "+919"]) assert.equal(phoneKey(bad), null);
+  for (const bad of [null, undefined, "", "   ", "abc", "12345", "+919"])
+    assert.equal(phoneKey(bad), null);
 });
 
 // ── guest stats ─────────────────────────────────────────────────────────────
@@ -65,7 +74,14 @@ const group = (over: Partial<G> = {}): G => ({
 });
 
 test("guest stats: a guest with no stays", () => {
-  assert.deepEqual(guestStats([], []), { stays: 0, revenue: 0, firstStay: null, lastStay: null, isRepeat: false, repeatVisits: 0 });
+  assert.deepEqual(guestStats([], []), {
+    stays: 0,
+    revenue: 0,
+    firstStay: null,
+    lastStay: null,
+    isRepeat: false,
+    repeatVisits: 0,
+  });
 });
 test("guest stats: the same guest can have many bookings; stay count, first and last stay are right", () => {
   const s = guestStats(
@@ -84,25 +100,43 @@ test("guest stats: revenue is the canonical stay value (extras and discount incl
   const s = guestStats(
     [
       booking({ total_amount: 6000, advance_amount: 1000 }), // paid only 1000 of 6000
-      booking({ total_amount: 5000, discount_amount: 500, booking_charges: [{ qty: 2, unit_price: 750 }], advance_amount: 0 }), // 5000 + 1500 − 500
+      booking({
+        total_amount: 5000,
+        discount_amount: 500,
+        booking_charges: [{ qty: 2, unit_price: 750 }],
+        advance_amount: 0,
+      }), // 5000 + 1500 − 500
     ],
     [],
   );
   assert.equal(s.revenue, 6000 + 6000);
 });
 test("guest stats: revenue agrees with Money's bookingRevenue over the same stays", () => {
-  const bs = [booking({ total_amount: 4321.5, discount_amount: 21.5 }), booking({ total_amount: 1000, check_in: "2026-04-01", check_out: "2026-04-02" })];
+  const bs = [
+    booking({ total_amount: 4321.5, discount_amount: 21.5 }),
+    booking({ total_amount: 1000, check_in: "2026-04-01", check_out: "2026-04-02" }),
+  ];
   const all: Period = { start: "2026-01-01", endExclusive: "2027-01-01" };
   assert.equal(guestStats(bs, []).revenue, bookingRevenue(bs, [], all));
 });
 test("guest stats: cancelled and pending bookings count as no stay and add no revenue", () => {
-  const s = guestStats([booking({ status: "cancelled" }), booking({ status: "pending", total_amount: 99999 }), booking()], []);
+  const s = guestStats(
+    [
+      booking({ status: "cancelled" }),
+      booking({ status: "pending", total_amount: 99999 }),
+      booking(),
+    ],
+    [],
+  );
   assert.equal(s.stays, 1);
   assert.equal(s.revenue, 6000);
 });
 test("guest stats: a multi-room booking is ONE stay, not one per room", () => {
   const g = group({ id: "G1", total_amount: 12000 });
-  const rooms = [booking({ group_id: "G1", total_amount: 6000 }), booking({ group_id: "G1", total_amount: 6000 })];
+  const rooms = [
+    booking({ group_id: "G1", total_amount: 6000 }),
+    booking({ group_id: "G1", total_amount: 6000 }),
+  ];
   const s = guestStats(rooms, [g]);
   assert.equal(s.stays, 1);
   assert.equal(s.revenue, 12000);
@@ -122,7 +156,10 @@ test("repeat: the first qualifying stay is not a repeat", () => {
   assert.equal(returningLabel(s.stays), null);
 });
 test("repeat: the second qualifying stay makes a repeat guest, and the count is right", () => {
-  const two = guestStats([booking(), booking({ check_in: "2026-06-01", check_out: "2026-06-02" })], []);
+  const two = guestStats(
+    [booking(), booking({ check_in: "2026-06-01", check_out: "2026-06-02" })],
+    [],
+  );
   assert.equal(two.isRepeat, true);
   assert.equal(two.repeatVisits, 1);
   assert.equal(returningLabel(two.stays), "Returning guest · 2 stays");
@@ -131,7 +168,10 @@ test("repeat: the second qualifying stay makes a repeat guest, and the count is 
   assert.equal(returningLabel(three.stays), "Returning guest · 3 stays");
 });
 test("repeat: cancelled or pending bookings never create repeat status", () => {
-  const s = guestStats([booking(), booking({ status: "cancelled" }), booking({ status: "pending" })], []);
+  const s = guestStats(
+    [booking(), booking({ status: "cancelled" }), booking({ status: "pending" })],
+    [],
+  );
   assert.equal(s.isRepeat, false);
 });
 test("repeat: a booking and a group of rooms are two stays (one each)", () => {

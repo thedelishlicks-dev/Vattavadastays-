@@ -69,7 +69,10 @@ export function guestStatusView(
 
 /** The status of the first row a token lookup returned (a group row wins over its rooms). */
 export function statusFromTokenLookup(
-  result: { groups?: { status?: string }[] | null; bookings?: { status?: string }[] | null } | null | undefined,
+  result:
+    | { groups?: { status?: string }[] | null; bookings?: { status?: string }[] | null }
+    | null
+    | undefined,
 ): string | null {
   return result?.groups?.[0]?.status ?? result?.bookings?.[0]?.status ?? null;
 }

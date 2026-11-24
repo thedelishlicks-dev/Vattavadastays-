@@ -15,7 +15,10 @@ export function LoadFailed({
   onRetry?: () => void;
 }) {
   return (
-    <div role="alert" className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center space-y-3">
+    <div
+      role="alert"
+      className="rounded-3xl border border-destructive/30 bg-destructive/5 p-6 text-center space-y-3"
+    >
       <TriangleAlert className="h-7 w-7 mx-auto text-destructive" />
       <p className="font-medium">{title}</p>
       <p className="text-sm text-muted-foreground">{detail}</p>

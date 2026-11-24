@@ -30,7 +30,11 @@ function link(phone: string, text: string): string {
  * only for backward compatibility with old links already sent before this
  * param existed; those still work, just without the scoping/branding.
  */
-export function guestTrackingUrl(origin: string, trackingToken: string | null | undefined, propertyId?: string): string {
+export function guestTrackingUrl(
+  origin: string,
+  trackingToken: string | null | undefined,
+  propertyId?: string,
+): string {
   const params: string[] = [];
   if (trackingToken) params.push(`t=${encodeURIComponent(trackingToken)}`);
   if (propertyId) params.push(`property=${encodeURIComponent(propertyId)}`);
@@ -76,10 +80,17 @@ export interface CatalogEnquiryInput {
 }
 
 /** One WhatsApp message for everything the guest ticked in Packages and add-ons (information only). */
-export function buildCatalogEnquiryText({ propertyName, items, stay }: CatalogEnquiryInput): string {
+export function buildCatalogEnquiryText({
+  propertyName,
+  items,
+  stay,
+}: CatalogEnquiryInput): string {
   const lines = [`Hi, I'm interested in these at ${propertyName}:`, ...items.map((i) => `• ${i}`)];
   if (stay) {
-    lines.push("", `Stay: ${stay.checkIn} to ${stay.checkOut}, ${stay.guests} guest${stay.guests > 1 ? "s" : ""}`);
+    lines.push(
+      "",
+      `Stay: ${stay.checkIn} to ${stay.checkOut}, ${stay.guests} guest${stay.guests > 1 ? "s" : ""}`,
+    );
     if (stay.rooms.length > 0) lines.push(`Rooms: ${stay.rooms.join(", ")}`);
   }
   lines.push("", "Please tell me the details and add them to my stay.");
@@ -253,17 +264,25 @@ export function buildPaymentReminderText({
   ownerPhone,
   trackingUrl,
 }: PaymentReminderInput): string {
-  const { netTotal: grandTotal, balance, refundDue } = computeBalance({
-    roomTotal: totalAmount, chargesTotal, discount, advance: advancePaid,
+  const {
+    netTotal: grandTotal,
+    balance,
+    refundDue,
+  } = computeBalance({
+    roomTotal: totalAmount,
+    chargesTotal,
+    discount,
+    advance: advancePaid,
   });
   const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 
-  const breakdownLine = chargesTotal > 0 || discount > 0
-    ? `(Room: ${inr(totalAmount)}` +
-      (chargesTotal > 0 ? ` + Extra charges: ${inr(chargesTotal)}` : "") +
-      (discount > 0 ? ` − Discount: ${inr(discount)}` : "") +
-      `)\n`
-    : "";
+  const breakdownLine =
+    chargesTotal > 0 || discount > 0
+      ? `(Room: ${inr(totalAmount)}` +
+        (chargesTotal > 0 ? ` + Extra charges: ${inr(chargesTotal)}` : "") +
+        (discount > 0 ? ` − Discount: ${inr(discount)}` : "") +
+        `)\n`
+      : "";
 
   const helpLine = ownerPhone
     ? `Call us at +91 ${ownerPhone.replace(/\D/g, "").slice(-10)} if you need help.`
@@ -272,13 +291,14 @@ export function buildPaymentReminderText({
   // Nothing to collect → never send a "payment pending / Pay ₹0" message.
   // (Previously this produced "Payment of fully paid ✓ is pending…".)
   if (balance === 0) {
-    const body = refundDue > 0
-      ? `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) has been updated.\n\n` +
-        `Revised total: ${inr(grandTotal)}\n${breakdownLine}` +
-        `Advance paid: ${inr(advancePaid)}\n` +
-        `You've paid ${inr(refundDue)} more than the revised total — we'll refund or adjust this with you. No further payment is needed.\n\n`
-      : `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) is fully paid ✓\n\n` +
-        `Total: ${inr(grandTotal)}\n${breakdownLine}\n`;
+    const body =
+      refundDue > 0
+        ? `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) has been updated.\n\n` +
+          `Revised total: ${inr(grandTotal)}\n${breakdownLine}` +
+          `Advance paid: ${inr(advancePaid)}\n` +
+          `You've paid ${inr(refundDue)} more than the revised total — we'll refund or adjust this with you. No further payment is needed.\n\n`
+        : `Hi ${guestName}, your booking at ${propertyName} (check-in ${checkIn}) is fully paid ✓\n\n` +
+          `Total: ${inr(grandTotal)}\n${breakdownLine}\n`;
     return body + `📋 Booking details & invoice:\n${trackingUrl}\n\n` + helpLine;
   }
 
@@ -287,20 +307,18 @@ export function buildPaymentReminderText({
   let contextLine: string;
 
   if (advancePaid === 0) {
-    amountLine  = `${inr(due)} (25% advance to confirm your booking)`;
+    amountLine = `${inr(due)} (25% advance to confirm your booking)`;
     contextLine = `Total booking amount: ${inr(grandTotal)}\n${breakdownLine}`;
   } else {
-    amountLine  = `${inr(due)} (remaining balance)`;
+    amountLine = `${inr(due)} (remaining balance)`;
     contextLine = `Advance paid: ${inr(advancePaid)} · Total: ${inr(grandTotal)}\n${breakdownLine}`;
   }
 
   const payBlock = `👉 Pay ${inr(due)} here (tap "Pay via UPI" on the page):\n${trackingUrl}\n\n`;
 
   const upiFallback = upiId
-    ? (
-        `Prefer to pay directly in your UPI app instead of the link above? Use this UPI ID:\n` +
-        `${upiId}\n\n`
-      )
+    ? `Prefer to pay directly in your UPI app instead of the link above? Use this UPI ID:\n` +
+      `${upiId}\n\n`
     : "";
 
   return (
@@ -314,9 +332,7 @@ export function buildPaymentReminderText({
 }
 
 /** Owner sends payment reminder to guest — returns a ready-to-open wa.me link. */
-export function paymentReminderLink(
-  input: PaymentReminderInput & { guestPhone: string }
-): string {
+export function paymentReminderLink(input: PaymentReminderInput & { guestPhone: string }): string {
   const { guestPhone, ...rest } = input;
   return link(guestPhone, buildPaymentReminderText(rest));
 }

@@ -10,17 +10,31 @@ import { AgentFormModal } from "@/components/AgentFormModal";
 import { RoomAvailabilityCalendar } from "@/components/RoomAvailabilityCalendar";
 import { RatesNotice } from "@/components/RatesNotice";
 import { useRoomRates } from "@/hooks/useRoomRates";
-import { getConflictingDates, markDatesUnavailable, isSameDayTurnoverSafe, pendingHoldExpiry, type TurnoverPolicyInput } from "@/lib/bookingAvailability";
+import {
+  getConflictingDates,
+  markDatesUnavailable,
+  isSameDayTurnoverSafe,
+  pendingHoldExpiry,
+  type TurnoverPolicyInput,
+} from "@/lib/bookingAvailability";
 import { confirmationLink, paymentReminderLink, guestTrackingUrl } from "@/lib/whatsapp";
 import { newTrackingToken } from "@/lib/trackingToken";
 import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
-import { priceRoomStay, chargesFromQuote, formPhoneFromQuote, lockToQuote, quotePriceDrift, type QuoteConversion } from "@/lib/quoteBuilder";
+import {
+  priceRoomStay,
+  chargesFromQuote,
+  formPhoneFromQuote,
+  lockToQuote,
+  quotePriceDrift,
+  type QuoteConversion,
+} from "@/lib/quoteBuilder";
 import { extractUPIId } from "@/utils/upi";
 import { Modal, ModalActions, Button } from "@/components/ds";
 import { SourceDetailPicker } from "@/components/SourceDetailPicker";
 import type { BookingStatus, BookingSource, BookingSourceDetail, Agent } from "@/types/database";
 
-const inputCls = "w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] placeholder:text-muted-foreground/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
+const inputCls =
+  "w-full rounded-xl border-0 bg-muted px-3.5 py-3 text-[15px] placeholder:text-muted-foreground/70 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60";
 const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 const SOURCE_OPTIONS: { value: BookingSource; label: string }[] = [
@@ -74,7 +88,14 @@ interface AddBookingModalProps {
   fromQuote?: QuoteConversion;
 }
 
-export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved, fromQuote }: AddBookingModalProps) {
+export function AddBookingModal({
+  propertyId,
+  property,
+  rooms,
+  onClose,
+  onSaved,
+  fromQuote,
+}: AddBookingModalProps) {
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
   const [form, setForm] = useState({
     guest_name: fromQuote?.guestName ?? "",
@@ -98,7 +119,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
     agent_id: "" as string,
   });
   const [selectedRoomIds, setSelectedRoomIds] = useState<string[]>(() => {
-    const ids = (fromQuote?.rooms ?? []).map((r) => r.room_id).filter((id) => rooms.some((r) => r.id === id));
+    const ids = (fromQuote?.rooms ?? [])
+      .map((r) => r.room_id)
+      .filter((id) => rooms.some((r) => r.id === id));
     return ids.length > 0 ? ids : [rooms[0]?.id ?? ""];
   });
   const [saving, setSaving] = useState(false);
@@ -132,41 +155,66 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   // When the dates differ from the quote, its add-ons (priced for the ORIGINAL dates and guests) are left out unless the owner opts in.
   const [includeStaleAddons, setIncludeStaleAddons] = useState(false);
   const [showDiscount, setShowDiscount] = useState((fromQuote?.discount ?? 0) > 0);
-  const [discountAmount, setDiscountAmount] = useState<string>(fromQuote && fromQuote.discount > 0 ? String(fromQuote.discount) : "");
-  const [discountReason, setDiscountReason] = useState(fromQuote && fromQuote.discount > 0 ? "As quoted" : "");
+  const [discountAmount, setDiscountAmount] = useState<string>(
+    fromQuote && fromQuote.discount > 0 ? String(fromQuote.discount) : "",
+  );
+  const [discountReason, setDiscountReason] = useState(
+    fromQuote && fromQuote.discount > 0 ? "As quoted" : "",
+  );
   const [discountError, setDiscountError] = useState("");
 
   // Extra charges entered by the owner while creating the booking (blanket,
   // meals, etc.). Saved to booking_charges exactly like the Extras tab does,
   // and included in the total + the 25% advance shown in the WhatsApp message.
-  const [manualExtras, setManualExtras] = useState<{ description: string; qty: string; unit_price: string }[]>([]);
+  const [manualExtras, setManualExtras] = useState<
+    { description: string; qty: string; unit_price: string }[]
+  >([]);
   const updateExtra = (i: number, k: "description" | "qty" | "unit_price", v: string) =>
     setManualExtras((xs) => xs.map((x, idx) => (idx === i ? { ...x, [k]: v } : x)));
   const cleanManualExtras = manualExtras
-    .map((x) => ({ description: x.description.trim(), qty: Math.max(1, parseInt(x.qty) || 1), unit_price: Number(x.unit_price) || 0 }))
+    .map((x) => ({
+      description: x.description.trim(),
+      qty: Math.max(1, parseInt(x.qty) || 1),
+      unit_price: Number(x.unit_price) || 0,
+    }))
     .filter((x) => x.description && x.unit_price > 0);
 
   const selectedAgent = agents.find((a) => a.id === form.agent_id) ?? null;
 
   const nights = useMemo(() => {
     if (!form.check_in || !form.check_out) return 0;
-    return Math.max(0, (new Date(form.check_out).getTime() - new Date(form.check_in).getTime()) / 86400000);
+    return Math.max(
+      0,
+      (new Date(form.check_out).getTime() - new Date(form.check_in).getTime()) / 86400000,
+    );
   }, [form.check_in, form.check_out]);
 
   const toggleRoom = (roomId: string) => {
     setSelectedRoomIds((prev) =>
       prev.includes(roomId)
-        ? prev.length > 1 ? prev.filter((id) => id !== roomId) : prev
-        : [...prev, roomId]
+        ? prev.length > 1
+          ? prev.filter((id) => id !== roomId)
+          : prev
+        : [...prev, roomId],
     );
-    setConflicts((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
-    setRoomGuestOverrides((prev) => { const next = { ...prev }; delete next[roomId]; return next; });
+    setConflicts((prev) => {
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
+    });
+    setRoomGuestOverrides((prev) => {
+      const next = { ...prev };
+      delete next[roomId];
+      return next;
+    });
   };
 
   const guestCount = Number(form.guest_count) || 1;
   const selectedRooms = rooms.filter((r) => selectedRoomIds.includes(r.id));
   // Guests are shared between the rooms (4 guests in two 2-guest rooms = 2 + 2), not applied to each room.
-  const overrideNums = Object.fromEntries(Object.entries(roomGuestOverrides).map(([k, v]) => [k, parseInt(v) || 0]));
+  const overrideNums = Object.fromEntries(
+    Object.entries(roomGuestOverrides).map(([k, v]) => [k, parseInt(v) || 0]),
+  );
   const guestSplit = splitGuests(guestCount, selectedRooms, overrideNums);
   const hasConflicts = Object.values(conflicts).some((dates) => dates.length > 0);
 
@@ -174,20 +222,34 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   // (useCreateBooking): base_price × weekend_multiplier on Fri/Sat nights,
   // plus extra-guest charges. Both flows
   // share priceRoomStay() so they can never drift apart again.
-  const liveRoomTotals = useMemo(() => selectedRooms.map((r) => {
-    const p = priceRoomStay({
-      room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
-      guests: guestSplit[r.id] ?? guestCount, checkIn: form.check_in, checkOut: form.check_out, rates,
-    });
-    return { room: r, roomPrice: p.room_price, extraCharge: p.extra_guest_charge, total: p.total };
-  }), [selectedRooms, guestCount, JSON.stringify(guestSplit), form.check_in, form.check_out, rates]); // eslint-disable-line react-hooks/exhaustive-deps
+  const liveRoomTotals = useMemo(
+    () =>
+      selectedRooms.map((r) => {
+        const p = priceRoomStay({
+          room: { ...r, weekend_multiplier: r.weekend_multiplier ?? 1 },
+          guests: guestSplit[r.id] ?? guestCount,
+          checkIn: form.check_in,
+          checkOut: form.check_out,
+          rates,
+        });
+        return {
+          room: r,
+          roomPrice: p.room_price,
+          extraCharge: p.extra_guest_charge,
+          total: p.total,
+        };
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedRooms, guestCount, JSON.stringify(guestSplit), form.check_in, form.check_out, rates],
+  );
 
   // Quote conversion: while the dates still match the quote, each quoted room
   // keeps EXACTLY the quoted price and guest count — the guest agreed to that
   // number, even if rates moved since. If the owner changes the dates the
   // quote no longer applies and live pricing takes over. The quote's add-ons
   // are saved as normal Extras charges (same mechanism as every other extra).
-  const quoteLocked = !!fromQuote && form.check_in === fromQuote.checkIn && form.check_out === fromQuote.checkOut;
+  const quoteLocked =
+    !!fromQuote && form.check_in === fromQuote.checkIn && form.check_out === fromQuote.checkOut;
   // Live prices need the seasonal rates; until they load (or if they fail) totals would silently use base
   // prices. A booking converted from a quote with its prices locked does not use live rates.
   const pricingPending = !ratesQ.isSuccess && !quoteLocked;
@@ -195,7 +257,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
     () => lockToQuote(liveRoomTotals, fromQuote?.rooms, quoteLocked, guestCount, guestSplit),
     [liveRoomTotals, fromQuote, quoteLocked, guestCount, JSON.stringify(guestSplit)], // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const priceDrift = useMemo(() => quotePriceDrift(liveRoomTotals, roomTotals), [liveRoomTotals, roomTotals]);
+  const priceDrift = useMemo(
+    () => quotePriceDrift(liveRoomTotals, roomTotals),
+    [liveRoomTotals, roomTotals],
+  );
   const quoteAddonsApply = !!fromQuote && (quoteLocked || includeStaleAddons);
   const extraLines = quoteAddonsApply ? (fromQuote?.lines ?? []) : [];
   const staleAddonsTotal = (fromQuote?.lines ?? []).reduce((s, l) => s + l.subtotal, 0);
@@ -252,16 +317,44 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
   };
 
   const handleSave = async () => {
-    if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
+    if (!form.guest_name.trim()) {
+      setError("Guest name is required");
+      return;
+    }
     // A blank or partial number breaks the booking-status link and WhatsApp reminders.
-    if (!isValidIndianMobile(form.guest_phone)) { setError("Enter the guest's 10-digit mobile number — it's needed for the booking link and reminders"); return; }
-    if (nights <= 0) { setError("Check-out must be after check-in"); return; }
-    if (selectedRoomIds.length === 0) { setError("Select at least one room"); return; }
-    if (pricingPending) { setError("Seasonal prices haven't loaded yet, so the total isn't reliable. Wait a moment, or tap Try again."); return; }
-    if (form.source === "agent" && !form.agent_id) { setError("Select an agent, or add a new one"); return; }
+    if (!isValidIndianMobile(form.guest_phone)) {
+      setError(
+        "Enter the guest's 10-digit mobile number — it's needed for the booking link and reminders",
+      );
+      return;
+    }
+    if (nights <= 0) {
+      setError("Check-out must be after check-in");
+      return;
+    }
+    if (selectedRoomIds.length === 0) {
+      setError("Select at least one room");
+      return;
+    }
+    if (pricingPending) {
+      setError(
+        "Seasonal prices haven't loaded yet, so the total isn't reliable. Wait a moment, or tap Try again.",
+      );
+      return;
+    }
+    if (form.source === "agent" && !form.agent_id) {
+      setError("Select an agent, or add a new one");
+      return;
+    }
     const discountAmt = Number(discountAmount) || 0;
-    if (discountAmt < 0) { setDiscountError("Cannot be negative"); return; }
-    if (discountAmt > grandTotal) { setDiscountError("Cannot exceed total"); return; }
+    if (discountAmt < 0) {
+      setDiscountError("Cannot be negative");
+      return;
+    }
+    if (discountAmt > grandTotal) {
+      setDiscountError("Cannot exceed total");
+      return;
+    }
     setSaving(true);
     setError("");
     setDiscountError("");
@@ -269,9 +362,14 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
     try {
       const conflictResults = await Promise.all(
         selectedRoomIds.map(async (roomId) => {
-          const blockedDates = await getConflictingDates(roomId, form.check_in, form.check_out, property);
+          const blockedDates = await getConflictingDates(
+            roomId,
+            form.check_in,
+            form.check_out,
+            property,
+          );
           return { roomId, blockedDates };
-        })
+        }),
       );
       const newConflicts: Record<string, string[]> = {};
       for (const { roomId, blockedDates } of conflictResults) {
@@ -285,37 +383,55 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
       const isAgentBooking = form.source === "agent" && !!form.agent_id;
       // Only sent when the owner picked one, so a booking saved without it is exactly what it was before.
-      const sourceDetailPatch = form.source_detail ? { booking_source_detail: form.source_detail } : {};
-      const finalCommission = isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
-      const finalDiscountReason = discountAmt > 0 ? (discountReason.trim() || null) : null;
+      const sourceDetailPatch = form.source_detail
+        ? { booking_source_detail: form.source_detail }
+        : {};
+      const finalCommission =
+        isAgentBooking && commissionAmount !== "" ? Number(commissionAmount) : null;
+      const finalDiscountReason = discountAmt > 0 ? discountReason.trim() || null : null;
       // A "pending" booking already blocks its dates the moment it's saved
       // (see markDatesUnavailable below) — hold_expires_at is what lets a
       // scheduled DB job release them again if the guest never confirms.
       // "confirmed" bookings never expire.
-      const holdExpiresAt = form.status === "pending" ? pendingHoldExpiry(property.pending_hold_hours ?? undefined) : null;
+      const holdExpiresAt =
+        form.status === "pending"
+          ? pendingHoldExpiry(property.pending_hold_hours ?? undefined)
+          : null;
       let createdBookingId = "";
       const trackingToken = newTrackingToken();
       let createdGroupId = "";
 
       if (selectedRoomIds.length === 1) {
         const rt = roomTotals[0];
-        const { data: inserted, error: err } = await supabase.from("bookings").insert({
-          property_id: propertyId, room_id: rt.room.id,
-          tracking_token: trackingToken,
-          guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: rt.guests,
-          check_in: form.check_in, check_out: form.check_out,
-          room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total, advance_amount: 0, discount_amount: discountAmt,
-          discount_reason: finalDiscountReason,
-          status: form.status, is_paid: false,
-          source: form.source,
-          ...sourceDetailPatch,
-          agent_id: isAgentBooking ? form.agent_id : null,
-          commission_amount: finalCommission,
-          commission_paid: false,
-          hold_expires_at: holdExpiresAt,
-        }).select("id").single();
+        const { data: inserted, error: err } = await supabase
+          .from("bookings")
+          .insert({
+            property_id: propertyId,
+            room_id: rt.room.id,
+            tracking_token: trackingToken,
+            guest_name: form.guest_name,
+            guest_phone: form.guest_phone,
+            guest_email: form.guest_email || null,
+            guest_count: rt.guests,
+            check_in: form.check_in,
+            check_out: form.check_out,
+            room_price: rt.roomPrice,
+            extra_guest_charge: rt.extraCharge,
+            total_amount: rt.total,
+            advance_amount: 0,
+            discount_amount: discountAmt,
+            discount_reason: finalDiscountReason,
+            status: form.status,
+            is_paid: false,
+            source: form.source,
+            ...sourceDetailPatch,
+            agent_id: isAgentBooking ? form.agent_id : null,
+            commission_amount: finalCommission,
+            commission_paid: false,
+            hold_expires_at: holdExpiresAt,
+          })
+          .select("id")
+          .single();
         if (err) throw err;
         createdBookingId = inserted.id;
       } else {
@@ -333,12 +449,18 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
             property_id: propertyId,
             tracking_token: trackingToken,
             group_reference: "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase(),
-            guest_name: form.guest_name, guest_phone: form.guest_phone,
-            guest_email: form.guest_email || null, guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : sumGuests(guestSplit),
-            check_in: form.check_in, check_out: form.check_out,
-            total_amount: grandTotal, advance_amount: 0, discount_amount: discountAmt,
+            guest_name: form.guest_name,
+            guest_phone: form.guest_phone,
+            guest_email: form.guest_email || null,
+            guest_count: quoteLocked && fromQuote ? fromQuote.guestCount : sumGuests(guestSplit),
+            check_in: form.check_in,
+            check_out: form.check_out,
+            total_amount: grandTotal,
+            advance_amount: 0,
+            discount_amount: discountAmt,
             discount_reason: finalDiscountReason,
-            status: form.status, is_paid: false,
+            status: form.status,
+            is_paid: false,
             source: form.source,
             ...sourceDetailPatch,
             agent_id: isAgentBooking ? form.agent_id : null,
@@ -351,13 +473,23 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
         if (groupErr) throw groupErr;
         createdGroupId = groupData.id;
         const bookingInserts = roomTotals.map((rt) => ({
-          property_id: propertyId, room_id: rt.room.id,
-          guest_name: form.guest_name, guest_phone: form.guest_phone,
-          guest_email: form.guest_email || null, guest_count: rt.guests,
-          check_in: form.check_in, check_out: form.check_out,
-          room_price: rt.roomPrice, extra_guest_charge: rt.extraCharge,
-          total_amount: rt.total, advance_amount: 0, discount_amount: 0,
-          status: form.status, is_paid: false, group_id: groupData.id, tracking_token: trackingToken,
+          property_id: propertyId,
+          room_id: rt.room.id,
+          guest_name: form.guest_name,
+          guest_phone: form.guest_phone,
+          guest_email: form.guest_email || null,
+          guest_count: rt.guests,
+          check_in: form.check_in,
+          check_out: form.check_out,
+          room_price: rt.roomPrice,
+          extra_guest_charge: rt.extraCharge,
+          total_amount: rt.total,
+          advance_amount: 0,
+          discount_amount: 0,
+          status: form.status,
+          is_paid: false,
+          group_id: groupData.id,
+          tracking_token: trackingToken,
           source: form.source,
           ...sourceDetailPatch,
           agent_id: isAgentBooking ? form.agent_id : null,
@@ -365,7 +497,10 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
           commission_paid: false,
           hold_expires_at: holdExpiresAt,
         }));
-        const { data: insertedBookings, error: bookErr } = await supabase.from("bookings").insert(bookingInserts).select("id");
+        const { data: insertedBookings, error: bookErr } = await supabase
+          .from("bookings")
+          .insert(bookingInserts)
+          .select("id");
         if (bookErr) throw bookErr;
         createdBookingId = insertedBookings?.[0]?.id ?? "";
       }
@@ -374,7 +509,9 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       // guest-facing booking flow does — don't rely on the status-UPDATE
       // trigger, since this is an INSERT and the trigger won't fire for it.
       await Promise.all(
-        selectedRoomIds.map((roomId) => markDatesUnavailable(roomId, form.check_in, form.check_out))
+        selectedRoomIds.map((roomId) =>
+          markDatesUnavailable(roomId, form.check_in, form.check_out),
+        ),
       );
 
       queryClient.invalidateQueries({ queryKey: ["bookings", propertyId], exact: false });
@@ -388,17 +525,28 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
       const quoteCharges = fromQuote && quoteAddonsApply ? chargesFromQuote(fromQuote.lines) : [];
       const allCharges = [...quoteCharges, ...cleanManualExtras];
       if (allCharges.length > 0) {
-        const owner = createdGroupId ? { group_id: createdGroupId } : { booking_id: createdBookingId };
-        const { error: chargeErr } = await supabase.from("booking_charges").insert(allCharges.map((c) => ({ ...owner, ...c })));
+        const owner = createdGroupId
+          ? { group_id: createdGroupId }
+          : { booking_id: createdBookingId };
+        const { error: chargeErr } = await supabase
+          .from("booking_charges")
+          .insert(allCharges.map((c) => ({ ...owner, ...c })));
         if (chargeErr) {
-          extrasWarning = "The booking was created, but its extra charges could not be added automatically. Please add them in the booking's Extras tab:\n" +
-            allCharges.map((c) => `• ${c.description} — ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`).join("\n");
+          extrasWarning =
+            "The booking was created, but its extra charges could not be added automatically. Please add them in the booking's Extras tab:\n" +
+            allCharges
+              .map((c) => `• ${c.description} — ₹${(c.qty * c.unit_price).toLocaleString("en-IN")}`)
+              .join("\n");
         }
         queryClient.invalidateQueries({ queryKey: ["bookingCharges"], exact: false });
         queryClient.invalidateQueries({ queryKey: ["groupCharges"], exact: false });
       }
       if (fromQuote) {
-        try { await fromQuote.onConverted?.(createdBookingId); } catch { /* linking the quote is best-effort */ }
+        try {
+          await fromQuote.onConverted?.(createdBookingId);
+        } catch {
+          /* linking the quote is best-effort */
+        }
       }
 
       // Auto-send the guest their tracking link on WhatsApp — same message
@@ -453,353 +601,581 @@ export function AddBookingModal({ propertyId, property, rooms, onClose, onSaved,
 
   return (
     <>
-    <Modal
-      title={fromQuote ? "Convert quote to booking" : "Add booking"}
-      onClose={onClose}
-      footer={
-        <>
-          {error && <p className="text-xs text-destructive">{error}</p>}
-          {!quoteLocked && <RatesNotice query={ratesQ} />}
-          {hasConflicts && (
-            <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-              Some rooms are not available for the selected dates. Please adjust dates or deselect conflicting rooms.
-            </div>
-          )}
-          <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={hasConflicts || pricingPending} loading={saving}>
-              {saving ? "Checking availability…" : selectedRoomIds.length > 1 ? `Book ${selectedRoomIds.length} rooms` : fromQuote ? "Create booking" : "Add booking"}
-            </Button>
-          </ModalActions>
-        </>
-      }
-    >
-      {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
-      <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
-          {fromQuote && (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
-              <p className="font-medium text-foreground">Pre-filled from the quote you sent.</p>
-              {quoteLocked ? (
-                <p className="text-muted-foreground">Room prices are kept exactly as quoted. Add-ons are saved as Extras on the booking.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  <p className="text-amber-700">Dates differ from the quote, so rooms are priced at today&apos;s rates.</p>
-                  {(fromQuote.lines ?? []).length > 0 && (
-                    <label className="flex items-start gap-2 text-amber-800 cursor-pointer select-none">
-                      <input type="checkbox" className="mt-0.5" checked={includeStaleAddons} onChange={(e) => setIncludeStaleAddons(e.target.checked)} />
-                      <span>
-                        {includeStaleAddons ? "Including" : "Not including"} the quoted add-ons (₹{staleAddonsTotal.toLocaleString("en-IN")}). They were priced for the
-                        original dates and guests, so check the amounts. Tick to include them anyway.
-                      </span>
-                    </label>
-                  )}
-                </div>
-              )}
-              {priceDrift.length > 0 && (
+      <Modal
+        title={fromQuote ? "Convert quote to booking" : "Add booking"}
+        onClose={onClose}
+        footer={
+          <>
+            {error && <p className="text-xs text-destructive">{error}</p>}
+            {!quoteLocked && <RatesNotice query={ratesQ} />}
+            {hasConflicts && (
+              <div className="flex items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Some rooms are not available for the selected dates. Please adjust dates or deselect
+                conflicting rooms.
+              </div>
+            )}
+            <ModalActions>
+              <Button variant="soft" size="lg" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1"
+                onClick={handleSave}
+                disabled={hasConflicts || pricingPending}
+                loading={saving}
+              >
+                {saving
+                  ? "Checking availability…"
+                  : selectedRoomIds.length > 1
+                    ? `Book ${selectedRoomIds.length} rooms`
+                    : fromQuote
+                      ? "Create booking"
+                      : "Add booking"}
+              </Button>
+            </ModalActions>
+          </>
+        }
+      >
+        {/* Hidden anchor for WhatsApp without popup blocker — see waRef above */}
+        <a
+          ref={waRef}
+          href="#"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden"
+          aria-hidden="true"
+        />
+        {fromQuote && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs space-y-1.5">
+            <p className="font-medium text-foreground">Pre-filled from the quote you sent.</p>
+            {quoteLocked ? (
+              <p className="text-muted-foreground">
+                Room prices are kept exactly as quoted. Add-ons are saved as Extras on the booking.
+              </p>
+            ) : (
+              <div className="space-y-1.5">
                 <p className="text-amber-700">
-                  Rates have changed since the quote ({priceDrift.map((d) => `${d.name}: quoted ₹${d.quoted.toLocaleString("en-IN")}, now ₹${d.now.toLocaleString("en-IN")}`).join("; ")}). The booking keeps the quoted price.
+                  Dates differ from the quote, so rooms are priced at today&apos;s rates.
                 </p>
-              )}
-              <p className="text-muted-foreground">It starts as pending, and holds the dates until the advance arrives.</p>
-            </div>
-          )}
-          {/* Guest details */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground">Guest details</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" /></div>
-              <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", formatIndianPhoneInput(e.target.value))} className={inputCls} /></div>
-            </div>
-            <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="Optional" /></div>
-          </div>
-
-          {/* Booking source */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground">How did this booking come in?</p>
-            <div className="flex rounded-full bg-muted p-1 gap-1">
-              {SOURCE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => handleSourceChange(opt.value)}
-                  className={[
-                    "flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors",
-                    form.source === opt.value ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60",
-                  ].join(" ")}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <SourceDetailPicker value={form.source_detail} onChange={(v) => set("source_detail", v)} />
-
-            {form.source === "agent" && (
-              <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                <div>
-                  <label className={labelCls}>Agent</label>
-                  <div className="relative">
-                    <select
-                      value={form.agent_id}
-                      onChange={(e) => {
-                        if (e.target.value === "__new__") {
-                          setShowNewAgentModal(true);
-                        } else {
-                          handleSelectAgent(e.target.value);
-                        }
-                      }}
-                      className={`${inputCls} appearance-none pr-8`}
-                    >
-                      <option value="" disabled>Select an agent</option>
-                      {agents.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name} ({a.default_commission_type === "percentage" ? `${a.default_commission_value}%` : `₹${a.default_commission_value} flat`})
-                        </option>
-                      ))}
-                      <option value="__new__">+ Add new agent</option>
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  </div>
-                </div>
-
-                {form.agent_id && (
-                  <div>
-                    <label className={labelCls}>
-                      Commission {roomRateTotal > 0 ? `(from ₹${roomRateTotal.toLocaleString("en-IN")} room rate)` : ""}
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">₹</span>
-                      <input
-                        type="number"
-                        min={0}
-                        value={commissionAmount}
-                        onChange={(e) => {
-                          setCommissionEdited(true);
-                          setCommissionAmount(e.target.value === "" ? "" : parseFloat(e.target.value));
-                        }}
-                        className={`${inputCls} pl-7`}
-                        placeholder="0"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Auto-filled from {selectedAgent?.name}'s default rate — editable for a one-off negotiated rate.
-                    </p>
-                  </div>
+                {(fromQuote.lines ?? []).length > 0 && (
+                  <label className="flex items-start gap-2 text-amber-800 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={includeStaleAddons}
+                      onChange={(e) => setIncludeStaleAddons(e.target.checked)}
+                    />
+                    <span>
+                      {includeStaleAddons ? "Including" : "Not including"} the quoted add-ons (₹
+                      {staleAddonsTotal.toLocaleString("en-IN")}). They were priced for the original
+                      dates and guests, so check the amounts. Tick to include them anyway.
+                    </span>
+                  </label>
                 )}
               </div>
             )}
+            {priceDrift.length > 0 && (
+              <p className="text-amber-700">
+                Rates have changed since the quote (
+                {priceDrift
+                  .map(
+                    (d) =>
+                      `${d.name}: quoted ₹${d.quoted.toLocaleString("en-IN")}, now ₹${d.now.toLocaleString("en-IN")}`,
+                  )
+                  .join("; ")}
+                ). The booking keeps the quoted price.
+              </p>
+            )}
+            <p className="text-muted-foreground">
+              It starts as pending, and holds the dates until the advance arrives.
+            </p>
           </div>
-
-          {/* Room selection */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground">Select rooms <span className="normal-case text-primary font-normal">(tap to add/remove)</span></p>
-            <div className="space-y-2">
-              {rooms.map((r) => {
-                const selected = selectedRoomIds.includes(r.id);
-                const roomTotal = roomTotals.find((x) => x.room.id === r.id)?.total ?? 0;
-                const roomConflicts = conflicts[r.id] ?? [];
-                return (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => toggleRoom(r.id)}
-                    className={[
-                      "w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
-                      roomConflicts.length > 0
-                        ? "border-destructive/50 bg-destructive/5"
-                        : selected ? "border-primary bg-primary/5" : "border-border hover:bg-muted/50",
-                    ].join(" ")}
-                  >
-                    <div className={["h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors", selected ? "border-primary bg-primary" : "border-border"].join(" ")}>
-                      {selected && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{r.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
-                        {(r.weekend_multiplier ?? 1) > 1 ? ` · Fri/Sat ₹${Math.round(r.base_price * (r.weekend_multiplier ?? 1)).toLocaleString("en-IN")}` : ""}
-                        {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
-                      </div>
-                      {roomConflicts.length > 0 && (
-                        <div className="flex items-center gap-1 mt-1 text-xs text-destructive font-medium">
-                          <AlertTriangle className="h-3 w-3 shrink-0" />
-                          Not available: {roomConflicts.slice(0, 3).join(", ")}{roomConflicts.length > 3 ? ` +${roomConflicts.length - 3} more` : ""}
-                        </div>
-                      )}
-                    </div>
-                    {selected && nights > 0 && roomConflicts.length === 0 && <div className="text-sm font-semibold text-primary shrink-0">₹{roomTotal.toLocaleString("en-IN")}</div>}
-                  </button>
-                );
-              })}
+        )}
+        {/* Guest details */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground">Guest details</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Guest name *</label>
+              <input
+                value={form.guest_name}
+                onChange={(e) => set("guest_name", e.target.value)}
+                className={inputCls}
+                placeholder="Full name"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Phone</label>
+              <input
+                type="tel"
+                value={form.guest_phone}
+                onChange={(e) => set("guest_phone", formatIndianPhoneInput(e.target.value))}
+                className={inputCls}
+              />
             </div>
           </div>
-
-          {/* Stay dates */}
-          <div className="space-y-3">
-            <p className="text-xs font-semibold text-muted-foreground">Stay dates</p>
-            <RoomAvailabilityCalendar
-              roomIds={selectedRoomIds}
-              checkIn={form.check_in}
-              checkOut={form.check_out}
-              turnoverSafe={turnoverSafe}
-              onChange={(checkIn, checkOut) => {
-                set("check_in", checkIn);
-                set("check_out", checkOut);
-                setConflicts({});
-              }}
+          <div>
+            <label className={labelCls}>Email</label>
+            <input
+              type="email"
+              value={form.guest_email}
+              onChange={(e) => set("guest_email", e.target.value)}
+              className={inputCls}
+              placeholder="Optional"
             />
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg border border-border px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-in</div>
-                <div className="mt-0.5 font-medium">{form.check_in || "Select date"}</div>
-              </div>
-              <div className="rounded-lg border border-border px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Check-out</div>
-                <div className="mt-0.5 font-medium">{form.check_out || "Select date"}</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div><label className={labelCls}>Total guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => { setRoomGuestOverrides({}); set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1); }} className={inputCls} /></div>
-              <div><label className={labelCls}>Status</label><select value={form.status} onChange={(e) => set("status", e.target.value)} className={inputCls}>{["pending", "confirmed"].map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}</select></div>
-            </div>
-            {selectedRooms.length > 1 && !quoteLocked && (
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
-                <p className="text-xs text-muted-foreground">Guests per room — split from the total; change a number to adjust (the total follows).</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {selectedRooms.map((r) => (
-                    <label key={r.id} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="truncate">{r.name}</span>
-                      <input
-                        type="number" min={1} max={50} value={guestSplit[r.id] ?? 1}
-                        onChange={(e) => {
-                          const v = Math.max(1, parseInt(e.target.value) || 1);
-                          const next: Record<string, string> = Object.fromEntries(selectedRooms.map((x) => [x.id, String(guestSplit[x.id] ?? 1)]));
-                          next[r.id] = String(v);
-                          setRoomGuestOverrides(next);
-                          set("guest_count", Object.values(next).reduce((t, n) => t + Number(n), 0));
-                        }}
-                        className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-sm text-right"
-                      />
-                    </label>
-                  ))}
+          </div>
+        </div>
+
+        {/* Booking source */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground">
+            How did this booking come in?
+          </p>
+          <div className="flex rounded-full bg-muted p-1 gap-1">
+            {SOURCE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSourceChange(opt.value)}
+                className={[
+                  "flex-1 rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                  form.source === opt.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/80 hover:bg-card/60",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          <SourceDetailPicker
+            value={form.source_detail}
+            onChange={(v) => set("source_detail", v)}
+          />
+
+          {form.source === "agent" && (
+            <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
+              <div>
+                <label className={labelCls}>Agent</label>
+                <div className="relative">
+                  <select
+                    value={form.agent_id}
+                    onChange={(e) => {
+                      if (e.target.value === "__new__") {
+                        setShowNewAgentModal(true);
+                      } else {
+                        handleSelectAgent(e.target.value);
+                      }
+                    }}
+                    className={`${inputCls} appearance-none pr-8`}
+                  >
+                    <option value="" disabled>
+                      Select an agent
+                    </option>
+                    {agents.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} (
+                        {a.default_commission_type === "percentage"
+                          ? `${a.default_commission_value}%`
+                          : `₹${a.default_commission_value} flat`}
+                        )
+                      </option>
+                    ))}
+                    <option value="__new__">+ Add new agent</option>
+                  </select>
+                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Discount — for a rate the guest negotiated before this booking
-              exists. Kept optional and collapsed by default so it stays out
-              of the way for the common no-discount case. */}
-          {nights > 0 && selectedRooms.length > 0 && (
-            <div className="space-y-2">
-              {!showDiscount ? (
-                <button
-                  type="button"
-                  onClick={() => setShowDiscount(true)}
-                  className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
-                >
-                  <Tag className="h-4 w-4" />
-                  Add discount
-                </button>
-              ) : (
-                <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-green-900">Discount</div>
-                    <button
-                      type="button"
-                      onClick={() => { setShowDiscount(false); setDiscountAmount(""); setDiscountReason(""); setDiscountError(""); }}
-                      className="text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                  <div>
-                    <label className={labelCls}>Discount amount (₹)</label>
+              {form.agent_id && (
+                <div>
+                  <label className={labelCls}>
+                    Commission{" "}
+                    {roomRateTotal > 0
+                      ? `(from ₹${roomRateTotal.toLocaleString("en-IN")} room rate)`
+                      : ""}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                      ₹
+                    </span>
                     <input
                       type="number"
                       min={0}
-                      max={grandTotal}
-                      value={discountAmount}
-                      onChange={(e) => { setDiscountAmount(e.target.value); setDiscountError(""); }}
-                      className={inputCls}
-                      placeholder="e.g. 500"
-                      autoFocus
+                      value={commissionAmount}
+                      onChange={(e) => {
+                        setCommissionEdited(true);
+                        setCommissionAmount(
+                          e.target.value === "" ? "" : parseFloat(e.target.value),
+                        );
+                      }}
+                      className={`${inputCls} pl-7`}
+                      placeholder="0"
                     />
                   </div>
-                  <div>
-                    <label className={labelCls}>Reason (optional)</label>
-                    <input
-                      value={discountReason}
-                      onChange={(e) => setDiscountReason(e.target.value)}
-                      className={inputCls}
-                      placeholder="e.g. Negotiated rate"
-                    />
-                  </div>
-                  {discountError && <p className="text-xs text-destructive">{discountError}</p>}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-filled from {selectedAgent?.name}'s default rate — editable for a one-off
+                    negotiated rate.
+                  </p>
                 </div>
               )}
             </div>
           )}
+        </div>
 
-          {/* Extra charges (blanket, meals, …) */}
-          {nights > 0 && selectedRooms.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">Extra charges <span className="normal-case font-normal">(optional)</span></p>
-              {/* Add-ons and packages from Property → Add-ons, priced for these dates and guests. Each one is
-                  added as ordinary editable rows below, so totals, the 25% advance and saving work as before. */}
-              <CatalogExtrasPicker
-                propertyId={propertyId}
-                checkIn={form.check_in}
-                checkOut={form.check_out}
-                guests={guestCount}
-                onAdd={(rows) => setManualExtras((xs) => [...xs, ...rows.map((r) => ({ description: r.description, qty: String(r.qty), unit_price: String(r.unit_price) }))])}
+        {/* Room selection */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground">
+            Select rooms{" "}
+            <span className="normal-case text-primary font-normal">(tap to add/remove)</span>
+          </p>
+          <div className="space-y-2">
+            {rooms.map((r) => {
+              const selected = selectedRoomIds.includes(r.id);
+              const roomTotal = roomTotals.find((x) => x.room.id === r.id)?.total ?? 0;
+              const roomConflicts = conflicts[r.id] ?? [];
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => toggleRoom(r.id)}
+                  className={[
+                    "w-full flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all",
+                    roomConflicts.length > 0
+                      ? "border-destructive/50 bg-destructive/5"
+                      : selected
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-muted/50",
+                  ].join(" ")}
+                >
+                  <div
+                    className={[
+                      "h-5 w-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors",
+                      selected ? "border-primary bg-primary" : "border-border",
+                    ].join(" ")}
+                  >
+                    {selected && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{r.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included
+                      {(r.weekend_multiplier ?? 1) > 1
+                        ? ` · Fri/Sat ₹${Math.round(r.base_price * (r.weekend_multiplier ?? 1)).toLocaleString("en-IN")}`
+                        : ""}
+                      {r.extra_guest_price > 0 ? ` · +₹${r.extra_guest_price}/extra guest` : ""}
+                    </div>
+                    {roomConflicts.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 text-xs text-destructive font-medium">
+                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                        Not available: {roomConflicts.slice(0, 3).join(", ")}
+                        {roomConflicts.length > 3 ? ` +${roomConflicts.length - 3} more` : ""}
+                      </div>
+                    )}
+                  </div>
+                  {selected && nights > 0 && roomConflicts.length === 0 && (
+                    <div className="text-sm font-semibold text-primary shrink-0">
+                      ₹{roomTotal.toLocaleString("en-IN")}
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Stay dates */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground">Stay dates</p>
+          <RoomAvailabilityCalendar
+            roomIds={selectedRoomIds}
+            checkIn={form.check_in}
+            checkOut={form.check_out}
+            turnoverSafe={turnoverSafe}
+            onChange={(checkIn, checkOut) => {
+              set("check_in", checkIn);
+              set("check_out", checkOut);
+              setConflicts({});
+            }}
+          />
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="rounded-lg border border-border px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Check-in
+              </div>
+              <div className="mt-0.5 font-medium">{form.check_in || "Select date"}</div>
+            </div>
+            <div className="rounded-lg border border-border px-3 py-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Check-out
+              </div>
+              <div className="mt-0.5 font-medium">{form.check_out || "Select date"}</div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Total guests</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={form.guest_count}
+                onChange={(e) => {
+                  setRoomGuestOverrides({});
+                  set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1);
+                }}
+                className={inputCls}
               />
-              {manualExtras.map((x, i) => (
-                <div key={i} className="grid grid-cols-[1fr_56px_80px_28px] gap-2 items-center">
-                  <input value={x.description} onChange={(e) => updateExtra(i, "description", e.target.value)} className={inputCls} placeholder="e.g. Extra blanket" />
-                  <input type="number" min={1} value={x.qty} onChange={(e) => updateExtra(i, "qty", e.target.value)} className={inputCls} placeholder="Qty" />
-                  <input type="number" min={0} value={x.unit_price} onChange={(e) => updateExtra(i, "unit_price", e.target.value)} className={inputCls} placeholder="₹ each" />
-                  <button type="button" onClick={() => setManualExtras((xs) => xs.filter((_, idx) => idx !== i))} className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Remove extra charge"><X className="h-3.5 w-3.5" /></button>
-                </div>
-              ))}
-              <button type="button" onClick={() => setManualExtras((xs) => [...xs, { description: "", qty: "1", unit_price: "" }])} className="w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors flex items-center justify-center gap-2">
-                <Plus className="h-4 w-4" /> Add extra charge
-              </button>
+            </div>
+            <div>
+              <label className={labelCls}>Status</label>
+              <select
+                value={form.status}
+                onChange={(e) => set("status", e.target.value)}
+                className={inputCls}
+              >
+                {["pending", "confirmed"].map((s) => (
+                  <option key={s} value={s}>
+                    {s.charAt(0).toUpperCase() + s.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          {selectedRooms.length > 1 && !quoteLocked && (
+            <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Guests per room — split from the total; change a number to adjust (the total
+                follows).
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {selectedRooms.map((r) => (
+                  <label key={r.id} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="truncate">{r.name}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={guestSplit[r.id] ?? 1}
+                      onChange={(e) => {
+                        const v = Math.max(1, parseInt(e.target.value) || 1);
+                        const next: Record<string, string> = Object.fromEntries(
+                          selectedRooms.map((x) => [x.id, String(guestSplit[x.id] ?? 1)]),
+                        );
+                        next[r.id] = String(v);
+                        setRoomGuestOverrides(next);
+                        set(
+                          "guest_count",
+                          Object.values(next).reduce((t, n) => t + Number(n), 0),
+                        );
+                      }}
+                      className="w-16 rounded-lg border border-border bg-background px-2 py-1 text-sm text-right"
+                    />
+                  </label>
+                ))}
+              </div>
             </div>
           )}
+        </div>
 
-          {/* Summary */}
-          {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
-            <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">{selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night{nights > 1 ? "s" : ""}</p>
-              {roomTotals.map((rt) => (
-                <div key={rt.room.id} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{rt.room.name}</span><span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span></div>
-              ))}
-              {selectedRooms.length > 1 && (
-                <div className="flex justify-between text-sm font-semibold border-t border-border pt-2 mt-1"><span>Room total</span><span>₹{grandTotal.toLocaleString("en-IN")}</span></div>
-              )}
-              {extraLines.map((l, i) => (
-                <div key={i} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{l.name}{l.variant_label && l.variant_label.toLowerCase() !== "standard" ? ` (${l.variant_label})` : ""} <span className="text-[11px]">· extra</span></span><span className="font-medium shrink-0">₹{l.subtotal.toLocaleString("en-IN")}</span></div>
-              ))}
-              {cleanManualExtras.map((x, i) => (
-                <div key={`m${i}`} className="flex justify-between text-sm"><span className="text-muted-foreground truncate mr-2">{x.description}{x.qty > 1 ? ` × ${x.qty}` : ""} <span className="text-[11px]">· extra</span></span><span className="font-medium shrink-0">₹{(x.qty * x.unit_price).toLocaleString("en-IN")}</span></div>
-              ))}
-              {discountValue > 0 && (
-                <div className="flex justify-between text-sm text-green-700 font-medium"><span>Discount{discountReason.trim() ? ` (${discountReason.trim()})` : ""}</span><span>-₹{discountValue.toLocaleString("en-IN")}</span></div>
-              )}
-              {(discountValue > 0 || extrasTotal > 0) && (
-                <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1"><span>Total</span><span>₹{(netTotal + extrasTotal).toLocaleString("en-IN")}</span></div>
-              )}
-              {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
-                <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
-                  <span>Commission to {selectedAgent?.name}</span>
-                  <span>₹{Number(commissionAmount).toLocaleString("en-IN")}</span>
+        {/* Discount — for a rate the guest negotiated before this booking
+              exists. Kept optional and collapsed by default so it stays out
+              of the way for the common no-discount case. */}
+        {nights > 0 && selectedRooms.length > 0 && (
+          <div className="space-y-2">
+            {!showDiscount ? (
+              <button
+                type="button"
+                onClick={() => setShowDiscount(true)}
+                className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Tag className="h-4 w-4" />
+                Add discount
+              </button>
+            ) : (
+              <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-green-900">Discount</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDiscount(false);
+                      setDiscountAmount("");
+                      setDiscountReason("");
+                      setDiscountError("");
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Remove
+                  </button>
                 </div>
-              )}
-            </div>
-          )}
-    </Modal>
+                <div>
+                  <label className={labelCls}>Discount amount (₹)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={grandTotal}
+                    value={discountAmount}
+                    onChange={(e) => {
+                      setDiscountAmount(e.target.value);
+                      setDiscountError("");
+                    }}
+                    className={inputCls}
+                    placeholder="e.g. 500"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Reason (optional)</label>
+                  <input
+                    value={discountReason}
+                    onChange={(e) => setDiscountReason(e.target.value)}
+                    className={inputCls}
+                    placeholder="e.g. Negotiated rate"
+                  />
+                </div>
+                {discountError && <p className="text-xs text-destructive">{discountError}</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Extra charges (blanket, meals, …) */}
+        {nights > 0 && selectedRooms.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">
+              Extra charges <span className="normal-case font-normal">(optional)</span>
+            </p>
+            {/* Add-ons and packages from Property → Add-ons, priced for these dates and guests. Each one is
+                  added as ordinary editable rows below, so totals, the 25% advance and saving work as before. */}
+            <CatalogExtrasPicker
+              propertyId={propertyId}
+              checkIn={form.check_in}
+              checkOut={form.check_out}
+              guests={guestCount}
+              onAdd={(rows) =>
+                setManualExtras((xs) => [
+                  ...xs,
+                  ...rows.map((r) => ({
+                    description: r.description,
+                    qty: String(r.qty),
+                    unit_price: String(r.unit_price),
+                  })),
+                ])
+              }
+            />
+            {manualExtras.map((x, i) => (
+              <div key={i} className="grid grid-cols-[1fr_56px_80px_28px] gap-2 items-center">
+                <input
+                  value={x.description}
+                  onChange={(e) => updateExtra(i, "description", e.target.value)}
+                  className={inputCls}
+                  placeholder="e.g. Extra blanket"
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={x.qty}
+                  onChange={(e) => updateExtra(i, "qty", e.target.value)}
+                  className={inputCls}
+                  placeholder="Qty"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  value={x.unit_price}
+                  onChange={(e) => updateExtra(i, "unit_price", e.target.value)}
+                  className={inputCls}
+                  placeholder="₹ each"
+                />
+                <button
+                  type="button"
+                  onClick={() => setManualExtras((xs) => xs.filter((_, idx) => idx !== i))}
+                  className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center"
+                  aria-label="Remove extra charge"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setManualExtras((xs) => [...xs, { description: "", qty: "1", unit_price: "" }])
+              }
+              className="w-full rounded-xl border border-dashed border-border py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted/50 transition-colors flex items-center justify-center gap-2"
+            >
+              <Plus className="h-4 w-4" /> Add extra charge
+            </button>
+          </div>
+        )}
+
+        {/* Summary */}
+        {nights > 0 && selectedRooms.length > 0 && !hasConflicts && (
+          <div className="rounded-xl bg-primary-light/40 border border-border p-4 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground">
+              {selectedRooms.length} room{selectedRooms.length > 1 ? "s" : ""} · {nights} night
+              {nights > 1 ? "s" : ""}
+            </p>
+            {roomTotals.map((rt) => (
+              <div key={rt.room.id} className="flex justify-between text-sm">
+                <span className="text-muted-foreground truncate mr-2">{rt.room.name}</span>
+                <span className="font-medium shrink-0">₹{rt.total.toLocaleString("en-IN")}</span>
+              </div>
+            ))}
+            {selectedRooms.length > 1 && (
+              <div className="flex justify-between text-sm font-semibold border-t border-border pt-2 mt-1">
+                <span>Room total</span>
+                <span>₹{grandTotal.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {extraLines.map((l, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-muted-foreground truncate mr-2">
+                  {l.name}
+                  {l.variant_label && l.variant_label.toLowerCase() !== "standard"
+                    ? ` (${l.variant_label})`
+                    : ""}{" "}
+                  <span className="text-[11px]">· extra</span>
+                </span>
+                <span className="font-medium shrink-0">₹{l.subtotal.toLocaleString("en-IN")}</span>
+              </div>
+            ))}
+            {cleanManualExtras.map((x, i) => (
+              <div key={`m${i}`} className="flex justify-between text-sm">
+                <span className="text-muted-foreground truncate mr-2">
+                  {x.description}
+                  {x.qty > 1 ? ` × ${x.qty}` : ""} <span className="text-[11px]">· extra</span>
+                </span>
+                <span className="font-medium shrink-0">
+                  ₹{(x.qty * x.unit_price).toLocaleString("en-IN")}
+                </span>
+              </div>
+            ))}
+            {discountValue > 0 && (
+              <div className="flex justify-between text-sm text-green-700 font-medium">
+                <span>Discount{discountReason.trim() ? ` (${discountReason.trim()})` : ""}</span>
+                <span>-₹{discountValue.toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {(discountValue > 0 || extrasTotal > 0) && (
+              <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-2 mt-1">
+                <span>Total</span>
+                <span>₹{(netTotal + extrasTotal).toLocaleString("en-IN")}</span>
+              </div>
+            )}
+            {form.source === "agent" && form.agent_id && commissionAmount !== "" && (
+              <div className="flex justify-between text-xs text-muted-foreground border-t border-border pt-2 mt-1">
+                <span>Commission to {selectedAgent?.name}</span>
+                <span>₹{Number(commissionAmount).toLocaleString("en-IN")}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {showNewAgentModal && (
         <AgentFormModal

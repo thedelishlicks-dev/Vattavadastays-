@@ -68,7 +68,12 @@ export const THEMES: Record<ThemeName, ThemeColors> = {
   },
 };
 
-export function parseTheme(property: any): ThemeName {
+type ThemeSource = {
+  theme?: string | null;
+  shared_amenities?: string[] | null;
+} | null;
+
+export function parseTheme(property: ThemeSource | undefined): ThemeName {
   if (!property) return "forest";
 
   // 1. Try dedicated column first
@@ -85,9 +90,11 @@ export function parseTheme(property: any): ThemeName {
   return THEMES[theme] ? theme : "forest";
 }
 
-export function parseFont(property: any): string {
-  if (!property?.heading_font) return "Fraunces";
-  return FONTS[property.heading_font] ? property.heading_font : "Fraunces";
+export function parseFont(property: unknown): string {
+  // The guest-side Property type doesn't declare heading_font, so read it defensively.
+  const font = (property as { heading_font?: string | null } | null | undefined)?.heading_font;
+  if (!font) return "Fraunces";
+  return FONTS[font] ? font : "Fraunces";
 }
 
 export function encodeTheme(theme: ThemeName, existing: string[]): string[] {

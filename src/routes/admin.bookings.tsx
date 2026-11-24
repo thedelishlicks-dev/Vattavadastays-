@@ -2,26 +2,73 @@ import { friendlyDbError } from "@/lib/dbErrors";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import {
-  Search, Plus, Loader2, IndianRupee, Utensils, MessageCircle, Check, LogOut,
-  Trash2, ChevronRight, ChevronLeft, Phone, Clock, CheckCircle2, Users, Calendar, BedDouble,
-  Tag, Pencil, Hotel, ChevronDown, ChevronUp,
+  Search,
+  Plus,
+  Loader2,
+  IndianRupee,
+  Utensils,
+  MessageCircle,
+  Check,
+  LogOut,
+  Trash2,
+  ChevronRight,
+  ChevronLeft,
+  Phone,
+  Clock,
+  CheckCircle2,
+  Users,
+  Calendar,
+  BedDouble,
+  Tag,
+  Pencil,
+  Hotel,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings, useBookingGroups, KEEP_OPEN_BOOKINGS, KEEP_OPEN_GROUPS } from "@/hooks/useBookings";
+import {
+  useBookings,
+  useBookingGroups,
+  KEEP_OPEN_BOOKINGS,
+  KEEP_OPEN_GROUPS,
+} from "@/hooks/useBookings";
 import { windowStartForMonth } from "@/lib/historyWindow";
 import {
-  useBookingCharges, useAddCharge, useDeleteCharge,
-  useGroupCharges, useAddGroupCharge, useDeleteGroupCharge, useAddChargeRows,
+  useBookingCharges,
+  useAddCharge,
+  useDeleteCharge,
+  useGroupCharges,
+  useAddGroupCharge,
+  useDeleteGroupCharge,
+  useAddChargeRows,
 } from "@/hooks/useBookingCharges";
 import { useCatalogItems } from "@/hooks/useCatalogItems";
 import { CatalogExtrasPicker } from "@/components/CatalogExtrasPicker";
 import { supabase } from "@/lib/supabase";
-import { setBookingStatus, cancelBooking, setGroupStatus, cancelGroup, setGroupDiscount, saveFailMessage } from "@/lib/bookingActions";
+import {
+  setBookingStatus,
+  cancelBooking,
+  setGroupStatus,
+  cancelGroup,
+  setGroupDiscount,
+  saveFailMessage,
+} from "@/lib/bookingActions";
 import { useQueryClient } from "@tanstack/react-query";
 import { priceRoomStay } from "@/lib/quoteBuilder";
 import { useRoomRates } from "@/hooks/useRoomRates";
-import { confirmationLink, directionsLink, paymentReminderLink, dayBeforeReminderLink, telLink, guestTrackingUrl, clean } from "@/lib/whatsapp";
-import { SendConfirmationPrompt, type ConfirmationPromptData } from "@/components/SendConfirmationPrompt";
+import {
+  confirmationLink,
+  directionsLink,
+  paymentReminderLink,
+  dayBeforeReminderLink,
+  telLink,
+  guestTrackingUrl,
+  clean,
+} from "@/lib/whatsapp";
+import {
+  SendConfirmationPrompt,
+  type ConfirmationPromptData,
+} from "@/components/SendConfirmationPrompt";
 import { extractUPIId } from "@/utils/upi";
 import { releaseDatesIfUnblocked, isSameDayTurnoverSafe } from "@/lib/bookingAvailability";
 import { BookingInvoice } from "@/components/BookingInvoice";
@@ -43,16 +90,47 @@ export const Route = createFileRoute("/admin/bookings")({
 type OwnerProperty = ReturnType<typeof useOwnerProperty>["data"];
 
 /** The wa.me link that sends a single booking's confirmation (with the tracking link) to the guest. */
-function bookingConfirmHref(booking: Booking, roomName: string, property: OwnerProperty): string | null {
+function bookingConfirmHref(
+  booking: Booking,
+  roomName: string,
+  property: OwnerProperty,
+): string | null {
   if (!property || !booking.guest_phone) return null;
-  return confirmationLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property.name, roomName, checkIn: booking.check_in, checkOut: booking.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) });
+  return confirmationLink({
+    guestPhone: booking.guest_phone,
+    guestName: booking.guest_name,
+    propertyName: property.name,
+    roomName,
+    checkIn: booking.check_in,
+    checkOut: booking.check_out,
+    ownerPhone: property.owner_phone ?? "",
+    trackingUrl: guestTrackingUrl(
+      window.location.origin,
+      booking.tracking_token,
+      booking.property_id,
+    ),
+  });
 }
 
 /** Same for a multi-room group: one message listing every room, with the group's tracking link. */
-function groupConfirmHref(group: BookingGroup, roomNameMap: Record<string, string>, property: OwnerProperty): string | null {
+function groupConfirmHref(
+  group: BookingGroup,
+  roomNameMap: Record<string, string>,
+  property: OwnerProperty,
+): string | null {
   if (!property || !group.guest_phone) return null;
   const names = (group.bookings ?? []).map((b) => roomNameMap[b.room_id] ?? "Room");
-  return confirmationLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property.name, roomName: names.length > 0 ? names.join(", ") : "your rooms", roomLabel: names.length > 1 ? "Rooms" : "Room", checkIn: group.check_in, checkOut: group.check_out, ownerPhone: property.owner_phone ?? "", trackingUrl: guestTrackingUrl(window.location.origin, group.tracking_token, group.property_id) });
+  return confirmationLink({
+    guestPhone: group.guest_phone,
+    guestName: group.guest_name,
+    propertyName: property.name,
+    roomName: names.length > 0 ? names.join(", ") : "your rooms",
+    roomLabel: names.length > 1 ? "Rooms" : "Room",
+    checkIn: group.check_in,
+    checkOut: group.check_out,
+    ownerPhone: property.owner_phone ?? "",
+    trackingUrl: guestTrackingUrl(window.location.origin, group.tracking_token, group.property_id),
+  });
 }
 
 const inputCls = fieldCls;
@@ -102,7 +180,12 @@ function chargesSum(charges?: { qty: number; unit_price: number }[] | null): num
 }
 
 /** Matches the balance math used on the tracking page / booking detail modal. */
-function amountDueFor(totalAmount: number, chargesTotal: number, discount: number, advance: number): number {
+function amountDueFor(
+  totalAmount: number,
+  chargesTotal: number,
+  discount: number,
+  advance: number,
+): number {
   return Math.max(0, totalAmount + chargesTotal - discount - advance);
 }
 
@@ -130,9 +213,15 @@ function dateBucket(checkIn: string, todayStr: string): string {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const cfg = STATUS_CONFIG[status] ?? { label: status, color: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" };
+  const cfg = STATUS_CONFIG[status] ?? {
+    label: status,
+    color: "bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground",
+  };
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${cfg.color.replace(/bg-\S+/g, "")}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 text-xs font-medium ${cfg.color.replace(/bg-\S+/g, "")}`}
+    >
       <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot}`} />
       {cfg.label}
     </span>
@@ -140,7 +229,15 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function ChargesList({
-  charges, chargesTotal, onDelete, groupId, bookingId, propertyId, checkIn, checkOut, guests,
+  charges,
+  chargesTotal,
+  onDelete,
+  groupId,
+  bookingId,
+  propertyId,
+  checkIn,
+  checkOut,
+  guests,
 }: {
   charges: BookingCharge[];
   chargesTotal: number;
@@ -164,18 +261,36 @@ function ChargesList({
   const [error, setError] = useState("");
 
   const handleAdd = async () => {
-    if (!desc.trim()) { setError("Description required"); return; }
+    if (!desc.trim()) {
+      setError("Description required");
+      return;
+    }
     const q = parseFloat(qty);
     const p = parseFloat(price);
-    if (!q || q <= 0 || !p || p < 0) { setError("Valid qty and price required"); return; }
+    if (!q || q <= 0 || !p || p < 0) {
+      setError("Valid qty and price required");
+      return;
+    }
     setError("");
     try {
       if (groupId) {
-        await groupChargeMutation.mutateAsync({ group_id: groupId, description: desc, qty: q, unit_price: p });
+        await groupChargeMutation.mutateAsync({
+          group_id: groupId,
+          description: desc,
+          qty: q,
+          unit_price: p,
+        });
       } else if (bookingId) {
-        await singleChargeMutation.mutateAsync({ booking_id: bookingId, description: desc, qty: q, unit_price: p });
+        await singleChargeMutation.mutateAsync({
+          booking_id: bookingId,
+          description: desc,
+          qty: q,
+          unit_price: p,
+        });
       }
-      setDesc(""); setQty("1"); setPrice("");
+      setDesc("");
+      setQty("1");
+      setPrice("");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to add charge");
     }
@@ -190,51 +305,108 @@ function ChargesList({
         checkIn={checkIn}
         checkOut={checkOut}
         guests={guests}
-        onAdd={(rows) => addRows.mutateAsync({ target: groupId ? { group_id: groupId } : { booking_id: bookingId ?? "" }, rows })}
+        onAdd={(rows) =>
+          addRows.mutateAsync({
+            target: groupId ? { group_id: groupId } : { booking_id: bookingId ?? "" },
+            rows,
+          })
+        }
       />
       {!hasCatalog && !catalogLoading && (
-      <div>
-        <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
-        <div className="flex flex-wrap gap-1.5">
-          {CHARGE_PRESETS.map((p) => (
-            <button key={p.description} onClick={() => { setDesc(p.description); setPrice(String(p.unit_price)); }} className="text-xs px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 transition-colors">
-              {p.description} · ₹{p.unit_price}
-            </button>
-          ))}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">Quick add</p>
+          <div className="flex flex-wrap gap-1.5">
+            {CHARGE_PRESETS.map((p) => (
+              <button
+                key={p.description}
+                onClick={() => {
+                  setDesc(p.description);
+                  setPrice(String(p.unit_price));
+                }}
+                className="text-xs px-2.5 py-1 rounded-full bg-muted hover:bg-muted/70 transition-colors"
+              >
+                {p.description} · ₹{p.unit_price}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
       )}
       <div className="rounded-2xl border border-border/60 p-3 space-y-2">
         <p className="text-xs font-medium text-muted-foreground">Or add your own charge</p>
-        <input value={desc} onChange={(e) => setDesc(e.target.value)} className={inputCls} placeholder="Description e.g. Dinner" />
+        <input
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          className={inputCls}
+          placeholder="Description e.g. Dinner"
+        />
         <div className="flex gap-2">
-          <input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="w-14 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="Qty" />
-          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} className="flex-1 min-w-0 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" placeholder="₹ Price" />
-          <button onClick={handleAdd} disabled={adding} className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0">
-            {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
+          <input
+            type="number"
+            min={1}
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="w-14 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="Qty"
+          />
+          <input
+            type="number"
+            min={0}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="flex-1 min-w-0 rounded-xl border-0 bg-muted px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            placeholder="₹ Price"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={adding}
+            className="h-9 px-4 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-1 shrink-0"
+          >
+            {adding ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Plus className="h-3.5 w-3.5" />
+            )}{" "}
+            Add
           </button>
         </div>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
       {charges.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          <Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />No extra charges yet
+          <Utensils className="h-6 w-6 mx-auto mb-2 opacity-30" />
+          No extra charges yet
         </div>
       ) : (
         <div className="space-y-2">
           {charges.map((c) => (
-            <div key={c.id} className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3">
+            <div
+              key={c.id}
+              className="flex items-center gap-3 rounded-xl bg-muted/30 border border-border px-4 py-3"
+            >
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium truncate">{c.description}</div>
-                <div className="text-xs text-muted-foreground mt-0.5">{c.qty > 1 ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}` : `₹${c.unit_price.toLocaleString("en-IN")}`}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {c.qty > 1
+                    ? `${c.qty} × ₹${c.unit_price.toLocaleString("en-IN")}`
+                    : `₹${c.unit_price.toLocaleString("en-IN")}`}
+                </div>
               </div>
-              <div className="font-semibold text-sm shrink-0">₹{(c.qty * c.unit_price).toLocaleString("en-IN")}</div>
-              <button onClick={() => onDelete(c.id)} className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+              <div className="font-semibold text-sm shrink-0">
+                ₹{(c.qty * c.unit_price).toLocaleString("en-IN")}
+              </div>
+              <button
+                onClick={() => onDelete(c.id)}
+                className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center shrink-0"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
           <div className="flex justify-between items-center px-4 py-2 rounded-xl bg-amber-50 border border-amber-100">
             <span className="text-sm text-amber-800">Extras total</span>
-            <span className="font-semibold text-amber-800">₹{chargesTotal.toLocaleString("en-IN")}</span>
+            <span className="font-semibold text-amber-800">
+              ₹{chargesTotal.toLocaleString("en-IN")}
+            </span>
           </div>
         </div>
       )}
@@ -246,26 +418,46 @@ function ChargesList({
 // Group booking card
 // ---------------------------------------------------------------------------
 
-function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup; roomNameMap: Record<string, string>; onClick: () => void }) {
+function GroupBookingCard({
+  group,
+  roomNameMap,
+  onClick,
+}: {
+  group: BookingGroup;
+  roomNameMap: Record<string, string>;
+  onClick: () => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const discount = Number(group.discount_amount ?? 0);
   const advance = Number(group.advance_amount ?? 0);
   const chargesTotal = chargesSum(group.booking_charges);
   const displayTotal = Number(group.total_amount) + chargesTotal - discount;
   // computeBalance keeps overpayment visible (refundDue); a bare Math.max(0, …) showed "Paid ✓" for it.
-  const { balance, refundDue } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
+  const { balance, refundDue } = computeBalance({
+    roomTotal: Number(group.total_amount),
+    chargesTotal,
+    discount,
+    advance,
+  });
   const bookings = group.bookings ?? [];
   return (
     <div className="bg-card border border-border/60 rounded-3xl overflow-hidden">
-      <button onClick={onClick} className="w-full text-left p-4 hover:bg-muted/30 transition-colors group">
+      <button
+        onClick={onClick}
+        className="w-full text-left p-4 hover:bg-muted/30 transition-colors group"
+      >
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <Hotel className="h-3.5 w-3.5 text-primary shrink-0" />
               <span className="font-semibold text-foreground truncate">{group.guest_name}</span>
-              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium shrink-0">{bookings.length} rooms</span>
+              <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium shrink-0">
+                {bookings.length} rooms
+              </span>
             </div>
-            <div className="text-xs text-muted-foreground mt-0.5">{group.guest_phone || "No phone"} · {group.group_reference}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {group.guest_phone || "No phone"} · {group.group_reference}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <StatusPill status={group.status} />
@@ -273,31 +465,86 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2 mb-3">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5 shrink-0" /><span>{group.check_in}</span></div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5 shrink-0" /><span>{group.check_out}</span></div>
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5 shrink-0" /><span>{group.guest_count} guests</span></div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Calendar className="h-3.5 w-3.5 shrink-0" />
+            <span>{group.check_in}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="h-3.5 w-3.5 shrink-0" />
+            <span>{group.check_out}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            <span>{group.guest_count} guests</span>
+          </div>
         </div>
         <div className="flex items-center justify-between pt-3 border-t border-border">
-          <div className="text-xs text-muted-foreground">Total <span className="font-semibold text-foreground">₹{displayTotal.toLocaleString("en-IN")}</span>{chargesTotal > 0 && <span className="ml-1.5 text-amber-700 font-medium">+₹{chargesTotal.toLocaleString("en-IN")} extras</span>}{discount > 0 && <span className="ml-1.5 text-green-600 font-medium">-₹{discount.toLocaleString("en-IN")} disc</span>}</div>
+          <div className="text-xs text-muted-foreground">
+            Total{" "}
+            <span className="font-semibold text-foreground">
+              ₹{displayTotal.toLocaleString("en-IN")}
+            </span>
+            {chargesTotal > 0 && (
+              <span className="ml-1.5 text-amber-700 font-medium">
+                +₹{chargesTotal.toLocaleString("en-IN")} extras
+              </span>
+            )}
+            {discount > 0 && (
+              <span className="ml-1.5 text-green-600 font-medium">
+                -₹{discount.toLocaleString("en-IN")} disc
+              </span>
+            )}
+          </div>
           {advance > 0 ? (
             <div className="flex items-center gap-2">
               <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
-              {refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}
+              {refundDue > 0 ? (
+                <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">
+                  ₹{refundDue.toLocaleString("en-IN")} refund due
+                </span>
+              ) : balance > 0 ? (
+                <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">
+                  ₹{balance.toLocaleString("en-IN")} due
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">
+                  Paid ✓
+                </span>
+              )}
             </div>
-          ) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>}
+          ) : (
+            <span className="text-xs text-muted-foreground italic">No advance recorded</span>
+          )}
         </div>
       </button>
       <div className="border-t border-border">
-        <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 transition-colors">
-          <span>{expanded ? "Hide" : "Show"} {bookings.length} rooms</span>
-          {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-between px-4 py-2 text-xs text-muted-foreground hover:bg-muted/30 transition-colors"
+        >
+          <span>
+            {expanded ? "Hide" : "Show"} {bookings.length} rooms
+          </span>
+          {expanded ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
         </button>
         {expanded && (
           <div className="px-4 pb-3 space-y-2">
             {bookings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs">
-                <div className="flex items-center gap-2"><BedDouble className="h-3.5 w-3.5 text-muted-foreground shrink-0" /><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span></div>
-                <span className="text-muted-foreground">₹{Number(b.total_amount).toLocaleString("en-IN")}</span>
+              <div
+                key={b.id}
+                className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <BedDouble className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span>
+                </div>
+                <span className="text-muted-foreground">
+                  ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                </span>
               </div>
             ))}
           </div>
@@ -311,23 +558,61 @@ function GroupBookingCard({ group, roomNameMap, onClick }: { group: BookingGroup
 // Edit Group Guest Modal
 // ---------------------------------------------------------------------------
 
-function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ guest_name: group.guest_name ?? "", guest_phone: group.guest_phone ?? "", guest_email: group.guest_email ?? "", guest_count: group.guest_count as number | string });
-  const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+function EditGroupGuestModal({
+  group,
+  onClose,
+  onSaved,
+}: {
+  group: BookingGroup;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    guest_name: group.guest_name ?? "",
+    guest_phone: group.guest_phone ?? "",
+    guest_email: group.guest_email ?? "",
+    guest_count: group.guest_count as number | string,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const handleSave = async () => {
-    if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
-    setSaving(true); setError("");
+    if (!form.guest_name.trim()) {
+      setError("Guest name is required");
+      return;
+    }
+    setSaving(true);
+    setError("");
     try {
-      const { error: groupErr } = await supabase.from("booking_groups").update({ guest_name: form.guest_name.trim(), guest_phone: (form.guest_phone as string).trim(), guest_email: (form.guest_email as string).trim() || null, guest_count: Number(form.guest_count) || 1 }).eq("id", group.id);
+      const { error: groupErr } = await supabase
+        .from("booking_groups")
+        .update({
+          guest_name: form.guest_name.trim(),
+          guest_phone: (form.guest_phone as string).trim(),
+          guest_email: (form.guest_email as string).trim() || null,
+          guest_count: Number(form.guest_count) || 1,
+        })
+        .eq("id", group.id);
       if (groupErr) throw groupErr;
-      const { error: bookingsErr } = await supabase.from("bookings").update({ guest_name: form.guest_name.trim(), guest_phone: (form.guest_phone as string).trim(), guest_email: (form.guest_email as string).trim() || null, guest_count: Number(form.guest_count) || 1 }).eq("group_id", group.id);
+      const { error: bookingsErr } = await supabase
+        .from("bookings")
+        .update({
+          guest_name: form.guest_name.trim(),
+          guest_phone: (form.guest_phone as string).trim(),
+          guest_email: (form.guest_email as string).trim() || null,
+          guest_count: Number(form.guest_count) || 1,
+        })
+        .eq("group_id", group.id);
       if (bookingsErr) throw bookingsErr;
       queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       onSaved();
-    } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
+    } catch (e: unknown) {
+      setError(friendlyDbError(e, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal
@@ -339,16 +624,65 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={false} loading={saving}>Save</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={handleSave}
+              disabled={false}
+              loading={saving}
+            >
+              Save
+            </Button>
           </ModalActions>
         </>
       }
     >
-          <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
-          <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
-          <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
-          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={50} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+      <div>
+        <label className={labelCls}>Guest name *</label>
+        <input
+          value={form.guest_name}
+          onChange={(e) => set("guest_name", e.target.value)}
+          className={inputCls}
+          placeholder="Full name"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Phone</label>
+        <input
+          type="tel"
+          value={form.guest_phone}
+          onChange={(e) => set("guest_phone", e.target.value)}
+          className={inputCls}
+          placeholder="+91 98765 43210"
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Email</label>
+        <input
+          type="email"
+          value={form.guest_email}
+          onChange={(e) => set("guest_email", e.target.value)}
+          className={inputCls}
+          placeholder="guest@email.com"
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Number of guests</label>
+        <input
+          type="number"
+          min={1}
+          max={50}
+          value={form.guest_count}
+          onChange={(e) =>
+            set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)
+          }
+          className={inputCls}
+        />
+      </div>
     </Modal>
   );
 }
@@ -359,7 +693,14 @@ function EditGroupGuestModal({ group, onClose, onSaved }: { group: BookingGroup;
 
 type GroupModalTab = "overview" | "charges" | "invoice";
 
-function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefresh, onConfirmed }: {
+function GroupBookingDetailModal({
+  group,
+  roomNameMap,
+  property,
+  onClose,
+  onRefresh,
+  onConfirmed,
+}: {
   group: BookingGroup;
   roomNameMap: Record<string, string>;
   property: ReturnType<typeof useOwnerProperty>["data"];
@@ -383,7 +724,12 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
   const discount = Number(group.discount_amount ?? 0);
   const advance = Number(group.advance_amount ?? 0);
   const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-  const { balance, refundDue } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
+  const { balance, refundDue } = computeBalance({
+    roomTotal: Number(group.total_amount),
+    chargesTotal,
+    discount,
+    advance,
+  });
   const ownerPhone = property?.owner_phone ?? "";
   const canAct = !["cancelled", "completed"].includes(group.status);
 
@@ -410,20 +756,39 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     const isPaid = newAdvance >= Number(group.total_amount) + chargesTotal - discount;
     // A pending group is confirmed by money only once the received total reaches the 25% advance;
     // a smaller part payment is recorded but the group stays pending until the owner confirms it.
-    const confirmsNow = group.status === "pending" && meetsConfirmationAdvance(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal, newAdvance);
+    const confirmsNow =
+      group.status === "pending" &&
+      meetsConfirmationAdvance(
+        computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal,
+        newAdvance,
+      );
     const newStatus: string = confirmsNow ? "confirmed" : group.status;
     const holdUpdate = newStatus !== "pending" ? { hold_expires_at: null } : {};
     // Errors are thrown so GroupPaymentForm can show them and stay open —
     // previously a failed save silently closed the form as if it had worked.
-    const { error: groupErr } = await supabase.from("booking_groups").update({ advance_amount: newAdvance, payment_method: method, ...(ref ? { payment_reference: ref } : {}), is_paid: isPaid, status: newStatus, ...holdUpdate }).eq("id", group.id);
+    const { error: groupErr } = await supabase
+      .from("booking_groups")
+      .update({
+        advance_amount: newAdvance,
+        payment_method: method,
+        ...(ref ? { payment_reference: ref } : {}),
+        is_paid: isPaid,
+        status: newStatus,
+        ...holdUpdate,
+      })
+      .eq("id", group.id);
     if (groupErr) throw groupErr;
     if (newStatus !== group.status) {
-      const { error: childErr } = await supabase.from("bookings").update({ status: newStatus, ...holdUpdate }).eq("group_id", group.id);
+      const { error: childErr } = await supabase
+        .from("bookings")
+        .update({ status: newStatus, ...holdUpdate })
+        .eq("group_id", group.id);
       if (childErr) throw childErr;
     }
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    onRefresh(); setShowPaymentForm(false);
+    onRefresh();
+    setShowPaymentForm(false);
     if (confirmsNow) onConfirmed(group);
   };
 
@@ -431,11 +796,15 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
     // Throws if it wasn't saved; GroupDiscountForm shows the message and stays open.
     await setGroupDiscount(supabase, group.id, amount, reason);
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
-    onRefresh(); setShowDiscountForm(false);
+    onRefresh();
+    setShowDiscountForm(false);
   };
 
   const groupRoomPriceTotal = bookings.reduce((sum, b) => sum + Number(b.room_price ?? 0), 0);
-  const groupExtraGuestTotal = bookings.reduce((sum, b) => sum + Number(b.extra_guest_charge ?? 0), 0);
+  const groupExtraGuestTotal = bookings.reduce(
+    (sum, b) => sum + Number(b.extra_guest_charge ?? 0),
+    0,
+  );
   const groupNights = bookings[0]?.nights ?? 0;
 
   const invoiceBooking = {
@@ -468,146 +837,629 @@ function GroupBookingDetailModal({ group, roomNameMap, property, onClose, onRefr
         onClose={onClose}
         headerExtra={
           <>
-            <div className="flex flex-wrap items-center gap-2 mb-3"><StatusPill status={group.status} /><span className="text-xs text-muted-foreground font-mono">{group.group_reference}</span><span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{bookings.length} rooms</span></div>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {group.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updatingStatus} icon={<Check className="h-3.5 w-3.5" />} label="Confirm all" color="green" />}
-              {group.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updatingStatus} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete all" color="amber" />}
-              <button onClick={() => setShowEditGroupGuest(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
-              {group.guest_phone && <a href={telLink(group.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>}
-              {group.guest_phone && <a href={group.status === "confirmed" ? (groupConfirmHref(group, roomNameMap, property) ?? `https://wa.me/${clean(group.guest_phone)}`) : `https://wa.me/${clean(group.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {group.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <StatusPill status={group.status} />
+              <span className="text-xs text-muted-foreground font-mono">
+                {group.group_reference}
+              </span>
+              <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">
+                {bookings.length} rooms
+              </span>
             </div>
-            {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {group.status === "pending" && (
+                <ActionChip
+                  onClick={() => handleStatus("confirmed")}
+                  loading={updatingStatus}
+                  icon={<Check className="h-3.5 w-3.5" />}
+                  label="Confirm all"
+                  color="green"
+                />
+              )}
+              {group.status === "confirmed" && (
+                <ActionChip
+                  onClick={() => handleStatus("completed")}
+                  loading={updatingStatus}
+                  icon={<LogOut className="h-3.5 w-3.5" />}
+                  label="Complete all"
+                  color="amber"
+                />
+              )}
+              <button
+                onClick={() => setShowEditGroupGuest(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit Guest
+              </button>
+              {group.guest_phone && (
+                <a
+                  href={telLink(group.guest_phone)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+                >
+                  <Phone className="h-3.5 w-3.5" /> Call
+                </a>
+              )}
+              {group.guest_phone && (
+                <a
+                  href={
+                    group.status === "confirmed"
+                      ? (groupConfirmHref(group, roomNameMap, property) ??
+                        `https://wa.me/${clean(group.guest_phone)}`)
+                      : `https://wa.me/${clean(group.guest_phone)}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"
+                >
+                  <MessageCircle className="h-3.5 w-3.5" />{" "}
+                  {group.status === "confirmed" ? "Send confirmation" : "WhatsApp"}
+                </a>
+              )}
+            </div>
+            {actionError && (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {actionError}
+              </p>
+            )}
           </>
         }
-        tabs={
-          ([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: GroupModalTab; label: string }[]).map((t) => (
-            <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
-              {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">{charges.length}</span>}
-            </ModalTab>
-          ))
-        }
+        tabs={(
+          [
+            { key: "overview", label: "Overview" },
+            { key: "charges", label: "Charges" },
+            { key: "invoice", label: "Invoice" },
+          ] as { key: GroupModalTab; label: string }[]
+        ).map((t) => (
+          <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+            {t.label}
+            {t.key === "charges" && charges.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+                {charges.length}
+              </span>
+            )}
+          </ModalTab>
+        ))}
       >
-            {tab === "overview" && (
-              <div className="p-5 space-y-4">
-                <GuestPanel propertyId={group.property_id} guestId={group.guest_id} name={group.guest_name} phone={group.guest_phone} email={group.guest_email} />
-                <Section title="Stay details">
-                  <Row label="Check-in" value={group.check_in} /><Row label="Check-out" value={group.check_out} /><Row label="Guests" value={`${group.guest_count}`} />
-                  <Row label="Source" value={sourceSummary(group)} />
-                  <button type="button" onClick={() => setShowEditGroupSource(true)} className="text-xs font-medium text-primary">Change source</button>
-                </Section>
-                <Section title={`Rooms (${bookings.length})`}>
-                  {bookings.map((b, i) => (
-                    <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
-                      <div className="flex justify-between text-sm"><span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5"><span>{b.nights} night{b.nights > 1 ? "s" : ""}</span><StatusPill status={b.status} /></div>
-                    </div>
-                  ))}
-                </Section>
-                <Section title="Payment summary">
-                  <Row label="Rooms total" value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`} />
-                  {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
-                  {discount > 0 && <Row label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
-                  {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
-                  {group.payment_reference && <Row label="Reference" value={group.payment_reference} small />}
-                  <div className="border-t border-border pt-2 mt-1"><Row label={refundDue > 0 ? "Refund due" : "Balance due"} value={refundDue > 0 ? `₹${refundDue.toLocaleString("en-IN")}` : balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
-                </Section>
-                {canAct && !showDiscountForm && !showPaymentForm && <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>}
-                {showDiscountForm && <GroupDiscountForm group={group} discount={discount} onSaved={handleSaveDiscount} onCancel={() => setShowDiscountForm(false)} />}
-                {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
-                {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">{refundDue > 0 ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust` : "Fully paid ✓"}</div>}
-                {showPaymentForm && <GroupPaymentForm group={group} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={handleSavePayment} onCancel={() => setShowPaymentForm(false)} />}
-                {group.guest_phone && (
-                  <Section title="Send to guest">
-                    <div className="space-y-2">
-                      <WALink href={paymentReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, totalAmount: Number(group.total_amount), chargesTotal, discount, advancePaid: advance, checkIn: group.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, group.tracking_token, group.property_id) })} label="💰 Payment reminder" />
-                      <WALink href={dayBeforeReminderLink({ guestPhone: group.guest_phone, guestName: group.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
-                    </div>
-                  </Section>
-                )}
-                {canAct && <GroupCancelButton group={group} rooms={bookings.map((b) => ({ roomId: b.room_id, checkIn: b.check_in, checkOut: b.check_out }))} onCancelled={() => { onRefresh(); onClose(); }} />}
-              </div>
-            )}
-            {tab === "charges" && (
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Rooms</div><div className="font-semibold text-sm mt-0.5">₹{Number(group.total_amount).toLocaleString("en-IN")}</div></div>
-                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
-                  <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
+        {tab === "overview" && (
+          <div className="p-5 space-y-4">
+            <GuestPanel
+              propertyId={group.property_id}
+              guestId={group.guest_id}
+              name={group.guest_name}
+              phone={group.guest_phone}
+              email={group.guest_email}
+            />
+            <Section title="Stay details">
+              <Row label="Check-in" value={group.check_in} />
+              <Row label="Check-out" value={group.check_out} />
+              <Row label="Guests" value={`${group.guest_count}`} />
+              <Row label="Source" value={sourceSummary(group)} />
+              <button
+                type="button"
+                onClick={() => setShowEditGroupSource(true)}
+                className="text-xs font-medium text-primary"
+              >
+                Change source
+              </button>
+            </Section>
+            <Section title={`Rooms (${bookings.length})`}>
+              {bookings.map((b, i) => (
+                <div key={b.id} className={i > 0 ? "border-t border-border pt-2 mt-2" : ""}>
+                  <div className="flex justify-between text-sm">
+                    <span className="font-medium">{roomNameMap[b.room_id] ?? "Unknown room"}</span>
+                    <span className="font-medium">
+                      ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <span>
+                      {b.nights} night{b.nights > 1 ? "s" : ""}
+                    </span>
+                    <StatusPill status={b.status} />
+                  </div>
                 </div>
-                {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-                <ChargesList charges={charges} chargesTotal={chargesTotal} groupId={group.id} propertyId={group.property_id} checkIn={group.check_in} checkOut={group.check_out} guests={Number(group.guest_count) || 1} onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })} />
+              ))}
+            </Section>
+            <Section title="Payment summary">
+              <Row
+                label="Rooms total"
+                value={`₹${Number(group.total_amount).toLocaleString("en-IN")}`}
+              />
+              {chargesTotal > 0 && (
+                <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />
+              )}
+              {discount > 0 && (
+                <Row
+                  label={`Discount${group.discount_reason ? ` (${group.discount_reason})` : ""}`}
+                  value={`-₹${discount.toLocaleString("en-IN")}`}
+                  highlight="green"
+                />
+              )}
+              {advance > 0 && (
+                <Row
+                  label="Advance paid"
+                  value={`₹${advance.toLocaleString("en-IN")}`}
+                  highlight="green"
+                />
+              )}
+              {group.payment_reference && (
+                <Row label="Reference" value={group.payment_reference} small />
+              )}
+              <div className="border-t border-border pt-2 mt-1">
+                <Row
+                  label={refundDue > 0 ? "Refund due" : "Balance due"}
+                  value={
+                    refundDue > 0
+                      ? `₹${refundDue.toLocaleString("en-IN")}`
+                      : balance === 0
+                        ? "Fully paid ✓"
+                        : `₹${balance.toLocaleString("en-IN")}`
+                  }
+                  highlight={balance === 0 ? "green" : "amber"}
+                  bold
+                />
+              </div>
+            </Section>
+            {canAct && !showDiscountForm && !showPaymentForm && (
+              <button
+                onClick={() => setShowDiscountForm(true)}
+                className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Tag className="h-4 w-4" />
+                {discount > 0
+                  ? `Edit discount (₹${discount.toLocaleString("en-IN")})`
+                  : "Add discount"}
+              </button>
+            )}
+            {showDiscountForm && (
+              <GroupDiscountForm
+                group={group}
+                discount={discount}
+                onSaved={handleSaveDiscount}
+                onCancel={() => setShowDiscountForm(false)}
+              />
+            )}
+            {!showPaymentForm && !showDiscountForm && balance > 0 && (
+              <button
+                onClick={() => setShowPaymentForm(true)}
+                className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"
+              >
+                <IndianRupee className="h-4 w-4" />
+                {advance > 0 ? "Record part payment" : "Record advance payment"}
+              </button>
+            )}
+            {!showPaymentForm && !showDiscountForm && balance === 0 && (
+              <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">
+                {refundDue > 0
+                  ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust`
+                  : "Fully paid ✓"}
               </div>
             )}
-            {tab === "invoice" && (
-              <div className="p-5">
-                <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground ">Group booking · {group.group_reference}</p>
-                  {bookings.map((b) => (
-                    <div key={b.id} className="flex justify-between text-sm"><span className="text-muted-foreground">{roomNameMap[b.room_id] ?? "Unknown room"}</span><span className="font-medium">₹{Number(b.total_amount).toLocaleString("en-IN")}</span></div>
-                  ))}
+            {showPaymentForm && (
+              <GroupPaymentForm
+                group={group}
+                advance={advance}
+                discount={discount}
+                chargesTotal={chargesTotal}
+                onSaved={handleSavePayment}
+                onCancel={() => setShowPaymentForm(false)}
+              />
+            )}
+            {group.guest_phone && (
+              <Section title="Send to guest">
+                <div className="space-y-2">
+                  <WALink
+                    href={paymentReminderLink({
+                      guestPhone: group.guest_phone,
+                      guestName: group.guest_name,
+                      totalAmount: Number(group.total_amount),
+                      chargesTotal,
+                      discount,
+                      advancePaid: advance,
+                      checkIn: group.check_in,
+                      propertyName: property?.name ?? "",
+                      upiId,
+                      ownerPhone,
+                      trackingUrl: guestTrackingUrl(
+                        window.location.origin,
+                        group.tracking_token,
+                        group.property_id,
+                      ),
+                    })}
+                    label="💰 Payment reminder"
+                  />
+                  <WALink
+                    href={dayBeforeReminderLink({
+                      guestPhone: group.guest_phone,
+                      guestName: group.guest_name,
+                      propertyName: property?.name ?? "",
+                      checkInTime: property?.check_in_time ?? "2:00 PM",
+                      ownerPhone,
+                    })}
+                    label="🌿 Day-before reminder"
+                  />
                 </div>
-                <BookingInvoice booking={invoiceBooking} roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} />
+              </Section>
+            )}
+            {canAct && (
+              <GroupCancelButton
+                group={group}
+                rooms={bookings.map((b) => ({
+                  roomId: b.room_id,
+                  checkIn: b.check_in,
+                  checkOut: b.check_out,
+                }))}
+                onCancelled={() => {
+                  onRefresh();
+                  onClose();
+                }}
+              />
+            )}
+          </div>
+        )}
+        {tab === "charges" && (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <div className="text-xs text-muted-foreground">Rooms</div>
+                <div className="font-semibold text-sm mt-0.5">
+                  ₹{Number(group.total_amount).toLocaleString("en-IN")}
+                </div>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+                <div className="text-xs text-muted-foreground">Extras</div>
+                <div className="font-semibold text-sm mt-0.5 text-amber-700">
+                  ₹{chargesTotal.toLocaleString("en-IN")}
+                </div>
+              </div>
+              <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center">
+                <div className="text-xs text-muted-foreground">Balance</div>
+                <div
+                  className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}
+                >
+                  ₹{balance.toLocaleString("en-IN")}
+                </div>
+              </div>
+            </div>
+            {discount > 0 && (
+              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm">
+                <span className="text-green-800">Discount</span>
+                <span className="font-semibold text-green-700">
+                  -₹{discount.toLocaleString("en-IN")}
+                </span>
               </div>
             )}
+            <ChargesList
+              charges={charges}
+              chargesTotal={chargesTotal}
+              groupId={group.id}
+              propertyId={group.property_id}
+              checkIn={group.check_in}
+              checkOut={group.check_out}
+              guests={Number(group.guest_count) || 1}
+              onDelete={(id) => deleteGroupCharge({ id, groupId: group.id })}
+            />
+          </div>
+        )}
+        {tab === "invoice" && (
+          <div className="p-5">
+            <div className="rounded-xl bg-muted/30 border border-border px-4 py-3 mb-4 space-y-1">
+              <p className="text-xs font-medium text-muted-foreground ">
+                Group booking · {group.group_reference}
+              </p>
+              {bookings.map((b) => (
+                <div key={b.id} className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {roomNameMap[b.room_id] ?? "Unknown room"}
+                  </span>
+                  <span className="font-medium">
+                    ₹{Number(b.total_amount).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <BookingInvoice
+              booking={invoiceBooking}
+              roomName={bookings.map((b) => roomNameMap[b.room_id] ?? "Unknown room").join(", ")}
+              property={property ?? null}
+              charges={charges}
+              chargesTotal={chargesTotal}
+              advance={advance}
+              balance={balance}
+              guestView={false}
+            />
+          </div>
+        )}
       </Modal>
-      {showEditGroupSource && <EditSourceModal kind="group" id={group.id} source={group.source} detail={group.booking_source_detail} onClose={() => setShowEditGroupSource(false)} onSaved={() => { setShowEditGroupSource(false); onRefresh(); }} />}
-      {showEditGroupGuest && <EditGroupGuestModal group={group} onClose={() => setShowEditGroupGuest(false)} onSaved={() => { setShowEditGroupGuest(false); onRefresh(); }} />}
+      {showEditGroupSource && (
+        <EditSourceModal
+          kind="group"
+          id={group.id}
+          source={group.source}
+          detail={group.booking_source_detail}
+          onClose={() => setShowEditGroupSource(false)}
+          onSaved={() => {
+            setShowEditGroupSource(false);
+            onRefresh();
+          }}
+        />
+      )}
+      {showEditGroupGuest && (
+        <EditGroupGuestModal
+          group={group}
+          onClose={() => setShowEditGroupGuest(false)}
+          onSaved={() => {
+            setShowEditGroupGuest(false);
+            onRefresh();
+          }}
+        />
+      )}
     </>
   );
 }
 
-function GroupDiscountForm({ group, discount, onSaved, onCancel }: { group: BookingGroup; discount: number; onSaved: (amount: number, reason: string) => void | Promise<void>; onCancel: () => void }) {
-  const [amount, setAmount] = useState(discount > 0 ? String(discount) : ""); const [reason, setReason] = useState(group.discount_reason ?? ""); const [error, setError] = useState("");
+function GroupDiscountForm({
+  group,
+  discount,
+  onSaved,
+  onCancel,
+}: {
+  group: BookingGroup;
+  discount: number;
+  onSaved: (amount: number, reason: string) => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const [amount, setAmount] = useState(discount > 0 ? String(discount) : "");
+  const [reason, setReason] = useState(group.discount_reason ?? "");
+  const [error, setError] = useState("");
   const handleSave = async () => {
     const amt = parseFloat(amount) || 0;
-    if (amt < 0) { setError("Cannot be negative"); return; }
-    if (amt > Number(group.total_amount)) { setError("Cannot exceed total"); return; }
+    if (amt < 0) {
+      setError("Cannot be negative");
+      return;
+    }
+    if (amt > Number(group.total_amount)) {
+      setError("Cannot exceed total");
+      return;
+    }
     setError("");
-    try { await onSaved(amt, reason.trim()); } catch (e) { setError(saveFailMessage(e)); }
+    try {
+      await onSaved(amt, reason.trim());
+    } catch (e) {
+      setError(saveFailMessage(e));
+    }
   };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
-      <div className="text-sm font-medium text-green-900">{discount > 0 ? "Edit discount" : "Add discount"}</div>
-      <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 1000" autoFocus /></div>
-      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Group booking" /></div>
+      <div className="text-sm font-medium text-green-900">
+        {discount > 0 ? "Edit discount" : "Add discount"}
+      </div>
+      <div>
+        <label className={labelCls}>Discount amount (₹)</label>
+        <input
+          type="number"
+          min={0}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. 1000"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Reason (optional)</label>
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. Group booking"
+        />
+      </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90">Save</button></div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90"
+        >
+          Save
+        </button>
+      </div>
     </div>
   );
 }
 
 /** One line in a payment form telling the owner whether this payment will confirm a pending booking. */
 function ConfirmHint({ confirms, needed }: { confirms: boolean; needed: number }) {
-  return confirms
-    ? <p className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-800">✅ This payment confirms the booking — you'll be asked to send the guest their confirmation.</p>
-    : <p className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">Below the ₹{needed.toLocaleString("en-IN")} advance (25%) — this is recorded as a part payment and the booking stays pending until you confirm it.</p>;
+  return confirms ? (
+    <p className="rounded-lg bg-green-50 border border-green-100 px-3 py-2 text-xs text-green-800">
+      ✅ This payment confirms the booking — you'll be asked to send the guest their confirmation.
+    </p>
+  ) : (
+    <p className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
+      Below the ₹{needed.toLocaleString("en-IN")} advance (25%) — this is recorded as a part payment
+      and the booking stays pending until you confirm it.
+    </p>
+  );
 }
 
-function GroupPaymentForm({ group, advance, discount, chargesTotal, onSaved, onCancel }: { group: BookingGroup; advance: number; discount: number; chargesTotal: number; onSaved: (amount: number, method: string, ref: string) => Promise<void>; onCancel: () => void }) {
-  const [amount, setAmount] = useState(""); const [method, setMethod] = useState(group.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [error, setError] = useState(""); const [saving, setSaving] = useState(false);
-  const newPayment = parseFloat(amount) || 0; const grandTotal = Number(group.total_amount) + chargesTotal; const maxAllowed = Math.max(0, grandTotal - discount - advance); const newAdvance = advance + newPayment; const bal = Math.max(0, grandTotal - discount - newAdvance);
-  const handleSave = async () => { if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; } if (newPayment > maxAllowed) { setError(`Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; } setSaving(true); setError(""); try { await onSaved(newPayment, method, ref.trim()); } catch (e: unknown) { setError(e instanceof Error ? e.message : "Save failed — check your connection and try again"); setSaving(false); } };
+function GroupPaymentForm({
+  group,
+  advance,
+  discount,
+  chargesTotal,
+  onSaved,
+  onCancel,
+}: {
+  group: BookingGroup;
+  advance: number;
+  discount: number;
+  chargesTotal: number;
+  onSaved: (amount: number, method: string, ref: string) => Promise<void>;
+  onCancel: () => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState(group.payment_method ?? "UPI");
+  const [ref, setRef] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const newPayment = parseFloat(amount) || 0;
+  const grandTotal = Number(group.total_amount) + chargesTotal;
+  const maxAllowed = Math.max(0, grandTotal - discount - advance);
+  const newAdvance = advance + newPayment;
+  const bal = Math.max(0, grandTotal - discount - newAdvance);
+  const handleSave = async () => {
+    if (!newPayment || newPayment <= 0) {
+      setError("Enter a valid amount");
+      return;
+    }
+    if (newPayment > maxAllowed) {
+      setError(`Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      await onSaved(newPayment, method, ref.trim());
+    } catch (e: unknown) {
+      setError(
+        e instanceof Error ? e.message : "Save failed — check your connection and try again",
+      );
+      setSaving(false);
+    }
+  };
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
-      <div className="text-sm font-medium">{advance > 0 ? "Record part payment" : "Record advance payment"}</div>
-      {advance > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Already recorded</span><span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span></div>}
-      {discount > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Discount</span><span className="font-medium text-green-600">-₹{discount.toLocaleString("en-IN")}</span></div>}
-      {chargesTotal > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Extra charges</span><span className="font-medium text-amber-700">+₹{chargesTotal.toLocaleString("en-IN")}</span></div>}
-      <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Remaining balance</span><span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span></div>
-      <div><label className={labelCls}>Amount received (₹) *</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
-      <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
-      {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvance.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
-      {group.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal, newAdvance)} needed={advanceAmount(computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount }).netTotal)} />}
+      <div className="text-sm font-medium">
+        {advance > 0 ? "Record part payment" : "Record advance payment"}
+      </div>
+      {advance > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Already recorded</span>
+          <span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      {discount > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Discount</span>
+          <span className="font-medium text-green-600">-₹{discount.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      {chargesTotal > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Extra charges</span>
+          <span className="font-medium text-amber-700">
+            +₹{chargesTotal.toLocaleString("en-IN")}
+          </span>
+        </div>
+      )}
+      <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+        <span className="text-muted-foreground">Remaining balance</span>
+        <span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span>
+      </div>
+      <div>
+        <label className={labelCls}>Amount received (₹) *</label>
+        <input
+          type="number"
+          min={0}
+          max={maxAllowed}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+          autoFocus
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelCls}>Method</label>
+          <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+            {["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Reference</label>
+          <input
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            className={inputCls}
+            placeholder="Optional"
+          />
+        </div>
+      </div>
+      {newPayment > 0 && (
+        <div className="rounded-lg bg-background px-3 py-2 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Total paid after this</span>
+            <span className="font-semibold text-primary">
+              ₹{newAdvance.toLocaleString("en-IN")}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Balance remaining</span>
+            <span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>
+              {bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}
+            </span>
+          </div>
+        </div>
+      )}
+      {group.status === "pending" && newPayment > 0 && (
+        <ConfirmHint
+          confirms={meetsConfirmationAdvance(
+            computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount })
+              .netTotal,
+            newAdvance,
+          )}
+          needed={advanceAmount(
+            computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount })
+              .netTotal,
+          )}
+        />
+      )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50">{saving ? "Saving…" : "Save"}</button></div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : "Save"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string; status: string; hold_expires_at?: string | null }; rooms: { roomId: string; checkIn: string; checkOut: string }[]; onCancelled: () => void }) {
-  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient();
+function GroupCancelButton({
+  group,
+  rooms,
+  onCancelled,
+}: {
+  group: { id: string; status: string; hold_expires_at?: string | null };
+  rooms: { roomId: string; checkIn: string; checkOut: string }[];
+  onCancelled: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const handleCancel = async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       // Throws if the group or its rooms can't be saved — then the dialog stays open and says so.
       await cancelGroup(supabase, group);
@@ -616,18 +1468,48 @@ function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string;
       setLoading(false);
       return;
     }
-    await Promise.all(rooms.map((r) => releaseDatesIfUnblocked(r.roomId, r.checkIn, r.checkOut).catch(() => {})));
+    await Promise.all(
+      rooms.map((r) => releaseDatesIfUnblocked(r.roomId, r.checkIn, r.checkOut).catch(() => {})),
+    );
     queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
     setLoading(false);
     onCancelled();
   };
-  if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel all rooms</button>;
+  if (!confirming)
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+      >
+        Cancel all rooms
+      </button>
+    );
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
-      <p className="text-sm text-destructive font-medium">Cancel all rooms in this booking? Cannot be undone.</p>
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all</button></div>
+      <p className="text-sm text-destructive font-medium">
+        Cancel all rooms in this booking? Cannot be undone.
+      </p>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setConfirming(false)}
+          className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted"
+        >
+          Keep
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={loading}
+          className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
+        >
+          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel all
+        </button>
+      </div>
     </div>
   );
 }
@@ -636,47 +1518,172 @@ function GroupCancelButton({ group, rooms, onCancelled }: { group: { id: string;
 // Single booking card + detail modal
 // ---------------------------------------------------------------------------
 
-function BookingCard({ booking, roomName, onClick }: { booking: Booking; roomName: string; onClick: () => void }) {
-  const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = chargesSum(booking.booking_charges); const displayTotal = Number(booking.total_amount) + chargesTotal - discount; const { balance, refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance }); const isActive = !["cancelled", "completed"].includes(booking.status);
+function BookingCard({
+  booking,
+  roomName,
+  onClick,
+}: {
+  booking: Booking;
+  roomName: string;
+  onClick: () => void;
+}) {
+  const discount = Number(booking.discount_amount ?? 0);
+  const advance = Number(booking.advance_amount ?? 0);
+  const chargesTotal = chargesSum(booking.booking_charges);
+  const displayTotal = Number(booking.total_amount) + chargesTotal - discount;
+  const { balance, refundDue } = computeBalance({
+    roomTotal: Number(booking.total_amount),
+    chargesTotal,
+    discount,
+    advance,
+  });
+  const isActive = !["cancelled", "completed"].includes(booking.status);
   return (
-    <button onClick={onClick} className="w-full text-left bg-card border border-border/60 rounded-3xl p-4 hover:bg-muted/40 transition-colors active:scale-[0.99] group">
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-card border border-border/60 rounded-3xl p-4 hover:bg-muted/40 transition-colors active:scale-[0.99] group"
+    >
       <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="min-w-0"><div className="font-semibold text-foreground truncate">{booking.guest_name}</div><div className="text-xs text-muted-foreground mt-0.5">{booking.guest_phone || <span className="italic text-amber-600">No phone — tap to edit</span>}</div></div>
-        <div className="flex items-center gap-2 shrink-0"><StatusPill status={booking.status} /><ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" /></div>
+        <div className="min-w-0">
+          <div className="font-semibold text-foreground truncate">{booking.guest_name}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {booking.guest_phone || (
+              <span className="italic text-amber-600">No phone — tap to edit</span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <StatusPill status={booking.status} />
+          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 mb-3">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><BedDouble className="h-3.5 w-3.5 shrink-0" /><span className="truncate">{roomName}</span></div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5 shrink-0" /><span>{booking.guest_count} guest{booking.guest_count > 1 ? "s" : ""}</span></div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Calendar className="h-3.5 w-3.5 shrink-0" /><span>{booking.check_in}</span></div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5 shrink-0" /><span>{booking.check_out} · {booking.nights}N</span></div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <BedDouble className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{roomName}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Users className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {booking.guest_count} guest{booking.guest_count > 1 ? "s" : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Calendar className="h-3.5 w-3.5 shrink-0" />
+          <span>{booking.check_in}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5 shrink-0" />
+          <span>
+            {booking.check_out} · {booking.nights}N
+          </span>
+        </div>
       </div>
       <div className="flex items-center justify-between pt-3 border-t border-border">
-        <div className="text-xs text-muted-foreground">Total <span className="font-semibold text-foreground">₹{displayTotal.toLocaleString("en-IN")}</span>{chargesTotal > 0 && <span className="ml-1.5 text-amber-700 font-medium">+₹{chargesTotal.toLocaleString("en-IN")} extras</span>}{discount > 0 && <span className="ml-1.5 text-green-600 font-medium">-₹{discount.toLocaleString("en-IN")} disc</span>}</div>
-        {isActive && (advance > 0 ? (<div className="flex items-center gap-2"><span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>{refundDue > 0 ? <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">₹{refundDue.toLocaleString("en-IN")} refund due</span> : balance > 0 ? <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">₹{balance.toLocaleString("en-IN")} due</span> : <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">Paid ✓</span>}</div>) : <span className="text-xs text-muted-foreground italic">No advance recorded</span>)}
+        <div className="text-xs text-muted-foreground">
+          Total{" "}
+          <span className="font-semibold text-foreground">
+            ₹{displayTotal.toLocaleString("en-IN")}
+          </span>
+          {chargesTotal > 0 && (
+            <span className="ml-1.5 text-amber-700 font-medium">
+              +₹{chargesTotal.toLocaleString("en-IN")} extras
+            </span>
+          )}
+          {discount > 0 && (
+            <span className="ml-1.5 text-green-600 font-medium">
+              -₹{discount.toLocaleString("en-IN")} disc
+            </span>
+          )}
+        </div>
+        {isActive &&
+          (advance > 0 ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-primary">Adv ₹{advance.toLocaleString("en-IN")}</span>
+              {refundDue > 0 ? (
+                <span className="text-xs font-semibold text-red-700 bg-red-50 rounded-full px-2.5 py-1">
+                  ₹{refundDue.toLocaleString("en-IN")} refund due
+                </span>
+              ) : balance > 0 ? (
+                <span className="text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2.5 py-1">
+                  ₹{balance.toLocaleString("en-IN")} due
+                </span>
+              ) : (
+                <span className="text-xs font-semibold text-primary bg-primary-light/60 rounded-full px-2 py-0.5">
+                  Paid ✓
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground italic">No advance recorded</span>
+          ))}
       </div>
-      {booking.status === "pending" && advance === 0 && booking.payment_method !== "Cash on Arrival" && (<div className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 flex items-center gap-1.5"><IndianRupee className="h-3 w-3 shrink-0" />Guest may have paid — tap to record advance</div>)}
+      {booking.status === "pending" &&
+        advance === 0 &&
+        booking.payment_method !== "Cash on Arrival" && (
+          <div className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 flex items-center gap-1.5">
+            <IndianRupee className="h-3 w-3 shrink-0" />
+            Guest may have paid — tap to record advance
+          </div>
+        )}
     </button>
   );
 }
 
 type ModalTab = "overview" | "charges" | "invoice";
 
-function BookingDetailModal({ booking, roomName, rooms, property, onClose, onStatusChange, onPaymentSaved }: {
-  booking: Booking; roomName: string;
-  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
-  property: ReturnType<typeof useOwnerProperty>["data"]; onClose: () => void; onStatusChange: (id: string, status: string) => Promise<void>; onPaymentSaved: (confirmed?: boolean) => void;
+function BookingDetailModal({
+  booking,
+  roomName,
+  rooms,
+  property,
+  onClose,
+  onStatusChange,
+  onPaymentSaved,
+}: {
+  booking: Booking;
+  roomName: string;
+  rooms: {
+    id: string;
+    name: string;
+    base_price: number;
+    extra_guest_price: number;
+    weekend_multiplier?: number;
+    max_guests: number;
+  }[];
+  property: ReturnType<typeof useOwnerProperty>["data"];
+  onClose: () => void;
+  onStatusChange: (id: string, status: string) => Promise<void>;
+  onPaymentSaved: (confirmed?: boolean) => void;
 }) {
-  const [tab, setTab] = useState<ModalTab>("overview"); const [updating, setUpdating] = useState(false); const [showEditGuest, setShowEditGuest] = useState(false); const [showEditStay, setShowEditStay] = useState(false); const [showEditSource, setShowEditSource] = useState(false);
-  const { data: charges = [] } = useBookingCharges(booking.id); const { mutateAsync: deleteCharge } = useDeleteCharge();
-  const discount = Number(booking.discount_amount ?? 0); const advance = Number(booking.advance_amount ?? 0); const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0); const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
-  const ownerPhone = property?.owner_phone ?? ""; const lat = property?.location_lat; const lng = property?.location_lng; const canEditStay = !["completed", "cancelled"].includes(booking.status);
+  const [tab, setTab] = useState<ModalTab>("overview");
+  const [updating, setUpdating] = useState(false);
+  const [showEditGuest, setShowEditGuest] = useState(false);
+  const [showEditStay, setShowEditStay] = useState(false);
+  const [showEditSource, setShowEditSource] = useState(false);
+  const { data: charges = [] } = useBookingCharges(booking.id);
+  const { mutateAsync: deleteCharge } = useDeleteCharge();
+  const discount = Number(booking.discount_amount ?? 0);
+  const advance = Number(booking.advance_amount ?? 0);
+  const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+  const balance = Math.max(0, Number(booking.total_amount) + chargesTotal - discount - advance);
+  const ownerPhone = property?.owner_phone ?? "";
+  const lat = property?.location_lat;
+  const lng = property?.location_lng;
+  const canEditStay = !["completed", "cancelled"].includes(booking.status);
   const upiId = extractUPIId(property?.shared_amenities ?? null) ?? undefined;
   const [actionError, setActionError] = useState("");
   const handleStatus = async (status: string) => {
-    setUpdating(true); setActionError("");
-    try { await onStatusChange(booking.id, status); }
-    catch (e) { setActionError(saveFailMessage(e)); }   // failed save: say so, no "confirmed" message
-    finally { setUpdating(false); }
+    setUpdating(true);
+    setActionError("");
+    try {
+      await onStatusChange(booking.id, status);
+    } catch (e) {
+      setActionError(saveFailMessage(e));
+    } finally {
+      // failed save: say so, no "confirmed" message
+      setUpdating(false);
+    }
   };
   return (
     <>
@@ -687,61 +1694,294 @@ function BookingDetailModal({ booking, roomName, rooms, property, onClose, onSta
         onClose={onClose}
         headerExtra={
           <>
-            <div className="flex flex-wrap items-center gap-2 mb-3"><StatusPill status={booking.status} /><span className="text-xs text-muted-foreground">{booking.id.slice(0, 8).toUpperCase()}</span></div>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {booking.status === "pending" && <ActionChip onClick={() => handleStatus("confirmed")} loading={updating} icon={<Check className="h-3.5 w-3.5" />} label="Confirm" color="green" />}
-              {booking.status === "confirmed" && <ActionChip onClick={() => handleStatus("completed")} loading={updating} icon={<LogOut className="h-3.5 w-3.5" />} label="Complete" color="amber" />}
-              <button onClick={() => setShowEditGuest(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Guest</button>
-              {canEditStay && <button onClick={() => setShowEditStay(true)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Pencil className="h-3.5 w-3.5" /> Edit Stay</button>}
-              <a href={telLink(booking.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><Phone className="h-3.5 w-3.5" /> Call</a>
-              <a href={booking.status === "confirmed" ? (bookingConfirmHref(booking, roomName, property) ?? `https://wa.me/${clean(booking.guest_phone)}`) : `https://wa.me/${clean(booking.guest_phone)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"><MessageCircle className="h-3.5 w-3.5" /> {booking.status === "confirmed" ? "Send confirmation" : "WhatsApp"}</a>
-              {lat && lng && <a href={directionsLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", lat, lng, ownerPhone })} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"><MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions</a>}
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <StatusPill status={booking.status} />
+              <span className="text-xs text-muted-foreground">
+                {booking.id.slice(0, 8).toUpperCase()}
+              </span>
             </div>
-            {actionError && <p role="alert" className="mt-2 text-xs text-destructive">{actionError}</p>}
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {booking.status === "pending" && (
+                <ActionChip
+                  onClick={() => handleStatus("confirmed")}
+                  loading={updating}
+                  icon={<Check className="h-3.5 w-3.5" />}
+                  label="Confirm"
+                  color="green"
+                />
+              )}
+              {booking.status === "confirmed" && (
+                <ActionChip
+                  onClick={() => handleStatus("completed")}
+                  loading={updating}
+                  icon={<LogOut className="h-3.5 w-3.5" />}
+                  label="Complete"
+                  color="amber"
+                />
+              )}
+              <button
+                onClick={() => setShowEditGuest(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" /> Edit Guest
+              </button>
+              {canEditStay && (
+                <button
+                  onClick={() => setShowEditStay(true)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit Stay
+                </button>
+              )}
+              <a
+                href={telLink(booking.guest_phone)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+              >
+                <Phone className="h-3.5 w-3.5" /> Call
+              </a>
+              <a
+                href={
+                  booking.status === "confirmed"
+                    ? (bookingConfirmHref(booking, roomName, property) ??
+                      `https://wa.me/${clean(booking.guest_phone)}`)
+                    : `https://wa.me/${clean(booking.guest_phone)}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-full bg-[#dcfce7] text-[#14532d] px-3.5 py-2 text-xs font-medium hover:bg-[#bbf7d0] transition-colors"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />{" "}
+                {booking.status === "confirmed" ? "Send confirmation" : "WhatsApp"}
+              </a>
+              {lat && lng && (
+                <a
+                  href={directionsLink({
+                    guestPhone: booking.guest_phone,
+                    guestName: booking.guest_name,
+                    propertyName: property?.name ?? "",
+                    lat,
+                    lng,
+                    ownerPhone,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3.5 py-2 text-xs font-medium hover:bg-muted/70 transition-colors"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 text-[#25D366]" /> Directions
+                </a>
+              )}
+            </div>
+            {actionError && (
+              <p role="alert" className="mt-2 text-xs text-destructive">
+                {actionError}
+              </p>
+            )}
           </>
         }
-        tabs={
-          ([{ key: "overview", label: "Overview" }, { key: "charges", label: "Charges" }, { key: "invoice", label: "Invoice" }] as { key: ModalTab; label: string }[]).map((t) => (
-            <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
-              {t.label}{t.key === "charges" && charges.length > 0 && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">{charges.length}</span>}
-            </ModalTab>
-          ))
-        }
+        tabs={(
+          [
+            { key: "overview", label: "Overview" },
+            { key: "charges", label: "Charges" },
+            { key: "invoice", label: "Invoice" },
+          ] as { key: ModalTab; label: string }[]
+        ).map((t) => (
+          <ModalTab key={t.key} active={tab === t.key} onClick={() => setTab(t.key)}>
+            {t.label}
+            {t.key === "charges" && charges.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">
+                {charges.length}
+              </span>
+            )}
+          </ModalTab>
+        ))}
       >
-            {tab === "overview" && <OverviewTab booking={booking} roomName={roomName} property={property} onEditSource={() => setShowEditSource(true)} advance={advance} discount={discount} balance={balance} chargesTotal={chargesTotal} onPaymentSaved={onPaymentSaved} ownerPhone={ownerPhone} upiId={upiId} />}
-            {tab === "charges" && (
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-xl bg-muted/50 p-3 text-center"><div className="text-xs text-muted-foreground">Room</div><div className="font-semibold text-sm mt-0.5">₹{Number(booking.total_amount).toLocaleString("en-IN")}</div></div>
-                  <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center"><div className="text-xs text-muted-foreground">Extras</div><div className="font-semibold text-sm mt-0.5 text-amber-700">₹{chargesTotal.toLocaleString("en-IN")}</div></div>
-                  <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center"><div className="text-xs text-muted-foreground">Balance</div><div className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}>₹{balance.toLocaleString("en-IN")}</div></div>
+        {tab === "overview" && (
+          <OverviewTab
+            booking={booking}
+            roomName={roomName}
+            property={property}
+            onEditSource={() => setShowEditSource(true)}
+            advance={advance}
+            discount={discount}
+            balance={balance}
+            chargesTotal={chargesTotal}
+            onPaymentSaved={onPaymentSaved}
+            ownerPhone={ownerPhone}
+            upiId={upiId}
+          />
+        )}
+        {tab === "charges" && (
+          <div className="p-5 space-y-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl bg-muted/50 p-3 text-center">
+                <div className="text-xs text-muted-foreground">Room</div>
+                <div className="font-semibold text-sm mt-0.5">
+                  ₹{Number(booking.total_amount).toLocaleString("en-IN")}
                 </div>
-                {discount > 0 && <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm"><span className="text-green-800">Discount</span><span className="font-semibold text-green-700">-₹{discount.toLocaleString("en-IN")}</span></div>}
-                <ChargesList charges={charges} chargesTotal={chargesTotal} bookingId={booking.id} propertyId={booking.property_id} checkIn={booking.check_in} checkOut={booking.check_out} guests={Number(booking.guest_count) || 1} onDelete={(id) => deleteCharge({ id, bookingId: booking.id })} />
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 text-center">
+                <div className="text-xs text-muted-foreground">Extras</div>
+                <div className="font-semibold text-sm mt-0.5 text-amber-700">
+                  ₹{chargesTotal.toLocaleString("en-IN")}
+                </div>
+              </div>
+              <div className="rounded-xl bg-primary-light/40 border border-border p-3 text-center">
+                <div className="text-xs text-muted-foreground">Balance</div>
+                <div
+                  className={`font-semibold text-sm mt-0.5 ${balance === 0 ? "text-primary" : "text-amber-700"}`}
+                >
+                  ₹{balance.toLocaleString("en-IN")}
+                </div>
+              </div>
+            </div>
+            {discount > 0 && (
+              <div className="rounded-xl bg-green-50 border border-green-200 px-4 py-2 flex justify-between text-sm">
+                <span className="text-green-800">Discount</span>
+                <span className="font-semibold text-green-700">
+                  -₹{discount.toLocaleString("en-IN")}
+                </span>
               </div>
             )}
-            {tab === "invoice" && <div className="p-5"><BookingInvoice booking={booking} roomName={roomName} property={property ?? null} charges={charges} chargesTotal={chargesTotal} advance={advance} balance={balance} guestView={false} /></div>}
+            <ChargesList
+              charges={charges}
+              chargesTotal={chargesTotal}
+              bookingId={booking.id}
+              propertyId={booking.property_id}
+              checkIn={booking.check_in}
+              checkOut={booking.check_out}
+              guests={Number(booking.guest_count) || 1}
+              onDelete={(id) => deleteCharge({ id, bookingId: booking.id })}
+            />
+          </div>
+        )}
+        {tab === "invoice" && (
+          <div className="p-5">
+            <BookingInvoice
+              booking={booking}
+              roomName={roomName}
+              property={property ?? null}
+              charges={charges}
+              chargesTotal={chargesTotal}
+              advance={advance}
+              balance={balance}
+              guestView={false}
+            />
+          </div>
+        )}
       </Modal>
-      {showEditGuest && <EditGuestModal booking={booking} onClose={() => setShowEditGuest(false)} onSaved={() => { setShowEditGuest(false); onPaymentSaved(); }} />}
-      {showEditSource && <EditSourceModal kind="booking" id={booking.id} source={booking.source} detail={booking.booking_source_detail} onClose={() => setShowEditSource(false)} onSaved={() => { setShowEditSource(false); onPaymentSaved(); }} />}
-      {showEditStay && <EditStayModal booking={booking} rooms={rooms} property={property} onClose={() => setShowEditStay(false)} onSaved={() => { setShowEditStay(false); onPaymentSaved(); }} />}
+      {showEditGuest && (
+        <EditGuestModal
+          booking={booking}
+          onClose={() => setShowEditGuest(false)}
+          onSaved={() => {
+            setShowEditGuest(false);
+            onPaymentSaved();
+          }}
+        />
+      )}
+      {showEditSource && (
+        <EditSourceModal
+          kind="booking"
+          id={booking.id}
+          source={booking.source}
+          detail={booking.booking_source_detail}
+          onClose={() => setShowEditSource(false)}
+          onSaved={() => {
+            setShowEditSource(false);
+            onPaymentSaved();
+          }}
+        />
+      )}
+      {showEditStay && (
+        <EditStayModal
+          booking={booking}
+          rooms={rooms}
+          property={property}
+          onClose={() => setShowEditStay(false)}
+          onSaved={() => {
+            setShowEditStay(false);
+            onPaymentSaved();
+          }}
+        />
+      )}
     </>
   );
 }
 
-function ActionChip({ onClick, loading, icon, label, color }: { onClick: () => void; loading: boolean; icon: React.ReactNode; label: string; color: "green" | "blue" | "amber" }) {
-  const colors = { green: "bg-green-600 text-white hover:bg-green-700", blue: "bg-blue-600 text-white hover:bg-blue-700", amber: "bg-amber-500 text-white hover:bg-amber-600" };
-  return <button onClick={onClick} disabled={loading} className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${colors[color]}`}>{loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}{label}</button>;
+function ActionChip({
+  onClick,
+  loading,
+  icon,
+  label,
+  color,
+}: {
+  onClick: () => void;
+  loading: boolean;
+  icon: React.ReactNode;
+  label: string;
+  color: "green" | "blue" | "amber";
+}) {
+  const colors = {
+    green: "bg-green-600 text-white hover:bg-green-700",
+    blue: "bg-blue-600 text-white hover:bg-blue-700",
+    amber: "bg-amber-500 text-white hover:bg-amber-600",
+  };
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors disabled:opacity-60 ${colors[color]}`}
+    >
+      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : icon}
+      {label}
+    </button>
+  );
 }
 
-function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ guest_name: booking.guest_name ?? "", guest_phone: booking.guest_phone ?? "", guest_email: booking.guest_email ?? "", guest_count: booking.guest_count as number | string });
-  const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient(); const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+function EditGuestModal({
+  booking,
+  onClose,
+  onSaved,
+}: {
+  booking: Booking;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [form, setForm] = useState({
+    guest_name: booking.guest_name ?? "",
+    guest_phone: booking.guest_phone ?? "",
+    guest_email: booking.guest_email ?? "",
+    guest_count: booking.guest_count as number | string,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
   const handleSave = async () => {
-    if (!form.guest_name.trim()) { setError("Guest name is required"); return; }
-    setSaving(true); setError("");
-    try { const { error: err } = await supabase.from("bookings").update({ guest_name: form.guest_name.trim(), guest_phone: (form.guest_phone as string).trim(), guest_email: (form.guest_email as string).trim() || null, guest_count: Number(form.guest_count) || 1 }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); }
-    catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
+    if (!form.guest_name.trim()) {
+      setError("Guest name is required");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("bookings")
+        .update({
+          guest_name: form.guest_name.trim(),
+          guest_phone: (form.guest_phone as string).trim(),
+          guest_email: (form.guest_email as string).trim() || null,
+          guest_count: Number(form.guest_count) || 1,
+        })
+        .eq("id", booking.id);
+      if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onSaved();
+    } catch (e: unknown) {
+      setError(friendlyDbError(e, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal
@@ -753,31 +1993,109 @@ function EditGuestModal({ booking, onClose, onSaved }: { booking: Booking; onClo
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={false} loading={saving}>Save</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={handleSave}
+              disabled={false}
+              loading={saving}
+            >
+              Save
+            </Button>
           </ModalActions>
         </>
       }
     >
-          <div><label className={labelCls}>Guest name *</label><input value={form.guest_name} onChange={(e) => set("guest_name", e.target.value)} className={inputCls} placeholder="Full name" autoFocus /></div>
-          <div><label className={labelCls}>Phone</label><input type="tel" value={form.guest_phone} onChange={(e) => set("guest_phone", e.target.value)} className={inputCls} placeholder="+91 98765 43210" /></div>
-          <div><label className={labelCls}>Email</label><input type="email" value={form.guest_email} onChange={(e) => set("guest_email", e.target.value)} className={inputCls} placeholder="guest@email.com" /></div>
-          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
+      <div>
+        <label className={labelCls}>Guest name *</label>
+        <input
+          value={form.guest_name}
+          onChange={(e) => set("guest_name", e.target.value)}
+          className={inputCls}
+          placeholder="Full name"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Phone</label>
+        <input
+          type="tel"
+          value={form.guest_phone}
+          onChange={(e) => set("guest_phone", e.target.value)}
+          className={inputCls}
+          placeholder="+91 98765 43210"
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Email</label>
+        <input
+          type="email"
+          value={form.guest_email}
+          onChange={(e) => set("guest_email", e.target.value)}
+          className={inputCls}
+          placeholder="guest@email.com"
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Number of guests</label>
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={form.guest_count}
+          onChange={(e) =>
+            set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)
+          }
+          className={inputCls}
+        />
+      </div>
     </Modal>
   );
 }
 
-function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
+function EditStayModal({
+  booking,
+  rooms,
+  property,
+  onClose,
+  onSaved,
+}: {
   booking: Booking;
-  rooms: { id: string; name: string; base_price: number; extra_guest_price: number; weekend_multiplier?: number; max_guests: number }[];
+  rooms: {
+    id: string;
+    name: string;
+    base_price: number;
+    extra_guest_price: number;
+    weekend_multiplier?: number;
+    max_guests: number;
+  }[];
   property: ReturnType<typeof useOwnerProperty>["data"];
-  onClose: () => void; onSaved: () => void;
+  onClose: () => void;
+  onSaved: () => void;
 }) {
   // Same turnover rule as Add Booking: decides whether a checkout day can also be a check-in.
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
-  const [form, setForm] = useState({ room_id: booking.room_id ?? rooms[0]?.id ?? "", check_in: booking.check_in ?? "", check_out: booking.check_out ?? "", guest_count: booking.guest_count as number | string });
-  const [saving, setSaving] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient(); const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
-  const nights = useMemo(() => { if (!form.check_in || !form.check_out) return 0; return Math.max(0, (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) / 86400000); }, [form.check_in, form.check_out]);
+  const [form, setForm] = useState({
+    room_id: booking.room_id ?? rooms[0]?.id ?? "",
+    check_in: booking.check_in ?? "",
+    check_out: booking.check_out ?? "",
+    guest_count: booking.guest_count as number | string,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const set = (k: string, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+  const nights = useMemo(() => {
+    if (!form.check_in || !form.check_out) return 0;
+    return Math.max(
+      0,
+      (new Date(form.check_out as string).getTime() - new Date(form.check_in as string).getTime()) /
+        86400000,
+    );
+  }, [form.check_in, form.check_out]);
   const selectedRoom = rooms.find((r) => r.id === form.room_id);
   const { data: stayCharges = [] } = useBookingCharges(booking.id);
   const ratesQ = useRoomRates(booking.property_id);
@@ -789,14 +2107,22 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
     if (!selectedRoom || nights === 0) return null;
     return priceRoomStay({
       room: { ...selectedRoom, weekend_multiplier: selectedRoom.weekend_multiplier ?? 1 },
-      guests: guestCount, checkIn: form.check_in as string, checkOut: form.check_out as string, rates,
+      guests: guestCount,
+      checkIn: form.check_in as string,
+      checkOut: form.check_out as string,
+      rates,
     });
   }, [selectedRoom, nights, guestCount, form.check_in, form.check_out, rates]);
   const newTotal = stay?.total ?? 0;
   const stayDiscount = Number(booking.discount_amount ?? 0);
   const stayAdvance = Number(booking.advance_amount ?? 0);
   const stayChargesTotal = stayCharges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-  const after = computeBalance({ roomTotal: newTotal, chargesTotal: stayChargesTotal, discount: stayDiscount, advance: stayAdvance });
+  const after = computeBalance({
+    roomTotal: newTotal,
+    chargesTotal: stayChargesTotal,
+    discount: stayDiscount,
+    advance: stayAdvance,
+  });
 
   // Agent commission follows the room rate. For percentage-type agents, scale the
   // saved commission by new/old room rate (keeps any one-off rate the owner typed
@@ -806,34 +2132,87 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
   useEffect(() => {
     if (!booking.agent_id) return;
     let live = true;
-    supabase.from("agents").select("default_commission_type").eq("id", booking.agent_id).maybeSingle()
-      .then(({ data }) => { if (live) setAgentType((data as { default_commission_type?: string } | null)?.default_commission_type ?? null); });
-    return () => { live = false; };
+    supabase
+      .from("agents")
+      .select("default_commission_type")
+      .eq("id", booking.agent_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (live)
+          setAgentType(
+            (data as { default_commission_type?: string } | null)?.default_commission_type ?? null,
+          );
+      });
+    return () => {
+      live = false;
+    };
   }, [booking.agent_id]);
-  const oldCommission = booking.commission_amount != null ? Number(booking.commission_amount) : null;
+  const oldCommission =
+    booking.commission_amount != null ? Number(booking.commission_amount) : null;
   const oldRoomRate = Number(booking.room_price ?? 0);
   const newRoomRate = stay?.room_price ?? 0;
   const isAgentStay = booking.source === "agent" && oldCommission != null;
   const commissionPaid = !!booking.commission_paid;
-  const newCommission = isAgentStay && !commissionPaid && agentType === "percentage" && oldRoomRate > 0 && newRoomRate > 0
-    ? Math.round(oldCommission! * (newRoomRate / oldRoomRate) * 100) / 100
-    : null;
-  const hasChanges = form.room_id !== booking.room_id || form.check_in !== booking.check_in || form.check_out !== booking.check_out || guestCount !== booking.guest_count;
-  const commissionNote = !(isAgentStay && hasChanges && nights > 0 && newRoomRate !== oldRoomRate) ? ""
-    : newCommission !== null && newCommission !== oldCommission ? `Agent commission will update from ₹${oldCommission!.toLocaleString("en-IN")} to ₹${newCommission.toLocaleString("en-IN")}.`
-    : commissionPaid ? "Agent commission was already paid, so it won't change — adjust it manually if needed."
-    : agentType && agentType !== "percentage" ? "Agent commission is a fixed amount and stays the same." : "";
+  const newCommission =
+    isAgentStay &&
+    !commissionPaid &&
+    agentType === "percentage" &&
+    oldRoomRate > 0 &&
+    newRoomRate > 0
+      ? Math.round(oldCommission! * (newRoomRate / oldRoomRate) * 100) / 100
+      : null;
+  const hasChanges =
+    form.room_id !== booking.room_id ||
+    form.check_in !== booking.check_in ||
+    form.check_out !== booking.check_out ||
+    guestCount !== booking.guest_count;
+  const commissionNote = !(isAgentStay && hasChanges && nights > 0 && newRoomRate !== oldRoomRate)
+    ? ""
+    : newCommission !== null && newCommission !== oldCommission
+      ? `Agent commission will update from ₹${oldCommission!.toLocaleString("en-IN")} to ₹${newCommission.toLocaleString("en-IN")}.`
+      : commissionPaid
+        ? "Agent commission was already paid, so it won't change — adjust it manually if needed."
+        : agentType && agentType !== "percentage"
+          ? "Agent commission is a fixed amount and stays the same."
+          : "";
   const handleSave = async () => {
-    if (nights <= 0) { setError("Check-out must be after check-in"); return; }
-    if (!ratesQ.isSuccess) { setError("Seasonal prices haven't loaded yet, so the new total isn't reliable. Wait a moment, or tap Try again."); return; }
-    setSaving(true); setError("");
+    if (nights <= 0) {
+      setError("Check-out must be after check-in");
+      return;
+    }
+    if (!ratesQ.isSuccess) {
+      setError(
+        "Seasonal prices haven't loaded yet, so the new total isn't reliable. Wait a moment, or tap Try again.",
+      );
+      return;
+    }
+    setSaving(true);
+    setError("");
     try {
       const roomCost = stay?.room_price ?? 0;
       const extraCharge = stay?.extra_guest_charge ?? 0;
-      const { error: err } = await supabase.from("bookings").update({ room_id: form.room_id, check_in: form.check_in, check_out: form.check_out, guest_count: guestCount, room_price: roomCost, extra_guest_charge: extraCharge, total_amount: newTotal, is_paid: after.balance === 0 && after.netTotal > 0, ...(newCommission !== null ? { commission_amount: newCommission } : {}) }).eq("id", booking.id);
+      const { error: err } = await supabase
+        .from("bookings")
+        .update({
+          room_id: form.room_id,
+          check_in: form.check_in,
+          check_out: form.check_out,
+          guest_count: guestCount,
+          room_price: roomCost,
+          extra_guest_charge: extraCharge,
+          total_amount: newTotal,
+          is_paid: after.balance === 0 && after.netTotal > 0,
+          ...(newCommission !== null ? { commission_amount: newCommission } : {}),
+        })
+        .eq("id", booking.id);
       if (err) throw err;
-      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved();
-    } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onSaved();
+    } catch (e: unknown) {
+      setError(friendlyDbError(e, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal
@@ -846,100 +2225,486 @@ function EditStayModal({ booking, rooms, property, onClose, onSaved }: {
           {error && <p className="text-xs text-destructive">{error}</p>}
           <RatesNotice query={ratesQ} />
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={!hasChanges || !ratesQ.isSuccess} loading={saving}>Save changes</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={handleSave}
+              disabled={!hasChanges || !ratesQ.isSuccess}
+              loading={saving}
+            >
+              Save changes
+            </Button>
           </ModalActions>
         </>
       }
     >
-          <div><label className={labelCls}>Room</label><select value={form.room_id} onChange={(e) => set("room_id", e.target.value)} className={inputCls}>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests included</option>)}</select></div>
-          <div className="space-y-2"><label className={labelCls}>Stay dates</label><RoomAvailabilityCalendar roomIds={form.room_id ? [form.room_id as string] : []} checkIn={form.check_in as string} checkOut={form.check_out as string} turnoverSafe={turnoverSafe} exclude={{ bookingId: booking.id, roomId: booking.room_id ?? "", checkIn: booking.check_in, checkOut: booking.check_out }} onChange={(ci, co) => { set("check_in", ci); set("check_out", co); }} /><p className="text-xs text-muted-foreground">Check-in {(form.check_in as string) || "—"} · Check-out {(form.check_out as string) || "—"}</p></div>
-          <div><label className={labelCls}>Number of guests</label><input type="number" min={1} max={20} value={form.guest_count} onChange={(e) => set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)} className={inputCls} /></div>
-          {nights > 0 && selectedRoom && (
-            <div className="rounded-2xl border border-border/60 p-3 space-y-1">
-              <div className="flex justify-between text-sm"><span className="text-muted-foreground">{nights}N · room</span><span>₹{(stay?.room_price ?? 0).toLocaleString("en-IN")}</span></div>
-              {guestCount > selectedRoom.max_guests && <div className="flex justify-between text-sm text-muted-foreground"><span>{guestCount - selectedRoom.max_guests} extra guest{guestCount - selectedRoom.max_guests > 1 ? "s" : ""}</span><span>₹{(Math.max(0, guestCount - selectedRoom.max_guests) * (selectedRoom.extra_guest_price ?? 0) * nights).toLocaleString("en-IN")}</span></div>}
-              <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1"><span>New total</span><span>₹{newTotal.toLocaleString("en-IN")}</span></div>
+      <div>
+        <label className={labelCls}>Room</label>
+        <select
+          value={form.room_id}
+          onChange={(e) => set("room_id", e.target.value)}
+          className={inputCls}
+        >
+          {rooms.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.name} — ₹{r.base_price.toLocaleString("en-IN")}/night · {r.max_guests} guests
+              included
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="space-y-2">
+        <label className={labelCls}>Stay dates</label>
+        <RoomAvailabilityCalendar
+          roomIds={form.room_id ? [form.room_id as string] : []}
+          checkIn={form.check_in as string}
+          checkOut={form.check_out as string}
+          turnoverSafe={turnoverSafe}
+          exclude={{
+            bookingId: booking.id,
+            roomId: booking.room_id ?? "",
+            checkIn: booking.check_in,
+            checkOut: booking.check_out,
+          }}
+          onChange={(ci, co) => {
+            set("check_in", ci);
+            set("check_out", co);
+          }}
+        />
+        <p className="text-xs text-muted-foreground">
+          Check-in {(form.check_in as string) || "—"} · Check-out{" "}
+          {(form.check_out as string) || "—"}
+        </p>
+      </div>
+      <div>
+        <label className={labelCls}>Number of guests</label>
+        <input
+          type="number"
+          min={1}
+          max={20}
+          value={form.guest_count}
+          onChange={(e) =>
+            set("guest_count", e.target.value === "" ? "" : parseInt(e.target.value) || 1)
+          }
+          className={inputCls}
+        />
+      </div>
+      {nights > 0 && selectedRoom && (
+        <div className="rounded-2xl border border-border/60 p-3 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">{nights}N · room</span>
+            <span>₹{(stay?.room_price ?? 0).toLocaleString("en-IN")}</span>
+          </div>
+          {guestCount > selectedRoom.max_guests && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>
+                {guestCount - selectedRoom.max_guests} extra guest
+                {guestCount - selectedRoom.max_guests > 1 ? "s" : ""}
+              </span>
+              <span>
+                ₹
+                {(
+                  Math.max(0, guestCount - selectedRoom.max_guests) *
+                  (selectedRoom.extra_guest_price ?? 0) *
+                  nights
+                ).toLocaleString("en-IN")}
+              </span>
             </div>
           )}
-          {commissionNote && (
-            <div className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-xs">{commissionNote}</div>
-          )}
-          {hasChanges && nights > 0 && (
-            <div className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-              <div>New total ₹{newTotal.toLocaleString("en-IN")}{stayChargesTotal > 0 ? ` + extras ₹${stayChargesTotal.toLocaleString("en-IN")}` : ""}{stayDiscount > 0 ? ` − discount ₹${stayDiscount.toLocaleString("en-IN")}` : ""}{stayAdvance > 0 ? ` − advance ₹${stayAdvance.toLocaleString("en-IN")}` : ""}</div>
-              <div className="font-semibold">{after.refundDue > 0 ? `Guest has overpaid by ₹${after.refundDue.toLocaleString("en-IN")} — refund or adjust after saving.` : after.balance === 0 ? "Fully paid after this change." : `New balance due: ₹${after.balance.toLocaleString("en-IN")}`}</div>
-              {stayDiscount > newTotal && <div>⚠️ The existing ₹{stayDiscount.toLocaleString("en-IN")} discount is larger than the new room total — review the discount after saving.</div>}
+          <div className="flex justify-between text-sm font-semibold text-primary border-t border-border pt-1 mt-1">
+            <span>New total</span>
+            <span>₹{newTotal.toLocaleString("en-IN")}</span>
+          </div>
+        </div>
+      )}
+      {commissionNote && (
+        <div className="rounded-2xl border border-border/60 bg-muted/40 px-3 py-2 text-xs">
+          {commissionNote}
+        </div>
+      )}
+      {hasChanges && nights > 0 && (
+        <div
+          className={`rounded-xl border px-3 py-2 text-xs space-y-1 ${after.refundDue > 0 || stayDiscount > newTotal ? "bg-red-50 border-red-200 text-red-800" : "bg-amber-50 border-amber-200 text-amber-800"}`}
+        >
+          <div>
+            New total ₹{newTotal.toLocaleString("en-IN")}
+            {stayChargesTotal > 0 ? ` + extras ₹${stayChargesTotal.toLocaleString("en-IN")}` : ""}
+            {stayDiscount > 0 ? ` − discount ₹${stayDiscount.toLocaleString("en-IN")}` : ""}
+            {stayAdvance > 0 ? ` − advance ₹${stayAdvance.toLocaleString("en-IN")}` : ""}
+          </div>
+          <div className="font-semibold">
+            {after.refundDue > 0
+              ? `Guest has overpaid by ₹${after.refundDue.toLocaleString("en-IN")} — refund or adjust after saving.`
+              : after.balance === 0
+                ? "Fully paid after this change."
+                : `New balance due: ₹${after.balance.toLocaleString("en-IN")}`}
+          </div>
+          {stayDiscount > newTotal && (
+            <div>
+              ⚠️ The existing ₹{stayDiscount.toLocaleString("en-IN")} discount is larger than the
+              new room total — review the discount after saving.
             </div>
           )}
+        </div>
+      )}
     </Modal>
   );
 }
 
-function DiscountForm({ booking, discount, onSaved, onCancel }: { booking: Booking; discount: number; onSaved: () => void; onCancel: () => void }) {
-  const [amount, setAmount] = useState(discount > 0 ? String(discount) : ""); const [reason, setReason] = useState(booking.discount_reason ?? ""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
+function DiscountForm({
+  booking,
+  discount,
+  onSaved,
+  onCancel,
+}: {
+  booking: Booking;
+  discount: number;
+  onSaved: () => void;
+  onCancel: () => void;
+}) {
+  const [amount, setAmount] = useState(discount > 0 ? String(discount) : "");
+  const [reason, setReason] = useState(booking.discount_reason ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const queryClient = useQueryClient();
-  const handleSave = async () => { const amt = parseFloat(amount) || 0; if (amt < 0) { setError("Cannot be negative"); return; } if (amt > Number(booking.total_amount)) { setError("Cannot exceed total"); return; } setSaving(true); setError(""); try { const { error: err } = await supabase.from("bookings").update({ discount_amount: amt, discount_reason: reason.trim() || null }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); } catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); } };
-  const handleRemove = async () => { setSaving(true); await supabase.from("bookings").update({ discount_amount: 0, discount_reason: null }).eq("id", booking.id); queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(); };
+  const handleSave = async () => {
+    const amt = parseFloat(amount) || 0;
+    if (amt < 0) {
+      setError("Cannot be negative");
+      return;
+    }
+    if (amt > Number(booking.total_amount)) {
+      setError("Cannot exceed total");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const { error: err } = await supabase
+        .from("bookings")
+        .update({ discount_amount: amt, discount_reason: reason.trim() || null })
+        .eq("id", booking.id);
+      if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onSaved();
+    } catch (e: unknown) {
+      setError(friendlyDbError(e, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
+  };
+  const handleRemove = async () => {
+    setSaving(true);
+    await supabase
+      .from("bookings")
+      .update({ discount_amount: 0, discount_reason: null })
+      .eq("id", booking.id);
+    queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+    onSaved();
+  };
   return (
     <div className="rounded-xl border border-green-200 bg-green-50/50 p-4 space-y-3">
-      <div className="text-sm font-medium text-green-900">{discount > 0 ? "Edit discount" : "Add discount"}</div>
-      <div><label className={labelCls}>Discount amount (₹)</label><input type="number" min={0} max={Number(booking.total_amount)} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} placeholder="e.g. 500" autoFocus /></div>
-      <div><label className={labelCls}>Reason (optional)</label><input value={reason} onChange={(e) => setReason(e.target.value)} className={inputCls} placeholder="e.g. Regular guest" /></div>
+      <div className="text-sm font-medium text-green-900">
+        {discount > 0 ? "Edit discount" : "Add discount"}
+      </div>
+      <div>
+        <label className={labelCls}>Discount amount (₹)</label>
+        <input
+          type="number"
+          min={0}
+          max={Number(booking.total_amount)}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. 500"
+          autoFocus
+        />
+      </div>
+      <div>
+        <label className={labelCls}>Reason (optional)</label>
+        <input
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          className={inputCls}
+          placeholder="e.g. Regular guest"
+        />
+      </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2">{discount > 0 && <button onClick={handleRemove} disabled={saving} className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50">Remove</button>}<button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
+      <div className="flex gap-2">
+        {discount > 0 && (
+          <button
+            onClick={handleRemove}
+            disabled={saving}
+            className="px-3 rounded-full border border-destructive/30 text-destructive text-xs py-2 hover:bg-destructive/5 disabled:opacity-50"
+          >
+            Remove
+          </button>
+        )}
+        <button
+          onClick={onCancel}
+          className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 rounded-full bg-green-600 text-white py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+      </div>
     </div>
   );
 }
 
-function OverviewTab({ booking, roomName, property, onEditSource, advance, discount, balance, chargesTotal, onPaymentSaved, ownerPhone, upiId }: {
-  booking: Booking; roomName: string; property: ReturnType<typeof useOwnerProperty>["data"]; onEditSource: () => void; advance: number; discount: number; balance: number; chargesTotal: number; onPaymentSaved: (confirmed?: boolean) => void; ownerPhone: string; upiId?: string;
+function OverviewTab({
+  booking,
+  roomName,
+  property,
+  onEditSource,
+  advance,
+  discount,
+  balance,
+  chargesTotal,
+  onPaymentSaved,
+  ownerPhone,
+  upiId,
+}: {
+  booking: Booking;
+  roomName: string;
+  property: ReturnType<typeof useOwnerProperty>["data"];
+  onEditSource: () => void;
+  advance: number;
+  discount: number;
+  balance: number;
+  chargesTotal: number;
+  onPaymentSaved: (confirmed?: boolean) => void;
+  ownerPhone: string;
+  upiId?: string;
 }) {
-  const [showPaymentForm, setShowPaymentForm] = useState(false); const [showDiscountForm, setShowDiscountForm] = useState(false);
-  const { refundDue } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showDiscountForm, setShowDiscountForm] = useState(false);
+  const { refundDue } = computeBalance({
+    roomTotal: Number(booking.total_amount),
+    chargesTotal,
+    discount,
+    advance,
+  });
   return (
     <div className="p-5 space-y-4">
-      <GuestPanel propertyId={booking.property_id} guestId={booking.guest_id} name={booking.guest_name} phone={booking.guest_phone} email={booking.guest_email} />
+      <GuestPanel
+        propertyId={booking.property_id}
+        guestId={booking.guest_id}
+        name={booking.guest_name}
+        phone={booking.guest_phone}
+        email={booking.guest_email}
+      />
       <Section title="Stay details">
-        <Row label="Room" value={roomName} /><Row label="Check-in" value={booking.check_in} /><Row label="Check-out" value={booking.check_out} /><Row label="Nights" value={`${booking.nights}`} /><Row label="Guests" value={`${booking.guest_count}`} />
+        <Row label="Room" value={roomName} />
+        <Row label="Check-in" value={booking.check_in} />
+        <Row label="Check-out" value={booking.check_out} />
+        <Row label="Nights" value={`${booking.nights}`} />
+        <Row label="Guests" value={`${booking.guest_count}`} />
         <Row label="Source" value={sourceSummary(booking)} />
-        <button type="button" onClick={onEditSource} className="text-xs font-medium text-primary">Change source</button>
+        <button type="button" onClick={onEditSource} className="text-xs font-medium text-primary">
+          Change source
+        </button>
         {booking.payment_method && <Row label="Payment method" value={booking.payment_method} />}
-        {booking.checked_in_at && <Row label="Checked in at" value={new Date(booking.checked_in_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
-        {booking.checked_out_at && <Row label="Checked out at" value={new Date(booking.checked_out_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })} />}
+        {booking.checked_in_at && (
+          <Row
+            label="Checked in at"
+            value={new Date(booking.checked_in_at).toLocaleString("en-IN", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+          />
+        )}
+        {booking.checked_out_at && (
+          <Row
+            label="Checked out at"
+            value={new Date(booking.checked_out_at).toLocaleString("en-IN", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+          />
+        )}
       </Section>
       <Section title="Payment summary">
-        <Row label="Room total" value={`₹${Number(booking.total_amount).toLocaleString("en-IN")}`} />
-        {chargesTotal > 0 && <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />}
-        {discount > 0 && <Row label={`Discount${booking.discount_reason ? ` (${booking.discount_reason})` : ""}`} value={`-₹${discount.toLocaleString("en-IN")}`} highlight="green" />}
-        {advance > 0 && <Row label="Advance paid" value={`₹${advance.toLocaleString("en-IN")}`} highlight="green" />}
-        {booking.payment_reference && <Row label="Reference" value={booking.payment_reference} small />}
-        <div className="border-t border-border pt-2 mt-1"><Row label={refundDue > 0 ? "Refund due" : "Balance due"} value={refundDue > 0 ? `₹${refundDue.toLocaleString("en-IN")}` : balance === 0 ? "Fully paid ✓" : `₹${balance.toLocaleString("en-IN")}`} highlight={balance === 0 ? "green" : "amber"} bold /></div>
-      </Section>
-      {!showDiscountForm && !showPaymentForm && !["cancelled", "completed"].includes(booking.status) && <button onClick={() => setShowDiscountForm(true)} className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"><Tag className="h-4 w-4" />{discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}</button>}
-      {showDiscountForm && <DiscountForm booking={booking} discount={discount} onSaved={() => { setShowDiscountForm(false); onPaymentSaved(); }} onCancel={() => setShowDiscountForm(false)} />}
-      {!showPaymentForm && !showDiscountForm && balance > 0 && <button onClick={() => setShowPaymentForm(true)} className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"><IndianRupee className="h-4 w-4" />{advance > 0 ? "Record part payment" : "Record advance payment"}</button>}
-      {!showPaymentForm && !showDiscountForm && balance === 0 && <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">{refundDue > 0 ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust` : "Fully paid ✓"}</div>}
-      {showPaymentForm && <RecordPaymentForm booking={booking} advance={advance} discount={discount} chargesTotal={chargesTotal} onSaved={(confirmed) => { setShowPaymentForm(false); onPaymentSaved(confirmed); }} onCancel={() => setShowPaymentForm(false)} />}
-      <Section title="Send to guest">
-        <div className="space-y-2">
-          <WALink href={paymentReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, totalAmount: Number(booking.total_amount), chargesTotal, discount, advancePaid: Number(booking.advance_amount ?? 0), checkIn: booking.check_in, propertyName: property?.name ?? "", upiId, ownerPhone, trackingUrl: guestTrackingUrl(window.location.origin, booking.tracking_token, booking.property_id) })} label="💰 Payment reminder" />
-          <WALink href={dayBeforeReminderLink({ guestPhone: booking.guest_phone, guestName: booking.guest_name, propertyName: property?.name ?? "", checkInTime: property?.check_in_time ?? "2:00 PM", ownerPhone })} label="🌿 Day-before reminder" />
+        <Row
+          label="Room total"
+          value={`₹${Number(booking.total_amount).toLocaleString("en-IN")}`}
+        />
+        {chargesTotal > 0 && (
+          <Row label="Extra charges" value={`₹${chargesTotal.toLocaleString("en-IN")}`} />
+        )}
+        {discount > 0 && (
+          <Row
+            label={`Discount${booking.discount_reason ? ` (${booking.discount_reason})` : ""}`}
+            value={`-₹${discount.toLocaleString("en-IN")}`}
+            highlight="green"
+          />
+        )}
+        {advance > 0 && (
+          <Row
+            label="Advance paid"
+            value={`₹${advance.toLocaleString("en-IN")}`}
+            highlight="green"
+          />
+        )}
+        {booking.payment_reference && (
+          <Row label="Reference" value={booking.payment_reference} small />
+        )}
+        <div className="border-t border-border pt-2 mt-1">
+          <Row
+            label={refundDue > 0 ? "Refund due" : "Balance due"}
+            value={
+              refundDue > 0
+                ? `₹${refundDue.toLocaleString("en-IN")}`
+                : balance === 0
+                  ? "Fully paid ✓"
+                  : `₹${balance.toLocaleString("en-IN")}`
+            }
+            highlight={balance === 0 ? "green" : "amber"}
+            bold
+          />
         </div>
       </Section>
-      {!["cancelled", "completed"].includes(booking.status) && <CancelButton bookingId={booking.id} roomId={booking.room_id} checkIn={booking.check_in} checkOut={booking.check_out} onCancelled={onPaymentSaved} />}
+      {!showDiscountForm &&
+        !showPaymentForm &&
+        !["cancelled", "completed"].includes(booking.status) && (
+          <button
+            onClick={() => setShowDiscountForm(true)}
+            className="w-full rounded-xl border border-green-200 bg-green-50/50 py-3 text-sm font-medium text-green-700 hover:bg-green-50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Tag className="h-4 w-4" />
+            {discount > 0 ? `Edit discount (₹${discount.toLocaleString("en-IN")})` : "Add discount"}
+          </button>
+        )}
+      {showDiscountForm && (
+        <DiscountForm
+          booking={booking}
+          discount={discount}
+          onSaved={() => {
+            setShowDiscountForm(false);
+            onPaymentSaved();
+          }}
+          onCancel={() => setShowDiscountForm(false)}
+        />
+      )}
+      {!showPaymentForm && !showDiscountForm && balance > 0 && (
+        <button
+          onClick={() => setShowPaymentForm(true)}
+          className="w-full rounded-xl border border-primary/30 bg-primary-light/40 py-3 text-sm font-medium text-primary hover:bg-primary-light/60 transition-colors flex items-center justify-center gap-2"
+        >
+          <IndianRupee className="h-4 w-4" />
+          {advance > 0 ? "Record part payment" : "Record advance payment"}
+        </button>
+      )}
+      {!showPaymentForm && !showDiscountForm && balance === 0 && (
+        <div className="w-full rounded-xl border border-primary/20 bg-primary-light/20 py-3 text-sm font-medium text-primary text-center">
+          {refundDue > 0
+            ? `Overpaid by ₹${refundDue.toLocaleString("en-IN")} — refund or adjust`
+            : "Fully paid ✓"}
+        </div>
+      )}
+      {showPaymentForm && (
+        <RecordPaymentForm
+          booking={booking}
+          advance={advance}
+          discount={discount}
+          chargesTotal={chargesTotal}
+          onSaved={(confirmed) => {
+            setShowPaymentForm(false);
+            onPaymentSaved(confirmed);
+          }}
+          onCancel={() => setShowPaymentForm(false)}
+        />
+      )}
+      <Section title="Send to guest">
+        <div className="space-y-2">
+          <WALink
+            href={paymentReminderLink({
+              guestPhone: booking.guest_phone,
+              guestName: booking.guest_name,
+              totalAmount: Number(booking.total_amount),
+              chargesTotal,
+              discount,
+              advancePaid: Number(booking.advance_amount ?? 0),
+              checkIn: booking.check_in,
+              propertyName: property?.name ?? "",
+              upiId,
+              ownerPhone,
+              trackingUrl: guestTrackingUrl(
+                window.location.origin,
+                booking.tracking_token,
+                booking.property_id,
+              ),
+            })}
+            label="💰 Payment reminder"
+          />
+          <WALink
+            href={dayBeforeReminderLink({
+              guestPhone: booking.guest_phone,
+              guestName: booking.guest_name,
+              propertyName: property?.name ?? "",
+              checkInTime: property?.check_in_time ?? "2:00 PM",
+              ownerPhone,
+            })}
+            label="🌿 Day-before reminder"
+          />
+        </div>
+      </Section>
+      {!["cancelled", "completed"].includes(booking.status) && (
+        <CancelButton
+          bookingId={booking.id}
+          roomId={booking.room_id}
+          checkIn={booking.check_in}
+          checkOut={booking.check_out}
+          onCancelled={onPaymentSaved}
+        />
+      )}
     </div>
   );
 }
 
 function WALink({ href, label }: { href: string; label: string }) {
-  return <a href={href} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-2xl border border-border/60 px-3 py-2.5 text-sm hover:bg-muted transition-colors"><MessageCircle className="h-4 w-4 text-[#25D366]" />{label}</a>;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-2 rounded-2xl border border-border/60 px-3 py-2.5 text-sm hover:bg-muted transition-colors"
+    >
+      <MessageCircle className="h-4 w-4 text-[#25D366]" />
+      {label}
+    </a>
+  );
 }
 
-function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { bookingId: string; roomId: string; checkIn: string; checkOut: string; onCancelled: () => void }) {
-  const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const queryClient = useQueryClient();
+function CancelButton({
+  bookingId,
+  roomId,
+  checkIn,
+  checkOut,
+  onCancelled,
+}: {
+  bookingId: string;
+  roomId: string;
+  checkIn: string;
+  checkOut: string;
+  onCancelled: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const handleCancel = async () => {
-    setLoading(true); setError("");
+    setLoading(true);
+    setError("");
     try {
       // Throws on any failure — then the dialog stays open and says so (it used to close as if it had worked).
       await cancelBooking(supabase, bookingId);
@@ -948,60 +2713,277 @@ function CancelButton({ bookingId, roomId, checkIn, checkOut, onCancelled }: { b
       setLoading(false);
       return;
     }
-    try { await releaseDatesIfUnblocked(roomId, checkIn, checkOut); } catch { /* non-fatal: booking is still cancelled either way */ }
+    try {
+      await releaseDatesIfUnblocked(roomId, checkIn, checkOut);
+    } catch {
+      /* non-fatal: booking is still cancelled either way */
+    }
     queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
-    setLoading(false); onCancelled();
+    setLoading(false);
+    onCancelled();
   };
-  if (!confirming) return <button onClick={() => setConfirming(true)} className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors">Cancel booking</button>;
+  if (!confirming)
+    return (
+      <button
+        onClick={() => setConfirming(true)}
+        className="w-full rounded-xl border border-destructive/20 py-2.5 text-sm text-destructive hover:bg-destructive/5 transition-colors"
+      >
+        Cancel booking
+      </button>
+    );
   return (
     <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 space-y-2">
       <p className="text-sm text-destructive font-medium">Are you sure? This cannot be undone.</p>
-      {error && <p role="alert" className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={() => setConfirming(false)} className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted">Keep</button><button onClick={handleCancel} disabled={loading} className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel</button></div>
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setConfirming(false)}
+          className="flex-1 rounded-2xl border border-border/60 py-2 text-sm hover:bg-muted"
+        >
+          Keep
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={loading}
+          className="flex-1 rounded-lg bg-destructive text-white py-2 text-sm hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
+        >
+          {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Cancel
+        </button>
+      </div>
     </div>
   );
 }
 
-function RecordPaymentForm({ booking, advance, discount, chargesTotal, onSaved, onCancel }: { booking: Booking; advance: number; discount: number; chargesTotal: number; onSaved: (confirmed: boolean) => void; onCancel: () => void }) {
-  const suggested = Math.round(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal * 0.25);
-  const [amount, setAmount] = useState(""); const [method, setMethod] = useState(booking.payment_method ?? "UPI"); const [ref, setRef] = useState(""); const [saving, setSaving] = useState(false); const [error, setError] = useState("");
-  const queryClient = useQueryClient(); const grandTotal = Number(booking.total_amount) + chargesTotal; const newPayment = parseFloat(amount) || 0; const newAdvanceTotal = advance + newPayment; const maxAllowed = Math.max(0, grandTotal - discount - advance); const bal = Math.max(0, grandTotal - discount - newAdvanceTotal);
+function RecordPaymentForm({
+  booking,
+  advance,
+  discount,
+  chargesTotal,
+  onSaved,
+  onCancel,
+}: {
+  booking: Booking;
+  advance: number;
+  discount: number;
+  chargesTotal: number;
+  onSaved: (confirmed: boolean) => void;
+  onCancel: () => void;
+}) {
+  const suggested = Math.round(
+    computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal *
+      0.25,
+  );
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState(booking.payment_method ?? "UPI");
+  const [ref, setRef] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
+  const grandTotal = Number(booking.total_amount) + chargesTotal;
+  const newPayment = parseFloat(amount) || 0;
+  const newAdvanceTotal = advance + newPayment;
+  const maxAllowed = Math.max(0, grandTotal - discount - advance);
+  const bal = Math.max(0, grandTotal - discount - newAdvanceTotal);
   const handleSave = async () => {
-    if (!newPayment || newPayment <= 0) { setError("Enter a valid amount"); return; }
-    if (newPayment > maxAllowed) { setError(maxAllowed <= 0 ? "Already fully paid" : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`); return; }
-    setSaving(true); setError("");
+    if (!newPayment || newPayment <= 0) {
+      setError("Enter a valid amount");
+      return;
+    }
+    if (newPayment > maxAllowed) {
+      setError(
+        maxAllowed <= 0
+          ? "Already fully paid"
+          : `Maximum is ₹${maxAllowed.toLocaleString("en-IN")}`,
+      );
+      return;
+    }
+    setSaving(true);
+    setError("");
     // Money confirms a pending booking only once the total received reaches the 25% advance; a smaller
     // part payment is recorded and the booking stays pending until the owner confirms it.
-    const confirmsNow = booking.status === "pending" && meetsConfirmationAdvance(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal, newAdvanceTotal);
+    const confirmsNow =
+      booking.status === "pending" &&
+      meetsConfirmationAdvance(
+        computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount })
+          .netTotal,
+        newAdvanceTotal,
+      );
     const newStatus: string = confirmsNow ? "confirmed" : booking.status;
-    try { const { error: err } = await supabase.from("bookings").update({ advance_amount: newAdvanceTotal, payment_method: method, ...(ref.trim() ? { payment_reference: ref.trim() } : {}), is_paid: newAdvanceTotal >= grandTotal - discount, status: newStatus, ...(newStatus !== "pending" ? { hold_expires_at: null } : {}) }).eq("id", booking.id); if (err) throw err; queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false }); onSaved(confirmsNow); }
-    catch (e: unknown) { setError(friendlyDbError(e, "Save failed")); } finally { setSaving(false); }
+    try {
+      const { error: err } = await supabase
+        .from("bookings")
+        .update({
+          advance_amount: newAdvanceTotal,
+          payment_method: method,
+          ...(ref.trim() ? { payment_reference: ref.trim() } : {}),
+          is_paid: newAdvanceTotal >= grandTotal - discount,
+          status: newStatus,
+          ...(newStatus !== "pending" ? { hold_expires_at: null } : {}),
+        })
+        .eq("id", booking.id);
+      if (err) throw err;
+      queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
+      onSaved(confirmsNow);
+    } catch (e: unknown) {
+      setError(friendlyDbError(e, "Save failed"));
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <div className="rounded-xl border border-primary/20 bg-primary-light/20 p-4 space-y-3">
-      <div className="text-sm font-medium">{advance > 0 ? "Record part payment" : "Record advance payment"}</div>
-      {advance > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Already recorded</span><span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span></div>}
-      {discount > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Discount</span><span className="font-medium text-green-600">-₹{discount.toLocaleString("en-IN")}</span></div>}
-      {chargesTotal > 0 && <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Extra charges</span><span className="font-medium text-amber-700">+₹{chargesTotal.toLocaleString("en-IN")}</span></div>}
-      <div className="text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 flex justify-between"><span>Suggested (25%)</span><span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span></div>
-      <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between"><span className="text-muted-foreground">Remaining balance</span><span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span></div>
-      <div><label className={labelCls}>{advance > 0 ? "New payment (₹) *" : "Amount received (₹) *"}</label><input type="number" min={0} max={maxAllowed} value={amount} onChange={(e) => setAmount(e.target.value)} className={inputCls} autoFocus /></div>
-      <div className="grid grid-cols-2 gap-2"><div><label className={labelCls}>Method</label><select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>{["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => <option key={m} value={m}>{m}</option>)}</select></div><div><label className={labelCls}>Reference</label><input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="Optional" /></div></div>
-      {newPayment > 0 && <div className="rounded-lg bg-background px-3 py-2 space-y-1"><div className="flex justify-between text-sm"><span className="text-muted-foreground">Total paid after this</span><span className="font-semibold text-primary">₹{newAdvanceTotal.toLocaleString("en-IN")}</span></div><div className="flex justify-between text-sm"><span className="text-muted-foreground">Balance remaining</span><span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>{bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}</span></div></div>}
-      {booking.status === "pending" && newPayment > 0 && <ConfirmHint confirms={meetsConfirmationAdvance(computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount }).netTotal, newAdvanceTotal)} needed={suggested} />}
+      <div className="text-sm font-medium">
+        {advance > 0 ? "Record part payment" : "Record advance payment"}
+      </div>
+      {advance > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Already recorded</span>
+          <span className="font-medium text-primary">₹{advance.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      {discount > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Discount</span>
+          <span className="font-medium text-green-600">-₹{discount.toLocaleString("en-IN")}</span>
+        </div>
+      )}
+      {chargesTotal > 0 && (
+        <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+          <span className="text-muted-foreground">Extra charges</span>
+          <span className="font-medium text-amber-700">
+            +₹{chargesTotal.toLocaleString("en-IN")}
+          </span>
+        </div>
+      )}
+      <div className="text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 flex justify-between">
+        <span>Suggested (25%)</span>
+        <span className="font-medium">₹{suggested.toLocaleString("en-IN")}</span>
+      </div>
+      <div className="text-xs bg-background rounded-lg px-3 py-2 flex justify-between">
+        <span className="text-muted-foreground">Remaining balance</span>
+        <span className="font-medium text-amber-700">₹{maxAllowed.toLocaleString("en-IN")}</span>
+      </div>
+      <div>
+        <label className={labelCls}>
+          {advance > 0 ? "New payment (₹) *" : "Amount received (₹) *"}
+        </label>
+        <input
+          type="number"
+          min={0}
+          max={maxAllowed}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={inputCls}
+          autoFocus
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className={labelCls}>Method</label>
+          <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+            {["UPI", "Bank Transfer", "Cash", "Cash on Arrival"].map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Reference</label>
+          <input
+            value={ref}
+            onChange={(e) => setRef(e.target.value)}
+            className={inputCls}
+            placeholder="Optional"
+          />
+        </div>
+      </div>
+      {newPayment > 0 && (
+        <div className="rounded-lg bg-background px-3 py-2 space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Total paid after this</span>
+            <span className="font-semibold text-primary">
+              ₹{newAdvanceTotal.toLocaleString("en-IN")}
+            </span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Balance remaining</span>
+            <span className={`font-semibold ${bal === 0 ? "text-primary" : "text-amber-700"}`}>
+              {bal === 0 ? "Fully paid ✓" : `₹${bal.toLocaleString("en-IN")}`}
+            </span>
+          </div>
+        </div>
+      )}
+      {booking.status === "pending" && newPayment > 0 && (
+        <ConfirmHint
+          confirms={meetsConfirmationAdvance(
+            computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount })
+              .netTotal,
+            newAdvanceTotal,
+          )}
+          needed={suggested}
+        />
+      )}
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <div className="flex gap-2"><button onClick={onCancel} className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70">Cancel</button><button onClick={handleSave} disabled={saving} className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1">{saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save</button></div>
+      <div className="flex gap-2">
+        <button
+          onClick={onCancel}
+          className="flex-1 rounded-full bg-muted py-2 text-sm hover:bg-muted/70"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 rounded-full bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+      </div>
     </div>
   );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><div className="text-xs  font-medium text-muted-foreground">{title}</div><div className="bg-muted/30 rounded-2xl border border-border/60 px-4 py-3 space-y-2">{children}</div></div>;
+  return (
+    <div className="space-y-2">
+      <div className="text-xs  font-medium text-muted-foreground">{title}</div>
+      <div className="bg-muted/30 rounded-2xl border border-border/60 px-4 py-3 space-y-2">
+        {children}
+      </div>
+    </div>
+  );
 }
 
-function Row({ label, value, highlight, bold, small }: { label: string; value: string; highlight?: "green" | "amber"; bold?: boolean; small?: boolean }) {
-  const valColor = highlight === "green" ? "text-primary" : highlight === "amber" ? "text-amber-700" : "text-foreground";
-  return <div className={`flex justify-between items-center ${small ? "text-xs" : "text-sm"}`}><span className="text-muted-foreground">{label}</span><span className={`${valColor} ${bold ? "font-semibold" : "font-medium"}`}>{value}</span></div>;
+function Row({
+  label,
+  value,
+  highlight,
+  bold,
+  small,
+}: {
+  label: string;
+  value: string;
+  highlight?: "green" | "amber";
+  bold?: boolean;
+  small?: boolean;
+}) {
+  const valColor =
+    highlight === "green"
+      ? "text-primary"
+      : highlight === "amber"
+        ? "text-amber-700"
+        : "text-foreground";
+  return (
+    <div className={`flex justify-between items-center ${small ? "text-xs" : "text-sm"}`}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className={`${valColor} ${bold ? "font-semibold" : "font-medium"}`}>{value}</span>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1009,8 +2991,30 @@ function Row({ label, value, highlight, bold, small }: { label: string; value: s
 // ---------------------------------------------------------------------------
 
 type BookingListItem =
-  | { kind: "single"; id: string; checkIn: string; checkOut: string; createdAt: string; status: string; guestName: string; guestPhone: string; amountDue: number; booking: Booking }
-  | { kind: "group"; id: string; checkIn: string; checkOut: string; createdAt: string; status: string; guestName: string; guestPhone: string; amountDue: number; group: BookingGroup };
+  | {
+      kind: "single";
+      id: string;
+      checkIn: string;
+      checkOut: string;
+      createdAt: string;
+      status: string;
+      guestName: string;
+      guestPhone: string;
+      amountDue: number;
+      booking: Booking;
+    }
+  | {
+      kind: "group";
+      id: string;
+      checkIn: string;
+      checkOut: string;
+      createdAt: string;
+      status: string;
+      guestName: string;
+      guestPhone: string;
+      amountDue: number;
+      group: BookingGroup;
+    };
 
 function BookingsAdmin() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
@@ -1025,14 +3029,44 @@ function BookingsAdmin() {
   const [hideCancelled, setHideCancelled] = useState(true);
   const [dateScope, setDateScope] = useState<DateScope>("upcoming");
   const [sortBy, setSortBy] = useState<SortKey>("checkin");
-  const [monthCursor, setMonthCursor] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const [monthCursor, setMonthCursor] = useState(() => {
+    const d = new Date();
+    return { year: d.getFullYear(), month: d.getMonth() };
+  });
 
   // Loads stays from the last 6 months onward (plus older ones still pending / confirmed / unpaid, so the
   // Active and Outstanding counts stay complete) instead of every booking ever made. Browsing an older
   // month in "By month" loads back to cover it, 6 months at a time. See lib/historyWindow.ts.
-  const loadFrom = useMemo(() => windowStartForMonth(new Date(), monthCursor.year, monthCursor.month), [monthCursor.year, monthCursor.month]);
-  const { data: bookings = [], isLoading: bookingsLoading, isPending: bookingsPending, isFetched: bookingsFetched, isFetching: bookingsFetching, isError: bookingsError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_BOOKINGS, keepPrevious: true });
-  const { data: groups = [], isLoading: groupsLoading, isPending: groupsPending, isFetched: groupsFetched, isFetching: groupsFetching, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: loadFrom, alsoKeep: KEEP_OPEN_GROUPS, keepPrevious: true });
+  const loadFrom = useMemo(
+    () => windowStartForMonth(new Date(), monthCursor.year, monthCursor.month),
+    [monthCursor.year, monthCursor.month],
+  );
+  const {
+    data: bookings = [],
+    isLoading: bookingsLoading,
+    isPending: bookingsPending,
+    isFetched: bookingsFetched,
+    isFetching: bookingsFetching,
+    isError: bookingsError,
+    refetch: refetchBookings,
+  } = useBookings(property?.id ?? "", {
+    from: loadFrom,
+    alsoKeep: KEEP_OPEN_BOOKINGS,
+    keepPrevious: true,
+  });
+  const {
+    data: groups = [],
+    isLoading: groupsLoading,
+    isPending: groupsPending,
+    isFetched: groupsFetched,
+    isFetching: groupsFetching,
+    isError: groupsError,
+    refetch: refetchGroups,
+  } = useBookingGroups(property?.id ?? "", {
+    from: loadFrom,
+    alsoKeep: KEEP_OPEN_GROUPS,
+    keepPrevious: true,
+  });
 
   // Deep-link support: the dashboard's "Needs your attention" rows link
   // here with ?bookingId=<id> or ?groupId=<id> so tapping a specific
@@ -1063,11 +3097,21 @@ function BookingsAdmin() {
     // history loaded), so when it is not in the lists, fetch just that one.
     const propertyId = property.id;
     const openOlderGroup = async (id: string) => {
-      const { data } = await supabase.from("booking_groups").select("*, bookings(*), booking_charges(*)").eq("id", id).eq("property_id", propertyId).maybeSingle();
+      const { data } = await supabase
+        .from("booking_groups")
+        .select("*, bookings(*), booking_charges(*)")
+        .eq("id", id)
+        .eq("property_id", propertyId)
+        .maybeSingle();
       if (data) setActiveGroup(data as BookingGroup);
     };
     const openOlderBooking = async (id: string) => {
-      const { data } = await supabase.from("bookings").select("*, booking_charges(*)").eq("id", id).eq("property_id", propertyId).maybeSingle();
+      const { data } = await supabase
+        .from("bookings")
+        .select("*, booking_charges(*)")
+        .eq("id", id)
+        .eq("property_id", propertyId)
+        .maybeSingle();
       if (!data) return;
       if (data.group_id) await openOlderGroup(data.group_id as string);
       else setActiveBooking(data as Booking);
@@ -1092,18 +3136,44 @@ function BookingsAdmin() {
     url.searchParams.delete("bookingId");
     url.searchParams.delete("groupId");
     window.history.replaceState({}, "", url.toString());
-  }, [property?.id, bookingsFetched, groupsFetched, bookingsLoading, groupsLoading, bookingsFetching, groupsFetching, bookings, groups]);
+  }, [
+    property?.id,
+    bookingsFetched,
+    groupsFetched,
+    bookingsLoading,
+    groupsLoading,
+    bookingsFetching,
+    groupsFetching,
+    bookings,
+    groups,
+  ]);
 
   const rooms = (property?.rooms ?? []).filter((r) => r.is_active);
-  const roomNameMap = useMemo(() => { const map: Record<string, string> = {}; (property?.rooms ?? []).forEach((r) => { map[r.id] = r.name; }); return map; }, [property]);
+  const roomNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (property?.rooms ?? []).forEach((r) => {
+      map[r.id] = r.name;
+    });
+    return map;
+  }, [property]);
 
-  const groupBookingIds = useMemo(() => { const ids = new Set<string>(); groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id))); return ids; }, [groups]);
-  const standaloneBookings = useMemo(() => bookings.filter((b) => !groupBookingIds.has(b.id)), [bookings, groupBookingIds]);
+  const groupBookingIds = useMemo(() => {
+    const ids = new Set<string>();
+    groups.forEach((g) => (g.bookings ?? []).forEach((b) => ids.add(b.id)));
+    return ids;
+  }, [groups]);
+  const standaloneBookings = useMemo(
+    () => bookings.filter((b) => !groupBookingIds.has(b.id)),
+    [bookings, groupBookingIds],
+  );
 
   const todayStr = useMemo(() => todayLocalStr(), []);
   const monthStart = `${monthCursor.year}-${pad2(monthCursor.month + 1)}-01`;
   const monthEnd = `${monthCursor.year}-${pad2(monthCursor.month + 1)}-${pad2(new Date(monthCursor.year, monthCursor.month + 1, 0).getDate())}`;
-  const monthLabel = new Date(monthCursor.year, monthCursor.month, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthLabel = new Date(monthCursor.year, monthCursor.month, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 
   const allItems = useMemo<BookingListItem[]>(() => {
     const groupItems: BookingListItem[] = groups.map((g) => {
@@ -1112,8 +3182,14 @@ function BookingsAdmin() {
       const advance = Number(gg.advance_amount ?? 0);
       const discount = Number(gg.discount_amount ?? 0);
       return {
-        kind: "group", id: gg.id, checkIn: gg.check_in, checkOut: gg.check_out,
-        createdAt: gg.created_at, status: gg.status, guestName: gg.guest_name, guestPhone: gg.guest_phone,
+        kind: "group",
+        id: gg.id,
+        checkIn: gg.check_in,
+        checkOut: gg.check_out,
+        createdAt: gg.created_at,
+        status: gg.status,
+        guestName: gg.guest_name,
+        guestPhone: gg.guest_phone,
         amountDue: amountDueFor(Number(gg.total_amount), chargesTotal, discount, advance),
         group: gg,
       };
@@ -1124,8 +3200,14 @@ function BookingsAdmin() {
       const advance = Number(bb.advance_amount ?? 0);
       const discount = Number(bb.discount_amount ?? 0);
       return {
-        kind: "single", id: bb.id, checkIn: bb.check_in, checkOut: bb.check_out,
-        createdAt: bb.created_at, status: bb.status, guestName: bb.guest_name, guestPhone: bb.guest_phone,
+        kind: "single",
+        id: bb.id,
+        checkIn: bb.check_in,
+        checkOut: bb.check_out,
+        createdAt: bb.created_at,
+        status: bb.status,
+        guestName: bb.guest_name,
+        guestPhone: bb.guest_phone,
         amountDue: amountDueFor(Number(bb.total_amount), chargesTotal, discount, advance),
         booking: bb,
       };
@@ -1133,18 +3215,23 @@ function BookingsAdmin() {
     return [...groupItems, ...singleItems];
   }, [groups, standaloneBookings]);
 
-  const filteredItems = useMemo(() => allItems.filter((it) => {
-    const viewingCancelled = filterStatus === "cancelled";
-    if (!viewingCancelled && hideCancelled && it.status === "cancelled") return false;
-    if (filterStatus !== "all" && it.status !== filterStatus) return false;
-    if (q && !`${it.guestName} ${it.guestPhone}`.toLowerCase().includes(q.toLowerCase())) return false;
-    if (dateScope === "upcoming") {
-      if (it.checkOut < todayStr) return false;
-    } else {
-      if (it.checkOut < monthStart || it.checkIn > monthEnd) return false;
-    }
-    return true;
-  }), [allItems, filterStatus, hideCancelled, q, dateScope, todayStr, monthStart, monthEnd]);
+  const filteredItems = useMemo(
+    () =>
+      allItems.filter((it) => {
+        const viewingCancelled = filterStatus === "cancelled";
+        if (!viewingCancelled && hideCancelled && it.status === "cancelled") return false;
+        if (filterStatus !== "all" && it.status !== filterStatus) return false;
+        if (q && !`${it.guestName} ${it.guestPhone}`.toLowerCase().includes(q.toLowerCase()))
+          return false;
+        if (dateScope === "upcoming") {
+          if (it.checkOut < todayStr) return false;
+        } else {
+          if (it.checkOut < monthStart || it.checkIn > monthEnd) return false;
+        }
+        return true;
+      }),
+    [allItems, filterStatus, hideCancelled, q, dateScope, todayStr, monthStart, monthEnd],
+  );
 
   const sortedItems = useMemo(() => {
     const items = [...filteredItems];
@@ -1170,10 +3257,17 @@ function BookingsAdmin() {
     // "your booking is confirmed" for a booking that is still pending.
     const updates = await setBookingStatus(supabase, id, newStatus);
     queryClient.invalidateQueries({ queryKey: ["bookings", property?.id], exact: false });
-    setActiveBooking((prev) => prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev);
+    setActiveBooking((prev) =>
+      prev?.id === id ? { ...prev, status: newStatus as BookingStatus, ...updates } : prev,
+    );
     if (newStatus === "confirmed") {
-      const booking = bookings.find((b) => b.id === id) ?? (activeBooking?.id === id ? activeBooking : undefined);
-      if (booking) promptSendConfirmation(bookingConfirmHref(booking, roomNameMap[booking.room_id] ?? "your room", property), booking.guest_name);
+      const booking =
+        bookings.find((b) => b.id === id) ?? (activeBooking?.id === id ? activeBooking : undefined);
+      if (booking)
+        promptSendConfirmation(
+          bookingConfirmHref(booking, roomNameMap[booking.room_id] ?? "your room", property),
+          booking.guest_name,
+        );
     }
   };
 
@@ -1183,10 +3277,21 @@ function BookingsAdmin() {
     if (href) setConfirmPrompt({ guestName, href });
   };
 
-  const handleCancelAndClose = () => { handleRefresh(); setActiveBooking(null); };
+  const handleCancelAndClose = () => {
+    handleRefresh();
+    setActiveBooking(null);
+  };
   // A payment was saved from the single-booking dialog. If it confirmed the booking, offer the confirmation message.
   const handlePaymentSaved = (confirmed?: boolean) => {
-    if (confirmed && activeBooking) promptSendConfirmation(bookingConfirmHref(activeBooking, roomNameMap[activeBooking.room_id] ?? "your room", property), activeBooking.guest_name);
+    if (confirmed && activeBooking)
+      promptSendConfirmation(
+        bookingConfirmHref(
+          activeBooking,
+          roomNameMap[activeBooking.room_id] ?? "your room",
+          property,
+        ),
+        activeBooking.guest_name,
+      );
     handleCancelAndClose();
   };
   const handleRefresh = () => {
@@ -1194,11 +3299,31 @@ function BookingsAdmin() {
     queryClient.invalidateQueries({ queryKey: ["bookingGroups", property?.id], exact: false });
   };
 
-  const isLoading = propLoading || bookingsLoading || groupsLoading || (!!property?.id && (bookingsPending || groupsPending));
+  const isLoading =
+    propLoading ||
+    bookingsLoading ||
+    groupsLoading ||
+    (!!property?.id && (bookingsPending || groupsPending));
   const totalItems = sortedItems.length;
 
-  if (isLoading) return <div className="animate-in fade-in duration-300 space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>;
-  if (bookingsError || groupsError) return <LoadFailed title="Couldn't load your bookings" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
+  if (isLoading)
+    return (
+      <div className="animate-in fade-in duration-300 space-y-3">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />
+        ))}
+      </div>
+    );
+  if (bookingsError || groupsError)
+    return (
+      <LoadFailed
+        title="Couldn't load your bookings"
+        onRetry={() => {
+          void refetchBookings();
+          void refetchGroups();
+        }}
+      />
+    );
 
   return (
     <div
@@ -1206,21 +3331,61 @@ function BookingsAdmin() {
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] space-y-5"
     >
       <div className="flex items-center justify-between">
-        <div><h1 className="text-[28px] leading-tight font-bold tracking-tight">Bookings</h1><p className="text-sm text-muted-foreground">Tap any booking to view details.</p></div>
-        <Button onClick={() => setShowAdd(true)}><Plus className="h-4 w-4" /> Add</Button>
+        <div>
+          <h1 className="text-[28px] leading-tight font-bold tracking-tight">Bookings</h1>
+          <p className="text-sm text-muted-foreground">Tap any booking to view details.</p>
+        </div>
+        <Button onClick={() => setShowAdd(true)}>
+          <Plus className="h-4 w-4" /> Add
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0"><CheckCircle2 className="h-5 w-5 text-[#166534]" /></div><div><div className="text-xs text-muted-foreground">Active</div><div className="text-2xl font-bold tabular-nums">{stats.active}</div></div></div>
-        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3"><div className="h-11 w-11 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0"><IndianRupee className="h-5 w-5 text-[#92400e]" /></div><div><div className="text-xs text-muted-foreground">Outstanding</div><div className="text-xl font-bold tabular-nums text-[#92400e]">₹{stats.outstanding.toLocaleString("en-IN")}</div></div></div>
+        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3">
+          <div className="h-11 w-11 rounded-full bg-[#dcfce7] flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-[#166534]" />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Active</div>
+            <div className="text-2xl font-bold tabular-nums">{stats.active}</div>
+          </div>
+        </div>
+        <div className="bg-card border border-border/60 rounded-3xl p-4 flex items-center gap-3">
+          <div className="h-11 w-11 rounded-full bg-[#fef3c7] flex items-center justify-center shrink-0">
+            <IndianRupee className="h-5 w-5 text-[#92400e]" />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground">Outstanding</div>
+            <div className="text-xl font-bold tabular-nums text-[#92400e]">
+              ₹{stats.outstanding.toLocaleString("en-IN")}
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-2">
-        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search guest or phone…" className="w-full rounded-full border-0 bg-muted pl-10 pr-4 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60" /></div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search guest or phone…"
+            className="w-full rounded-full border-0 bg-muted pl-10 pr-4 py-3 text-[15px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+          />
+        </div>
 
         <div className="flex gap-2 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((s) => (
-            <button key={s} onClick={() => setFilterStatus(s)} className={["shrink-0 text-sm px-3.5 py-2 rounded-full font-medium transition-colors", filterStatus === s ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
+            <button
+              key={s}
+              onClick={() => setFilterStatus(s)}
+              className={[
+                "shrink-0 text-sm px-3.5 py-2 rounded-full font-medium transition-colors",
+                filterStatus === s
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-foreground/80 hover:bg-muted/70",
+              ].join(" ")}
+            >
               {s === "all" ? "All" : (STATUS_CONFIG[s]?.label ?? s)}
             </button>
           ))}
@@ -1228,20 +3393,69 @@ function BookingsAdmin() {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-full bg-muted p-1 gap-1 shrink-0">
-            <button onClick={() => setDateScope("upcoming")} className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", dateScope === "upcoming" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}>Upcoming</button>
-            <button onClick={() => setDateScope("month")} className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", dateScope === "month" ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}>By month</button>
+            <button
+              onClick={() => setDateScope("upcoming")}
+              className={[
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                dateScope === "upcoming"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/80 hover:bg-card/60",
+              ].join(" ")}
+            >
+              Upcoming
+            </button>
+            <button
+              onClick={() => setDateScope("month")}
+              className={[
+                "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                dateScope === "month"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/80 hover:bg-card/60",
+              ].join(" ")}
+            >
+              By month
+            </button>
           </div>
           {dateScope === "month" && (
             <div className="flex items-center gap-1 shrink-0">
-              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month - 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() =>
+                  setMonthCursor((c) => {
+                    const d = new Date(c.year, c.month - 1, 1);
+                    return { year: d.getFullYear(), month: d.getMonth() };
+                  })
+                }
+                className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
               <span className="text-xs font-medium min-w-[96px] text-center">{monthLabel}</span>
-              <button onClick={() => setMonthCursor((c) => { const d = new Date(c.year, c.month + 1, 1); return { year: d.getFullYear(), month: d.getMonth() }; })} className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"><ChevronRight className="h-3.5 w-3.5" /></button>
+              <button
+                onClick={() =>
+                  setMonthCursor((c) => {
+                    const d = new Date(c.year, c.month + 1, 1);
+                    return { year: d.getFullYear(), month: d.getMonth() };
+                  })
+                }
+                className="h-9 w-9 rounded-full bg-muted flex items-center justify-center hover:bg-muted/70"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           )}
           <div className="flex items-center gap-1.5 text-xs w-full overflow-x-auto pb-0.5">
             <span className="text-muted-foreground shrink-0">Sort:</span>
             {SORT_OPTIONS.map((s) => (
-              <button key={s.key} onClick={() => setSortBy(s.key)} className={["px-3 py-1.5 rounded-full font-medium transition-colors whitespace-nowrap", sortBy === s.key ? "bg-primary/10 text-primary" : "bg-muted text-foreground/80 hover:bg-muted/70"].join(" ")}>
+              <button
+                key={s.key}
+                onClick={() => setSortBy(s.key)}
+                className={[
+                  "px-3 py-1.5 rounded-full font-medium transition-colors whitespace-nowrap",
+                  sortBy === s.key
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-foreground/80 hover:bg-muted/70",
+                ].join(" ")}
+              >
                 {s.label}
               </button>
             ))}
@@ -1249,18 +3463,28 @@ function BookingsAdmin() {
         </div>
 
         {filterStatus !== "cancelled" && (
-          <button onClick={() => setHideCancelled((v) => !v)} className={["self-start text-xs px-3.5 py-2 rounded-full font-medium transition-colors", hideCancelled ? "bg-muted text-foreground/80" : "bg-red-50 text-red-700"].join(" ")}>
+          <button
+            onClick={() => setHideCancelled((v) => !v)}
+            className={[
+              "self-start text-xs px-3.5 py-2 rounded-full font-medium transition-colors",
+              hideCancelled ? "bg-muted text-foreground/80" : "bg-red-50 text-red-700",
+            ].join(" ")}
+          >
             {hideCancelled ? "Show cancelled" : "Hide cancelled"}
           </button>
         )}
       </div>
 
       {totalItems === 0 && dateScope === "month" && (bookingsFetching || groupsFetching) ? (
-        <div className="space-y-3">{[...Array(2)].map((_, i) => <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />)}</div>
+        <div className="space-y-3">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="h-32 rounded-3xl bg-muted animate-pulse" />
+          ))}
+        </div>
       ) : totalItems === 0 ? (
         <div className="rounded-3xl bg-muted/50 p-12 text-center text-muted-foreground">
           {dateScope === "upcoming" && filterStatus === "all" && !q
-            ? "No upcoming bookings — you're all caught up! Switch to \"By month\" to see past bookings."
+            ? 'No upcoming bookings — you\'re all caught up! Switch to "By month" to see past bookings.'
             : "No bookings match these filters."}
         </div>
       ) : (
@@ -1271,14 +3495,31 @@ function BookingsAdmin() {
               let header: React.ReactNode = null;
               if (showDateHeaders) {
                 const bucket = dateBucket(it.checkIn, todayStr);
-                if (bucket !== lastBucket) { header = <div className="text-sm font-semibold text-muted-foreground pt-2 first:pt-0">{bucket}</div>; lastBucket = bucket; }
+                if (bucket !== lastBucket) {
+                  header = (
+                    <div className="text-sm font-semibold text-muted-foreground pt-2 first:pt-0">
+                      {bucket}
+                    </div>
+                  );
+                  lastBucket = bucket;
+                }
               }
               return (
                 <div key={`${it.kind}-${it.id}`}>
                   {header}
-                  {it.kind === "group"
-                    ? <GroupBookingCard group={it.group} roomNameMap={roomNameMap} onClick={() => setActiveGroup(it.group)} />
-                    : <BookingCard booking={it.booking} roomName={roomNameMap[it.booking.room_id] ?? "Unknown room"} onClick={() => setActiveBooking(it.booking)} />}
+                  {it.kind === "group" ? (
+                    <GroupBookingCard
+                      group={it.group}
+                      roomNameMap={roomNameMap}
+                      onClick={() => setActiveGroup(it.group)}
+                    />
+                  ) : (
+                    <BookingCard
+                      booking={it.booking}
+                      roomName={roomNameMap[it.booking.room_id] ?? "Unknown room"}
+                      onClick={() => setActiveBooking(it.booking)}
+                    />
+                  )}
                 </div>
               );
             });
@@ -1286,10 +3527,44 @@ function BookingsAdmin() {
         </div>
       )}
 
-      {showAdd && property && <AddBookingModal propertyId={property.id} property={property} rooms={rooms} onClose={() => setShowAdd(false)} onSaved={() => { handleRefresh(); setShowAdd(false); }} />}
-      {activeBooking && <BookingDetailModal booking={activeBooking} roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"} rooms={rooms} property={property} onClose={() => setActiveBooking(null)} onStatusChange={updateStatus} onPaymentSaved={handlePaymentSaved} />}
-      {activeGroup && <GroupBookingDetailModal group={groups.find((g) => g.id === activeGroup.id) ?? activeGroup} roomNameMap={roomNameMap} property={property} onClose={() => setActiveGroup(null)} onRefresh={handleRefresh} onConfirmed={(g) => promptSendConfirmation(groupConfirmHref(g, roomNameMap, property), g.guest_name)} />}
-      {confirmPrompt && <SendConfirmationPrompt data={confirmPrompt} onDismiss={() => setConfirmPrompt(null)} />}
+      {showAdd && property && (
+        <AddBookingModal
+          propertyId={property.id}
+          property={property}
+          rooms={rooms}
+          onClose={() => setShowAdd(false)}
+          onSaved={() => {
+            handleRefresh();
+            setShowAdd(false);
+          }}
+        />
+      )}
+      {activeBooking && (
+        <BookingDetailModal
+          booking={activeBooking}
+          roomName={roomNameMap[activeBooking.room_id] ?? "Unknown room"}
+          rooms={rooms}
+          property={property}
+          onClose={() => setActiveBooking(null)}
+          onStatusChange={updateStatus}
+          onPaymentSaved={handlePaymentSaved}
+        />
+      )}
+      {activeGroup && (
+        <GroupBookingDetailModal
+          group={groups.find((g) => g.id === activeGroup.id) ?? activeGroup}
+          roomNameMap={roomNameMap}
+          property={property}
+          onClose={() => setActiveGroup(null)}
+          onRefresh={handleRefresh}
+          onConfirmed={(g) =>
+            promptSendConfirmation(groupConfirmHref(g, roomNameMap, property), g.guest_name)
+          }
+        />
+      )}
+      {confirmPrompt && (
+        <SendConfirmationPrompt data={confirmPrompt} onDismiss={() => setConfirmPrompt(null)} />
+      )}
     </div>
   );
 }

@@ -8,7 +8,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildSourcePatch, canChangeSource, sourceSummary } from "./bookingSourceEdit";
 import { computeMoneySummary, sourceGroupOf } from "./moneySummary";
-import { MIN_MISSING_SOURCES, missingBookingSourceRule, type RuleBooking } from "./revenueIntelligence";
+import {
+  MIN_MISSING_SOURCES,
+  missingBookingSourceRule,
+  type RuleBooking,
+} from "./revenueIntelligence";
 import { computePropertyScore, summariseActivity } from "./propertyScore";
 import type { Period } from "./businessMetrics";
 
@@ -17,49 +21,95 @@ const TODAY = "2026-11-20";
 
 // ── the patch ───────────────────────────────────────────────────────────────
 test("source can be edited (direct ⇄ walk-in)", () => {
-  assert.deepEqual(buildSourcePatch({ source: "direct" }, { source: "walk_in" }), { source: "walk_in", booking_source_detail: null });
-  assert.deepEqual(buildSourcePatch({ source: "walk_in", booking_source_detail: "phone" }, { source: "direct", detail: "phone" }), {
-    source: "direct",
-    booking_source_detail: "phone",
+  assert.deepEqual(buildSourcePatch({ source: "direct" }, { source: "walk_in" }), {
+    source: "walk_in",
+    booking_source_detail: null,
   });
+  assert.deepEqual(
+    buildSourcePatch(
+      { source: "walk_in", booking_source_detail: "phone" },
+      { source: "direct", detail: "phone" },
+    ),
+    {
+      source: "direct",
+      booking_source_detail: "phone",
+    },
+  );
 });
 test("source detail can be edited", () => {
-  assert.deepEqual(buildSourcePatch({ source: "direct" }, { detail: "whatsapp" }), { source: "direct", booking_source_detail: "whatsapp" });
-  assert.deepEqual(buildSourcePatch({ source: "direct", booking_source_detail: "whatsapp" }, { detail: "airbnb" }), {
+  assert.deepEqual(buildSourcePatch({ source: "direct" }, { detail: "whatsapp" }), {
     source: "direct",
-    booking_source_detail: "airbnb",
+    booking_source_detail: "whatsapp",
   });
+  assert.deepEqual(
+    buildSourcePatch({ source: "direct", booking_source_detail: "whatsapp" }, { detail: "airbnb" }),
+    {
+      source: "direct",
+      booking_source_detail: "airbnb",
+    },
+  );
 });
 test("source detail can be cleared, and the primary source stays valid", () => {
   const p = buildSourcePatch({ source: "walk_in", booking_source_detail: "phone" }, { detail: "" });
   assert.deepEqual(p, { source: "walk_in", booking_source_detail: null });
-  assert.deepEqual(buildSourcePatch({ source: "direct", booking_source_detail: "google" }, { detail: "   " }), {
-    source: "direct",
-    booking_source_detail: null,
-  });
+  assert.deepEqual(
+    buildSourcePatch({ source: "direct", booking_source_detail: "google" }, { detail: "   " }),
+    {
+      source: "direct",
+      booking_source_detail: null,
+    },
+  );
 });
 test("no change = no patch (nothing is written)", () => {
-  assert.equal(buildSourcePatch({ source: "direct", booking_source_detail: "google" }, { detail: "google" }), null);
-  assert.equal(buildSourcePatch({ source: "direct", booking_source_detail: null }, { detail: "" }), null);
+  assert.equal(
+    buildSourcePatch({ source: "direct", booking_source_detail: "google" }, { detail: "google" }),
+    null,
+  );
+  assert.equal(
+    buildSourcePatch({ source: "direct", booking_source_detail: null }, { detail: "" }),
+    null,
+  );
   assert.equal(buildSourcePatch({ source: "walk_in" }, {}), null);
 });
 test("the patch can only ever carry the two source columns (never money, dates, room, status, payments, guest or agent)", () => {
-  const p = buildSourcePatch({ source: "direct" }, { source: "walk_in", detail: "instagram", ...({ total_amount: 1, advance_amount: 1, guest_id: "x", status: "cancelled" } as object) });
+  const p = buildSourcePatch(
+    { source: "direct" },
+    {
+      source: "walk_in",
+      detail: "instagram",
+      ...({ total_amount: 1, advance_amount: 1, guest_id: "x", status: "cancelled" } as object),
+    },
+  );
   assert.deepEqual(Object.keys(p!).sort(), ["booking_source_detail", "source"]);
 });
 test("agent source stays compatible: it is kept (with its agent and commission) and its detail can still be edited", () => {
   assert.equal(canChangeSource({ source: "agent" }), false);
-  assert.deepEqual(buildSourcePatch({ source: "agent", booking_source_detail: null }, { source: "direct", detail: "whatsapp" }), {
-    source: "agent",
-    booking_source_detail: "whatsapp",
-  });
+  assert.deepEqual(
+    buildSourcePatch(
+      { source: "agent", booking_source_detail: null },
+      { source: "direct", detail: "whatsapp" },
+    ),
+    {
+      source: "agent",
+      booking_source_detail: "whatsapp",
+    },
+  );
   assert.equal(buildSourcePatch({ source: "agent" }, { source: "direct" }), null);
 });
 test("an owner cannot turn a booking into an agent booking here (that needs an agent and a commission)", () => {
-  assert.deepEqual(buildSourcePatch({ source: "direct" }, { source: "agent", detail: "google" }), { source: "direct", booking_source_detail: "google" });
+  assert.deepEqual(buildSourcePatch({ source: "direct" }, { source: "agent", detail: "google" }), {
+    source: "direct",
+    booking_source_detail: "google",
+  });
 });
 test("existing source values stay compatible: unknown stored text is untouched until changed, and reads as written", () => {
-  assert.equal(buildSourcePatch({ source: "direct", booking_source_detail: "facebook" }, { detail: "facebook" }), null);
+  assert.equal(
+    buildSourcePatch(
+      { source: "direct", booking_source_detail: "facebook" },
+      { detail: "facebook" },
+    ),
+    null,
+  );
   assert.equal(sourceSummary({ source: "direct", booking_source_detail: "facebook" }), "facebook");
   assert.equal(sourceGroupOf({ source: "direct", booking_source_detail: "facebook" }), "other");
 });
@@ -67,7 +117,10 @@ test("source line on the booking: reads what is stored, never infers", () => {
   assert.equal(sourceSummary({ source: "direct", booking_source_detail: null }), "Not recorded");
   assert.equal(sourceSummary({ source: "direct", booking_source_detail: "whatsapp" }), "WhatsApp");
   assert.equal(sourceSummary({ source: "walk_in" }), "Walk-in");
-  assert.equal(sourceSummary({ source: "agent", booking_source_detail: "instagram" }), "Agent · Instagram");
+  assert.equal(
+    sourceSummary({ source: "agent", booking_source_detail: "instagram" }),
+    "Agent · Instagram",
+  );
   assert.equal(sourceSummary({ source: "agent" }), "Agent");
 });
 
@@ -109,7 +162,8 @@ function before(): Row[] {
     row({ status: "pending", total_amount: 88888 }), // never counts
   ];
 }
-const money = (rows: Row[]) => computeMoneySummary({ period: NOV, bookings: rows, groups: [], expenses: [], today: TODAY });
+const money = (rows: Row[]) =>
+  computeMoneySummary({ period: NOV, bookings: rows, groups: [], expenses: [], today: TODAY });
 const missing = (rows: Row[]) => {
   const o = missingBookingSourceRule({
     today: TODAY,
@@ -127,7 +181,9 @@ const missing = (rows: Row[]) => {
 test("Revenue Intelligence: the missing-source count goes down as the owner corrects bookings", () => {
   const rows = before();
   assert.equal(missing(rows), 4);
-  const noSource = rows.filter((r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail);
+  const noSource = rows.filter(
+    (r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail,
+  );
   const e1 = apply(rows, noSource[0].id, buildSourcePatch(noSource[0], { detail: "instagram" }));
   assert.equal(missing(e1), 3);
   // 2 left is below MIN_MISSING_SOURCES (3): a couple of gaps is not a pattern, so the opportunity goes quiet.
@@ -135,7 +191,11 @@ test("Revenue Intelligence: the missing-source count goes down as the owner corr
   assert.equal(missing(e2), 0);
   assert.equal(MIN_MISSING_SOURCES, 3);
   // and it comes back, with the right count, if bookings lose their source again
-  const e3 = apply(e2, noSource[0].id, buildSourcePatch(e2.find((r) => r.id === noSource[0].id)!, { detail: "" }));
+  const e3 = apply(
+    e2,
+    noSource[0].id,
+    buildSourcePatch(e2.find((r) => r.id === noSource[0].id)!, { detail: "" }),
+  );
   assert.equal(missing(e3), 3); // 4 gaps − 2 corrected + 1 cleared = 3 → reported again
 });
 test("Revenue Intelligence: clearing a detail makes the booking count as missing again", () => {
@@ -151,7 +211,9 @@ test("Money: editing sources moves revenue between source rows but never changes
   const unknown = a.bySource.find((r) => r.group === "unknown")!;
   assert.equal(unknown.bookings, 4);
 
-  const noSource = rows.filter((r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail);
+  const noSource = rows.filter(
+    (r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail,
+  );
   let edited = apply(rows, noSource[0].id, buildSourcePatch(noSource[0], { detail: "instagram" }));
   edited = apply(edited, noSource[1].id, buildSourcePatch(noSource[1], { detail: "whatsapp" }));
   const b = money(edited);
@@ -176,11 +238,19 @@ test("Money: source totals still reconcile exactly to total revenue, before and 
     assert.equal(Math.round(s.bySource.reduce((t, r) => t + r.revenue, 0) * 100) / 100, s.revenue);
   reconciles(money(rows));
   const target = rows[1];
-  for (const patch of [{ detail: "google" }, { source: "walk_in" }, { detail: "unheard-of-source" }, { detail: "" }]) {
+  for (const patch of [
+    { detail: "google" },
+    { source: "walk_in" },
+    { detail: "unheard-of-source" },
+    { detail: "" },
+  ]) {
     reconciles(money(apply(rows, target.id, buildSourcePatch(target, patch))));
   }
   // a stay split across the period boundary (odd fraction) still reconciles after an edit
-  const split = [...rows, row({ check_in: "2026-10-30", check_out: "2026-11-02", total_amount: 1000 })];
+  const split = [
+    ...rows,
+    row({ check_in: "2026-10-30", check_out: "2026-11-02", total_amount: 1000 }),
+  ];
   const sp = split[split.length - 1];
   reconciles(money(split));
   reconciles(money(apply(split, sp.id, buildSourcePatch(sp, { detail: "phone" }))));
@@ -199,10 +269,21 @@ test("Property Score: the 'booking sources recorded' share follows source edits 
   const rows = before();
   const share = (rs: Row[]) => summariseActivity(rs, [], TODAY).withSourceDetail;
   const a = share(rows);
-  const target = rows.find((r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail)!;
-  assert.equal(share(apply(rows, target.id, buildSourcePatch(target, { detail: "google" }))), a + 1);
+  const target = rows.find(
+    (r) => r.status === "confirmed" && r.source === "direct" && !r.booking_source_detail,
+  )!;
+  assert.equal(
+    share(apply(rows, target.id, buildSourcePatch(target, { detail: "google" }))),
+    a + 1,
+  );
   const prop = { name: "Hill View", rooms: [{ is_active: true, base_price: 3000 }] };
   const sc = (rs: Row[]) =>
-    computePropertyScore(prop, { today: TODAY, activity: summariseActivity(rs, [], TODAY), seasonRates: [], bookingTotal: rs.length, expenseCount: 1 }).items.find((i) => i.id === "growth_source")!.points;
+    computePropertyScore(prop, {
+      today: TODAY,
+      activity: summariseActivity(rs, [], TODAY),
+      seasonRates: [],
+      bookingTotal: rs.length,
+      expenseCount: 1,
+    }).items.find((i) => i.id === "growth_source")!.points;
   assert.ok(sc(apply(rows, target.id, buildSourcePatch(target, { detail: "google" }))) >= sc(rows));
 });

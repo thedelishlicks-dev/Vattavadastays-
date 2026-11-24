@@ -24,7 +24,8 @@ export async function fetchSharedAmenities(propertyId: string): Promise<string[]
     .eq("id", propertyId)
     .single();
   if (error) throw error;
-  return ((data as { shared_amenities: string[] | null } | null)?.shared_amenities ?? []) as string[];
+  return ((data as { shared_amenities: string[] | null } | null)?.shared_amenities ??
+    []) as string[];
 }
 
 /**
