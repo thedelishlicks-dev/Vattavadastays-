@@ -19,6 +19,10 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// Intentional copy: this function is pasted into the Supabase dashboard as a single file, so it
+// cannot import src/lib/superadmin.ts. It is the *authorization* check for a service-key function,
+// so it fails closed on any mismatch. src/lib/superadmin.test.ts fails if this value ever differs
+// from the app constant. See docs/superadmin-authorization.md.
 const SUPERADMIN_EMAIL = "thedelishlicks@gmail.com";
 const DEFAULT_SITE = "https://stayidom.in";
 
