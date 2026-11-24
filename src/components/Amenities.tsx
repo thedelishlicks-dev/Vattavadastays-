@@ -23,23 +23,26 @@ import type { Property } from "@/hooks/useProperty";
 // Icon + label map — keys must match PROPERTY_AMENITY_OPTIONS in
 // src/routes/admin.amenities.tsx exactly.
 // ---------------------------------------------------------------------------
-const AMENITY_META: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
-  parking:        { label: "Parking",              icon: Car },
-  wifi:           { label: "WiFi",                 icon: Wifi },
-  swimming_pool:  { label: "Swimming Pool",        icon: Waves },
-  bonfire:        { label: "Bonfire",              icon: Flame },
-  garden:         { label: "Garden",               icon: Trees },
-  bbq:            { label: "BBQ / Grill",          icon: FlameKindling },
-  trekking:       { label: "Trekking Access",      icon: Bike },
-  campfire_area:  { label: "Campfire Area",        icon: Tent },
-  common_kitchen: { label: "Common Kitchen",       icon: UtensilsCrossed },
-  laundry:        { label: "Laundry",              icon: WashingMachine },
-  pet_friendly:   { label: "Pet Friendly",         icon: Dog },
-  wheelchair:     { label: "Wheelchair Accessible",icon: Accessibility },
-  generator:      { label: "Generator Backup",     icon: Zap },
-  solar:          { label: "Solar Power",          icon: Sun },
-  ev_charging:    { label: "EV Charging",          icon: ShowerHead },
-  pickup:         { label: "Pickup / Drop",        icon: Truck },
+const AMENITY_META: Record<
+  string,
+  { label: string; icon: React.ComponentType<{ className?: string }> }
+> = {
+  parking: { label: "Parking", icon: Car },
+  wifi: { label: "WiFi", icon: Wifi },
+  swimming_pool: { label: "Swimming Pool", icon: Waves },
+  bonfire: { label: "Bonfire", icon: Flame },
+  garden: { label: "Garden", icon: Trees },
+  bbq: { label: "BBQ / Grill", icon: FlameKindling },
+  trekking: { label: "Trekking Access", icon: Bike },
+  campfire_area: { label: "Campfire Area", icon: Tent },
+  common_kitchen: { label: "Common Kitchen", icon: UtensilsCrossed },
+  laundry: { label: "Laundry", icon: WashingMachine },
+  pet_friendly: { label: "Pet Friendly", icon: Dog },
+  wheelchair: { label: "Wheelchair Accessible", icon: Accessibility },
+  generator: { label: "Generator Backup", icon: Zap },
+  solar: { label: "Solar Power", icon: Sun },
+  ev_charging: { label: "EV Charging", icon: ShowerHead },
+  pickup: { label: "Pickup / Drop", icon: Truck },
 };
 
 // Fallback for custom amenities the owner typed in free-text.
@@ -66,7 +69,10 @@ export function Amenities({ property }: Props) {
           </div>
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="rounded-2xl bg-card border border-border p-6 animate-pulse h-28" />
+              <div
+                key={i}
+                className="rounded-2xl bg-card border border-border p-6 animate-pulse h-28"
+              />
             ))}
           </div>
         </div>
@@ -113,4 +119,3 @@ export function Amenities({ property }: Props) {
     </section>
   );
 }
- 

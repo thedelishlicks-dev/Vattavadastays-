@@ -69,7 +69,9 @@ Deno.serve(async (req) => {
     // ── 2) Validate input ─────────────────────────────────────────────────
     const body = await req.json().catch(() => ({}));
     const propertyId = String(body?.property_id ?? "");
-    const email = String(body?.email ?? "").trim().toLowerCase();
+    const email = String(body?.email ?? "")
+      .trim()
+      .toLowerCase();
     const replace = body?.replace === true;
 
     if (!UUID_RE.test(propertyId)) return fail(400, "bad_property", "Unknown property.");
@@ -77,7 +79,11 @@ Deno.serve(async (req) => {
       return fail(400, "bad_email", "Enter a valid email address.");
     }
     if (email === SUPERADMIN_EMAIL) {
-      return fail(400, "superadmin_email", "That is the platform admin login. Use a separate email for the owner.");
+      return fail(
+        400,
+        "superadmin_email",
+        "That is the platform admin login. Use a separate email for the owner.",
+      );
     }
 
     const { data: property, error: propErr } = await admin
@@ -89,7 +95,11 @@ Deno.serve(async (req) => {
     if (!property) return fail(404, "property_not_found", "Property not found.");
 
     if (property.owner_id && !replace) {
-      return fail(409, "already_linked", "This property already has an owner. Confirm to replace them.");
+      return fail(
+        409,
+        "already_linked",
+        "This property already has an owner. Confirm to replace them.",
+      );
     }
 
     // ── 3) Find the login, or invite a new one ────────────────────────────
@@ -118,8 +128,11 @@ Deno.serve(async (req) => {
       const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo });
       if (error) {
         if (/rate limit/i.test(error.message)) {
-          return fail(429, "email_rate_limit",
-            "Supabase's email limit was reached. Wait a while, or add your own SMTP provider in Supabase > Authentication > SMTP.");
+          return fail(
+            429,
+            "email_rate_limit",
+            "Supabase's email limit was reached. Wait a while, or add your own SMTP provider in Supabase > Authentication > SMTP.",
+          );
         }
         if (/already (been )?registered/i.test(error.message)) {
           const again = await findUser();
@@ -127,7 +140,10 @@ Deno.serve(async (req) => {
           userId = again.id;
           outcome = "linked_existing";
           // fall through to linking
-          const { error: linkErr } = await admin.from("properties").update({ owner_id: userId }).eq("id", propertyId);
+          const { error: linkErr } = await admin
+            .from("properties")
+            .update({ owner_id: userId })
+            .eq("id", propertyId);
           if (linkErr) throw linkErr;
           console.log(JSON.stringify({ fn: "invite-owner", propertyId, outcome }));
           return json({ outcome, user_id: userId });
@@ -139,7 +155,10 @@ Deno.serve(async (req) => {
     }
 
     // ── 4) Link the property to that login ────────────────────────────────
-    const { error: linkErr } = await admin.from("properties").update({ owner_id: userId }).eq("id", propertyId);
+    const { error: linkErr } = await admin
+      .from("properties")
+      .update({ owner_id: userId })
+      .eq("id", propertyId);
     if (linkErr) throw linkErr;
 
     console.log(JSON.stringify({ fn: "invite-owner", propertyId, outcome }));

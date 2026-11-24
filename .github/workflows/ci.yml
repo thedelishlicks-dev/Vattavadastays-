@@ -32,6 +32,9 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Lint (ESLint + Prettier formatting)
+        run: npm run lint
+
       # Also regenerates src/routeTree.gen.ts, which the type check needs.
       - name: Build
         run: npm run build

@@ -13,37 +13,40 @@
  *
  * Optional env: WEATHER_USER_AGENT (default names stayidom.in with its URL as the contact).
  */
-import { summarizeForecast } from './_lib/forecast'
+import { summarizeForecast } from "./_lib/forecast";
 
-export const config = { runtime: 'edge' }
+export const config = { runtime: "edge" };
 
 const json = (body: unknown, sMaxAge: number): Response =>
   new Response(JSON.stringify(body), {
     headers: {
-      'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': `public, max-age=600, s-maxage=${sMaxAge}, stale-while-revalidate=${sMaxAge * 2}`,
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": `public, max-age=600, s-maxage=${sMaxAge}, stale-while-revalidate=${sMaxAge * 2}`,
     },
-  })
+  });
 
 export default async function handler(req: Request): Promise<Response> {
-  const url = new URL(req.url)
-  const lat = Number(url.searchParams.get('lat'))
-  const lng = Number(url.searchParams.get('lng'))
+  const url = new URL(req.url);
+  const lat = Number(url.searchParams.get("lat"));
+  const lng = Number(url.searchParams.get("lng"));
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
-    return json({ available: false }, 3600)
+    return json({ available: false }, 3600);
   }
 
-  const userAgent = process.env.WEATHER_USER_AGENT || 'stayidom.in/1.0 (+https://stayidom.in)'
-  const api = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}`
+  const userAgent = process.env.WEATHER_USER_AGENT || "stayidom.in/1.0 (+https://stayidom.in)";
+  const api = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${lat.toFixed(2)}&lon=${lng.toFixed(2)}`;
 
   try {
-    const res = await fetch(api, { headers: { 'User-Agent': userAgent }, signal: AbortSignal.timeout(4000) })
-    if (!res.ok) return json({ available: false }, 300) // includes 429: back off for a while
-    const data = (await res.json()) as { properties?: { timeseries?: unknown } }
-    const summary = summarizeForecast(data.properties?.timeseries, new Date())
-    if (!summary) return json({ available: false }, 300)
-    return json({ available: true, ...summary }, 3600)
+    const res = await fetch(api, {
+      headers: { "User-Agent": userAgent },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return json({ available: false }, 300); // includes 429: back off for a while
+    const data = (await res.json()) as { properties?: { timeseries?: unknown } };
+    const summary = summarizeForecast(data.properties?.timeseries, new Date());
+    if (!summary) return json({ available: false }, 300);
+    return json({ available: true, ...summary }, 3600);
   } catch {
-    return json({ available: false }, 300)
+    return json({ available: false }, 300);
   }
 }

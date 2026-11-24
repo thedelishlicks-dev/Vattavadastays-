@@ -10,8 +10,10 @@ import { supabase } from "@/lib/supabase";
 import { seasonRulesToRates, type RoomRate, type SeasonRoomRule } from "@/lib/roomRates";
 import type { PriceSeason } from "@/lib/quotes";
 
-export const roomRatesKey = (propertyId: string | undefined) => ["roomRates", propertyId ?? ""] as const;
-export const seasonRulesKey = (propertyId: string | undefined) => ["seasonRoomRules", propertyId ?? ""] as const;
+export const roomRatesKey = (propertyId: string | undefined) =>
+  ["roomRates", propertyId ?? ""] as const;
+export const seasonRulesKey = (propertyId: string | undefined) =>
+  ["seasonRoomRules", propertyId ?? ""] as const;
 
 const yesterday = () => new Date(Date.now() - 86400000).toISOString().slice(0, 10);
 
@@ -26,7 +28,10 @@ export async function fetchSeasonRules(propertyId: string): Promise<SeasonRoomRu
 
 async function fetchSeasonRates(propertyId: string): Promise<RoomRate[]> {
   const [seasonsRes, rules] = await Promise.all([
-    supabase.from("price_seasons").select("id, name, start_date, end_date, recurs_yearly, priority").eq("property_id", propertyId),
+    supabase
+      .from("price_seasons")
+      .select("id, name, start_date, end_date, recurs_yearly, priority")
+      .eq("property_id", propertyId),
     fetchSeasonRules(propertyId),
   ]);
   if (seasonsRes.error) throw seasonsRes.error;

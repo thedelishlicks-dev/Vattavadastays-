@@ -41,7 +41,9 @@ function ResetPasswordPage() {
     });
 
     // 2. Also listen for the PASSWORD_RECOVERY event (token processed after mount)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || (event === "SIGNED_IN" && session)) {
         markReady();
       }
@@ -93,7 +95,6 @@ function ResetPasswordPage() {
   return (
     <div className="min-h-screen bg-muted/30 flex items-center justify-center px-4">
       <div className="w-full max-w-sm space-y-6">
-
         {/* Header */}
         <div className="text-center">
           <div className="mx-auto h-12 w-12 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-4">
@@ -112,10 +113,7 @@ function ResetPasswordPage() {
             <p className="text-xs text-muted-foreground">
               Password reset links expire after 1 hour. Please request a new one.
             </p>
-            <a
-              href="/admin"
-              className="inline-block mt-2 text-sm text-primary hover:underline"
-            >
+            <a href="/admin" className="inline-block mt-2 text-sm text-primary hover:underline">
               Back to login
             </a>
           </div>
@@ -135,9 +133,7 @@ function ResetPasswordPage() {
             <CheckCircle2 className="h-10 w-10 text-primary mx-auto" />
             <div>
               <p className="font-medium">Password updated!</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Redirecting to login…
-              </p>
+              <p className="text-sm text-muted-foreground mt-1">Redirecting to login…</p>
             </div>
           </div>
         )}
@@ -165,9 +161,7 @@ function ResetPasswordPage() {
                     onClick={() => setShowPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
-                    {showPassword
-                      ? <EyeOff className="h-4 w-4" />
-                      : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
@@ -195,9 +189,11 @@ function ResetPasswordPage() {
                       className={[
                         "h-1 flex-1 rounded-full transition-colors",
                         password.length >= (i + 1) * 3
-                          ? password.length >= 12 ? "bg-primary"
-                            : password.length >= 8 ? "bg-amber-400"
-                            : "bg-destructive"
+                          ? password.length >= 12
+                            ? "bg-primary"
+                            : password.length >= 8
+                              ? "bg-amber-400"
+                              : "bg-destructive"
                           : "bg-border",
                       ].join(" ")}
                     />

@@ -12,7 +12,12 @@ type Props = {
   defaultOpen?: boolean;
 };
 
-export function GuestPolicies({ sharedAmenities, checkInTime, checkOutTime, defaultOpen = false }: Props) {
+export function GuestPolicies({
+  sharedAmenities,
+  checkInTime,
+  checkOutTime,
+  defaultOpen = false,
+}: Props) {
   const policies = extractPolicies(sharedAmenities);
   if (!hasPolicies(policies)) return null;
 
@@ -34,13 +39,17 @@ export function GuestPolicies({ sharedAmenities, checkInTime, checkOutTime, defa
         )}
         {policies.cancellation && (
           <div>
-            <p className="text-xs uppercase tracking-wider font-medium text-foreground">Cancellation</p>
+            <p className="text-xs uppercase tracking-wider font-medium text-foreground">
+              Cancellation
+            </p>
             <p className="mt-1 whitespace-pre-line">{policies.cancellation}</p>
           </div>
         )}
         {policies.rules && (
           <div>
-            <p className="text-xs uppercase tracking-wider font-medium text-foreground">House rules</p>
+            <p className="text-xs uppercase tracking-wider font-medium text-foreground">
+              House rules
+            </p>
             <p className="mt-1 whitespace-pre-line">{policies.rules}</p>
           </div>
         )}

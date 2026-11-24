@@ -47,30 +47,65 @@ function Catalog({ propertyId }: { propertyId: string }) {
 
       <div className="rounded-2xl border border-border/60 bg-muted/40 p-3 text-sm text-muted-foreground">
         Seasons are set up once in{" "}
-        <a href={seasonsHref} className="underline text-foreground">Rooms & Pricing → Seasons</a>
-        . Tick “Also use for add-ons & packages” on a season, then give each add-on its price for it here.
+        <a href={seasonsHref} className="underline text-foreground">
+          Rooms & Pricing → Seasons
+        </a>
+        . Tick “Also use for add-ons & packages” on a season, then give each add-on its price for it
+        here.
       </div>
 
-      <Section title="Add-ons" description="Individual things guests can add. Use variants for Veg / Non-veg or with / without guide.">
+      <Section
+        title="Add-ons"
+        description="Individual things guests can add. Use variants for Veg / Non-veg or with / without guide."
+      >
         {loadingAddons && <div className="h-16 rounded-lg bg-muted animate-pulse" />}
         {addons.map((a) => (
-          <ItemCard key={a.id} propertyId={propertyId} kind="addon" item={a} seasons={seasons} addons={addons} />
+          <ItemCard
+            key={a.id}
+            propertyId={propertyId}
+            kind="addon"
+            item={a}
+            seasons={seasons}
+            addons={addons}
+          />
         ))}
         {adding === "addon" && (
-          <ItemCard propertyId={propertyId} kind="addon" seasons={seasons} addons={addons} startOpen onClose={() => setAdding(null)} />
+          <ItemCard
+            propertyId={propertyId}
+            kind="addon"
+            seasons={seasons}
+            addons={addons}
+            startOpen
+            onClose={() => setAdding(null)}
+          />
         )}
-        {adding !== "addon" && (
-          <AddButton label="Add add-on" onClick={() => setAdding("addon")} />
-        )}
+        {adding !== "addon" && <AddButton label="Add add-on" onClick={() => setAdding("addon")} />}
       </Section>
 
-      <Section title="Packages" description="Bundles of add-ons sold at one price — e.g. “Weekend Escape: full-board + campfire + guided trek”.">
+      <Section
+        title="Packages"
+        description="Bundles of add-ons sold at one price — e.g. “Weekend Escape: full-board + campfire + guided trek”."
+      >
         {loadingPackages && <div className="h-16 rounded-lg bg-muted animate-pulse" />}
         {packages.map((p) => (
-          <ItemCard key={p.id} propertyId={propertyId} kind="package" item={p} seasons={seasons} addons={addons} />
+          <ItemCard
+            key={p.id}
+            propertyId={propertyId}
+            kind="package"
+            item={p}
+            seasons={seasons}
+            addons={addons}
+          />
         ))}
         {adding === "package" && (
-          <ItemCard propertyId={propertyId} kind="package" seasons={seasons} addons={addons} startOpen onClose={() => setAdding(null)} />
+          <ItemCard
+            propertyId={propertyId}
+            kind="package"
+            seasons={seasons}
+            addons={addons}
+            startOpen
+            onClose={() => setAdding(null)}
+          />
         )}
         {adding !== "package" && (
           <AddButton label="Add package" onClick={() => setAdding("package")} />
@@ -127,7 +162,13 @@ function initialDraft(kind: "addon" | "package", item?: Addon | Package): Draft 
 }
 
 function ItemCard({
-  propertyId, kind, item, seasons, addons, startOpen = false, onClose,
+  propertyId,
+  kind,
+  item,
+  seasons,
+  addons,
+  startOpen = false,
+  onClose,
 }: {
   propertyId: string;
   kind: "addon" | "package";
@@ -145,7 +186,10 @@ function ItemCard({
   const [error, setError] = useState("");
 
   const setVariant = (i: number, patch: Partial<PriceVariant>) =>
-    setDraft((d) => ({ ...d, variants: d.variants.map((v, idx) => (idx === i ? { ...v, ...patch } : v)) }));
+    setDraft((d) => ({
+      ...d,
+      variants: d.variants.map((v, idx) => (idx === i ? { ...v, ...patch } : v)),
+    }));
 
   const setSeasonPrice = (i: number, seasonId: string, raw: string) =>
     setDraft((d) => ({
@@ -186,8 +230,10 @@ function ItemCard({
   const handleSave = async () => {
     if (!draft.name.trim()) return setError("Give it a name");
     if (draft.variants.length === 0) return setError("Add at least one price");
-    if (draft.variants.some((v) => !v.label.trim())) return setError("Every price option needs a label");
-    if (kind === "package" && draft.included.length === 0) return setError("Pick at least one add-on to include");
+    if (draft.variants.some((v) => !v.label.trim()))
+      return setError("Every price option needs a label");
+    if (kind === "package" && draft.included.length === 0)
+      return setError("Pick at least one add-on to include");
     setError("");
     try {
       await save.mutateAsync({
@@ -195,8 +241,21 @@ function ItemCard({
         id: item?.id,
         values:
           kind === "addon"
-            ? { name: draft.name.trim(), category: draft.category, unit: draft.unit, variants: draft.variants, is_active: draft.is_active }
-            : { name: draft.name.trim(), description: draft.description.trim() || null, unit: draft.unit, included: draft.included, variants: draft.variants, is_active: draft.is_active },
+            ? {
+                name: draft.name.trim(),
+                category: draft.category,
+                unit: draft.unit,
+                variants: draft.variants,
+                is_active: draft.is_active,
+              }
+            : {
+                name: draft.name.trim(),
+                description: draft.description.trim() || null,
+                unit: draft.unit,
+                included: draft.included,
+                variants: draft.variants,
+                is_active: draft.is_active,
+              },
       });
       if (item) setOpen(false);
       else close();
@@ -217,20 +276,31 @@ function ItemCard({
 
   // ── collapsed summary
   const bases = (item?.variants ?? []).map((v) => v.base_price);
-  const missing = item ? Object.values(coverageGaps([item], seasons)).reduce((s, n) => s + n, 0) : 0;
+  const missing = item
+    ? Object.values(coverageGaps([item], seasons)).reduce((s, n) => s + n, 0)
+    : 0;
   const priceText =
-    bases.length === 0 ? "" : Math.min(...bases) === Math.max(...bases)
-      ? formatINR(bases[0])
-      : `${formatINR(Math.min(...bases))} – ${formatINR(Math.max(...bases))}`;
+    bases.length === 0
+      ? ""
+      : Math.min(...bases) === Math.max(...bases)
+        ? formatINR(bases[0])
+        : `${formatINR(Math.min(...bases))} – ${formatINR(Math.max(...bases))}`;
 
   return (
-    <div className={`rounded-lg border ${open ? "border-primary/40" : "border-border"} ${item && !item.is_active ? "opacity-60" : ""}`}>
+    <div
+      className={`rounded-lg border ${open ? "border-primary/40" : "border-border"} ${item && !item.is_active ? "opacity-60" : ""}`}
+    >
       {item && !open && (
-        <button onClick={() => setOpen(true)} className="w-full flex items-center justify-between gap-3 p-3 text-left">
+        <button
+          onClick={() => setOpen(true)}
+          className="w-full flex items-center justify-between gap-3 p-3 text-left"
+        >
           <div className="min-w-0">
             <div className="font-medium truncate">
               {item.name}
-              {!item.is_active && <span className="ml-2 text-xs text-muted-foreground">(hidden)</span>}
+              {!item.is_active && (
+                <span className="ml-2 text-xs text-muted-foreground">(hidden)</span>
+              )}
             </div>
             <div className="text-xs text-muted-foreground">
               {priceText} · {UNIT_LABELS[item.unit]}
@@ -238,7 +308,8 @@ function ItemCard({
             </div>
             {missing > 0 && (
               <div className="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
-                <TriangleAlert className="h-3 w-3" /> {missing} season price{missing > 1 ? "s" : ""} not set
+                <TriangleAlert className="h-3 w-3" /> {missing} season price{missing > 1 ? "s" : ""}{" "}
+                not set
               </div>
             )}
           </div>
@@ -252,28 +323,57 @@ function ItemCard({
             <input
               className={inputCls}
               value={draft.name}
-              placeholder={kind === "addon" ? "e.g. Campfire, Full-board meals, Guided trek" : "e.g. Weekend Escape"}
+              placeholder={
+                kind === "addon"
+                  ? "e.g. Campfire, Full-board meals, Guided trek"
+                  : "e.g. Weekend Escape"
+              }
               onChange={(e) => setDraft({ ...draft, name: e.target.value })}
             />
           </Field>
 
           {kind === "package" && (
             <Field label="Description (optional)">
-              <input className={inputCls} value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
+              <input
+                className={inputCls}
+                value={draft.description}
+                onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              />
             </Field>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             {kind === "addon" && (
               <Field label="Category">
-                <select className={inputCls} value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value as AddonCategory })}>
-                  {Object.entries(CATEGORY_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                <select
+                  className={inputCls}
+                  value={draft.category}
+                  onChange={(e) =>
+                    setDraft({ ...draft, category: e.target.value as AddonCategory })
+                  }
+                >
+                  {Object.entries(CATEGORY_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
                 </select>
               </Field>
             )}
-            <Field label="Charged" hint={kind === "package" ? "Most bundles are “per person”." : undefined}>
-              <select className={inputCls} value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value as AddonUnit })}>
-                {Object.entries(UNIT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            <Field
+              label="Charged"
+              hint={kind === "package" ? "Most bundles are “per person”." : undefined}
+            >
+              <select
+                className={inputCls}
+                value={draft.unit}
+                onChange={(e) => setDraft({ ...draft, unit: e.target.value as AddonUnit })}
+              >
+                {Object.entries(UNIT_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
               </select>
             </Field>
           </div>
@@ -282,15 +382,23 @@ function ItemCard({
             <div className="space-y-2">
               <span className="text-xs font-medium">Includes</span>
               {addons.filter((a) => a.is_active).length === 0 ? (
-                <p className="text-xs text-muted-foreground">Add some add-ons first, then bundle them here.</p>
+                <p className="text-xs text-muted-foreground">
+                  Add some add-ons first, then bundle them here.
+                </p>
               ) : (
                 <div className="grid gap-1.5">
-                  {addons.filter((a) => a.is_active).map((a) => (
-                    <label key={a.id} className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={draft.included.some((i) => i.addon_id === a.id)} onChange={() => toggleIncluded(a.id)} />
-                      {a.name}
-                    </label>
-                  ))}
+                  {addons
+                    .filter((a) => a.is_active)
+                    .map((a) => (
+                      <label key={a.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={draft.included.some((i) => i.addon_id === a.id)}
+                          onChange={() => toggleIncluded(a.id)}
+                        />
+                        {a.name}
+                      </label>
+                    ))}
                 </div>
               )}
             </div>
@@ -300,22 +408,43 @@ function ItemCard({
             <div>
               <span className="text-xs font-medium">Prices</span>
               <p className="text-[11px] text-muted-foreground">
-                Enter exact prices. Leave a season blank to use the base price. Add a second option for Veg / Non-veg.
+                Enter exact prices. Leave a season blank to use the base price. Add a second option
+                for Veg / Non-veg.
               </p>
             </div>
 
             {draft.variants.map((v, i) => (
-              <div key={v.key} className="rounded-2xl border border-border/60 p-3 space-y-3 bg-muted/20">
+              <div
+                key={v.key}
+                className="rounded-2xl border border-border/60 p-3 space-y-3 bg-muted/20"
+              >
                 <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
                   <Field label="Option">
-                    <input className={inputCls} value={v.label} onChange={(e) => setVariant(i, { label: e.target.value })} />
+                    <input
+                      className={inputCls}
+                      value={v.label}
+                      onChange={(e) => setVariant(i, { label: e.target.value })}
+                    />
                   </Field>
                   <Field label="Base ₹">
-                    <input type="number" min={0} className={inputCls} value={v.base_price || ""} onChange={(e) => setVariant(i, { base_price: Math.max(0, Number(e.target.value) || 0) })} />
+                    <input
+                      type="number"
+                      min={0}
+                      className={inputCls}
+                      value={v.base_price || ""}
+                      onChange={(e) =>
+                        setVariant(i, { base_price: Math.max(0, Number(e.target.value) || 0) })
+                      }
+                    />
                   </Field>
                   {draft.variants.length > 1 && (
                     <button
-                      onClick={() => setDraft((d) => ({ ...d, variants: d.variants.filter((_, idx) => idx !== i) }))}
+                      onClick={() =>
+                        setDraft((d) => ({
+                          ...d,
+                          variants: d.variants.filter((_, idx) => idx !== i),
+                        }))
+                      }
                       className="h-10 w-10 inline-flex items-center justify-center rounded-2xl border border-border/60 text-destructive hover:bg-muted"
                       aria-label="Remove option"
                     >
@@ -339,7 +468,9 @@ function ItemCard({
                               value={v.season_prices[s.id] ?? ""}
                               onChange={(e) => setSeasonPrice(i, s.id, e.target.value)}
                             />
-                            {blank && <TriangleAlert className="absolute right-2.5 top-3 h-4 w-4 text-amber-500 pointer-events-none" />}
+                            {blank && (
+                              <TriangleAlert className="absolute right-2.5 top-3 h-4 w-4 text-amber-500 pointer-events-none" />
+                            )}
                           </div>
                         </Field>
                       );
@@ -349,13 +480,20 @@ function ItemCard({
               </div>
             ))}
 
-            <button onClick={addVariant} className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline">
+            <button
+              onClick={addVariant}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
               <Plus className="h-3.5 w-3.5" /> Add option (e.g. Veg / Non-veg)
             </button>
           </div>
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })} />
+            <input
+              type="checkbox"
+              checked={draft.is_active}
+              onChange={(e) => setDraft({ ...draft, is_active: e.target.checked })}
+            />
             Available when building quotes
           </label>
 
@@ -363,12 +501,21 @@ function ItemCard({
 
           <div className="flex items-center gap-2">
             {item && (
-              <button onClick={handleDelete} disabled={remove.isPending} className="inline-flex items-center gap-1.5 text-sm text-destructive hover:underline mr-auto">
+              <button
+                onClick={handleDelete}
+                disabled={remove.isPending}
+                className="inline-flex items-center gap-1.5 text-sm text-destructive hover:underline mr-auto"
+              >
                 <Trash2 className="h-4 w-4" /> Delete
               </button>
             )}
             <div className="flex gap-2 ml-auto">
-              <button onClick={close} className="rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70">Cancel</button>
+              <button
+                onClick={close}
+                className="rounded-full bg-muted px-4 py-2 text-sm hover:bg-muted/70"
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleSave}
                 disabled={save.isPending}

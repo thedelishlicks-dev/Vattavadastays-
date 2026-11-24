@@ -25,6 +25,11 @@ import type { BookingCharge } from "@/types/database";
 import { computeBalance } from "@/lib/balance";
 import { waDigits } from "@/lib/phone";
 
+// Row shape returned by the guest-lookup RPCs (bookings/groups joined with rooms). Not modelled yet,
+// so it stays loosely typed. Giving it a real type is a separate typing task, not lint cleanup.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RpcRow = any;
+
 export const Route = createFileRoute("/booking-status")({
   component: BookingStatusPage,
   validateSearch: (search: Record<string, unknown>) => ({
@@ -85,7 +90,7 @@ function getHospitableMessage(entry: BookingStatusEntry, propertyName?: string):
 interface BookingStatusEntry {
   // Mirrors the subset of `bookings` fields the UI reads. For a group entry
   // this is synthesized from `booking_groups` + the first room's nights.
-  booking: any;
+  booking: RpcRow;
   charges: BookingCharge[];
   chargesTotal: number;
   advance: number;
@@ -101,7 +106,11 @@ interface BookingStatusEntry {
 }
 
 function BookingStatusPage() {
-  const { phone: prefillPhone, property: propertyIdFilter, t: trackingToken } = useSearch({ from: "/booking-status" });
+  const {
+    phone: prefillPhone,
+    property: propertyIdFilter,
+    t: trackingToken,
+  } = useSearch({ from: "/booking-status" });
 
   // Legacy ?phone= links only. Current links carry ?t=<token> instead.
   const phone = prefillPhone ?? "";
@@ -128,8 +137,8 @@ function BookingStatusPage() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["booking-status-lookup", trackingToken, phone, propertyIdFilter],
     queryFn: async (): Promise<BookingStatusEntry[]> => {
-      let bookingsRaw: any[] | null = null;
-      let groupsRaw: any[] | null = null;
+      let bookingsRaw: RpcRow[] | null = null;
+      let groupsRaw: RpcRow[] | null = null;
 
       if (trackingToken) {
         // Current links (?t=<token>). The token is unguessable, so it is the
@@ -138,7 +147,10 @@ function BookingStatusPage() {
         const { data: tokenResult, error: tokenErr } = (await supabase.rpc(
           "lookup_booking_by_token",
           { p_token: trackingToken },
-        )) as { data: { bookings: any[]; groups: any[] } | null; error: { message: string } | null };
+        )) as {
+          data: { bookings: RpcRow[]; groups: RpcRow[] } | null;
+          error: { message: string } | null;
+        };
         if (tokenErr) throw new Error("Could not fetch your booking. Please try again.");
         bookingsRaw = tokenResult?.bookings ?? [];
         groupsRaw = tokenResult?.groups ?? [];
@@ -156,13 +168,13 @@ function BookingStatusPage() {
         const { data: legacyBookings, error: bookingsErr } = (await supabase.rpc(
           "lookup_bookings_by_phone",
           { p_phone: last10, p_property_id: propertyIdFilter },
-        )) as { data: any[] | null; error: { message: string } | null };
+        )) as { data: RpcRow[] | null; error: { message: string } | null };
         if (bookingsErr) throw new Error("Could not fetch bookings. Please try again.");
 
         const { data: legacyGroups, error: groupsErr } = (await supabase.rpc(
           "lookup_booking_groups_by_phone",
           { p_phone: last10, p_property_id: propertyIdFilter },
-        )) as { data: any[] | null; error: { message: string } | null };
+        )) as { data: RpcRow[] | null; error: { message: string } | null };
         if (groupsErr) throw new Error("Could not fetch group bookings. Please try again.");
 
         bookingsRaw = legacyBookings;
@@ -196,7 +208,12 @@ function BookingStatusPage() {
 
           const discount = Number(group.discount_amount ?? 0);
           const advance = Number(group.advance_amount ?? 0);
-          const { balance, refundDue, netTotal } = computeBalance({ roomTotal: Number(group.total_amount), chargesTotal, discount, advance });
+          const { balance, refundDue, netTotal } = computeBalance({
+            roomTotal: Number(group.total_amount),
+            chargesTotal,
+            discount,
+            advance,
+          });
 
           const synthesizedBooking = {
             ...roomsInGroup[0],
@@ -242,16 +259,32 @@ function BookingStatusPage() {
         ? []
         : groupedRoomRows.filter((b) => !groupsById.has(b.group_id));
 
-      const standaloneEntries: BookingStatusEntry[] = [...standaloneRows, ...orphanedGroupedRows].map(
-        (booking): BookingStatusEntry => {
-          const charges: BookingCharge[] = booking.booking_charges ?? [];
-          const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
-          const discount = Number(booking.discount_amount ?? 0);
-          const advance = Number(booking.advance_amount ?? 0);
-          const { balance, refundDue, netTotal } = computeBalance({ roomTotal: Number(booking.total_amount), chargesTotal, discount, advance });
-          return { booking, charges, chargesTotal, advance, discount, balance, refundDue, netTotal, isGroup: false };
-        },
-      );
+      const standaloneEntries: BookingStatusEntry[] = [
+        ...standaloneRows,
+        ...orphanedGroupedRows,
+      ].map((booking): BookingStatusEntry => {
+        const charges: BookingCharge[] = booking.booking_charges ?? [];
+        const chargesTotal = charges.reduce((s, c) => s + c.qty * c.unit_price, 0);
+        const discount = Number(booking.discount_amount ?? 0);
+        const advance = Number(booking.advance_amount ?? 0);
+        const { balance, refundDue, netTotal } = computeBalance({
+          roomTotal: Number(booking.total_amount),
+          chargesTotal,
+          discount,
+          advance,
+        });
+        return {
+          booking,
+          charges,
+          chargesTotal,
+          advance,
+          discount,
+          balance,
+          refundDue,
+          netTotal,
+          isGroup: false,
+        };
+      });
 
       const combined = [...groupEntries, ...standaloneEntries].sort(
         (a, b) => new Date(b.booking.check_in).getTime() - new Date(a.booking.check_in).getTime(),
@@ -290,9 +323,9 @@ function BookingStatusPage() {
         <div className="max-w-md text-center space-y-3">
           <h1 className="font-display text-xl font-semibold">Booking link needed</h1>
           <p className="text-sm text-muted-foreground">
-            This page needs to be opened from the tracking link sent to you on WhatsApp, or from
-            the "Track your booking" link on the property's own page — please use that link
-            rather than this one directly.
+            This page needs to be opened from the tracking link sent to you on WhatsApp, or from the
+            "Track your booking" link on the property's own page — please use that link rather than
+            this one directly.
           </p>
         </div>
       </div>
@@ -389,7 +422,9 @@ function BookingStatusPage() {
             {/* Personal greeting */}
             <div className="px-1">
               <h2 className="font-display text-lg font-semibold">
-                {getFirstName(selected.booking.guest_name) ? `Hi ${getFirstName(selected.booking.guest_name)} 👋` : "Hi there 👋"}
+                {getFirstName(selected.booking.guest_name)
+                  ? `Hi ${getFirstName(selected.booking.guest_name)} 👋`
+                  : "Hi there 👋"}
               </h2>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {getHospitableMessage(selected, linkProperty?.name)}
@@ -500,7 +535,12 @@ function BookingStatusPage() {
                   )}
                   {selected.discount > 0 && (
                     <div className="flex justify-between text-green-600">
-                      <span>Discount{selected.booking.discount_reason ? ` (${selected.booking.discount_reason})` : ""}</span>
+                      <span>
+                        Discount
+                        {selected.booking.discount_reason
+                          ? ` (${selected.booking.discount_reason})`
+                          : ""}
+                      </span>
                       <span>-₹{selected.discount.toLocaleString("en-IN")}</span>
                     </div>
                   )}
@@ -524,8 +564,9 @@ function BookingStatusPage() {
 
                 {selected.refundDue > 0 && (
                   <div className="rounded-lg bg-green-50 border border-green-100 px-3 py-2.5 text-xs text-green-800 leading-relaxed">
-                    Your booking total was revised and you've paid ₹{selected.refundDue.toLocaleString("en-IN")} more
-                    than the new total. No payment is needed — the owner will refund or adjust this with you.
+                    Your booking total was revised and you've paid ₹
+                    {selected.refundDue.toLocaleString("en-IN")} more than the new total. No payment
+                    is needed — the owner will refund or adjust this with you.
                   </div>
                 )}
 
@@ -621,7 +662,7 @@ function ContactPropertyWithInvoice({
   roomNameOverride,
 }: {
   propertyId: string;
-  booking: any;
+  booking: RpcRow;
   charges: BookingCharge[];
   chargesTotal: number;
   advance: number;
@@ -673,7 +714,7 @@ function ContactProperty({
   roomNameOverride,
 }: {
   propertyId: string;
-  booking: any;
+  booking: RpcRow;
   totalAmount: number;
   advancePaid: number;
   showUPI: boolean;
@@ -702,7 +743,9 @@ function ContactProperty({
   const whatsapp = property.owner_whatsapp ?? phone;
   const waLink = whatsapp ? `https://wa.me/${waDigits(whatsapp)}` : null;
   // The short link: the server picks the pin or the owner's Google listing (api/directions.ts).
-  const mapsLink = hasCoordinates(property.location_lat, property.location_lng) ? directionsShortLink(property.subdomain) : null;
+  const mapsLink = hasCoordinates(property.location_lat, property.location_lng)
+    ? directionsShortLink(property.subdomain)
+    : null;
 
   return (
     <div className="space-y-4">

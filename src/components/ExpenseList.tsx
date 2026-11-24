@@ -1,4 +1,4 @@
- import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { expenseCategoryLabel } from "@/lib/expenses";
 import type { Expense } from "@/types/database";
 
@@ -63,4 +63,3 @@ export function ExpenseList({ expenses, onEdit, onDelete, deletingId }: ExpenseL
     </ul>
   );
 }
- 

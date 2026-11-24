@@ -7,8 +7,14 @@ import { WINDOW_STEP_MONTHS, windowStart } from "@/lib/historyWindow";
  */
 export function useHistoryWindow() {
   const [months, setMonths] = useState<number | "all">(WINDOW_STEP_MONTHS);
-  const from = useMemo(() => (months === "all" ? undefined : windowStart(new Date(), months)), [months]);
-  const loadMore = useCallback(() => setMonths((m) => (m === "all" ? m : m + WINDOW_STEP_MONTHS)), []);
+  const from = useMemo(
+    () => (months === "all" ? undefined : windowStart(new Date(), months)),
+    [months],
+  );
+  const loadMore = useCallback(
+    () => setMonths((m) => (m === "all" ? m : m + WINDOW_STEP_MONTHS)),
+    [],
+  );
   const loadAll = useCallback(() => setMonths("all"), []);
   return { from, isAll: months === "all", loadMore, loadAll };
 }

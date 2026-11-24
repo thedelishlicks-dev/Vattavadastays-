@@ -48,7 +48,15 @@ export function SectionTabs({
               aria-current={active ? "page" : undefined}
               onClick={(e) => {
                 // Let the browser handle new-tab / modified clicks normally.
-                if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                if (
+                  e.defaultPrevented ||
+                  e.button !== 0 ||
+                  e.metaKey ||
+                  e.ctrlKey ||
+                  e.shiftKey ||
+                  e.altKey
+                )
+                  return;
                 e.preventDefault();
                 if (active) return;
                 navigate({

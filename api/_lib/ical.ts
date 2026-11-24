@@ -28,7 +28,8 @@ export function unfold(text: string): string[] {
   const raw = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
   const out: string[] = [];
   for (const line of raw) {
-    if ((line.startsWith(" ") || line.startsWith("\t")) && out.length > 0) out[out.length - 1] += line.slice(1);
+    if ((line.startsWith(" ") || line.startsWith("\t")) && out.length > 0)
+      out[out.length - 1] += line.slice(1);
     else out.push(line);
   }
   return out;
@@ -91,19 +92,30 @@ export function parseIcsNights(text: string, fromDate: string, toDate: string): 
   for (const line of lines) {
     const up = line.trim().toUpperCase();
     if (up === "BEGIN:VEVENT") {
-      inEvent = true; start = null; end = null; cancelled = false; transparent = false; recurring = false;
+      inEvent = true;
+      start = null;
+      end = null;
+      cancelled = false;
+      transparent = false;
+      recurring = false;
       continue;
     }
     if (up === "END:VEVENT") {
       inEvent = false;
-      if (recurring) { recurringIgnored += 1; continue; }
+      if (recurring) {
+        recurringIgnored += 1;
+        continue;
+      }
       if (cancelled || transparent || !start) continue;
       const last = end && end > start ? end : addDays(start, 1); // exclusive end
       let added = false;
       for (let d = start; d < last; d = addDays(d, 1)) {
         if (d < fromDate) continue;
         if (d > toDate) break;
-        if (nights.size >= MAX_NIGHTS) { truncated = true; break; }
+        if (nights.size >= MAX_NIGHTS) {
+          truncated = true;
+          break;
+        }
         nights.add(d);
         added = true;
       }
@@ -143,19 +155,31 @@ function fold(line: string): string {
   if (line.length <= 74) return line;
   const parts: string[] = [];
   let rest = line;
-  parts.push(rest.slice(0, 74)); rest = rest.slice(74);
-  while (rest.length > 0) { parts.push(" " + rest.slice(0, 73)); rest = rest.slice(73); }
+  parts.push(rest.slice(0, 74));
+  rest = rest.slice(74);
+  while (rest.length > 0) {
+    parts.push(" " + rest.slice(0, 73));
+    rest = rest.slice(73);
+  }
   return parts.join("\r\n");
 }
 
-const esc = (s: string) => s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+const esc = (s: string) =>
+  s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 
 /**
  * Build the feed other sites import. Deliberately carries NO guest data:
  * every event is just "Reserved". `stampIso` is injectable for tests.
  */
-export function buildIcs(opts: { roomId: string; calName: string; blockedNights: string[]; stampIso?: string }): string {
-  const stamp = (opts.stampIso ?? new Date().toISOString()).replace(/[-:]/g, "").replace(/\.\d+/, "");
+export function buildIcs(opts: {
+  roomId: string;
+  calName: string;
+  blockedNights: string[];
+  stampIso?: string;
+}): string {
+  const stamp = (opts.stampIso ?? new Date().toISOString())
+    .replace(/[-:]/g, "")
+    .replace(/\.\d+/, "");
   const lines = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
@@ -186,18 +210,33 @@ export function buildIcs(opts: { roomId: string; calName: string; blockedNights:
  * Only public https feeds. `webcal://` (what sites hand out) is https underneath.
  * Rejects IP literals, localhost-style names, non-standard ports and credentials.
  */
-export function normalizeFeedUrl(input: string): { ok: true; url: string } | { ok: false; error: string } {
+export function normalizeFeedUrl(
+  input: string,
+): { ok: true; url: string } | { ok: false; error: string } {
   let raw = (input ?? "").trim();
   if (!raw) return { ok: false, error: "Paste the calendar link first." };
   if (/^webcal:\/\//i.test(raw)) raw = "https://" + raw.slice("webcal://".length);
   if (raw.length > 2000) return { ok: false, error: "That link is too long." };
   let u: URL;
-  try { u = new URL(raw); } catch { return { ok: false, error: "That doesn't look like a link." }; }
-  if (u.protocol !== "https:") return { ok: false, error: "The link must start with https:// (or webcal://)." };
-  if (u.username || u.password) return { ok: false, error: "Links with a username/password aren't supported." };
-  if (u.port && u.port !== "443") return { ok: false, error: "Only standard https links are supported." };
+  try {
+    u = new URL(raw);
+  } catch {
+    return { ok: false, error: "That doesn't look like a link." };
+  }
+  if (u.protocol !== "https:")
+    return { ok: false, error: "The link must start with https:// (or webcal://)." };
+  if (u.username || u.password)
+    return { ok: false, error: "Links with a username/password aren't supported." };
+  if (u.port && u.port !== "443")
+    return { ok: false, error: "Only standard https links are supported." };
   const host = u.hostname.toLowerCase();
-  const blockedName = host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".lan") || !host.includes(".");
+  const blockedName =
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".lan") ||
+    !host.includes(".");
   const ipv4 = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
   const ipv6 = host.startsWith("[") || host.includes(":");
   if (blockedName || ipv4 || ipv6) return { ok: false, error: "That address can't be used." };

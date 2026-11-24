@@ -33,12 +33,22 @@ export const OFFLINE_MESSAGE =
   "Couldn't reach the server — check your internet connection and try again. Nothing was changed.";
 
 /** A message fit to show the owner for any failure from the functions below. */
-export function saveFailMessage(e: unknown, fallback = "Couldn't save. Please try again — nothing was changed."): string {
+export function saveFailMessage(
+  e: unknown,
+  fallback = "Couldn't save. Please try again — nothing was changed.",
+): string {
   if (e instanceof NotSavedError) return NOT_SAVED_MESSAGE;
-  const msg = e instanceof Error ? e.message : typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : "";
-  if (/AGENT_NOT_FOUND/.test(msg)) return "That agent no longer exists (or isn't yours). Refresh the page.";
+  const msg =
+    e instanceof Error
+      ? e.message
+      : typeof e === "object" && e && "message" in e
+        ? String((e as { message: unknown }).message)
+        : "";
+  if (/AGENT_NOT_FOUND/.test(msg))
+    return "That agent no longer exists (or isn't yours). Refresh the page.";
   // fetch() failures read differently per browser (Chrome / Safari / Firefox).
-  if (/failed to fetch|load failed|networkerror|network request failed|timeout/i.test(msg)) return OFFLINE_MESSAGE;
+  if (/failed to fetch|load failed|networkerror|network request failed|timeout/i.test(msg))
+    return OFFLINE_MESSAGE;
   return msg ? `${fallback.replace(/\.$/, "")} (${msg})` : fallback;
 }
 
@@ -54,7 +64,11 @@ export function statusUpdate(status: string, now: Date = new Date()): Record<str
 }
 
 /** Update one booking's status. Returns the columns written (for updating the open dialog). */
-export async function setBookingStatus(db: Db, id: string, status: string): Promise<Record<string, unknown>> {
+export async function setBookingStatus(
+  db: Db,
+  id: string,
+  status: string,
+): Promise<Record<string, unknown>> {
   const updates = statusUpdate(status);
   const { data, error } = await db.from("bookings").update(updates).eq("id", id).select("id");
   if (error) throw error;
@@ -64,24 +78,43 @@ export async function setBookingStatus(db: Db, id: string, status: string): Prom
 
 /** Cancel one booking. */
 export async function cancelBooking(db: Db, id: string): Promise<void> {
-  const { data, error } = await db.from("bookings").update({ status: "cancelled" }).eq("id", id).select("id");
+  const { data, error } = await db
+    .from("bookings")
+    .update({ status: "cancelled" })
+    .eq("id", id)
+    .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new NotSavedError();
 }
 
 /** Change a group's status, then all of its rooms. If the rooms fail, the group is put back. */
-export async function setGroupStatus(db: Db, group: { id: string; status: string } & PendingHold, status: string): Promise<void> {
+export async function setGroupStatus(
+  db: Db,
+  group: { id: string; status: string } & PendingHold,
+  status: string,
+): Promise<void> {
   const updates = status !== "pending" ? { status, hold_expires_at: null } : { status };
   await writeGroupAndRooms(db, group, updates);
 }
 
 /** Cancel a group and all of its rooms. If the rooms fail, the group is put back. */
-export async function cancelGroup(db: Db, group: { id: string; status: string } & PendingHold): Promise<void> {
+export async function cancelGroup(
+  db: Db,
+  group: { id: string; status: string } & PendingHold,
+): Promise<void> {
   await writeGroupAndRooms(db, group, { status: "cancelled" });
 }
 
-async function writeGroupAndRooms(db: Db, group: { id: string; status: string } & PendingHold, updates: Record<string, unknown>): Promise<void> {
-  const { data, error } = await db.from("booking_groups").update(updates).eq("id", group.id).select("id");
+async function writeGroupAndRooms(
+  db: Db,
+  group: { id: string; status: string } & PendingHold,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const { data, error } = await db
+    .from("booking_groups")
+    .update(updates)
+    .eq("id", group.id)
+    .select("id");
   if (error) throw error;
   if (!data || data.length === 0) throw new NotSavedError();
 
@@ -91,13 +124,22 @@ async function writeGroupAndRooms(db: Db, group: { id: string; status: string } 
     // group can still expire instead of staying "pending" forever.
     const restore: Record<string, unknown> = { status: group.status };
     if (group.hold_expires_at !== undefined) restore.hold_expires_at = group.hold_expires_at;
-    try { await db.from("booking_groups").update(restore).eq("id", group.id); } catch { /* the original error is what matters */ }
+    try {
+      await db.from("booking_groups").update(restore).eq("id", group.id);
+    } catch {
+      /* the original error is what matters */
+    }
     throw roomsErr;
   }
 }
 
 /** Save a group's discount. Throws if it wasn't saved, so the form can show why instead of closing as if it worked. */
-export async function setGroupDiscount(db: Db, groupId: string, amount: number, reason: string): Promise<void> {
+export async function setGroupDiscount(
+  db: Db,
+  groupId: string,
+  amount: number,
+  reason: string,
+): Promise<void> {
   const { data, error } = await db
     .from("booking_groups")
     .update({ discount_amount: amount, discount_reason: reason || null })
@@ -111,7 +153,13 @@ export async function setGroupDiscount(db: Db, groupId: string, amount: number, 
  * Mark an agent's commission paid / not paid (single booking or group). Throws if it wasn't
  * saved; "no error but no row changed" (expired login) counts as a failure too.
  */
-export async function setCommissionPaid(db: Db, kind: "booking" | "group", id: string, paid: boolean, now: Date = new Date()): Promise<void> {
+export async function setCommissionPaid(
+  db: Db,
+  kind: "booking" | "group",
+  id: string,
+  paid: boolean,
+  now: Date = new Date(),
+): Promise<void> {
   const { data, error } = await db
     .from(kind === "group" ? "booking_groups" : "bookings")
     .update({ commission_paid: paid, commission_paid_date: paid ? now.toISOString() : null })

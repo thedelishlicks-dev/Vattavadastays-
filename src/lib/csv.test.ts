@@ -28,5 +28,11 @@ test("ordinary text is untouched; commas, quotes and new lines are quoted", () =
 });
 
 test("toCsv builds rows", () => {
-  assert.equal(toCsv([["Agent", "Guest"], ["Anil", "=1+1"]]), "Agent,Guest\nAnil,'=1+1");
+  assert.equal(
+    toCsv([
+      ["Agent", "Guest"],
+      ["Anil", "=1+1"],
+    ]),
+    "Agent,Guest\nAnil,'=1+1",
+  );
 });

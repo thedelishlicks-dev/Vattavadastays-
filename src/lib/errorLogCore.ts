@@ -1,4 +1,4 @@
- // src/lib/errorLogCore.ts
+// src/lib/errorLogCore.ts
 //
 // Pure logic for the client error log (no network, no Supabase) so it can be
 // unit-tested: scrubbing personal data, ignoring noise, throttling.
@@ -14,15 +14,17 @@ export const MAX_CONTEXT = 1200;
 
 /** Removes personal data and secrets from free text before it leaves the browser. */
 export function scrubText(input: string): string {
-  return input
-    // URL query strings can carry tokens / phone numbers
-    .replace(/(https?:\/\/[^\s?#"')]+)\?[^\s"')]*/g, "$1?…")
-    // email addresses
-    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
-    // phone-like numbers: 10+ digits, optionally with spaces/hyphens and a +
-    .replace(/\+?(?:\d[\s-]?){9,}\d/g, "[number]")
-    // long opaque tokens / JWTs / UUIDs
-    .replace(/\b[A-Za-z0-9_-]{32,}\b/g, "[token]");
+  return (
+    input
+      // URL query strings can carry tokens / phone numbers
+      .replace(/(https?:\/\/[^\s?#"')]+)\?[^\s"')]*/g, "$1?…")
+      // email addresses
+      .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, "[email]")
+      // phone-like numbers: 10+ digits, optionally with spaces/hyphens and a +
+      .replace(/\+?(?:\d[\s-]?){9,}\d/g, "[number]")
+      // long opaque tokens / JWTs / UUIDs
+      .replace(/\b[A-Za-z0-9_-]{32,}\b/g, "[token]")
+  );
 }
 
 export function cleanPath(pathname: string): string {
@@ -82,7 +84,10 @@ export function createThrottle(
 }
 
 /** Turns anything that can be thrown into a message + stack. */
-export function describeError(error: unknown, fallbackMessage?: string): { message: string; stack: string } {
+export function describeError(
+  error: unknown,
+  fallbackMessage?: string,
+): { message: string; stack: string } {
   if (error instanceof Error) {
     return { message: `${error.name}: ${error.message}`, stack: error.stack ?? "" };
   }
@@ -102,7 +107,9 @@ export function describeError(error: unknown, fallbackMessage?: string): { messa
   return { message: fallbackMessage ?? "", stack: "" };
 }
 
-export function scrubContext(context: Record<string, unknown> | undefined): Record<string, unknown> | null {
+export function scrubContext(
+  context: Record<string, unknown> | undefined,
+): Record<string, unknown> | null {
   if (!context) return null;
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(context)) {

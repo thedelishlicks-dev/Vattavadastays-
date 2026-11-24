@@ -27,7 +27,17 @@ const SIZES: Record<Size, string> = {
 
 /** The only button style: flat, fully rounded, no shadow. Four variants, three sizes. */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "primary", size = "md", loading, block, className, disabled, children, type = "button", ...rest },
+  {
+    variant = "primary",
+    size = "md",
+    loading,
+    block,
+    className,
+    disabled,
+    children,
+    type = "button",
+    ...rest
+  },
   ref,
 ) {
   return (
@@ -38,7 +48,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       className={cn(
         "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors press-scale",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 disabled:pointer-events-none",
-        VARIANTS[variant], SIZES[size], block && "w-full", className,
+        VARIANTS[variant],
+        SIZES[size],
+        block && "w-full",
+        className,
       )}
       {...rest}
     >

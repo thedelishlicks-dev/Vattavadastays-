@@ -61,7 +61,12 @@ export interface SeasonRoomRule {
 }
 
 function covers(date: string, r: RoomRate): boolean {
-  if (r.season) return inSeason(date, { start_date: r.start_date, end_date: r.end_date, recurs_yearly: r.season.recurs_yearly });
+  if (r.season)
+    return inSeason(date, {
+      start_date: r.start_date,
+      end_date: r.end_date,
+      recurs_yearly: r.season.recurs_yearly,
+    });
   return date >= r.start_date && date <= r.end_date;
 }
 
@@ -98,7 +103,11 @@ export function seasonRulesToRates(
  * Precedence: room-specific beats all-rooms; then the later start_date;
  * then the newest created_at. Deterministic, so guest, owner and server agree.
  */
-export function pickRate(date: string, roomId: string, rates: readonly RoomRate[] | undefined): RoomRate | null {
+export function pickRate(
+  date: string,
+  roomId: string,
+  rates: readonly RoomRate[] | undefined,
+): RoomRate | null {
   if (!rates || rates.length === 0) return null;
   let best: RoomRate | null = null;
   for (const r of rates) {
@@ -112,8 +121,16 @@ export function pickRate(date: string, roomId: string, rates: readonly RoomRate[
 function beats(a: RoomRate, b: RoomRate): boolean {
   if (a.season && b.season) {
     if (a.season.priority !== b.season.priority) return a.season.priority > b.season.priority;
-    const sa = seasonSpanDays({ start_date: a.start_date, end_date: a.end_date, recurs_yearly: a.season.recurs_yearly });
-    const sb = seasonSpanDays({ start_date: b.start_date, end_date: b.end_date, recurs_yearly: b.season.recurs_yearly });
+    const sa = seasonSpanDays({
+      start_date: a.start_date,
+      end_date: a.end_date,
+      recurs_yearly: a.season.recurs_yearly,
+    });
+    const sb = seasonSpanDays({
+      start_date: b.start_date,
+      end_date: b.end_date,
+      recurs_yearly: b.season.recurs_yearly,
+    });
     if (sa !== sb) return sa < sb;
     const na = a.label ?? "";
     const nb = b.label ?? "";
@@ -144,23 +161,48 @@ export interface RateFormValues {
 }
 
 export type ParsedRate =
-  | { ok: true; values: { label: string; start_date: string; end_date: string; kind: RateKind; value: number } }
+  | {
+      ok: true;
+      values: {
+        label: string;
+        start_date: string;
+        end_date: string;
+        kind: RateKind;
+        value: number;
+      };
+    }
   | { ok: false; error: string };
 
 /** Validation for the legacy rate form. Mirrors the table's CHECK constraints. */
 export function parseRate(f: RateFormValues): ParsedRate {
   if (!f.start_date || !f.end_date) return { ok: false, error: "Pick the first and last night." };
-  if (f.end_date < f.start_date) return { ok: false, error: "The last night can't be before the first night." };
-  const span = (Date.parse(`${f.end_date}T00:00:00Z`) - Date.parse(`${f.start_date}T00:00:00Z`)) / 86400000;
-  if (span > 400) return { ok: false, error: "A period can be at most 400 nights. Split it into two." };
+  if (f.end_date < f.start_date)
+    return { ok: false, error: "The last night can't be before the first night." };
+  const span =
+    (Date.parse(`${f.end_date}T00:00:00Z`) - Date.parse(`${f.start_date}T00:00:00Z`)) / 86400000;
+  if (span > 400)
+    return { ok: false, error: "A period can be at most 400 nights. Split it into two." };
   const v = Math.round(parseFloat(f.value));
-  if (!Number.isFinite(v)) return { ok: false, error: f.kind === "fixed" ? "Enter the nightly price." : "Enter the percentage." };
-  if (f.kind === "fixed" && (v <= 0 || v > 1000000)) return { ok: false, error: "Nightly price must be more than 0." };
-  if (f.kind === "percent" && (v <= -90 || v > 500)) return { ok: false, error: "Percentage must be between -89 and 500." };
-  if (f.label.trim().length > 60) return { ok: false, error: "Name is too long (60 characters max)." };
+  if (!Number.isFinite(v))
+    return {
+      ok: false,
+      error: f.kind === "fixed" ? "Enter the nightly price." : "Enter the percentage.",
+    };
+  if (f.kind === "fixed" && (v <= 0 || v > 1000000))
+    return { ok: false, error: "Nightly price must be more than 0." };
+  if (f.kind === "percent" && (v <= -90 || v > 500))
+    return { ok: false, error: "Percentage must be between -89 and 500." };
+  if (f.label.trim().length > 60)
+    return { ok: false, error: "Name is too long (60 characters max)." };
   return {
     ok: true,
-    values: { label: f.label.trim(), start_date: f.start_date, end_date: f.end_date, kind: f.kind, value: v },
+    values: {
+      label: f.label.trim(),
+      start_date: f.start_date,
+      end_date: f.end_date,
+      kind: f.kind,
+      value: v,
+    },
   };
 }
 
@@ -168,7 +210,10 @@ export function parseRate(f: RateFormValues): ParsedRate {
 export function describeRate(rate: RoomRate, roomBasePrice?: number): string {
   if (rate.kind === "fixed") return `₹${rate.value.toLocaleString("en-IN")}/night`;
   const sign = rate.value > 0 ? "+" : "";
-  const abs = roomBasePrice != null ? ` (₹${rateBasePrice(rate, roomBasePrice).toLocaleString("en-IN")}/night)` : "";
+  const abs =
+    roomBasePrice != null
+      ? ` (₹${rateBasePrice(rate, roomBasePrice).toLocaleString("en-IN")}/night)`
+      : "";
   return `${sign}${rate.value}%${abs}`;
 }
 
@@ -179,18 +224,32 @@ export interface RuleFormValues {
   value: string; // typed text
 }
 
-export type ParsedRule = { ok: true; values: { kind: RateKind; value: number } } | { ok: false; error: string };
+export type ParsedRule =
+  | { ok: true; values: { kind: RateKind; value: number } }
+  | { ok: false; error: string };
 
 /** Same limits as the season_room_rules CHECK constraints. */
 export function parseRule(f: RuleFormValues): ParsedRule {
   const v = Math.round(parseFloat(f.value));
-  if (!Number.isFinite(v)) return { ok: false, error: f.kind === "fixed" ? "Enter the nightly price." : "Enter the percentage." };
-  if (f.kind === "fixed" && (v <= 0 || v > 1000000)) return { ok: false, error: "Nightly price must be more than 0." };
-  if (f.kind === "percent" && (v <= -90 || v > 500)) return { ok: false, error: "Percentage must be between -89 and 500." };
+  if (!Number.isFinite(v))
+    return {
+      ok: false,
+      error: f.kind === "fixed" ? "Enter the nightly price." : "Enter the percentage.",
+    };
+  if (f.kind === "fixed" && (v <= 0 || v > 1000000))
+    return { ok: false, error: "Nightly price must be more than 0." };
+  if (f.kind === "percent" && (v <= -90 || v > 500))
+    return { ok: false, error: "Percentage must be between -89 and 500." };
   return { ok: true, values: { kind: f.kind, value: v } };
 }
 
 /** "+30%" / "-20%" / "₹4,500 / night" — one short line for a rule. */
-export function describeRule(rule: Pick<SeasonRoomRule, "kind" | "value">, roomBasePrice?: number): string {
-  return describeRate({ room_id: null, start_date: "", end_date: "", kind: rule.kind, value: rule.value }, roomBasePrice);
+export function describeRule(
+  rule: Pick<SeasonRoomRule, "kind" | "value">,
+  roomBasePrice?: number,
+): string {
+  return describeRate(
+    { room_id: null, start_date: "", end_date: "", kind: rule.kind, value: rule.value },
+    roomBasePrice,
+  );
 }

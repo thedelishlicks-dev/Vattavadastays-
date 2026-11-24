@@ -1,59 +1,82 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useRef, useEffect } from 'react'
-import { useOwnerProperty } from '@/hooks/useOwnerProperty'
-import { supabase } from '@/lib/supabase'
-import { useQueryClient } from '@tanstack/react-query'
-import { useAuth } from '@/hooks/useAuth'
-import { BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from 'lucide-react'
-import { Modal, ModalActions, Button, fieldCls } from '@/components/ds'
-import type { Room } from '@/types/database'
-import { RoomSeasonPrices } from '@/components/RoomSeasonPrices'
-import { SeasonsPanel } from '@/components/SeasonsPanel'
-import { RoomPhotosManager } from '@/components/RoomPhotosManager'
-import { fallbackToFull, thumbUrl } from '@/lib/gallery'
-import { RoomPricingFields, pricingTextFromRoom, parsePricing, type PricingText } from '@/components/RoomPricingFields'
+import { createFileRoute } from "@tanstack/react-router";
+import { useState, useRef, useEffect } from "react";
+import { useOwnerProperty } from "@/hooks/useOwnerProperty";
+import { supabase } from "@/lib/supabase";
+import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import { BedDouble, Plus, X, Pencil, Check, Upload, ImageOff, Trash2 } from "lucide-react";
+import { Modal, ModalActions, Button, fieldCls } from "@/components/ds";
+import type { Room } from "@/types/database";
+import { RoomSeasonPrices } from "@/components/RoomSeasonPrices";
+import { SeasonsPanel } from "@/components/SeasonsPanel";
+import { RoomPhotosManager } from "@/components/RoomPhotosManager";
+import { fallbackToFull, thumbUrl } from "@/lib/gallery";
+import {
+  RoomPricingFields,
+  pricingTextFromRoom,
+  parsePricing,
+  type PricingText,
+} from "@/components/RoomPricingFields";
 
-export const Route = createFileRoute('/admin/rooms')({
+export const Route = createFileRoute("/admin/rooms")({
   component: AdminRooms,
-})
+});
 
-const ROOM_TYPES = ['deluxe', 'standard', 'family', 'dormitory', 'suite']
-const BED_TYPES = ['king', 'queen', 'twin', 'double', 'single', 'bunk']
+const ROOM_TYPES = ["deluxe", "standard", "family", "dormitory", "suite"];
+const BED_TYPES = ["king", "queen", "twin", "double", "single", "bunk"];
 const AMENITY_OPTIONS = [
-  'ac', 'tv', 'balcony', 'attach_bath', 'heater', 'hot_water',
-  'kitchen', 'view', 'wifi', 'wardrobe', 'mini_fridge', 'work_desk',
-]
+  "ac",
+  "tv",
+  "balcony",
+  "attach_bath",
+  "heater",
+  "hot_water",
+  "kitchen",
+  "view",
+  "wifi",
+  "wardrobe",
+  "mini_fridge",
+  "work_desk",
+];
 
-const inputCls = fieldCls
-const labelCls = 'block text-xs font-medium text-muted-foreground mb-1'
+const inputCls = fieldCls;
+const labelCls = "block text-xs font-medium text-muted-foreground mb-1";
 
 type RoomForm = {
-  name: string
-  room_type: string
-  bed_type: string
-  max_guests: string
-  max_occupancy: string
-  room_amenities: string[]
-  is_active: boolean
-}
+  name: string;
+  room_type: string;
+  bed_type: string;
+  max_guests: string;
+  max_occupancy: string;
+  room_amenities: string[];
+  is_active: boolean;
+};
 
 const emptyForm = (): RoomForm => ({
-  name: '',
-  room_type: 'deluxe',
-  bed_type: 'king',
-  max_guests: '2',
-  max_occupancy: '',
+  name: "",
+  room_type: "deluxe",
+  bed_type: "king",
+  max_guests: "2",
+  max_occupancy: "",
   room_amenities: [],
   is_active: true,
-})
+});
 
 // ---------------------------------------------------------------------------
 // Delete confirmation modal
 // ---------------------------------------------------------------------------
 
-function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: () => void; onDeleted: () => void }) {
-  const [deleting, setDeleting] = useState(false)
-  const [error, setError] = useState('')
+function DeleteRoomModal({
+  room,
+  onClose,
+  onDeleted,
+}: {
+  room: Room;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
   // Bookings that reference this room survive a delete (room_id just goes
   // null — see the "will not be deleted" note below), but the moment the
   // room is gone, every screen that looks up its name (booking cards,
@@ -63,46 +86,46 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
   // can no longer tell which physical room a guest is actually staying in
   // — so those get checked for and blocked here rather than only warned
   // about after the fact.
-  const [upcomingCount, setUpcomingCount] = useState<number | null>(null)
-  const [checkingBookings, setCheckingBookings] = useState(true)
+  const [upcomingCount, setUpcomingCount] = useState<number | null>(null);
+  const [checkingBookings, setCheckingBookings] = useState(true);
 
   useEffect(() => {
-    let cancelled = false
-    setCheckingBookings(true)
+    let cancelled = false;
+    setCheckingBookings(true);
     supabase
-      .from('bookings')
-      .select('id', { count: 'exact', head: true })
-      .eq('room_id', room.id)
-      .neq('status', 'cancelled')
-      .gte('check_out', new Date().toISOString().slice(0, 10))
+      .from("bookings")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", room.id)
+      .neq("status", "cancelled")
+      .gte("check_out", new Date().toISOString().slice(0, 10))
       .then(({ count }) => {
         if (!cancelled) {
-          setUpcomingCount(count ?? 0)
-          setCheckingBookings(false)
+          setUpcomingCount(count ?? 0);
+          setCheckingBookings(false);
         }
-      })
+      });
     return () => {
-      cancelled = true
-    }
-  }, [room.id])
+      cancelled = true;
+    };
+  }, [room.id]);
 
-  const blocked = (upcomingCount ?? 0) > 0
+  const blocked = (upcomingCount ?? 0) > 0;
 
   const handleDelete = async () => {
-    if (blocked) return
-    setDeleting(true)
-    setError('')
+    if (blocked) return;
+    setDeleting(true);
+    setError("");
     try {
       // Delete availability rows first to avoid FK constraint errors
-      await supabase.from('availability').delete().eq('room_id', room.id)
-      const { error: err } = await supabase.from('rooms').delete().eq('id', room.id)
-      if (err) throw err
-      onDeleted()
+      await supabase.from("availability").delete().eq("room_id", room.id);
+      const { error: err } = await supabase.from("rooms").delete().eq("id", room.id);
+      if (err) throw err;
+      onDeleted();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
-      setDeleting(false)
+      setError(e instanceof Error ? e.message : "Delete failed");
+      setDeleting(false);
     }
-  }
+  };
 
   return (
     <Modal
@@ -113,209 +136,364 @@ function DeleteRoomModal({ room, onClose, onDeleted }: { room: Room; onClose: ()
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Keep room</Button>
-            <Button variant="danger" size="lg" className="flex-1" onClick={handleDelete} disabled={blocked || checkingBookings} loading={deleting}>Delete</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Keep room
+            </Button>
+            <Button
+              variant="danger"
+              size="lg"
+              className="flex-1"
+              onClick={handleDelete}
+              disabled={blocked || checkingBookings}
+              loading={deleting}
+            >
+              Delete
+            </Button>
           </ModalActions>
         </>
       }
     >
-        {checkingBookings ? (
-          <div className="h-16 rounded-2xl bg-muted animate-pulse" />
-        ) : blocked ? (
-          <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1.5">
-            <p className="font-medium">
-              Can't delete — {upcomingCount} upcoming or in-progress booking{upcomingCount === 1 ? "" : "s"} still reference this room.
-            </p>
-            <p>
-              Deleting it now would make those bookings show "Unknown room" everywhere — the
-              booking list, invoices, WhatsApp messages. Wait until those stays are complete, or
-              set this room to <strong>Inactive</strong> instead (hides it from new guests without
-              breaking existing bookings).
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-destructive/5 px-4 py-3 text-xs text-destructive space-y-1">
-            <p className="font-medium">This cannot be undone. This will permanently delete:</p>
-            <ul className="list-disc list-inside space-y-0.5 text-destructive/80">
-              <li>The room and all its details</li>
-              <li>All availability calendar entries for this room</li>
-            </ul>
-            <p className="mt-1 text-destructive/70">Past bookings for this room will not be deleted but will show "Unknown room".</p>
-          </div>
-        )}
+      {checkingBookings ? (
+        <div className="h-16 rounded-2xl bg-muted animate-pulse" />
+      ) : blocked ? (
+        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800 space-y-1.5">
+          <p className="font-medium">
+            Can't delete — {upcomingCount} upcoming or in-progress booking
+            {upcomingCount === 1 ? "" : "s"} still reference this room.
+          </p>
+          <p>
+            Deleting it now would make those bookings show "Unknown room" everywhere — the booking
+            list, invoices, WhatsApp messages. Wait until those stays are complete, or set this room
+            to <strong>Inactive</strong> instead (hides it from new guests without breaking existing
+            bookings).
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-2xl bg-destructive/5 px-4 py-3 text-xs text-destructive space-y-1">
+          <p className="font-medium">This cannot be undone. This will permanently delete:</p>
+          <ul className="list-disc list-inside space-y-0.5 text-destructive/80">
+            <li>The room and all its details</li>
+            <li>All availability calendar entries for this room</li>
+          </ul>
+          <p className="mt-1 text-destructive/70">
+            Past bookings for this room will not be deleted but will show "Unknown room".
+          </p>
+        </div>
+      )}
     </Modal>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
 // Room drawer (add / edit)
 // ---------------------------------------------------------------------------
 
-function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, onGoToSeasons }: { room: Room | null; propertyId: string; onClose: () => void; onSaved: () => void; focusPricing?: boolean; onGoToSeasons?: () => void }) {
+function RoomDrawer({
+  room,
+  propertyId,
+  onClose,
+  onSaved,
+  focusPricing = false,
+  onGoToSeasons,
+}: {
+  room: Room | null;
+  propertyId: string;
+  onClose: () => void;
+  onSaved: () => void;
+  focusPricing?: boolean;
+  onGoToSeasons?: () => void;
+}) {
   // Tapping the price block on a room card opens this same editor already scrolled to pricing.
-  const pricingRef = useRef<HTMLDivElement>(null)
+  const pricingRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (focusPricing) pricingRef.current?.scrollIntoView({ block: 'start' })
-  }, [focusPricing])
+    if (focusPricing) pricingRef.current?.scrollIntoView({ block: "start" });
+  }, [focusPricing]);
   const [form, setForm] = useState<RoomForm>(
     room
-      ? { name: room.name, room_type: room.room_type, bed_type: room.bed_type, max_guests: String(room.max_guests), max_occupancy: room.max_occupancy != null ? String(room.max_occupancy) : '', room_amenities: room.room_amenities ?? [], is_active: room.is_active }
-      : emptyForm()
-  )
+      ? {
+          name: room.name,
+          room_type: room.room_type,
+          bed_type: room.bed_type,
+          max_guests: String(room.max_guests),
+          max_occupancy: room.max_occupancy != null ? String(room.max_occupancy) : "",
+          room_amenities: room.room_amenities ?? [],
+          is_active: room.is_active,
+        }
+      : emptyForm(),
+  );
   // Price fields come from the shared RoomPricingFields component (same one the Pricing page uses).
-  const [pricing, setPricing] = useState<PricingText>(pricingTextFromRoom(room))
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [customAmenity, setCustomAmenity] = useState('')
+  const [pricing, setPricing] = useState<PricingText>(pricingTextFromRoom(room));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [customAmenity, setCustomAmenity] = useState("");
 
-  const set = (k: keyof RoomForm, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
+  const set = (k: keyof RoomForm, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleAmenity = (a: string) =>
-    set('room_amenities', form.room_amenities.includes(a) ? form.room_amenities.filter((x) => x !== a) : [...form.room_amenities, a])
+    set(
+      "room_amenities",
+      form.room_amenities.includes(a)
+        ? form.room_amenities.filter((x) => x !== a)
+        : [...form.room_amenities, a],
+    );
 
   const addCustomAmenity = () => {
-    const trimmed = customAmenity.trim().toLowerCase()
-    if (trimmed && !form.room_amenities.includes(trimmed)) set('room_amenities', [...form.room_amenities, trimmed])
-    setCustomAmenity('')
-  }
+    const trimmed = customAmenity.trim().toLowerCase();
+    if (trimmed && !form.room_amenities.includes(trimmed))
+      set("room_amenities", [...form.room_amenities, trimmed]);
+    setCustomAmenity("");
+  };
 
   const handleSave = async () => {
-    if (!form.name.trim()) { setError('Room name is required'); return }
-    const maxGuests = parseInt(form.max_guests)
-    if (isNaN(maxGuests) || maxGuests < 1) { setError('Max guests must be at least 1'); return }
-    const occupancy = form.max_occupancy.trim() === '' ? null : parseInt(form.max_occupancy)
-    if (occupancy !== null && (isNaN(occupancy) || occupancy < maxGuests || occupancy > 30)) {
-      setError(`Most guests allowed must be between ${maxGuests} (the guests included in the price) and 30, or left empty`)
-      return
+    if (!form.name.trim()) {
+      setError("Room name is required");
+      return;
     }
-    const parsedPricing = parsePricing(pricing)
-    if (!parsedPricing.ok) { setError(parsedPricing.error); return }
-    setSaving(true)
-    setError('')
+    const maxGuests = parseInt(form.max_guests);
+    if (isNaN(maxGuests) || maxGuests < 1) {
+      setError("Max guests must be at least 1");
+      return;
+    }
+    const occupancy = form.max_occupancy.trim() === "" ? null : parseInt(form.max_occupancy);
+    if (occupancy !== null && (isNaN(occupancy) || occupancy < maxGuests || occupancy > 30)) {
+      setError(
+        `Most guests allowed must be between ${maxGuests} (the guests included in the price) and 30, or left empty`,
+      );
+      return;
+    }
+    const parsedPricing = parsePricing(pricing);
+    if (!parsedPricing.ok) {
+      setError(parsedPricing.error);
+      return;
+    }
+    setSaving(true);
+    setError("");
     try {
-      const payload: Record<string, unknown> = { ...form, max_guests: maxGuests, ...parsedPricing.values }
+      const payload: Record<string, unknown> = {
+        ...form,
+        max_guests: maxGuests,
+        ...parsedPricing.values,
+      };
       // Sent only when it has a value or the room already has the column, so saving a room keeps working
       // on a database that has not had the 20261101 migration yet.
-      if (occupancy !== null || (room && 'max_occupancy' in room)) payload.max_occupancy = occupancy
-      else delete payload.max_occupancy
+      if (occupancy !== null || (room && "max_occupancy" in room))
+        payload.max_occupancy = occupancy;
+      else delete payload.max_occupancy;
       if (room) {
-        const { error: err } = await supabase.from('rooms').update(payload).eq('id', room.id)
-        if (err) throw err
+        const { error: err } = await supabase.from("rooms").update(payload).eq("id", room.id);
+        if (err) throw err;
       } else {
-        const { error: err } = await supabase.from('rooms').insert({ ...payload, property_id: propertyId, images: [] })
-        if (err) throw err
+        const { error: err } = await supabase
+          .from("rooms")
+          .insert({ ...payload, property_id: propertyId, images: [] });
+        if (err) throw err;
       }
-      onSaved()
+      onSaved();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(e instanceof Error ? e.message : "Save failed");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
   return (
     <Modal
       size="lg"
-      title={room ? 'Edit room' : 'Add new room'}
+      title={room ? "Edit room" : "Add new room"}
       onClose={onClose}
       footer={
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} loading={saving}>{room ? 'Save changes' : 'Add room'}</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="lg" className="flex-1" onClick={handleSave} loading={saving}>
+              {room ? "Save changes" : "Add room"}
+            </Button>
           </ModalActions>
         </>
       }
     >
-          {room && <RoomPhotosManager roomId={room.id} propertyId={propertyId} photos={room.images ?? []} onChanged={onSaved} />}
+      {room && (
+        <RoomPhotosManager
+          roomId={room.id}
+          propertyId={propertyId}
+          photos={room.images ?? []}
+          onChanged={onSaved}
+        />
+      )}
 
-          <div>
-            <label className={labelCls}>Room name *</label>
-            <input value={form.name} onChange={(e) => set('name', e.target.value)} className={inputCls} placeholder="e.g. Deluxe Valley View" />
-          </div>
+      <div>
+        <label className={labelCls}>Room name *</label>
+        <input
+          value={form.name}
+          onChange={(e) => set("name", e.target.value)}
+          className={inputCls}
+          placeholder="e.g. Deluxe Valley View"
+        />
+      </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Room type</label>
-              <select value={form.room_type} onChange={(e) => set('room_type', e.target.value)} className={inputCls}>
-                {ROOM_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Bed type</label>
-              <select value={form.bed_type} onChange={(e) => set('bed_type', e.target.value)} className={inputCls}>
-                {BED_TYPES.map((t) => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Guests included in the price</label>
-              <input type="number" min={1} max={20} value={form.max_guests} onChange={(e) => set('max_guests', e.target.value)} className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Most guests allowed</label>
-              <input type="number" min={1} max={30} value={form.max_occupancy} onChange={(e) => set('max_occupancy', e.target.value)} placeholder={`${(parseInt(form.max_guests) || 0) + 4}`} className={inputCls} />
-            </div>
-            <p className="col-span-2 -mt-1 text-xs text-muted-foreground">
-              Guests above the included number pay the extra-guest price. "Most guests allowed" is the most the room can hold with extra beds; guests can never book more. Leave empty to allow {(parseInt(form.max_guests) || 0) + 4}.
-            </p>
-          </div>
-
-          <div ref={pricingRef} className="scroll-mt-4">
-          <h3 className="text-sm font-semibold mb-3">Pricing</h3>
-          <RoomPricingFields
-            value={pricing}
-            onChange={(k, v) => setPricing((p) => ({ ...p, [k]: v }))}
-            maxGuests={form.max_guests}
-          />
-          </div>
-
-          {room ? (
-            <RoomSeasonPrices propertyId={propertyId} room={{ id: room.id, name: room.name, base_price: room.base_price }} onGoToSeasons={onGoToSeasons} />
-          ) : (
-            <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">
-              Save the room first, then reopen it to see its seasonal prices (peak / off-season).
-            </p>
-          )}
-
-          <div>
-            <label className={labelCls}>Amenities</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {AMENITY_OPTIONS.map((a) => {
-                const active = form.room_amenities.includes(a)
-                return (
-                  <button key={a} type="button" onClick={() => toggleAmenity(a)} className={['text-xs px-2.5 py-1 rounded-full border transition-colors', active ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border hover:bg-muted'].join(' ')}>
-                    {active && <Check className="inline h-2.5 w-2.5 mr-1" />}
-                    {a}
-                  </button>
-                )
-              })}
-            </div>
-
-            {form.room_amenities.filter((a) => !AMENITY_OPTIONS.includes(a)).map((a) => (
-              <span key={a} className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary text-primary-foreground mr-1 mb-1">
-                {a}
-                <button onClick={() => toggleAmenity(a)}><X className="h-2.5 w-2.5" /></button>
-              </span>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Room type</label>
+          <select
+            value={form.room_type}
+            onChange={(e) => set("room_type", e.target.value)}
+            className={inputCls}
+          >
+            {ROOM_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>Bed type</label>
+          <select
+            value={form.bed_type}
+            onChange={(e) => set("bed_type", e.target.value)}
+            className={inputCls}
+          >
+            {BED_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t.charAt(0).toUpperCase() + t.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
 
-            <div className="flex gap-2 mt-2">
-              <input value={customAmenity} onChange={(e) => setCustomAmenity(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addCustomAmenity()} placeholder="Add custom amenity" className={`${inputCls} flex-1`} />
-              <button type="button" onClick={addCustomAmenity} className="px-3 rounded-xl border-0 bg-muted hover:bg-muted/70 text-sm">Add</button>
-            </div>
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelCls}>Guests included in the price</label>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={form.max_guests}
+            onChange={(e) => set("max_guests", e.target.value)}
+            className={inputCls}
+          />
+        </div>
+        <div>
+          <label className={labelCls}>Most guests allowed</label>
+          <input
+            type="number"
+            min={1}
+            max={30}
+            value={form.max_occupancy}
+            onChange={(e) => set("max_occupancy", e.target.value)}
+            placeholder={`${(parseInt(form.max_guests) || 0) + 4}`}
+            className={inputCls}
+          />
+        </div>
+        <p className="col-span-2 -mt-1 text-xs text-muted-foreground">
+          Guests above the included number pay the extra-guest price. "Most guests allowed" is the
+          most the room can hold with extra beds; guests can never book more. Leave empty to allow{" "}
+          {(parseInt(form.max_guests) || 0) + 4}.
+        </p>
+      </div>
 
-          <label className="flex items-center gap-3 cursor-pointer select-none">
-            <div onClick={() => set('is_active', !form.is_active)} className={['w-10 h-6 rounded-full transition-colors relative cursor-pointer', form.is_active ? 'bg-primary' : 'bg-muted-foreground/30'].join(' ')}>
-              <span className={['absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform', form.is_active ? 'translate-x-5' : 'translate-x-1'].join(' ')} />
-            </div>
-            <span className="text-sm font-medium">{form.is_active ? 'Active — visible to guests' : 'Inactive — hidden from guests'}</span>
-          </label>
+      <div ref={pricingRef} className="scroll-mt-4">
+        <h3 className="text-sm font-semibold mb-3">Pricing</h3>
+        <RoomPricingFields
+          value={pricing}
+          onChange={(k, v) => setPricing((p) => ({ ...p, [k]: v }))}
+          maxGuests={form.max_guests}
+        />
+      </div>
+
+      {room ? (
+        <RoomSeasonPrices
+          propertyId={propertyId}
+          room={{ id: room.id, name: room.name, base_price: room.base_price }}
+          onGoToSeasons={onGoToSeasons}
+        />
+      ) : (
+        <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border px-3 py-2.5">
+          Save the room first, then reopen it to see its seasonal prices (peak / off-season).
+        </p>
+      )}
+
+      <div>
+        <label className={labelCls}>Amenities</label>
+        <div className="flex flex-wrap gap-2 mb-2">
+          {AMENITY_OPTIONS.map((a) => {
+            const active = form.room_amenities.includes(a);
+            return (
+              <button
+                key={a}
+                type="button"
+                onClick={() => toggleAmenity(a)}
+                className={[
+                  "text-xs px-2.5 py-1 rounded-full border transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background border-border hover:bg-muted",
+                ].join(" ")}
+              >
+                {active && <Check className="inline h-2.5 w-2.5 mr-1" />}
+                {a}
+              </button>
+            );
+          })}
+        </div>
+
+        {form.room_amenities
+          .filter((a) => !AMENITY_OPTIONS.includes(a))
+          .map((a) => (
+            <span
+              key={a}
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-primary text-primary-foreground mr-1 mb-1"
+            >
+              {a}
+              <button onClick={() => toggleAmenity(a)}>
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </span>
+          ))}
+
+        <div className="flex gap-2 mt-2">
+          <input
+            value={customAmenity}
+            onChange={(e) => setCustomAmenity(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addCustomAmenity()}
+            placeholder="Add custom amenity"
+            className={`${inputCls} flex-1`}
+          />
+          <button
+            type="button"
+            onClick={addCustomAmenity}
+            className="px-3 rounded-xl border-0 bg-muted hover:bg-muted/70 text-sm"
+          >
+            Add
+          </button>
+        </div>
+      </div>
+
+      <label className="flex items-center gap-3 cursor-pointer select-none">
+        <div
+          onClick={() => set("is_active", !form.is_active)}
+          className={[
+            "w-10 h-6 rounded-full transition-colors relative cursor-pointer",
+            form.is_active ? "bg-primary" : "bg-muted-foreground/30",
+          ].join(" ")}
+        >
+          <span
+            className={[
+              "absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform",
+              form.is_active ? "translate-x-5" : "translate-x-1",
+            ].join(" ")}
+          />
+        </div>
+        <span className="text-sm font-medium">
+          {form.is_active ? "Active — visible to guests" : "Inactive — hidden from guests"}
+        </span>
+      </label>
     </Modal>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -323,25 +501,25 @@ function RoomDrawer({ room, propertyId, onClose, onSaved, focusPricing = false, 
 // ---------------------------------------------------------------------------
 
 function AdminRooms() {
-  const { data: property, isLoading, error } = useOwnerProperty()
-  const { user } = useAuth()
-  const queryClient = useQueryClient()
-  const [drawerRoom, setDrawerRoom] = useState<Room | null | undefined>(undefined)
-  const [focusPricing, setFocusPricing] = useState(false)
-  const [deleteRoom, setDeleteRoom] = useState<Room | null>(null)
+  const { data: property, isLoading, error } = useOwnerProperty();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [drawerRoom, setDrawerRoom] = useState<Room | null | undefined>(undefined);
+  const [focusPricing, setFocusPricing] = useState(false);
+  const [deleteRoom, setDeleteRoom] = useState<Room | null>(null);
 
   const handleSaved = () => {
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
-    queryClient.invalidateQueries({ queryKey: ['property'] })
-    setDrawerRoom(undefined)
-    setFocusPricing(false)
-  }
+    queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["property"] });
+    setDrawerRoom(undefined);
+    setFocusPricing(false);
+  };
 
   const handleDeleted = () => {
-    queryClient.invalidateQueries({ queryKey: ['ownerProperty', user?.id] })
-    queryClient.invalidateQueries({ queryKey: ['property'] })
-    setDeleteRoom(null)
-  }
+    queryClient.invalidateQueries({ queryKey: ["ownerProperty", user?.id] });
+    queryClient.invalidateQueries({ queryKey: ["property"] });
+    setDeleteRoom(null);
+  };
 
   if (isLoading)
     return (
@@ -366,19 +544,23 @@ function AdminRooms() {
           ))}
         </div>
       </div>
-    )
+    );
 
   if (error || !property)
     return (
       <div className="text-center py-16 text-muted-foreground">Could not load property data.</div>
-    )
+    );
 
-  const rooms = property.rooms ?? []
+  const rooms = property.rooms ?? [];
   const goToSeasons = () => {
-    setDrawerRoom(undefined)
-    setFocusPricing(false)
-    setTimeout(() => document.getElementById('seasons')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
-  }
+    setDrawerRoom(undefined);
+    setFocusPricing(false);
+    setTimeout(
+      () =>
+        document.getElementById("seasons")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      50,
+    );
+  };
 
   return (
     <div
@@ -389,35 +571,59 @@ function AdminRooms() {
         <div>
           <h1 className="text-2xl md:text-3xl font-semibold">Rooms & Pricing</h1>
           <p className="text-sm text-muted-foreground">
-            {rooms.length} room{rooms.length !== 1 ? 's' : ''} · {rooms.filter((r) => r.is_active).length} active
+            {rooms.length} room{rooms.length !== 1 ? "s" : ""} ·{" "}
+            {rooms.filter((r) => r.is_active).length} active
           </p>
         </div>
-        <button onClick={() => setDrawerRoom(null)} className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90">
+        <button
+          onClick={() => setDrawerRoom(null)}
+          className="inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium hover:opacity-90"
+        >
           <Plus className="h-4 w-4" /> Add room
         </button>
       </div>
 
       <div id="seasons" className="scroll-mt-32">
-        <SeasonsPanel propertyId={property.id} rooms={rooms.map((r) => ({ id: r.id, name: r.name, base_price: r.base_price }))} />
+        <SeasonsPanel
+          propertyId={property.id}
+          rooms={rooms.map((r) => ({ id: r.id, name: r.name, base_price: r.base_price }))}
+        />
       </div>
 
       {rooms.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center">
           <BedDouble className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
           <p className="text-muted-foreground font-medium">No rooms yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Add your first room to start accepting bookings.</p>
-          <button onClick={() => setDrawerRoom(null)} className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium">
+          <p className="text-sm text-muted-foreground mt-1">
+            Add your first room to start accepting bookings.
+          </p>
+          <button
+            onClick={() => setDrawerRoom(null)}
+            className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary text-primary-foreground px-4 py-2 text-sm font-medium"
+          >
             <Plus className="h-4 w-4" /> Add room
           </button>
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {rooms.map((room) => (
-            <div key={room.id} className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
+            <div
+              key={room.id}
+              className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden"
+            >
               {room.images?.[0] ? (
-                <img src={thumbUrl(room.images[0])} alt={room.name} loading="lazy" className="w-full h-40 object-cover" onError={fallbackToFull(room.images[0])} />
+                <img
+                  src={thumbUrl(room.images[0])}
+                  alt={room.name}
+                  loading="lazy"
+                  className="w-full h-40 object-cover"
+                  onError={fallbackToFull(room.images[0])}
+                />
               ) : (
-                <div className="w-full h-40 bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/70 transition-colors" onClick={() => setDrawerRoom(room)}>
+                <div
+                  className="w-full h-40 bg-muted flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-muted/70 transition-colors"
+                  onClick={() => setDrawerRoom(room)}
+                >
                   <ImageOff className="h-6 w-6 text-muted-foreground/50" />
                   <p className="text-xs text-muted-foreground">Tap to add photo</p>
                 </div>
@@ -430,13 +636,23 @@ function AdminRooms() {
                     <h2 className="font-semibold text-foreground">{room.name}</h2>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${room.is_active ? 'bg-primary-light text-primary' : 'bg-muted text-muted-foreground'}`}>
-                      {room.is_active ? 'Active' : 'Inactive'}
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full ${room.is_active ? "bg-primary-light text-primary" : "bg-muted text-muted-foreground"}`}
+                    >
+                      {room.is_active ? "Active" : "Inactive"}
                     </span>
-                    <button onClick={() => setDrawerRoom(room)} className="h-7 w-7 rounded-2xl border border-border/60 hover:bg-muted flex items-center justify-center" title="Edit room">
+                    <button
+                      onClick={() => setDrawerRoom(room)}
+                      className="h-7 w-7 rounded-2xl border border-border/60 hover:bg-muted flex items-center justify-center"
+                      title="Edit room"
+                    >
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => setDeleteRoom(room)} className="h-7 w-7 rounded-md border border-destructive/30 hover:bg-destructive/5 text-destructive flex items-center justify-center" title="Delete room">
+                    <button
+                      onClick={() => setDeleteRoom(room)}
+                      className="h-7 w-7 rounded-md border border-destructive/30 hover:bg-destructive/5 text-destructive flex items-center justify-center"
+                      title="Delete room"
+                    >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -444,31 +660,68 @@ function AdminRooms() {
 
                 <div className="text-sm text-muted-foreground space-y-1">
                   <div className="flex gap-4">
-                    <span>Type: <span className="text-foreground font-medium capitalize">{room.room_type}</span></span>
-                    <span>Bed: <span className="text-foreground font-medium capitalize">{room.bed_type}</span></span>
+                    <span>
+                      Type:{" "}
+                      <span className="text-foreground font-medium capitalize">
+                        {room.room_type}
+                      </span>
+                    </span>
+                    <span>
+                      Bed:{" "}
+                      <span className="text-foreground font-medium capitalize">
+                        {room.bed_type}
+                      </span>
+                    </span>
                   </div>
                   <div className="flex gap-4">
-                    <span>Includes <span className="text-foreground font-medium">{room.max_guests} guests</span>{room.max_occupancy ? <> · up to <span className="text-foreground font-medium">{room.max_occupancy}</span></> : null}</span>
+                    <span>
+                      Includes{" "}
+                      <span className="text-foreground font-medium">{room.max_guests} guests</span>
+                      {room.max_occupancy ? (
+                        <>
+                          {" "}
+                          · up to{" "}
+                          <span className="text-foreground font-medium">{room.max_occupancy}</span>
+                        </>
+                      ) : null}
+                    </span>
                   </div>
                 </div>
 
                 {/* One tap from the price to the editor — pricing is edited here, in the room editor. */}
                 <button
                   type="button"
-                  onClick={() => { setFocusPricing(true); setDrawerRoom(room) }}
+                  onClick={() => {
+                    setFocusPricing(true);
+                    setDrawerRoom(room);
+                  }}
                   className="mt-3 w-full text-left rounded-2xl border border-border/60 bg-muted/30 hover:bg-muted/60 transition-colors px-3 py-2.5 flex items-center justify-between gap-3"
                   title="Edit pricing"
                 >
                   <div className="text-sm space-y-0.5">
                     <div>
-                      <span className="font-semibold text-foreground">₹{room.base_price.toLocaleString('en-IN')}</span>
+                      <span className="font-semibold text-foreground">
+                        ₹{room.base_price.toLocaleString("en-IN")}
+                      </span>
                       <span className="text-muted-foreground"> / night</span>
                       {(room.weekend_multiplier ?? 1) > 1 && (
-                        <span className="text-muted-foreground"> · Fri–Sat <span className="text-foreground font-medium">₹{Math.round(room.base_price * (room.weekend_multiplier ?? 1)).toLocaleString('en-IN')}</span></span>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · Fri–Sat{" "}
+                          <span className="text-foreground font-medium">
+                            ₹
+                            {Math.round(
+                              room.base_price * (room.weekend_multiplier ?? 1),
+                            ).toLocaleString("en-IN")}
+                          </span>
+                        </span>
                       )}
                     </div>
                     {room.extra_guest_price > 0 && (
-                      <div className="text-xs text-muted-foreground">+₹{room.extra_guest_price.toLocaleString('en-IN')} per guest beyond {room.max_guests}</div>
+                      <div className="text-xs text-muted-foreground">
+                        +₹{room.extra_guest_price.toLocaleString("en-IN")} per guest beyond{" "}
+                        {room.max_guests}
+                      </div>
                     )}
                   </div>
                   <Pencil className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -477,7 +730,12 @@ function AdminRooms() {
                 {room.room_amenities && room.room_amenities.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1">
                     {room.room_amenities.map((a) => (
-                      <span key={a} className="text-xs bg-primary-light/60 text-primary px-2 py-0.5 rounded-full">{a}</span>
+                      <span
+                        key={a}
+                        className="text-xs bg-primary-light/60 text-primary px-2 py-0.5 rounded-full"
+                      >
+                        {a}
+                      </span>
                     ))}
                   </div>
                 )}
@@ -488,12 +746,26 @@ function AdminRooms() {
       )}
 
       {drawerRoom !== undefined && (
-        <RoomDrawer room={drawerRoom} propertyId={property.id} focusPricing={focusPricing} onGoToSeasons={goToSeasons} onClose={() => { setDrawerRoom(undefined); setFocusPricing(false) }} onSaved={handleSaved} />
+        <RoomDrawer
+          room={drawerRoom}
+          propertyId={property.id}
+          focusPricing={focusPricing}
+          onGoToSeasons={goToSeasons}
+          onClose={() => {
+            setDrawerRoom(undefined);
+            setFocusPricing(false);
+          }}
+          onSaved={handleSaved}
+        />
       )}
 
       {deleteRoom && (
-        <DeleteRoomModal room={deleteRoom} onClose={() => setDeleteRoom(null)} onDeleted={handleDeleted} />
+        <DeleteRoomModal
+          room={deleteRoom}
+          onClose={() => setDeleteRoom(null)}
+          onDeleted={handleDeleted}
+        />
       )}
     </div>
-  )
+  );
 }

@@ -31,7 +31,9 @@ export function PeriodPicker({
             aria-selected={active}
             onClick={() => onChange(o.key)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-              active ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70"
+              active
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-foreground/80 hover:bg-muted/70"
             }`}
           >
             {o.label}
@@ -42,7 +44,13 @@ export function PeriodPicker({
   );
 }
 
-function Trend({ change, goodWhen }: { change: MoneyChange | null | undefined; goodWhen: "up" | "down" }) {
+function Trend({
+  change,
+  goodWhen,
+}: {
+  change: MoneyChange | null | undefined;
+  goodWhen: "up" | "down";
+}) {
   // No trustworthy comparison renders nothing: never a guess, never "↑ ∞%".
   if (!change) return null;
   const tone =
@@ -124,14 +132,20 @@ export function MoneyTop({
         <MetricCard
           label="Outstanding"
           value={rupees(o.total)}
-          hint={o.count > 0 ? `${plural(o.count, "booking", "bookings")} with money due` : "Nothing due"}
+          hint={
+            o.count > 0 ? `${plural(o.count, "booking", "bookings")} with money due` : "Nothing due"
+          }
         />
         <MetricCard
           label="Expenses"
           value={rupees(summary.expenses)}
           change={comparisons?.expenses}
           goodWhen="down"
-          hint={summary.expenseCount > 0 ? `${plural(summary.expenseCount, "expense", "expenses")} recorded` : "None recorded"}
+          hint={
+            summary.expenseCount > 0
+              ? `${plural(summary.expenseCount, "expense", "expenses")} recorded`
+              : "None recorded"
+          }
         />
       </div>
 
@@ -177,7 +191,9 @@ export function RevenueBySource({ summary }: { summary: MoneySummary }) {
         </p>
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No confirmed or completed stays in this period.</p>
+        <p className="text-sm text-muted-foreground">
+          No confirmed or completed stays in this period.
+        </p>
       ) : (
         <>
           <ul className="space-y-2.5">
@@ -239,7 +255,10 @@ export function ExpenseBreakdown({
         <>
           <ul className="space-y-1.5">
             {rows.map((c) => (
-              <li key={c.category} className="flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-2.5 text-sm">
+              <li
+                key={c.category}
+                className="flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-2.5 text-sm"
+              >
                 <span>{expenseCategoryLabel(c.category)}</span>
                 <span className="font-semibold tabular-nums">{rupees(c.total)}</span>
               </li>
@@ -288,7 +307,9 @@ export function OutstandingPayments({
         <>
           <div>
             <p className="text-2xl font-bold tabular-nums">{rupees(o.total)}</p>
-            <p className="text-xs text-muted-foreground">{plural(o.count, "booking", "bookings")} with money due</p>
+            <p className="text-xs text-muted-foreground">
+              {plural(o.count, "booking", "bookings")} with money due
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-muted/60 px-4 py-3">
@@ -304,7 +325,8 @@ export function OutstandingPayments({
       )}
       {summary.refundDue > 0 && (
         <p className="rounded-2xl bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
-          {rupees(summary.refundDue)} was paid above the bill on these stays (refund due). It is not taken off Outstanding.
+          {rupees(summary.refundDue)} was paid above the bill on these stays (refund due). It is not
+          taken off Outstanding.
         </p>
       )}
     </section>
@@ -314,12 +336,23 @@ export function OutstandingPayments({
 export function MoneyFootnote({ periodLabel }: { periodLabel: string }) {
   return (
     <details className="rounded-3xl bg-muted/50 px-4 py-3 text-xs text-muted-foreground">
-      <summary className="cursor-pointer font-medium text-foreground/80">How these numbers work</summary>
+      <summary className="cursor-pointer font-medium text-foreground/80">
+        How these numbers work
+      </summary>
       <ul className="mt-2 list-disc space-y-1 pl-4">
-        <li>Revenue, Collected and Outstanding cover stays with nights in {periodLabel}. A stay that crosses into another period is split by nights.</li>
+        <li>
+          Revenue, Collected and Outstanding cover stays with nights in {periodLabel}. A stay that
+          crosses into another period is split by nights.
+        </li>
         <li>Pending and cancelled bookings are never counted. A multi-room booking counts once.</li>
-        <li>Collected is the money recorded on those stays. The app does not keep payment dates, so it is not "cash received during the period".</li>
-        <li>Estimated operating profit is revenue minus the expenses you recorded. It is not accounting profit.</li>
+        <li>
+          Collected is the money recorded on those stays. The app does not keep payment dates, so it
+          is not "cash received during the period".
+        </li>
+        <li>
+          Estimated operating profit is revenue minus the expenses you recorded. It is not
+          accounting profit.
+        </li>
       </ul>
     </details>
   );

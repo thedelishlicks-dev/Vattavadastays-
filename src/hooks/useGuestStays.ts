@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { fetchAllRows } from "@/lib/paginate";
 import { guestStats, type GuestStats } from "@/lib/guestIdentity";
+import type { Booking, BookingGroup } from "@/types/database";
 
 /**
  * One guest's stay history, loaded ONLY for the booking the owner has open (never for a list of bookings, so
@@ -21,7 +22,7 @@ export function useGuestStays(propertyId: string, guestId: string | null | undef
   const bookings = useQuery({
     queryKey: ["bookings", "guest", propertyId, guestId ?? null],
     queryFn: () =>
-      fetchAllRows<any>((from, to) =>
+      fetchAllRows<Booking>((from, to) =>
         supabase
           .from("bookings")
           .select("*, booking_charges(*)", { count: "exact" })
@@ -37,7 +38,7 @@ export function useGuestStays(propertyId: string, guestId: string | null | undef
   const groups = useQuery({
     queryKey: ["bookingGroups", "guest", propertyId, guestId ?? null],
     queryFn: () =>
-      fetchAllRows<any>((from, to) =>
+      fetchAllRows<BookingGroup>((from, to) =>
         supabase
           .from("booking_groups")
           .select("*, booking_charges(*)", { count: "exact" })
@@ -51,7 +52,10 @@ export function useGuestStays(propertyId: string, guestId: string | null | undef
   });
 
   const stats = useMemo<GuestStats | null>(
-    () => (bookings.isSuccess && groups.isSuccess ? guestStats(bookings.data ?? [], groups.data ?? []) : null),
+    () =>
+      bookings.isSuccess && groups.isSuccess
+        ? guestStats(bookings.data ?? [], groups.data ?? [])
+        : null,
     [bookings.isSuccess, groups.isSuccess, bookings.data, groups.data],
   );
 

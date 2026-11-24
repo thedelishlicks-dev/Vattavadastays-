@@ -8,10 +8,19 @@ let failed = 0;
 function eq(name: string, got: unknown, want: unknown) {
   const ok = JSON.stringify(got) === JSON.stringify(want);
   if (!ok) failed++;
-  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : `  got=${JSON.stringify(got)} want=${JSON.stringify(want)}`}`);
+  console.log(
+    `${ok ? "PASS" : "FAIL"}  ${name}${ok ? "" : `  got=${JSON.stringify(got)} want=${JSON.stringify(want)}`}`,
+  );
 }
 
-const room = { id: "r1", name: "Mud House", base_price: 3000, extra_guest_price: 500, weekend_multiplier: 1.5, max_guests: 2 };
+const room = {
+  id: "r1",
+  name: "Mud House",
+  base_price: 3000,
+  extra_guest_price: 500,
+  weekend_multiplier: 1.5,
+  max_guests: 2,
+};
 
 // 2026-10-07 is a Wednesday. Nights: Wed, Thu, Fri, Sat → 2 weekday + 2 weekend.
 let r = priceRoomStay({ room, guests: 2, checkIn: "2026-10-07", checkOut: "2026-10-11" });
@@ -32,5 +41,8 @@ eq("Sunday night is base price", r.total, 3000);
 r = priceRoomStay({ room, guests: 1, checkIn: "", checkOut: "" });
 eq("empty dates → 0, not NaN", r.total, 0);
 
-if (failed) { console.error(`\n${failed} check(s) failed`); process.exit(1); }
+if (failed) {
+  console.error(`\n${failed} check(s) failed`);
+  process.exit(1);
+}
 console.log("\nAll pricing checks passed");

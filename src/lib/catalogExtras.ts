@@ -108,7 +108,8 @@ export interface PricedCatalogItem {
  */
 export function priceCatalogItem(input: PriceCatalogInput): PricedCatalogItem | null {
   const { item } = input;
-  if (!input.checkIn || !input.checkOut || nightsBetween(input.checkIn, input.checkOut) < 1) return null;
+  if (!input.checkIn || !input.checkOut || nightsBetween(input.checkIn, input.checkOut) < 1)
+    return null;
   const quantity =
     input.quantity !== undefined && Number.isFinite(input.quantity) && input.quantity >= 1
       ? Math.floor(input.quantity)
@@ -130,7 +131,10 @@ export function priceCatalogItem(input: PriceCatalogInput): PricedCatalogItem | 
     return null;
   }
   // "Bonfire (Standard)" reads badly on an invoice; only name a variant when there is a real choice.
-  const label = line.variant_label && line.variant_label.trim().toLowerCase() !== "standard" ? line.variant_label : null;
+  const label =
+    line.variant_label && line.variant_label.trim().toLowerCase() !== "standard"
+      ? line.variant_label
+      : null;
   const rows = lineToCharges({ ...line, variant_label: label });
   const total = rows.reduce((s, r) => s + r.qty * r.unit_price, 0);
   return { line, rows, total, usedFallback: line.used_fallback };

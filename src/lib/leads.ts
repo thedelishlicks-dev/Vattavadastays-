@@ -31,14 +31,14 @@ export interface LeadPayload {
 
 export async function submitLead(data: LeadPayload): Promise<void> {
   const { error } = await supabase.from("leads").insert({
-    name:          data.name.trim(),
-    phone:         data.phone.trim(),
+    name: data.name.trim(),
+    phone: data.phone.trim(),
     property_name: data.property_name?.trim() || null,
-    tier:          data.tier || null,
+    tier: data.tier || null,
   });
 
   if (error) {
     console.error("submitLead error:", error.message);
-    throw error;          // let the modal's catch handle it gracefully
+    throw error; // let the modal's catch handle it gracefully
   }
 }

@@ -3,12 +3,25 @@ import { useState } from "react";
 import { CalendarCheck, MessageSquareText, Pencil, Phone, Plus, Send, Trash2 } from "lucide-react";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { LoadFailed } from "@/components/LoadFailed";
-import { useDeleteQuote, useMarkQuoteConverted, useQuotes, useSaveQuote, useSetQuoteStatus, type Quote } from "@/hooks/useQuotes";
+import {
+  useDeleteQuote,
+  useMarkQuoteConverted,
+  useQuotes,
+  useSaveQuote,
+  useSetQuoteStatus,
+  type Quote,
+} from "@/hooks/useQuotes";
 import { AddBookingModal } from "@/components/AddBookingModal";
 import { QuoteBuilder } from "@/components/QuoteBuilder";
 import { PageHeader } from "@/admin/formKit";
 import { formatINR, nightsBetween } from "@/lib/quotes";
-import { buildQuoteText, displayStatus, quoteLink, todayStr, type DisplayStatus } from "@/lib/quoteBuilder";
+import {
+  buildQuoteText,
+  displayStatus,
+  quoteLink,
+  todayStr,
+  type DisplayStatus,
+} from "@/lib/quoteBuilder";
 import { telLink } from "@/lib/whatsapp";
 
 export const Route = createFileRoute("/admin/quotes")({
@@ -23,7 +36,11 @@ const STATUS_STYLE: Record<DisplayStatus, string> = {
   lost: "bg-red-100 text-red-700",
 };
 const STATUS_LABEL: Record<DisplayStatus, string> = {
-  draft: "Draft", sent: "Sent", expired: "Expired", accepted: "Accepted", lost: "Lost",
+  draft: "Draft",
+  sent: "Sent",
+  expired: "Expired",
+  accepted: "Accepted",
+  lost: "Lost",
 };
 
 type Filter = "open" | "accepted" | "lost" | "all";
@@ -53,9 +70,21 @@ function AdminQuotes() {
   return <QuoteList property={property as never} onEdit={setEditing} />;
 }
 
-type ListProperty = { id: string; name: string; owner_phone?: string; rooms?: { id: string; is_active?: boolean }[]; [k: string]: unknown };
+type ListProperty = {
+  id: string;
+  name: string;
+  owner_phone?: string;
+  rooms?: { id: string; is_active?: boolean }[];
+  [k: string]: unknown;
+};
 
-function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Quote | "new") => void }) {
+function QuoteList({
+  property,
+  onEdit,
+}: {
+  property: ListProperty;
+  onEdit: (q: Quote | "new") => void;
+}) {
   const { data: quotes = [], isLoading, isError, refetch } = useQuotes(property.id);
   const setStatus = useSetQuoteStatus();
   const del = useDeleteQuote();
@@ -75,17 +104,27 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
     quoteLink(
       q.guest_phone,
       buildQuoteText({
-        propertyName: property.name, guestName: q.guest_name === "Guest" ? "" : q.guest_name,
-        checkIn: q.check_in, checkOut: q.check_out, guestCount: q.guest_count,
-        rooms: q.rooms, lines: q.lines, discount: q.discount_amount, total: q.total_amount,
-        validUntil, ownerPhone: property.owner_phone,
+        propertyName: property.name,
+        guestName: q.guest_name === "Guest" ? "" : q.guest_name,
+        checkIn: q.check_in,
+        checkOut: q.check_out,
+        guestCount: q.guest_count,
+        rooms: q.rooms,
+        lines: q.lines,
+        discount: q.discount_amount,
+        total: q.total_amount,
+        validUntil,
+        ownerPhone: property.owner_phone,
       }),
     );
 
   return (
     <div className="space-y-5 max-w-2xl">
       <div className="flex items-start justify-between gap-3">
-        <PageHeader title="Quotes" subtitle="Price an enquiry while the guest is on the phone, then send it on WhatsApp." />
+        <PageHeader
+          title="Quotes"
+          subtitle="Price an enquiry while the guest is on the phone, then send it on WhatsApp."
+        />
         <button
           onClick={() => onEdit("new")}
           className="shrink-0 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
@@ -113,7 +152,9 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
       {!isLoading && !isError && shown.length === 0 && (
         <div className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           <MessageSquareText className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-          {quotes.length === 0 ? "No quotes yet. Tap “New quote” when the next enquiry call comes in." : "Nothing in this view."}
+          {quotes.length === 0
+            ? "No quotes yet. Tap “New quote” when the next enquiry call comes in."
+            : "Nothing in this view."}
         </div>
       )}
 
@@ -127,13 +168,17 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                 <div className="min-w-0">
                   <div className="font-medium truncate">{q.guest_name}</div>
                   <div className="text-xs text-muted-foreground">
-                    {q.check_in} → {q.check_out} · {n} night{n === 1 ? "" : "s"} · {q.guest_count} guest{q.guest_count === 1 ? "" : "s"}
+                    {q.check_in} → {q.check_out} · {n} night{n === 1 ? "" : "s"} · {q.guest_count}{" "}
+                    guest{q.guest_count === 1 ? "" : "s"}
                   </div>
                 </div>
                 <div className="text-right shrink-0">
                   <div className="font-semibold">{formatINR(q.total_amount)}</div>
-                  <span className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[11px] ${STATUS_STYLE[st]}`}>
-                    {q.converted_booking_id ? "Booked ✓" : STATUS_LABEL[st]}{st === "sent" && q.sent_at ? ` · ${ago(q.sent_at)}` : ""}
+                  <span
+                    className={`inline-block mt-1 rounded-full px-2 py-0.5 text-[11px] ${STATUS_STYLE[st]}`}
+                  >
+                    {q.converted_booking_id ? "Booked ✓" : STATUS_LABEL[st]}
+                    {st === "sent" && q.sent_at ? ` · ${ago(q.sent_at)}` : ""}
                   </span>
                 </div>
               </div>
@@ -149,52 +194,98 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
                     if (q.valid_until && q.valid_until < todayStr() && !q.converted_booking_id) {
                       e.preventDefault();
                       const newUntil = todayStr(3);
-                      if (!window.confirm(`This quote's "valid till" date (${q.valid_until}) has passed.\n\nSend it again with a new valid-till date of ${newUntil}?`)) return;
+                      if (
+                        !window.confirm(
+                          `This quote's "valid till" date (${q.valid_until}) has passed.\n\nSend it again with a new valid-till date of ${newUntil}?`,
+                        )
+                      )
+                        return;
                       window.open(resendLink(q, newUntil), "_blank", "noopener,noreferrer");
-                      saveQuote.mutate({ propertyId: property.id, id: q.id, values: { valid_until: newUntil, status: "sent", sent_at: new Date().toISOString() } });
+                      saveQuote.mutate({
+                        propertyId: property.id,
+                        id: q.id,
+                        values: {
+                          valid_until: newUntil,
+                          status: "sent",
+                          sent_at: new Date().toISOString(),
+                        },
+                      });
                       return;
                     }
-                    setStatus.mutate({ propertyId: property.id, id: q.id, status: q.status === "draft" ? "sent" : q.status, markSent: true });
+                    setStatus.mutate({
+                      propertyId: property.id,
+                      id: q.id,
+                      status: q.status === "draft" ? "sent" : q.status,
+                      markSent: true,
+                    });
                   }}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-3 py-1.5 text-white"
                 >
                   <Send className="h-3.5 w-3.5" /> {q.status === "draft" ? "Send" : "Resend"}
                 </a>
-                <a href={telLink(q.guest_phone)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
+                <a
+                  href={telLink(q.guest_phone)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70"
+                >
                   <Phone className="h-3.5 w-3.5" /> Call
                 </a>
-                <button onClick={() => onEdit(q)} className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
+                <button
+                  onClick={() => onEdit(q)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70"
+                >
                   <Pencil className="h-3.5 w-3.5" /> Edit
                 </button>
                 {!q.converted_booking_id && q.status !== "lost" && (
-                  <button onClick={() => setConverting(q)} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-primary-foreground hover:opacity-90">
+                  <button
+                    onClick={() => setConverting(q)}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-primary-foreground hover:opacity-90"
+                  >
                     <CalendarCheck className="h-3.5 w-3.5" /> Convert to booking
                   </button>
                 )}
                 {q.converted_booking_id && (
                   <Link
                     to="/admin/bookings"
-                    search={{
-                      ...(new URLSearchParams(window.location.search).get("property") ? { property: new URLSearchParams(window.location.search).get("property") } : {}),
-                      bookingId: q.converted_booking_id,
-                    } as never}
+                    search={
+                      {
+                        ...(new URLSearchParams(window.location.search).get("property")
+                          ? {
+                              property: new URLSearchParams(window.location.search).get("property"),
+                            }
+                          : {}),
+                        bookingId: q.converted_booking_id,
+                      } as never
+                    }
                     className="inline-flex items-center gap-1.5 rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50"
                   >
                     <CalendarCheck className="h-3.5 w-3.5" /> View in Bookings
                   </Link>
                 )}
                 {!q.converted_booking_id && q.status !== "accepted" && (
-                  <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "accepted" })} className="rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50">
+                  <button
+                    onClick={() =>
+                      setStatus.mutate({ propertyId: property.id, id: q.id, status: "accepted" })
+                    }
+                    className="rounded-full border border-green-300 px-3 py-1.5 text-green-800 hover:bg-green-50"
+                  >
                     Accepted
                   </button>
                 )}
                 {!q.converted_booking_id && q.status !== "lost" && (
-                  <button onClick={() => setStatus.mutate({ propertyId: property.id, id: q.id, status: "lost" })} className="rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70">
+                  <button
+                    onClick={() =>
+                      setStatus.mutate({ propertyId: property.id, id: q.id, status: "lost" })
+                    }
+                    className="rounded-full bg-muted px-3 py-1.5 hover:bg-muted/70"
+                  >
                     Lost
                   </button>
                 )}
                 <button
-                  onClick={() => { if (window.confirm("Delete this quote?")) del.mutate({ propertyId: property.id, id: q.id }); }}
+                  onClick={() => {
+                    if (window.confirm("Delete this quote?"))
+                      del.mutate({ propertyId: property.id, id: q.id });
+                  }}
                   className="ml-auto inline-flex items-center justify-center h-8 w-8 rounded-full text-destructive hover:bg-muted"
                   aria-label="Delete quote"
                 >
@@ -211,7 +302,7 @@ function QuoteList({ property, onEdit }: { property: ListProperty; onEdit: (q: Q
         <AddBookingModal
           propertyId={property.id}
           property={property as never}
-          rooms={((property.rooms ?? []).filter((r) => r.is_active !== false)) as never}
+          rooms={(property.rooms ?? []).filter((r) => r.is_active !== false) as never}
           onClose={() => setConverting(null)}
           onSaved={() => setConverting(null)}
           fromQuote={{

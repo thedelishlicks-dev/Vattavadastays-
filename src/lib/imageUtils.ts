@@ -35,7 +35,14 @@ import imageCompression from "browser-image-compression";
 // Types
 // ---------------------------------------------------------------------------
 
-export type ImagePreset = "room" | "hero" | "about" | "logo" | "staticMap" | "gallery" | "galleryThumb";
+export type ImagePreset =
+  | "room"
+  | "hero"
+  | "about"
+  | "logo"
+  | "staticMap"
+  | "gallery"
+  | "galleryThumb";
 
 export interface CompressResult {
   file: File;
@@ -61,50 +68,47 @@ export interface CompressResult {
  * useWebWorker: true keeps the UI thread unblocked during compression.
  *   Critical on low-end Android devices where the main thread is already slow.
  */
-const PRESET_OPTIONS: Record<
-  ImagePreset,
-  Parameters<typeof imageCompression>[1]
-> = {
+const PRESET_OPTIONS: Record<ImagePreset, Parameters<typeof imageCompression>[1]> = {
   room: {
-    maxSizeMB: 0.12,         // 120 KB
+    maxSizeMB: 0.12, // 120 KB
     maxWidthOrHeight: 800,
-    initialQuality: 0.70,
+    initialQuality: 0.7,
     useWebWorker: true,
   },
   hero: {
-    maxSizeMB: 0.22,         // 220 KB
+    maxSizeMB: 0.22, // 220 KB
     maxWidthOrHeight: 1280,
     initialQuality: 0.73,
     useWebWorker: true,
   },
   about: {
-    maxSizeMB: 0.15,         // 150 KB
+    maxSizeMB: 0.15, // 150 KB
     maxWidthOrHeight: 900,
     initialQuality: 0.73,
     useWebWorker: true,
   },
   logo: {
-    maxSizeMB: 0.015,        // 15 KB
+    maxSizeMB: 0.015, // 15 KB
     maxWidthOrHeight: 120,
     initialQuality: 0.82,
     useWebWorker: true,
   },
   staticMap: {
-    maxSizeMB: 0.10,         // 100 KB
+    maxSizeMB: 0.1, // 100 KB
     maxWidthOrHeight: 900,
-    initialQuality: 0.70,
+    initialQuality: 0.7,
     useWebWorker: true,
   },
   gallery: {
-    maxSizeMB: 0.14,         // 140 KB
+    maxSizeMB: 0.14, // 140 KB
     maxWidthOrHeight: 1200,
     initialQuality: 0.72,
     useWebWorker: true,
   },
   galleryThumb: {
-    maxSizeMB: 0.03,         // 30 KB
+    maxSizeMB: 0.03, // 30 KB
     maxWidthOrHeight: 480,
-    initialQuality: 0.70,
+    initialQuality: 0.7,
     useWebWorker: true,
   },
 };
@@ -115,13 +119,7 @@ const PRESET_OPTIONS: Record<
 
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10 MB
 
-const ACCEPTED_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-];
+const ACCEPTED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
 
 /**
  * Throws a user-friendly string on failure — callers display it directly.
@@ -168,13 +166,13 @@ export function validateImageFile(file: File): void {
  */
 export async function validateAndCompress(
   file: File,
-  preset: ImagePreset
+  preset: ImagePreset,
 ): Promise<CompressResult> {
   validateImageFile(file);
 
   const originalBytes = file.size;
-  const opts          = PRESET_OPTIONS[preset];
-  const maxBytes      = (opts.maxSizeMB as number) * 1024 * 1024;
+  const opts = PRESET_OPTIONS[preset];
+  const maxBytes = (opts.maxSizeMB as number) * 1024 * 1024;
 
   let compressed: File;
   try {
@@ -213,7 +211,7 @@ export async function validateAndCompress(
 // ---------------------------------------------------------------------------
 
 export function formatBytes(bytes: number): string {
-  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }

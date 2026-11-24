@@ -56,7 +56,12 @@ export interface BalanceResult {
   isPaid: boolean;
 }
 
-export function computeBalance({ roomTotal, chargesTotal = 0, discount = 0, advance = 0 }: BalanceInput): BalanceResult {
+export function computeBalance({
+  roomTotal,
+  chargesTotal = 0,
+  discount = 0,
+  advance = 0,
+}: BalanceInput): BalanceResult {
   // A negative discount/advance is bad data; never let it inflate or shrink the bill.
   const netTotal = Math.max(0, num(roomTotal) + num(chargesTotal) - Math.max(0, num(discount)));
   const diff = netTotal - Math.max(0, num(advance));

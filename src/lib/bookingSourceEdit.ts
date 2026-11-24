@@ -56,14 +56,20 @@ export function buildSourcePatch(
     current.source === "agent" || current.source === "walk_in" ? current.source : "direct";
   const wanted = next.source ?? currentSource;
   const source: BookingSource =
-    canChangeSource(current) && (wanted === "direct" || wanted === "walk_in") ? wanted : currentSource;
+    canChangeSource(current) && (wanted === "direct" || wanted === "walk_in")
+      ? wanted
+      : currentSource;
   const detail = clean(next.detail);
   const currentDetail = clean(current.booking_source_detail);
   if (source === currentSource && detail === currentDetail) return null;
   return { source, booking_source_detail: detail };
 }
 
-const SOURCE_LABELS: Record<string, string> = { direct: "Direct", agent: "Agent", walk_in: "Walk-in" };
+const SOURCE_LABELS: Record<string, string> = {
+  direct: "Direct",
+  agent: "Agent",
+  walk_in: "Walk-in",
+};
 
 /**
  * One line for the booking details: "WhatsApp", "Walk-in", "Agent · Instagram", or "Not recorded" for a plain
@@ -73,6 +79,7 @@ export function sourceSummary(row: SourceFields): string {
   const detail = bookingSourceDetailLabel(row.booking_source_detail);
   const primary = SOURCE_LABELS[row.source ?? ""] ?? "Direct";
   if (row.source === "agent") return detail ? `${primary} · ${detail}` : primary;
-  if (row.source === "walk_in") return detail && detail !== primary ? `${primary} · ${detail}` : primary;
+  if (row.source === "walk_in")
+    return detail && detail !== primary ? `${primary} · ${detail}` : primary;
   return detail ?? "Not recorded";
 }

@@ -42,7 +42,10 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
   const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
   const quantity = qty.trim() === "" ? undefined : parseInt(qty, 10);
   const priced = useMemo(
-    () => (item ? priceCatalogItem({ item, variantKey, checkIn, checkOut, guests, seasons, quantity }) : null),
+    () =>
+      item
+        ? priceCatalogItem({ item, variantKey, checkIn, checkOut, guests, seasons, quantity })
+        : null,
     [item, variantKey, checkIn, checkOut, guests, seasons, quantity],
   );
 
@@ -59,7 +62,9 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
       await onAdd(priced.rows);
       setItemKey("");
     } catch (e: unknown) {
-      setError(e instanceof Error && e.message ? e.message : "Could not add this item. Please try again.");
+      setError(
+        e instanceof Error && e.message ? e.message : "Could not add this item. Please try again.",
+      );
     } finally {
       setAdding(false);
     }
@@ -71,23 +76,45 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
   return (
     <div className="rounded-2xl border border-border/60 bg-muted/20 p-3 space-y-2">
       <p className="text-xs font-medium text-muted-foreground">Add from your catalog</p>
-      <select value={itemKey} onChange={(e) => setItemKey(e.target.value)} className={fieldCls} aria-label="Add-on or package">
+      <select
+        value={itemKey}
+        onChange={(e) => setItemKey(e.target.value)}
+        className={fieldCls}
+        aria-label="Add-on or package"
+      >
         <option value="">Choose an add-on or package…</option>
         {packages.length > 0 && (
           <optgroup label="Packages">
-            {packages.map((i) => <option key={i.key} value={i.key}>{i.name} — {priceHint(i)}</option>)}
+            {packages.map((i) => (
+              <option key={i.key} value={i.key}>
+                {i.name} — {priceHint(i)}
+              </option>
+            ))}
           </optgroup>
         )}
         {addons.length > 0 && (
           <optgroup label="Add-ons">
-            {addons.map((i) => <option key={i.key} value={i.key}>{i.name} — {priceHint(i)}</option>)}
+            {addons.map((i) => (
+              <option key={i.key} value={i.key}>
+                {i.name} — {priceHint(i)}
+              </option>
+            ))}
           </optgroup>
         )}
       </select>
 
       {item && item.variants.length > 1 && (
-        <select value={variantKey} onChange={(e) => setVariantKey(e.target.value)} className={fieldCls} aria-label="Option">
-          {item.variants.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+        <select
+          value={variantKey}
+          onChange={(e) => setVariantKey(e.target.value)}
+          className={fieldCls}
+          aria-label="Option"
+        >
+          {item.variants.map((v) => (
+            <option key={v.key} value={v.key}>
+              {v.label}
+            </option>
+          ))}
         </select>
       )}
 
@@ -97,7 +124,9 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
 
       {item && (
         <div className="flex items-center gap-2">
-          <label className="text-xs text-muted-foreground shrink-0" htmlFor="catalog-extra-qty">{perPerson ? "People" : "Qty"}</label>
+          <label className="text-xs text-muted-foreground shrink-0" htmlFor="catalog-extra-qty">
+            {perPerson ? "People" : "Qty"}
+          </label>
           <input
             id="catalog-extra-qty"
             type="number"
@@ -111,22 +140,36 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
       )}
 
       {item && !priced && (
-        <p className="text-xs text-amber-700">{nights < 1 ? "Choose the stay dates first so this can be priced." : "This item has no price set. Add one in Property → Add-ons."}</p>
+        <p className="text-xs text-amber-700">
+          {nights < 1
+            ? "Choose the stay dates first so this can be priced."
+            : "This item has no price set. Add one in Property → Add-ons."}
+        </p>
       )}
 
       {item && priced && (
         <div className="rounded-lg bg-background border border-border px-3 py-2 space-y-1">
           {priced.rows.map((r, i) => (
             <div key={i} className="flex justify-between gap-2 text-xs">
-              <span className="text-muted-foreground min-w-0 break-words">{r.description}{r.qty > 1 ? ` × ${r.qty}` : ""} <span className="text-[11px]">(₹{r.unit_price.toLocaleString("en-IN")} each)</span></span>
-              <span className="font-medium shrink-0">₹{(r.qty * r.unit_price).toLocaleString("en-IN")}</span>
+              <span className="text-muted-foreground min-w-0 break-words">
+                {r.description}
+                {r.qty > 1 ? ` × ${r.qty}` : ""}{" "}
+                <span className="text-[11px]">(₹{r.unit_price.toLocaleString("en-IN")} each)</span>
+              </span>
+              <span className="font-medium shrink-0">
+                ₹{(r.qty * r.unit_price).toLocaleString("en-IN")}
+              </span>
             </div>
           ))}
           <div className="flex justify-between border-t border-border pt-1 text-sm font-semibold">
-            <span>Total</span><span>₹{priced.total.toLocaleString("en-IN")}</span>
+            <span>Total</span>
+            <span>₹{priced.total.toLocaleString("en-IN")}</span>
           </div>
           {priced.usedFallback && (
-            <p className="text-[11px] text-amber-700">A season applies but no seasonal price is set for this item, so the standard price is used.</p>
+            <p className="text-[11px] text-amber-700">
+              A season applies but no seasonal price is set for this item, so the standard price is
+              used.
+            </p>
           )}
         </div>
       )}
@@ -140,11 +183,18 @@ export function CatalogExtrasPicker({ propertyId, checkIn, checkOut, guests, onA
           disabled={!priced || adding}
           className="w-full rounded-lg bg-primary text-primary-foreground py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
         >
-          {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add to extras
+          {adding ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}{" "}
+          Add to extras
         </button>
       )}
       <p className="text-[11px] text-muted-foreground">
-        Priced for {nights > 0 ? `${nights} night${nights > 1 ? "s" : ""}` : "the chosen dates"} · {Math.max(1, guests || 1)} guest{Math.max(1, guests || 1) > 1 ? "s" : ""}, at today's catalog prices. It will not change if the stay changes later.
+        Priced for {nights > 0 ? `${nights} night${nights > 1 ? "s" : ""}` : "the chosen dates"} ·{" "}
+        {Math.max(1, guests || 1)} guest{Math.max(1, guests || 1) > 1 ? "s" : ""}, at today's
+        catalog prices. It will not change if the stay changes later.
       </p>
     </div>
   );

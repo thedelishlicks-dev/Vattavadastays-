@@ -6,7 +6,10 @@
 // property called "Tea & Coffee Villa" or a landmark like "Plot #5" can't cut a message short.
 
 export function smsSafe(text: string): string {
-  return text.replace(/\s*&\s*/g, " and ").replace(/#/g, "No. ").replace(/[ \t]{2,}/g, " ");
+  return text
+    .replace(/\s*&\s*/g, " and ")
+    .replace(/#/g, "No. ")
+    .replace(/[ \t]{2,}/g, " ");
 }
 
 export function smsLink(body: string): string {

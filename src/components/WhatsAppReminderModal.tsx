@@ -56,7 +56,7 @@ function buildMessage(
   booking: Booking,
   roomName: string,
   property: Props["property"],
-  origin: string
+  origin: string,
 ): string {
   const name = booking.guest_name;
   const prop = property.name;
@@ -78,7 +78,11 @@ function buildMessage(
         checkIn,
         checkOut,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(
+          origin,
+          booking.tracking_token,
+          booking.property_id ?? property.id,
+        ),
       });
 
     case "reminder":
@@ -90,8 +94,10 @@ function buildMessage(
       });
 
     case "payment": {
-      const chargesTotal = (booking.booking_charges ?? [])
-        .reduce((sum, c) => sum + c.qty * c.unit_price, 0);
+      const chargesTotal = (booking.booking_charges ?? []).reduce(
+        (sum, c) => sum + c.qty * c.unit_price,
+        0,
+      );
       return buildPaymentReminderText({
         guestName: name,
         totalAmount: Number(booking.total_amount),
@@ -102,7 +108,11 @@ function buildMessage(
         propertyName: prop,
         upiId: property.upiId ?? undefined,
         ownerPhone: phone,
-        trackingUrl: guestTrackingUrl(origin, booking.tracking_token, booking.property_id ?? property.id),
+        trackingUrl: guestTrackingUrl(
+          origin,
+          booking.tracking_token,
+          booking.property_id ?? property.id,
+        ),
       });
     }
 
@@ -130,22 +140,22 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
 
   const templates = useMemo(() => {
     const all: { key: Template; label: string }[] = [
-      { key: "confirmed",  label: "Booking confirmed" },
-      { key: "reminder",  label: "Day-before reminder" },
-      { key: "payment",   label: "Payment reminder" },
+      { key: "confirmed", label: "Booking confirmed" },
+      { key: "reminder", label: "Day-before reminder" },
+      { key: "payment", label: "Payment reminder" },
       { key: "directions", label: "Directions" },
     ];
     // Directions needs real coordinates to build a maps link — don't offer
     // a template that can only ever fall back to "call us", same rule the
     // bookings page uses for its own Directions button.
-    return hasCoordinates ? all : all.filter(t => t.key !== "directions");
+    return hasCoordinates ? all : all.filter((t) => t.key !== "directions");
   }, [hasCoordinates]);
 
-  const upcoming = bookings.filter(b => b.check_in >= new Date().toISOString().split("T")[0]);
+  const upcoming = bookings.filter((b) => b.check_in >= new Date().toISOString().split("T")[0]);
   const [bookingId, setBookingId] = useState(upcoming[0]?.id ?? bookings[0]?.id ?? "");
   const [template, setTemplate] = useState<Template>("confirmed");
 
-  const booking = bookings.find(b => b.id === bookingId);
+  const booking = bookings.find((b) => b.id === bookingId);
   const roomName = booking ? (roomNameMap[booking.room_id] ?? "your room") : "";
   const message = booking
     ? buildMessage(template, booking, roomName, property, window.location.origin)
@@ -159,7 +169,9 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
       onClose={onClose}
       footer={
         <ModalActions>
-          <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
+          <Button variant="soft" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
           {booking && (
             <a
               href={waUrl}
@@ -180,8 +192,12 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
       ) : (
         <>
           <Field label="Guest / booking">
-            <select value={bookingId} onChange={e => setBookingId(e.target.value)} className={fieldCls}>
-              {bookings.map(b => (
+            <select
+              value={bookingId}
+              onChange={(e) => setBookingId(e.target.value)}
+              className={fieldCls}
+            >
+              {bookings.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.guest_name} — {b.check_in} ({roomNameMap[b.room_id] ?? "room"})
                 </option>
@@ -192,14 +208,16 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
           <div className="space-y-2">
             <p className="text-xs font-medium text-muted-foreground">Message type</p>
             <div className="flex flex-wrap gap-2">
-              {templates.map(t => (
+              {templates.map((t) => (
                 <button
                   key={t.key}
                   type="button"
                   onClick={() => setTemplate(t.key)}
                   className={[
                     "press-scale rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-                    template === t.key ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70",
+                    template === t.key
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-foreground/80 hover:bg-muted/70",
                   ].join(" ")}
                 >
                   {t.label}
@@ -211,7 +229,9 @@ export function WhatsAppReminderModal({ bookings, roomNameMap, property, onClose
           {booking && (
             <div key={bookingId + template} className="animate-in fade-in duration-200 space-y-2">
               <p className="text-xs font-medium text-muted-foreground">Preview</p>
-              <div className="rounded-2xl bg-[#dcfce7] p-4 text-sm leading-relaxed whitespace-pre-wrap text-[#14532d]">{message}</div>
+              <div className="rounded-2xl bg-[#dcfce7] p-4 text-sm leading-relaxed whitespace-pre-wrap text-[#14532d]">
+                {message}
+              </div>
               <p className="text-xs text-muted-foreground">Sending to: {booking.guest_phone}</p>
             </div>
           )}

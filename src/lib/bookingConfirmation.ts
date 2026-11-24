@@ -51,38 +51,75 @@ export function browserStore(): Store | null {
 }
 
 /** Identifies a selection: the same rooms for the same dates. */
-export function selectionKey(selections: { roomId: string; checkIn: string; checkOut: string }[]): string {
+export function selectionKey(
+  selections: { roomId: string; checkIn: string; checkOut: string }[],
+): string {
   if (selections.length === 0) return "";
-  const rooms = selections.map((s) => s.roomId).sort().join(",");
+  const rooms = selections
+    .map((s) => s.roomId)
+    .sort()
+    .join(",");
   return `${rooms}|${selections[0].checkIn}|${selections[0].checkOut}`;
 }
 
 export function saveConfirmation(store: Store | null | undefined, c: Confirmation): void {
-  try { store?.setItem(CONFIRMATION_KEY, JSON.stringify(c)); } catch { /* storage full / blocked: the screen still shows this session */ }
+  try {
+    store?.setItem(CONFIRMATION_KEY, JSON.stringify(c));
+  } catch {
+    /* storage full / blocked: the screen still shows this session */
+  }
 }
 
 export function clearConfirmation(store: Store | null | undefined): void {
-  try { store?.removeItem(CONFIRMATION_KEY); } catch { /* ignore */ }
+  try {
+    store?.removeItem(CONFIRMATION_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 const isStr = (v: unknown): v is string => typeof v === "string";
 const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /** The saved confirmation for THIS property, if it exists, is intact and is under 24 hours old. */
-export function loadConfirmation(store: Store | null | undefined, propertyId: string, now: number = Date.now()): Confirmation | null {
+export function loadConfirmation(
+  store: Store | null | undefined,
+  propertyId: string,
+  now: number = Date.now(),
+): Confirmation | null {
   let raw: string | null = null;
-  try { raw = store?.getItem(CONFIRMATION_KEY) ?? null; } catch { return null; }
+  try {
+    raw = store?.getItem(CONFIRMATION_KEY) ?? null;
+  } catch {
+    return null;
+  }
   if (!raw) return null;
   try {
     const c = JSON.parse(raw) as Partial<Confirmation>;
     const ok =
-      c && c.v === 1 && c.propertyId === propertyId &&
-      isNum(c.savedAt) && now - c.savedAt >= -60_000 && now - c.savedAt <= CONFIRMATION_MAX_AGE_MS &&
-      isStr(c.name) && isStr(c.phone) && isStr(c.bookingId) && isStr(c.checkIn) && isStr(c.checkOut) &&
-      isNum(c.nights) && isNum(c.totalGuests) && isNum(c.grandTotal) && isStr(c.selectionKey) && isStr(c.requests) &&
+      c &&
+      c.v === 1 &&
+      c.propertyId === propertyId &&
+      isNum(c.savedAt) &&
+      now - c.savedAt >= -60_000 &&
+      now - c.savedAt <= CONFIRMATION_MAX_AGE_MS &&
+      isStr(c.name) &&
+      isStr(c.phone) &&
+      isStr(c.bookingId) &&
+      isStr(c.checkIn) &&
+      isStr(c.checkOut) &&
+      isNum(c.nights) &&
+      isNum(c.totalGuests) &&
+      isNum(c.grandTotal) &&
+      isStr(c.selectionKey) &&
+      isStr(c.requests) &&
       (c.payment === "UPI" || c.payment === "Cash on Arrival") &&
-      Array.isArray(c.rooms) && c.rooms.every((r) => r && isStr(r.name) && isNum(r.total));
-    if (!ok) { clearConfirmation(store); return null; }
+      Array.isArray(c.rooms) &&
+      c.rooms.every((r) => r && isStr(r.name) && isNum(r.total));
+    if (!ok) {
+      clearConfirmation(store);
+      return null;
+    }
     return c as Confirmation;
   } catch {
     clearConfirmation(store);

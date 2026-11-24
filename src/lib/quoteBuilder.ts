@@ -5,7 +5,14 @@
 // helpers. No React / Supabase. Builds on lib/quotes.ts (add-on pricing).
 
 import { clean } from "./whatsapp";
-import { formatINR, lineToCharges, nightsBetween, stayDates, UNIT_LABELS, type QuoteLine } from "./quotes";
+import {
+  formatINR,
+  lineToCharges,
+  nightsBetween,
+  stayDates,
+  UNIT_LABELS,
+  type QuoteLine,
+} from "./quotes";
 import { pickRate, rateBasePrice, type RoomRate } from "./roomRates";
 
 // ── Rooms ───────────────────────────────────────────────────────────────────
@@ -121,7 +128,10 @@ export type QuoteStatus = "draft" | "sent" | "accepted" | "lost";
 export type DisplayStatus = QuoteStatus | "expired";
 
 /** A sent quote past its valid_until date reads as "expired". */
-export function displayStatus(q: { status: QuoteStatus; valid_until: string | null }, today = todayStr()): DisplayStatus {
+export function displayStatus(
+  q: { status: QuoteStatus; valid_until: string | null },
+  today = todayStr(),
+): DisplayStatus {
   if (q.status === "sent" && q.valid_until && q.valid_until < today) return "expired";
   return q.status;
 }
@@ -159,20 +169,33 @@ function lineDescriptor(l: QuoteLine): string {
 export function buildQuoteText(i: QuoteMessageInput): string {
   const nights = nightsBetween(i.checkIn, i.checkOut);
   const out: string[] = [];
-  out.push(`Hi ${i.guestName?.trim() || "there"}, thanks for your enquiry at ${i.propertyName}! Here's your quote:`);
+  out.push(
+    `Hi ${i.guestName?.trim() || "there"}, thanks for your enquiry at ${i.propertyName}! Here's your quote:`,
+  );
   out.push("");
   out.push(
     `📅 ${fmtDate(i.checkIn)} – ${fmtDate(i.checkOut, true)} (${nights} night${nights === 1 ? "" : "s"}) · ${i.guestCount} guest${i.guestCount === 1 ? "" : "s"}`,
   );
   out.push("");
   for (const r of i.rooms) {
-    out.push(`🛏 ${r.name} × ${r.nights} night${r.nights === 1 ? "" : "s"} — ${formatINR(r.total)}`);
+    out.push(
+      `🛏 ${r.name} × ${r.nights} night${r.nights === 1 ? "" : "s"} — ${formatINR(r.total)}`,
+    );
   }
   for (const l of i.lines) {
-    const variant = l.variant_label && l.variant_label.toLowerCase() !== "standard" ? ` (${l.variant_label})` : "";
-    const seasons = Array.from(new Set(l.breakdown.filter((s) => s.source === "season" && s.season_name).map((s) => s.season_name)));
+    const variant =
+      l.variant_label && l.variant_label.toLowerCase() !== "standard"
+        ? ` (${l.variant_label})`
+        : "";
+    const seasons = Array.from(
+      new Set(
+        l.breakdown.filter((s) => s.source === "season" && s.season_name).map((s) => s.season_name),
+      ),
+    );
     const rates = seasons.length ? ` (incl. ${seasons.join(", ")} rates)` : "";
-    out.push(`${l.kind === "package" ? "🎁" : "➕"} ${l.name}${variant}${lineDescriptor(l)}${rates} — ${formatINR(l.subtotal)}`);
+    out.push(
+      `${l.kind === "package" ? "🎁" : "➕"} ${l.name}${variant}${lineDescriptor(l)}${rates} — ${formatINR(l.subtotal)}`,
+    );
     if (l.kind === "package" && l.includes.length) out.push(`   ↳ ${l.includes.join(" · ")}`);
   }
   if (i.discount > 0) out.push(`🏷 Discount — −${formatINR(i.discount)}`);
@@ -209,7 +232,9 @@ export interface QuoteConversion {
 }
 
 /** Add-on lines → booking_charges rows (one per price segment, exact prices). */
-export function chargesFromQuote(lines: QuoteLine[]): { description: string; qty: number; unit_price: number }[] {
+export function chargesFromQuote(
+  lines: QuoteLine[],
+): { description: string; qty: number; unit_price: number }[] {
   return lines.flatMap(lineToCharges);
 }
 
@@ -244,7 +269,14 @@ export function lockToQuote<T extends RoomTotalLike>(
   return live.map((rt) => {
     const q = active ? quoteRooms?.find((r) => r.room_id === rt.room.id) : undefined;
     return q
-      ? { ...rt, roomPrice: q.room_price, extraCharge: q.extra_guest_charge, total: q.total, guests: q.guests, locked: true }
+      ? {
+          ...rt,
+          roomPrice: q.room_price,
+          extraCharge: q.extra_guest_charge,
+          total: q.total,
+          guests: q.guests,
+          locked: true,
+        }
       : { ...rt, guests: guestsByRoom?.[rt.room.id] ?? fallbackGuests, locked: false };
   });
 }

@@ -28,7 +28,10 @@ export function acceptedMethods(shared: string[] | null | undefined): string[] {
  * Never empty: if the owner's setup leaves nothing usable, cash on arrival is offered
  * so a guest can always send a request (the owner confirms terms by phone/WhatsApp).
  */
-export function guestPaymentOptions(shared: string[] | null | undefined, upiId: string | null): GuestPayment[] {
+export function guestPaymentOptions(
+  shared: string[] | null | undefined,
+  upiId: string | null,
+): GuestPayment[] {
   const methods = acceptedMethods(shared);
   const out: GuestPayment[] = [];
   if (methods.includes("UPI") && upiId) out.push("UPI");

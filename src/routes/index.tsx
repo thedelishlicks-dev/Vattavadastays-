@@ -18,7 +18,13 @@ import { useProperty } from "@/hooks/useProperty";
 import { useRoomRates } from "@/hooks/useRoomRates";
 import { useUnavailableRoomIds } from "@/hooks/useUnavailableRoomIds";
 import { getSubdomain } from "@/lib/subdomain";
-import { allocateGuests, suggestOptions, isFullyPlaced, partySize, type Party } from "@/lib/partyAllocation";
+import {
+  allocateGuests,
+  suggestOptions,
+  isFullyPlaced,
+  partySize,
+  type Party,
+} from "@/lib/partyAllocation";
 import { buildBookingDetails, type BookingDetails } from "@/lib/roomSelection";
 import type { Room } from "@/types/database";
 
@@ -82,32 +88,65 @@ function GuestPage({ subdomain }: { subdomain: string }) {
   const hasDates = !!checkIn && !!checkOut;
   const { unavailable, settled } = useUnavailableRoomIds(property, checkInStr, checkOutStr);
 
-  const activeRooms = useMemo<Room[]>(() => (property?.rooms ?? []).filter((r: Room) => r.is_active), [property]);
+  const activeRooms = useMemo<Room[]>(
+    () => (property?.rooms ?? []).filter((r: Room) => r.is_active),
+    [property],
+  );
   // With dates chosen only the free rooms are offered.
-  const visibleRooms = useMemo(() => (hasDates ? activeRooms.filter((r) => !unavailable.has(r.id)) : activeRooms), [activeRooms, unavailable, hasDates]);
-  const selectedRooms = useMemo(() => selectedIds.map((id) => activeRooms.find((r) => r.id === id)).filter((r): r is Room => !!r), [selectedIds, activeRooms]);
+  const visibleRooms = useMemo(
+    () => (hasDates ? activeRooms.filter((r) => !unavailable.has(r.id)) : activeRooms),
+    [activeRooms, unavailable, hasDates],
+  );
+  const selectedRooms = useMemo(
+    () =>
+      selectedIds.map((id) => activeRooms.find((r) => r.id === id)).filter((r): r is Room => !!r),
+    [selectedIds, activeRooms],
+  );
 
-  const allocation = useMemo(() => allocateGuests(selectedRooms, party, pinned), [selectedRooms, party, pinned]);
+  const allocation = useMemo(
+    () => allocateGuests(selectedRooms, party, pinned),
+    [selectedRooms, party, pinned],
+  );
   const selections = useMemo<BookingDetails[]>(
-    () => (checkIn && checkOut ? selectedRooms.map((r) => buildBookingDetails(r, allocation.byRoom[r.id], checkIn, checkOut, rates)) : []),
+    () =>
+      checkIn && checkOut
+        ? selectedRooms.map((r) =>
+            buildBookingDetails(r, allocation.byRoom[r.id], checkIn, checkOut, rates),
+          )
+        : [],
     [selectedRooms, allocation, checkIn, checkOut, rates],
   );
   // Options for a group, priced for real (room prices for these dates, weekend and season included, plus extra guests).
   const options = useMemo(() => {
     if (!checkIn || !checkOut || !settled) return { bestValue: null, moreSpace: null };
     const byId = new Map(visibleRooms.map((r) => [r.id, r]));
-    return suggestOptions(visibleRooms, party, (r, g) => buildBookingDetails(byId.get(r.id) as Room, { adults: g, children: 0 }, checkIn, checkOut, rates).total);
+    return suggestOptions(
+      visibleRooms,
+      party,
+      (r, g) =>
+        buildBookingDetails(
+          byId.get(r.id) as Room,
+          { adults: g, children: 0 },
+          checkIn,
+          checkOut,
+          rates,
+        ).total,
+    );
   }, [checkIn, checkOut, settled, visibleRooms, party, rates]);
 
   const guests = partySize(party);
   // The group only needs a choice when no single room covers everyone inside its included guests.
-  const groupNeedsChoice = visibleRooms.length > 0 && guests > Math.max(0, ...visibleRooms.map((r) => r.max_guests));
+  const groupNeedsChoice =
+    visibleRooms.length > 0 && guests > Math.max(0, ...visibleRooms.map((r) => r.max_guests));
   const unplaced = allocation.unplacedAdults + allocation.unplacedChildren;
   const problem =
-    selectedRooms.length === 0 ? null
-    : allocation.roomsWithoutAdult.length > 0 ? "Each room needs at least one adult."
-    : unplaced > 0 ? `${unplaced} guest${unplaced > 1 ? "s" : ""} still need${unplaced > 1 ? "" : "s"} a room.`
-    : null;
+    selectedRooms.length === 0
+      ? null
+      : allocation.roomsWithoutAdult.length > 0
+        ? "Each room needs at least one adult."
+        : unplaced > 0
+          ? `${unplaced} guest${unplaced > 1 ? "s" : ""} still need${unplaced > 1 ? "" : "s"} a room.`
+          : null;
   const grandTotal = selections.reduce((sum, s) => sum + s.total, 0);
   const placedGuests = selections.reduce((sum, s) => sum + s.adults + s.children, 0);
 
@@ -118,7 +157,9 @@ function GuestPage({ subdomain }: { subdomain: string }) {
     const gone = selectedRooms.filter((r) => unavailable.has(r.id));
     if (gone.length === 0) return;
     setSelectedIds((prev) => prev.filter((id) => !unavailable.has(id)));
-    setNotice(`${gone.map((r) => r.name).join(", ")} ${gone.length > 1 ? "are" : "is"} not free for these dates and ${gone.length > 1 ? "were" : "was"} removed.`);
+    setNotice(
+      `${gone.map((r) => r.name).join(", ")} ${gone.length > 1 ? "are" : "is"} not free for these dates and ${gone.length > 1 ? "were" : "was"} removed.`,
+    );
   }, [hasDates, settled, unavailable, selectedRooms]);
 
   const handlePartyChange = (p: Party) => {
@@ -127,7 +168,9 @@ function GuestPage({ subdomain }: { subdomain: string }) {
   };
   const handleToggleRoom = (room: Room) => {
     setNotice(null);
-    setSelectedIds((prev) => (prev.includes(room.id) ? prev.filter((id) => id !== room.id) : [...prev, room.id]));
+    setSelectedIds((prev) =>
+      prev.includes(room.id) ? prev.filter((id) => id !== room.id) : [...prev, room.id],
+    );
     setPinned((prev) => {
       if (!prev[room.id]) return prev;
       const next = { ...prev };
@@ -198,14 +241,25 @@ function GuestPage({ subdomain }: { subdomain: string }) {
 
   // A failed request is not the same as a property that is closed: say so, so a guest on a weak
   // connection does not leave thinking the place is unavailable. (PGRST116 = no such property.)
-  if (!isLoading && isError && !property && (error as { code?: string } | null)?.code !== "PGRST116") {
+  if (
+    !isLoading &&
+    isError &&
+    !property &&
+    (error as { code?: string } | null)?.code !== "PGRST116"
+  ) {
     return (
       <div className="min-h-screen bg-stone-950 flex flex-col items-center justify-center p-6 text-center text-white">
         <SeoTags subdomain={subdomain} />
         <div className="space-y-4 max-w-md">
-          <p className="text-xl font-medium text-white/90 leading-relaxed">We couldn't load this page.</p>
+          <p className="text-xl font-medium text-white/90 leading-relaxed">
+            We couldn't load this page.
+          </p>
           <p className="text-sm text-white/60">Please check your connection and try again.</p>
-          <button type="button" onClick={() => void refetch()} className="rounded-full bg-white text-stone-950 px-6 py-2.5 text-sm font-semibold hover:bg-white/90">
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="rounded-full bg-white text-stone-950 px-6 py-2.5 text-sm font-semibold hover:bg-white/90"
+          >
             Try again
           </button>
         </div>
@@ -235,7 +289,16 @@ function GuestPage({ subdomain }: { subdomain: string }) {
       className="animate-in fade-in slide-in-from-bottom-1 duration-[var(--duration-lazy)] [--tw-ease:var(--ease-lazy)] min-h-screen bg-background"
     >
       {subdomain === "demo" && (
-        <div style={{ background: "#fef3c7", borderBottom: "1px solid #fcd34d", color: "#92400e", textAlign: "center", fontSize: "13px", padding: "8px 16px" }}>
+        <div
+          style={{
+            background: "#fef3c7",
+            borderBottom: "1px solid #fcd34d",
+            color: "#92400e",
+            textAlign: "center",
+            fontSize: "13px",
+            padding: "8px 16px",
+          }}
+        >
           You're viewing a demo — no real booking will be made.
         </div>
       )}
@@ -284,7 +347,16 @@ function GuestPage({ subdomain }: { subdomain: string }) {
         />
         <Packages
           property={property}
-          stay={checkIn && checkOut ? { checkIn: format(checkIn, "d MMM yyyy"), checkOut: format(checkOut, "d MMM yyyy"), guests, rooms: selectedRooms.map((r) => r.name) } : undefined}
+          stay={
+            checkIn && checkOut
+              ? {
+                  checkIn: format(checkIn, "d MMM yyyy"),
+                  checkOut: format(checkOut, "d MMM yyyy"),
+                  guests,
+                  rooms: selectedRooms.map((r) => r.name),
+                }
+              : undefined
+          }
           liftForCartBar={selections.length > 0 && !justBooked}
         />
         <MapSection subdomain={subdomain} />

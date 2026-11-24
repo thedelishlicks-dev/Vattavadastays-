@@ -1,6 +1,16 @@
 import { formatIndianPhoneInput, isValidIndianMobile, waDigits } from "@/lib/phone";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Clock, ExternalLink, MessageCircle, Copy, CheckCheck, X, Plus, Minus } from "lucide-react";
+import {
+  Check,
+  Clock,
+  ExternalLink,
+  MessageCircle,
+  Copy,
+  CheckCheck,
+  X,
+  Plus,
+  Minus,
+} from "lucide-react";
 import { format } from "date-fns";
 import { stepperLimits } from "@/lib/guestCount";
 import type { Party } from "@/lib/partyAllocation";
@@ -15,7 +25,11 @@ import { UPIPaymentSection } from "@/components/UPIPaymentSection";
 import type { BookingDetails } from "@/lib/roomSelection";
 import { guestPaymentOptions, paymentNote, type GuestPayment } from "@/lib/guestPayment";
 import {
-  browserStore, clearConfirmation, loadConfirmation, saveConfirmation, selectionKey,
+  browserStore,
+  clearConfirmation,
+  loadConfirmation,
+  saveConfirmation,
+  selectionKey,
   type Confirmation,
 } from "@/lib/bookingConfirmation";
 
@@ -41,7 +55,17 @@ type Props = {
 const inputCls =
   "focus-glow w-full rounded-lg border border-border bg-background px-3 py-2.5 text-sm shadow-[var(--shadow-neu-inset-sm)] transition-all duration-[var(--duration-base)] ease-[var(--ease-smooth)] focus:outline-none";
 
-export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, hasManualSplit, onResetSplit, problem, onJustBookedChange, subdomain }: Props) {
+export function BookingForm({
+  selections,
+  onRemoveRoom,
+  party,
+  onAdjustRoom,
+  hasManualSplit,
+  onResetSplit,
+  problem,
+  onJustBookedChange,
+  subdomain,
+}: Props) {
   const [editingGuests, setEditingGuests] = useState(false);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("+91 ");
@@ -81,11 +105,15 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
   const totalGuests = selections.reduce((sum, s) => sum + s.adults + (s.children ?? 0), 0);
   const hasSelection = selections.length > 0;
 
-  const currentKey = selectionKey(selections.map((s) => ({ roomId: s.room.id, checkIn: s.checkIn, checkOut: s.checkOut })));
+  const currentKey = selectionKey(
+    selections.map((s) => ({ roomId: s.room.id, checkIn: s.checkIn, checkOut: s.checkOut })),
+  );
   // The form is replaced by the confirmation only for the selection that was just booked.
   const justBooked = !!confirmation && hasSelection && confirmation.selectionKey === currentKey;
 
-  useEffect(() => { onJustBookedChange?.(justBooked); }, [justBooked]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onJustBookedChange?.(justBooked);
+  }, [justBooked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const placedAdults = selections.reduce((n, s) => n + s.adults, 0);
   const placedChildren = selections.reduce((n, s) => n + (s.children ?? 0), 0);
@@ -140,7 +168,10 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
             guestName: name,
             guestPhone: phone,
             propertyName: property.name,
-            rooms: selections.map((s) => ({ name: s.room.name, guests: s.adults + (s.children ?? 0) })),
+            rooms: selections.map((s) => ({
+              name: s.room.name,
+              guests: s.adults + (s.children ?? 0),
+            })),
             checkIn: selections[0].checkIn,
             checkOut: selections[0].checkOut,
             totalGuests,
@@ -170,7 +201,7 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
         requests: cleanRequests,
         selectionKey: currentKey,
       };
-      saveConfirmation(store, snapshot);   // survives a reload (e.g. after the GPay round trip)
+      saveConfirmation(store, snapshot); // survives a reload (e.g. after the GPay round trip)
       setConfirmation(snapshot);
       setRequests("");
 
@@ -202,7 +233,14 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
   return (
     <section id="booking" className="py-16 md:py-24 bg-background">
       {/* Hidden anchor for WhatsApp without popup blocker */}
-      <a ref={waRef} href="#" target="_blank" rel="noreferrer" className="hidden" aria-hidden="true" />
+      <a
+        ref={waRef}
+        href="#"
+        target="_blank"
+        rel="noreferrer"
+        className="hidden"
+        aria-hidden="true"
+      />
 
       <div className="mx-auto max-w-3xl px-4 md:px-8">
         <div className="text-center mb-10">
@@ -236,24 +274,46 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
         )}
 
         {hasSelection && !justBooked && (
-          <div className={["bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]", confirmation ? "mt-8" : ""].join(" ")}>
+          <div
+            className={[
+              "bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)]",
+              confirmation ? "mt-8" : "",
+            ].join(" ")}
+          >
             {/* ── Booking summary ── */}
             <div className="rounded-xl bg-primary-light/40 p-4 mb-6 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-medium">{stayLine}</div>
                   <div className="text-xs text-muted-foreground mt-0.5">
-                    {totalNights} night{totalNights > 1 ? "s" : ""} · {totalGuests} guest{totalGuests > 1 ? "s" : ""}
+                    {totalNights} night{totalNights > 1 ? "s" : ""} · {totalGuests} guest
+                    {totalGuests > 1 ? "s" : ""}
                   </div>
                 </div>
-                <a href="#availability" className="shrink-0 text-xs text-primary underline underline-offset-2">Change</a>
+                <a
+                  href="#availability"
+                  className="shrink-0 text-xs text-primary underline underline-offset-2"
+                >
+                  Change
+                </a>
               </div>
 
               <div className="border-t border-primary/20 pt-3 space-y-3">
                 {selections.map((s) => {
-                  const lim = stepperLimits(s.room.max_guests, s.adults, s.children ?? 0, s.room.max_occupancy);
-                  const maxAdults = Math.min(lim.maxAdults, s.adults + Math.max(0, party.adults - placedAdults));
-                  const maxChildren = Math.min(lim.maxChildren, (s.children ?? 0) + Math.max(0, party.children - placedChildren));
+                  const lim = stepperLimits(
+                    s.room.max_guests,
+                    s.adults,
+                    s.children ?? 0,
+                    s.room.max_occupancy,
+                  );
+                  const maxAdults = Math.min(
+                    lim.maxAdults,
+                    s.adults + Math.max(0, party.adults - placedAdults),
+                  );
+                  const maxChildren = Math.min(
+                    lim.maxChildren,
+                    (s.children ?? 0) + Math.max(0, party.children - placedChildren),
+                  );
                   return (
                     <div key={s.room.id} className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
@@ -261,21 +321,48 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
                           <div className="font-medium text-sm truncate">{s.room.name}</div>
                           <div className="text-xs text-muted-foreground mt-0.5">
                             {s.adults} adult{s.adults > 1 ? "s" : ""}
-                            {s.children ? ` · ${s.children} child${s.children > 1 ? "ren" : ""}` : ""}
-                            {s.extraGuestCharge > 0 ? ` · extra guests ₹${s.extraGuestCharge.toLocaleString("en-IN")}` : ""}
+                            {s.children
+                              ? ` · ${s.children} child${s.children > 1 ? "ren" : ""}`
+                              : ""}
+                            {s.extraGuestCharge > 0
+                              ? ` · extra guests ₹${s.extraGuestCharge.toLocaleString("en-IN")}`
+                              : ""}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-sm font-semibold text-primary">₹{s.total.toLocaleString("en-IN")}</span>
-                          <button type="button" onClick={() => onRemoveRoom(s.room.id)} className="h-7 w-7 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors" aria-label={`Remove ${s.room.name}`}>
+                          <span className="text-sm font-semibold text-primary">
+                            ₹{s.total.toLocaleString("en-IN")}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveRoom(s.room.id)}
+                            className="h-7 w-7 rounded-full hover:bg-red-50 text-muted-foreground hover:text-red-500 flex items-center justify-center transition-colors"
+                            aria-label={`Remove ${s.room.name}`}
+                          >
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
                       {editingGuests && (
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-background/70 px-3 py-2">
-                          <MiniStepper label="Adults" value={s.adults} min={1} max={maxAdults} onChange={(n) => onAdjustRoom(s.room.id, { adults: n, children: s.children ?? 0 })} />
-                          <MiniStepper label="Children" value={s.children ?? 0} min={0} max={maxChildren} onChange={(n) => onAdjustRoom(s.room.id, { adults: s.adults, children: n })} />
+                          <MiniStepper
+                            label="Adults"
+                            value={s.adults}
+                            min={1}
+                            max={maxAdults}
+                            onChange={(n) =>
+                              onAdjustRoom(s.room.id, { adults: n, children: s.children ?? 0 })
+                            }
+                          />
+                          <MiniStepper
+                            label="Children"
+                            value={s.children ?? 0}
+                            min={0}
+                            max={maxChildren}
+                            onChange={(n) =>
+                              onAdjustRoom(s.room.id, { adults: s.adults, children: n })
+                            }
+                          />
                         </div>
                       )}
                     </div>
@@ -284,13 +371,25 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
               </div>
 
               <div className="flex items-center justify-between text-xs">
-                <a href="#rooms" className="text-primary underline underline-offset-2">Change rooms</a>
+                <a href="#rooms" className="text-primary underline underline-offset-2">
+                  Change rooms
+                </a>
                 <div className="flex items-center gap-3">
                   {editingGuests && hasManualSplit && (
-                    <button type="button" onClick={onResetSplit} className="text-muted-foreground underline underline-offset-2">Reset to automatic split</button>
+                    <button
+                      type="button"
+                      onClick={onResetSplit}
+                      className="text-muted-foreground underline underline-offset-2"
+                    >
+                      Reset to automatic split
+                    </button>
                   )}
                   {selections.length > 1 || editingGuests ? (
-                    <button type="button" onClick={() => setEditingGuests(!editingGuests)} className="text-primary underline underline-offset-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditingGuests(!editingGuests)}
+                      className="text-primary underline underline-offset-2"
+                    >
                       {editingGuests ? "Done" : "Adjust guests per room"}
                     </button>
                   ) : null}
@@ -299,7 +398,9 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
 
               <div className="pt-2 border-t border-primary/20 flex justify-between items-center">
                 <span className="text-sm font-medium">Total</span>
-                <span className="font-display text-xl font-semibold text-primary">₹{grandTotal.toLocaleString("en-IN")}</span>
+                <span className="font-display text-xl font-semibold text-primary">
+                  ₹{grandTotal.toLocaleString("en-IN")}
+                </span>
               </div>
 
               {payment === "UPI" && (
@@ -310,121 +411,129 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
             </div>
 
             {/* ── BOOKING FORM ── */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <Field label="Full name" required>
-                    <input
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className={inputCls}
-                      placeholder="Your full name"
-                    />
-                  </Field>
-                  <Field label="Phone" required>
-                    <input
-                      required
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      className={inputCls}
-                      placeholder="+91 98765 43210"
-                    />
-                  </Field>
-                </div>
-
-                <Field label="Email">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <Field label="Full name" required>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                     className={inputCls}
-                    placeholder="optional"
+                    placeholder="Your full name"
                   />
                 </Field>
-
-                <Field label="Special requests">
-                  <textarea
-                    rows={3}
-                    value={requests}
-                    onChange={(e) => setRequests(e.target.value)}
+                <Field label="Phone" required>
+                  <input
+                    required
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => handlePhoneChange(e.target.value)}
                     className={inputCls}
-                    placeholder="Arrival time, dietary needs, etc."
+                    placeholder="+91 98765 43210"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Included in your booking message to the host on WhatsApp.
-                  </p>
                 </Field>
+              </div>
 
-                <Field label="Payment method">
-                  <div className={paymentOptions.length > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"}>
-                    {paymentOptions.map((p) => (
-                      <button
-                        type="button"
-                        key={p}
-                        onClick={() => setPayment(p)}
-                        className={[
-                          "rounded-lg border px-3 py-2 text-xs md:text-sm font-medium transition-colors",
-                          payment === p
-                            ? "bg-primary text-primary-foreground border-primary"
-                            : "bg-background border-border hover:bg-accent",
-                        ].join(" ")}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {paymentNote(payment)}
-                  </p>
-                </Field>
-
-                {whatsappBookingLink && (
-                  <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
-                    <p className="text-xs text-muted-foreground mb-2">Prefer to book directly?</p>
-                    <a
-                      href={whatsappBookingLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-[#25D366] text-[#128C7E] px-4 py-2 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      Book via WhatsApp instead
-                    </a>
-                  </div>
-                )}
-
-                <GuestPolicies
-                  sharedAmenities={property?.shared_amenities}
-                  checkInTime={property?.check_in_time}
-                  checkOutTime={property?.check_out_time}
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputCls}
+                  placeholder="optional"
                 />
+              </Field>
 
-                {error && (
-                  <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
-                    <p className="text-xs text-destructive font-medium">Booking failed</p>
-                    <p className="text-xs text-destructive mt-0.5">{error}</p>
-                  </div>
-                )}
+              <Field label="Special requests">
+                <textarea
+                  rows={3}
+                  value={requests}
+                  onChange={(e) => setRequests(e.target.value)}
+                  className={inputCls}
+                  placeholder="Arrival time, dietary needs, etc."
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Included in your booking message to the host on WhatsApp.
+                </p>
+              </Field>
 
-                {problem && (
-                  <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    {problem} <a href="#rooms" className="underline underline-offset-2">Change rooms</a>
-                  </div>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={isPending || !!problem}
-                  className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100"
+              <Field label="Payment method">
+                <div
+                  className={
+                    paymentOptions.length > 1 ? "grid grid-cols-2 gap-2" : "grid grid-cols-1 gap-2"
+                  }
                 >
-                  {isPending
-                    ? "Submitting..."
-                    : selections.length > 1
+                  {paymentOptions.map((p) => (
+                    <button
+                      type="button"
+                      key={p}
+                      onClick={() => setPayment(p)}
+                      className={[
+                        "rounded-lg border px-3 py-2 text-xs md:text-sm font-medium transition-colors",
+                        payment === p
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border hover:bg-accent",
+                      ].join(" ")}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{paymentNote(payment)}</p>
+              </Field>
+
+              {whatsappBookingLink && (
+                <div className="rounded-xl border border-border bg-muted/30 p-4 text-center">
+                  <p className="text-xs text-muted-foreground mb-2">Prefer to book directly?</p>
+                  <a
+                    href={whatsappBookingLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full border border-[#25D366] text-[#128C7E] px-4 py-2 text-xs font-medium hover:bg-[#25D366]/10 transition-colors"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Book via WhatsApp instead
+                  </a>
+                </div>
+              )}
+
+              <GuestPolicies
+                sharedAmenities={property?.shared_amenities}
+                checkInTime={property?.check_in_time}
+                checkOutTime={property?.check_out_time}
+              />
+
+              {error && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2">
+                  <p className="text-xs text-destructive font-medium">Booking failed</p>
+                  <p className="text-xs text-destructive mt-0.5">{error}</p>
+                </div>
+              )}
+
+              {problem && (
+                <div
+                  role="alert"
+                  className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                >
+                  {problem}{" "}
+                  <a href="#rooms" className="underline underline-offset-2">
+                    Change rooms
+                  </a>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isPending || !!problem}
+                className="w-full rounded-full bg-primary py-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-neu-raised)] transition-all duration-[var(--duration-fast)] ease-[var(--ease-snappy)] hover:opacity-90 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] active:shadow-[var(--shadow-neu-pressed)] disabled:opacity-50 disabled:active:scale-100"
+              >
+                {isPending
+                  ? "Submitting..."
+                  : selections.length > 1
                     ? `Send Group Booking Request (${selections.length} rooms)`
                     : "Send Booking Request"}
-                </button>
-              </form>
+              </button>
+            </form>
           </div>
         )}
       </div>
@@ -435,9 +544,15 @@ export function BookingForm({ selections, onRemoveRoom, party, onAdjustRoom, has
 // How each status looks on the card: the round icon, and the status pill under the heading.
 const TONE_STYLES: Record<GuestStatusTone, { icon: string; pill: string }> = {
   pending: { icon: "bg-amber-500 text-white", pill: "bg-amber-50 border-amber-200 text-amber-800" },
-  confirmed: { icon: "bg-primary text-primary-foreground", pill: "bg-green-50 border-green-200 text-green-800" },
+  confirmed: {
+    icon: "bg-primary text-primary-foreground",
+    pill: "bg-green-50 border-green-200 text-green-800",
+  },
   cancelled: { icon: "bg-red-600 text-white", pill: "bg-red-50 border-red-200 text-red-700" },
-  done: { icon: "bg-primary text-primary-foreground", pill: "bg-muted border-border text-muted-foreground" },
+  done: {
+    icon: "bg-primary text-primary-foreground",
+    pill: "bg-muted border-border text-muted-foreground",
+  },
 };
 
 /**
@@ -447,7 +562,10 @@ const TONE_STYLES: Record<GuestStatusTone, { icon: string; pill: string }> = {
  * so it says "Awaiting owner confirmation" until the owner confirms, then "Confirmed".
  */
 /** Compact reminder of the guest's most recent booking, shown above a new selection. */
-function RecentBookingStrip({ confirmation: c, onDismiss }: {
+function RecentBookingStrip({
+  confirmation: c,
+  onDismiss,
+}: {
   confirmation: Confirmation;
   onDismiss: () => void;
 }) {
@@ -458,17 +576,30 @@ function RecentBookingStrip({ confirmation: c, onDismiss }: {
   return (
     <div className="bg-card border border-border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 text-sm">
       <div className="min-w-0">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground">Your recent booking</div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground">
+          Your recent booking
+        </div>
         <div className="font-medium">
           <span className="font-mono">{ref}</span> · {c.checkIn} → {c.checkOut}
         </div>
-        <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${TONE_STYLES[view.tone].pill}`}>{view.badge}</span>
+        <span
+          className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[11px] font-medium ${TONE_STYLES[view.tone].pill}`}
+        >
+          {view.badge}
+        </span>
       </div>
       <div className="flex items-center gap-3">
-        <a href={trackingUrl} className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline">
+        <a
+          href={trackingUrl}
+          className="inline-flex items-center gap-1.5 text-primary font-medium hover:underline"
+        >
           <ExternalLink className="h-3.5 w-3.5" /> Track
         </a>
-        <button type="button" onClick={onDismiss} className="text-xs text-muted-foreground underline hover:text-foreground">
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="text-xs text-muted-foreground underline hover:text-foreground"
+        >
           Dismiss
         </button>
       </div>
@@ -491,7 +622,11 @@ function ConfirmationCard({
 }) {
   const [copied, setCopied] = useState(false);
   const ownerName = property?.owner_name ?? "The host";
-  const trackingUrl = guestTrackingUrl(window.location.origin, c.trackingToken, property?.id ?? c.propertyId);
+  const trackingUrl = guestTrackingUrl(
+    window.location.origin,
+    c.trackingToken,
+    property?.id ?? c.propertyId,
+  );
   const ref = c.groupRef;
   // Live status of the booking (see useGuestBookingStatus). Until it loads, or if it can't be read,
   // the card reads "awaiting owner confirmation".
@@ -502,20 +637,38 @@ function ConfirmationCard({
 
   const handleCopyRef = () => {
     if (!ref) return;
-    navigator.clipboard.writeText(ref).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }).catch(() => { /* clipboard blocked: the reference is on screen anyway */ });
+    navigator.clipboard
+      .writeText(ref)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => {
+        /* clipboard blocked: the reference is on screen anyway */
+      });
   };
 
   return (
     <div className="bg-card border border-border rounded-2xl p-6 md:p-8 shadow-[var(--shadow-soft)] space-y-5">
       <div className="text-center">
-        <div className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center mb-3 ${toneStyle.icon}`}>
-          {view.tone === "pending" ? <Clock className="h-6 w-6" /> : view.tone === "cancelled" ? <X className="h-6 w-6" /> : <Check className="h-6 w-6" />}
+        <div
+          className={`mx-auto h-14 w-14 rounded-full flex items-center justify-center mb-3 ${toneStyle.icon}`}
+        >
+          {view.tone === "pending" ? (
+            <Clock className="h-6 w-6" />
+          ) : view.tone === "cancelled" ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Check className="h-6 w-6" />
+          )}
         </div>
         <h3 className="font-display text-xl font-semibold">{view.heading}</h3>
-        <span role="status" className={`mt-2 inline-block rounded-full border px-3 py-1 text-xs font-medium ${toneStyle.pill}`}>Status: {view.badge}</span>
+        <span
+          role="status"
+          className={`mt-2 inline-block rounded-full border px-3 py-1 text-xs font-medium ${toneStyle.pill}`}
+        >
+          Status: {view.badge}
+        </span>
         <p className="mt-2 text-sm text-muted-foreground max-w-xs mx-auto">{view.message}</p>
       </div>
 
@@ -526,17 +679,25 @@ function ConfirmationCard({
             Booking reference
           </p>
           <div className="flex items-center justify-center gap-2">
-            <span className="font-mono text-2xl font-semibold text-primary tracking-widest">{ref}</span>
+            <span className="font-mono text-2xl font-semibold text-primary tracking-widest">
+              {ref}
+            </span>
             <button
               type="button"
               onClick={handleCopyRef}
               className="text-muted-foreground hover:text-primary transition-colors p-1 rounded"
               aria-label="Copy booking reference"
             >
-              {copied ? <CheckCheck className="h-4 w-4 text-primary" /> : <Copy className="h-4 w-4" />}
+              {copied ? (
+                <CheckCheck className="h-4 w-4 text-primary" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">Quote this number when contacting the host.</p>
+          <p className="text-xs text-muted-foreground">
+            Quote this number when contacting the host.
+          </p>
         </div>
       )}
 
@@ -544,7 +705,8 @@ function ConfirmationCard({
       {c.ownerNotifyLink && isPending && (
         <div className="rounded-xl border border-[#25D366]/30 bg-[#25D366]/5 p-4 space-y-2">
           <p className="text-xs text-muted-foreground text-center">
-            Your request is saved, but the host is only told once you send it. Tap below and press Send in WhatsApp so {property?.owner_name ?? "the host"} can confirm faster.
+            Your request is saved, but the host is only told once you send it. Tap below and press
+            Send in WhatsApp so {property?.owner_name ?? "the host"} can confirm faster.
           </p>
           <a
             href={c.ownerNotifyLink}
@@ -560,7 +722,9 @@ function ConfirmationCard({
 
       {/* Stay summary */}
       <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2 text-sm">
-        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">Your booking</div>
+        <div className="text-xs uppercase tracking-wider text-muted-foreground font-medium mb-1">
+          Your booking
+        </div>
         {c.rooms.map((r, i) => (
           <div key={`${r.name}-${i}`} className="flex justify-between">
             <span className="text-muted-foreground">{r.name}</span>
@@ -581,7 +745,9 @@ function ConfirmationCard({
         </div>
         <div className="flex justify-between pt-1 border-t border-border">
           <span className="text-muted-foreground">Grand total</span>
-          <span className="font-semibold text-primary">₹{c.grandTotal.toLocaleString("en-IN")}</span>
+          <span className="font-semibold text-primary">
+            ₹{c.grandTotal.toLocaleString("en-IN")}
+          </span>
         </div>
         {c.requests && (
           <div className="pt-1 border-t border-border">
@@ -591,7 +757,8 @@ function ConfirmationCard({
         )}
         {c.payment === "Cash on Arrival" && (
           <div className="mt-2 rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800">
-            Full payment of ₹{c.grandTotal.toLocaleString("en-IN")} is due on arrival. No advance needed.
+            Full payment of ₹{c.grandTotal.toLocaleString("en-IN")} is due on arrival. No advance
+            needed.
           </div>
         )}
       </div>
@@ -646,7 +813,9 @@ function ConfirmationCard({
           <Plus className="h-4 w-4" />
           {showDismissLabel}
         </button>
-        <p className="text-[11px] text-muted-foreground">This confirmation is kept on this phone for 24 hours.</p>
+        <p className="text-[11px] text-muted-foreground">
+          This confirmation is kept on this phone for 24 hours.
+        </p>
       </div>
     </div>
   );
@@ -720,15 +889,39 @@ function buildOwnerNotifyLink({
   return `https://wa.me/${waDigits(ownerWhatsapp)}?text=${encodeURIComponent(text)}`;
 }
 
-function MiniStepper({ label, value, min, max, onChange }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void }) {
+function MiniStepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+}) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-14 text-muted-foreground">{label}</span>
-      <button type="button" onClick={() => onChange(Math.max(min, value - 1))} disabled={value <= min} aria-label={`Fewer ${label.toLowerCase()}`} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+      <button
+        type="button"
+        onClick={() => onChange(Math.max(min, value - 1))}
+        disabled={value <= min}
+        aria-label={`Fewer ${label.toLowerCase()}`}
+        className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30"
+      >
         <Minus className="h-3 w-3" />
       </button>
       <span className="w-4 text-center font-medium">{value}</span>
-      <button type="button" onClick={() => onChange(Math.min(max, value + 1))} disabled={value >= max} aria-label={`More ${label.toLowerCase()}`} className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30">
+      <button
+        type="button"
+        onClick={() => onChange(Math.min(max, value + 1))}
+        disabled={value >= max}
+        aria-label={`More ${label.toLowerCase()}`}
+        className="h-8 w-8 rounded-full border border-border flex items-center justify-center hover:bg-accent disabled:opacity-30"
+      >
         <Plus className="h-3 w-3" />
       </button>
     </div>

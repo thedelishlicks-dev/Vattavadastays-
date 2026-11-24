@@ -17,7 +17,8 @@ export interface IcalFeed {
   last_conflicts: number | null;
 }
 
-export const icalFeedsKey = (propertyId: string | undefined) => ["icalFeeds", propertyId ?? ""] as const;
+export const icalFeedsKey = (propertyId: string | undefined) =>
+  ["icalFeeds", propertyId ?? ""] as const;
 
 export function useIcalFeeds(propertyId: string | undefined) {
   return useQuery({
@@ -28,7 +29,9 @@ export function useIcalFeeds(propertyId: string | undefined) {
     queryFn: async (): Promise<IcalFeed[]> => {
       const { data, error } = await supabase
         .from("room_ical_feeds")
-        .select("id, property_id, room_id, name, url, last_synced_at, last_status, last_message, last_nights, last_conflicts")
+        .select(
+          "id, property_id, room_id, name, url, last_synced_at, last_status, last_message, last_nights, last_conflicts",
+        )
         .eq("property_id", propertyId as string)
         .order("created_at", { ascending: true });
       if (error) throw error;
@@ -39,7 +42,14 @@ export function useIcalFeeds(propertyId: string | undefined) {
 
 /** Refresh everything that shows availability after a sync changed it. */
 export function invalidateAvailability(qc: ReturnType<typeof useQueryClient>) {
-  for (const key of ["blocked-dates", "availability-range", "availability", "guestAvailability", "bookings", "guest-bookings"]) {
+  for (const key of [
+    "blocked-dates",
+    "availability-range",
+    "availability",
+    "guestAvailability",
+    "bookings",
+    "guest-bookings",
+  ]) {
     qc.invalidateQueries({ queryKey: [key], exact: false });
   }
 }
@@ -60,11 +70,18 @@ export function useIcalAutoSync(propertyId: string | undefined) {
     if (!propertyId || !feeds || feeds.length === 0) return;
     const now = Date.now();
     if (now - lastAutoSyncAt < AUTO_SYNC_AFTER_MS) return;
-    const stale = feeds.some((f) => !f.last_synced_at || now - Date.parse(f.last_synced_at) > AUTO_SYNC_AFTER_MS);
+    const stale = feeds.some(
+      (f) => !f.last_synced_at || now - Date.parse(f.last_synced_at) > AUTO_SYNC_AFTER_MS,
+    );
     if (!stale) return;
     lastAutoSyncAt = now;
     syncIcalFeeds({ property_id: propertyId })
-      .then(() => { invalidateAvailability(qc); qc.invalidateQueries({ queryKey: icalFeedsKey(propertyId) }); })
-      .catch(() => { /* silent: the manual "Sync now" shows errors */ });
+      .then(() => {
+        invalidateAvailability(qc);
+        qc.invalidateQueries({ queryKey: icalFeedsKey(propertyId) });
+      })
+      .catch(() => {
+        /* silent: the manual "Sync now" shows errors */
+      });
   }, [propertyId, feeds, qc]);
 }

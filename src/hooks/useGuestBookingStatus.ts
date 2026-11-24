@@ -19,7 +19,9 @@ export function useGuestBookingStatus(trackingToken: string | null | undefined) 
     refetchOnWindowFocus: true,
     retry: 1,
     queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase.rpc("lookup_booking_by_token", { p_token: trackingToken });
+      const { data, error } = await supabase.rpc("lookup_booking_by_token", {
+        p_token: trackingToken,
+      });
       if (error) throw error;
       return statusFromTokenLookup(data as Parameters<typeof statusFromTokenLookup>[0]);
     },

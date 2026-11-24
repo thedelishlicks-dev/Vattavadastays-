@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  addMonths, endOfMonth, endOfWeek, format, isAfter, isBefore, isSameDay,
-  isSameMonth, startOfMonth, startOfWeek, addDays, parseISO,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isAfter,
+  isBefore,
+  isSameDay,
+  isSameMonth,
+  startOfMonth,
+  startOfWeek,
+  addDays,
+  parseISO,
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { getBlockedDatesForRooms, type BookingExclusion } from "@/lib/bookingAvailability";
@@ -64,15 +74,31 @@ interface RoomAvailabilityCalendarProps {
   exclude?: BookingExclusion;
 }
 
-export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange, turnoverSafe, softBlock = false, blockedWhen = "any", inclusiveEnd = false, exclude }: RoomAvailabilityCalendarProps) {
+export function RoomAvailabilityCalendar({
+  roomIds,
+  checkIn,
+  checkOut,
+  onChange,
+  turnoverSafe,
+  softBlock = false,
+  blockedWhen = "any",
+  inclusiveEnd = false,
+  exclude,
+}: RoomAvailabilityCalendarProps) {
   const [month, setMonth] = useState(() => (checkIn ? parseISO(checkIn) : new Date()));
   const days = useMemo(() => buildMonthDays(month), [month]);
-  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const gridStart = format(days[0], "yyyy-MM-dd");
   const gridEnd = format(days[days.length - 1], "yyyy-MM-dd");
   const roomKey = [...roomIds].sort().join(",");
-  const excludeKey = exclude ? `${exclude.bookingId}|${exclude.roomId}|${exclude.checkIn}|${exclude.checkOut}` : "";
+  const excludeKey = exclude
+    ? `${exclude.bookingId}|${exclude.roomId}|${exclude.checkIn}|${exclude.checkOut}`
+    : "";
 
   const [blockedByRoom, setBlockedByRoom] = useState<Record<string, Set<string>>>({});
   const [loading, setLoading] = useState(false);
@@ -82,13 +108,27 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
   useEffect(() => {
     let cancelled = false;
     setLoadFailed(false);
-    if (roomIds.length === 0) { setBlockedByRoom({}); return; }
+    if (roomIds.length === 0) {
+      setBlockedByRoom({});
+      return;
+    }
     setLoading(true);
     getBlockedDatesForRooms(roomIds, gridStart, gridEnd, turnoverSafe, exclude)
-      .then((res) => { if (!cancelled) setBlockedByRoom(res); })
-      .catch(() => { if (!cancelled) { setBlockedByRoom({}); setLoadFailed(true); } })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((res) => {
+        if (!cancelled) setBlockedByRoom(res);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBlockedByRoom({});
+          setLoadFailed(true);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomKey, gridStart, gridEnd, turnoverSafe, excludeKey]);
 
@@ -99,11 +139,13 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
 
   // With no room picked yet ("all" mode) a day is red only when EVERY room is taken. Days where some,
   // but not all, rooms are taken are shown amber so partial bookings are visible too.
-  const takenRooms = (dateStr: string) => roomIds.filter((id) => blockedByRoom[id]?.has(dateStr)).length;
+  const takenRooms = (dateStr: string) =>
+    roomIds.filter((id) => blockedByRoom[id]?.has(dateStr)).length;
 
   const getDateState = (date: Date): DateState => {
     if (!isSameMonth(date, month)) return "out-of-month";
-    const d = new Date(date); d.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
     if (isBefore(d, today)) return "past";
     return isDateBlocked(format(date, "yyyy-MM-dd")) ? "blocked" : "available";
   };
@@ -124,7 +166,9 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     // Quote mode: availability is informational only, so any non-past day
     // can be either end of the range — no blocked-day or night-by-night checks.
     if (softBlock) {
-      const endsRange = inclusiveEnd ? !isBefore(d, checkInDate ?? d) : !!checkInDate && isAfter(d, checkInDate);
+      const endsRange = inclusiveEnd
+        ? !isBefore(d, checkInDate ?? d)
+        : !!checkInDate && isAfter(d, checkInDate);
       if (!checkInDate || checkOutDate || !endsRange) {
         onChange(format(d, "yyyy-MM-dd"), "");
       } else {
@@ -143,12 +187,17 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     // full clear day is required between stays, so the day stays blocked
     // for every purpose, exactly like it did before same-day-turnover
     // support existed.
-    const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+    const isCandidateCheckout =
+      turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
 
     // Starting a fresh range, or re-picking after a complete range: begin a
     // new check-in. A blocked day can never become a check-in date — but it
     // CAN become a checkout date (see above).
-    if (!checkInDate || (checkInDate && checkOutDate) || (state === "blocked" && !isCandidateCheckout)) {
+    if (
+      !checkInDate ||
+      (checkInDate && checkOutDate) ||
+      (state === "blocked" && !isCandidateCheckout)
+    ) {
       if (state === "blocked") return;
       onChange(format(d, "yyyy-MM-dd"), "");
       return;
@@ -165,7 +214,8 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
     // must also be free of any other booking's check-in.
     const validateThrough = turnoverSafe ? d : addDays(d, 1);
     const proposedNights: Date[] = [];
-    for (let cur = new Date(checkInDate); isBefore(cur, validateThrough); cur = addDays(cur, 1)) proposedNights.push(new Date(cur));
+    for (let cur = new Date(checkInDate); isBefore(cur, validateThrough); cur = addDays(cur, 1))
+      proposedNights.push(new Date(cur));
     const rangeHasBlocked = proposedNights.some((rd) => isDateBlocked(format(rd, "yyyy-MM-dd")));
     if (rangeHasBlocked) return;
     onChange(format(checkInDate, "yyyy-MM-dd"), format(d, "yyyy-MM-dd"));
@@ -174,20 +224,34 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
   return (
     <div className="rounded-2xl border border-border/60 p-3">
       <div className="flex items-center justify-between mb-3">
-        <button type="button" onClick={() => setMonth((m) => addMonths(m, -1))} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Previous month">
+        <button
+          type="button"
+          onClick={() => setMonth((m) => addMonths(m, -1))}
+          className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"
+          aria-label="Previous month"
+        >
           <ChevronLeft className="h-4 w-4" />
         </button>
         <div className="text-sm font-semibold flex items-center gap-2">
           {format(month, "MMMM yyyy")}
           {loading && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />}
         </div>
-        <button type="button" onClick={() => setMonth((m) => addMonths(m, 1))} className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center" aria-label="Next month">
+        <button
+          type="button"
+          onClick={() => setMonth((m) => addMonths(m, 1))}
+          className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center"
+          aria-label="Next month"
+        >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
 
       <div className="grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium text-muted-foreground mb-1">
-        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => <div key={d} className="py-1">{d}</div>)}
+        {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
+          <div key={d} className="py-1">
+            {d}
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-7 gap-0.5">
@@ -195,37 +259,56 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
           const rawState = getDateState(d);
           const isStart = checkInDate && isSameDay(d, checkInDate);
           const isEnd = checkOutDate && isSameDay(d, checkOutDate);
-          const isCandidateCheckout = turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
+          const isCandidateCheckout =
+            turnoverSafe && !!checkInDate && !checkOutDate && isAfter(d, checkInDate);
           // A day blocked only because another booking's stay STARTS there
           // is still a valid checkout date for a different booking
           // (same-day turnover). Don't show it as unavailable while it's
           // being considered as an end date — handlePick's night-by-night
           // check (excluding this day) decides if the range is actually free.
-          const state: DateState = rawState === "blocked" && isCandidateCheckout ? "available" : rawState;
+          const state: DateState =
+            rawState === "blocked" && isCandidateCheckout ? "available" : rawState;
           const selected = inRange(d);
           const dateStr = format(d, "yyyy-MM-dd");
-          const partialCount = blockedWhen === "all" && state === "available" ? takenRooms(dateStr) : 0;
+          const partialCount =
+            blockedWhen === "all" && state === "available" ? takenRooms(dateStr) : 0;
           const partial = partialCount > 0;
 
           let cellCls = "aspect-square rounded-md text-xs font-medium transition-colors ";
           if (state === "out-of-month") cellCls += "text-muted-foreground/20 cursor-default";
-          else if (state === "past") cellCls += "text-muted-foreground/30 cursor-default line-through";
+          else if (state === "past")
+            cellCls += "text-muted-foreground/30 cursor-default line-through";
           else if (state === "blocked" && !(softBlock && (isStart || isEnd))) {
             // Quote mode uses a stronger red: the pale one was easy to miss on a phone.
-            cellCls += softBlock ? "bg-red-100 text-red-600 cursor-pointer hover:bg-red-200" : "bg-red-50 text-red-300 cursor-not-allowed";
-          }
-          else if (isStart || isEnd) cellCls += "bg-primary text-primary-foreground cursor-pointer";
+            cellCls += softBlock
+              ? "bg-red-100 text-red-600 cursor-pointer hover:bg-red-200"
+              : "bg-red-50 text-red-300 cursor-not-allowed";
+          } else if (isStart || isEnd)
+            cellCls += "bg-primary text-primary-foreground cursor-pointer";
           else if (selected) cellCls += "bg-primary-light text-primary cursor-pointer";
-          else if (partial) cellCls += "bg-amber-100 text-amber-800 cursor-pointer hover:bg-amber-200";
+          else if (partial)
+            cellCls += "bg-amber-100 text-amber-800 cursor-pointer hover:bg-amber-200";
           else cellCls += "text-foreground hover:bg-primary-light cursor-pointer";
 
           return (
             <button
               key={i}
               type="button"
-              disabled={state === "past" || state === "out-of-month" || (state === "blocked" && !softBlock && !isStart && !isEnd)}
+              disabled={
+                state === "past" ||
+                state === "out-of-month" ||
+                (state === "blocked" && !softBlock && !isStart && !isEnd)
+              }
               onClick={() => handlePick(d)}
-              title={state === "blocked" ? (softBlock ? "Already booked — you can still quote" : "Not available") : partial ? `${partialCount} of ${roomIds.length} rooms booked` : undefined}
+              title={
+                state === "blocked"
+                  ? softBlock
+                    ? "Already booked — you can still quote"
+                    : "Not available"
+                  : partial
+                    ? `${partialCount} of ${roomIds.length} rooms booked`
+                    : undefined
+              }
               className={cellCls}
             >
               {format(d, "d")}
@@ -235,20 +318,39 @@ export function RoomAvailabilityCalendar({ roomIds, checkIn, checkOut, onChange,
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3 text-[10px] text-muted-foreground">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-background border border-border" />Available</span>
-        {blockedWhen === "all" && <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300" />Some rooms booked</span>}
-        <span className="flex items-center gap-1"><span className={`w-2.5 h-2.5 rounded-sm border ${softBlock ? "bg-red-100 border-red-300" : "bg-red-50 border-red-200"}`} />{blockedWhen === "all" ? "Fully booked" : "Not available"}</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-primary" />Selected</span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-background border border-border" />
+          Available
+        </span>
+        {blockedWhen === "all" && (
+          <span className="flex items-center gap-1">
+            <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300" />
+            Some rooms booked
+          </span>
+        )}
+        <span className="flex items-center gap-1">
+          <span
+            className={`w-2.5 h-2.5 rounded-sm border ${softBlock ? "bg-red-100 border-red-300" : "bg-red-50 border-red-200"}`}
+          />
+          {blockedWhen === "all" ? "Fully booked" : "Not available"}
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-sm bg-primary" />
+          Selected
+        </span>
       </div>
 
       {loadFailed && (
         <p role="alert" className="text-xs text-destructive mt-2">
-          Couldn't load availability, so booked days may show as free. Check your connection, then change the month to try again.
+          Couldn't load availability, so booked days may show as free. Check your connection, then
+          change the month to try again.
         </p>
       )}
 
       {roomIds.length === 0 && (
-        <p className="text-xs text-muted-foreground mt-2">Select a room below to see its availability.</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          Select a room below to see its availability.
+        </p>
       )}
     </div>
   );

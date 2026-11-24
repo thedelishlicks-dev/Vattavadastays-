@@ -446,9 +446,7 @@ export function compareMoney(
     revenue: moneyChange(current.revenue, previous.revenue, comparisonLabel),
     collected: moneyChange(current.collected, previous.collected, comparisonLabel),
     expenses: moneyChange(current.expenses, previous.expenses, comparisonLabel),
-    profit: profitComparable
-      ? moneyChange(current.profit, previous.profit, comparisonLabel)
-      : null,
+    profit: profitComparable ? moneyChange(current.profit, previous.profit, comparisonLabel) : null,
     outstanding: null,
   };
 }

@@ -99,7 +99,9 @@ export function stateOf(idx: CalIndex, roomId: string, date: string): DayInfo {
   if (out && unavail) {
     // A note means someone closed this night on purpose (reason typed, or a synced calendar):
     // show it as blocked so it can be seen and reopened. No note: it may just be the booking's own row.
-    return idx.notes.get(roomId)?.has(date) ? { state: "blocked" } : { state: "checkout", name: out };
+    return idx.notes.get(roomId)?.has(date)
+      ? { state: "blocked" }
+      : { state: "checkout", name: out };
   }
   if (unavail) return { state: "blocked" };
   return { state: "open", name: out }; // free; `name` is only an "Out: …" hint
@@ -125,7 +127,11 @@ export type DaySummary = {
 };
 
 /** One date across several rooms — for the "All rooms" view. */
-export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }[], date: string): DaySummary {
+export function summarizeDate(
+  idx: CalIndex,
+  rooms: { id: string; name: string }[],
+  date: string,
+): DaySummary {
   const total = rooms.length;
   let free = 0;
   let blocked = 0;
@@ -136,13 +142,24 @@ export function summarizeDate(idx: CalIndex, rooms: { id: string; name: string }
   const perRoom: RoomDay[] = [];
   for (const r of rooms) {
     const info = stateOf(idx, r.id, date);
-    perRoom.push({ id: r.id, name: r.name, state: info.state, guest: info.state === "open" ? undefined : info.name });
+    perRoom.push({
+      id: r.id,
+      name: r.name,
+      state: info.state,
+      guest: info.state === "open" ? undefined : info.name,
+    });
     if (info.state === "open") free++;
     else if (info.state === "blocked") blocked++;
     else if (info.state === "pending") pending++;
     else if (info.state === "checkout") leaving++;
     else booked++;
-    const label = { open: "Open", booked: "Booked", pending: "Pending", checkout: "Check-out", blocked: "Blocked" }[info.state];
+    const label = {
+      open: "Open",
+      booked: "Booked",
+      pending: "Pending",
+      checkout: "Check-out",
+      blocked: "Blocked",
+    }[info.state];
     lines.push(`${r.name}: ${label}${info.state !== "open" && info.name ? ` (${info.name})` : ""}`);
   }
   let kind: DaySummary["kind"];

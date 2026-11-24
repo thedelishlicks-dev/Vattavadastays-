@@ -66,7 +66,11 @@ export function reuseOrCreateSubmission(
   gen: IdGenerators,
 ): { submission: Submission; isRetry: boolean } {
   const fingerprint = submissionFingerprint(input);
-  if (previous && previous.fingerprint === fingerprint && previous.bookingIds.length === input.rooms.length) {
+  if (
+    previous &&
+    previous.fingerprint === fingerprint &&
+    previous.bookingIds.length === input.rooms.length
+  ) {
     return { submission: previous, isRetry: true };
   }
   const multi = input.rooms.length > 1;

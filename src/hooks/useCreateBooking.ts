@@ -8,7 +8,11 @@ import { maxGuestsFor } from "@/lib/guestCount";
 import { isOverlapError, OVERLAP_MESSAGE } from "@/lib/dbErrors";
 import { logClientError } from "@/lib/errorLog";
 import { newTrackingToken } from "@/lib/trackingToken";
-import { reuseOrCreateSubmission, storedStateFromLookup, type Submission } from "@/lib/bookingSubmission";
+import {
+  reuseOrCreateSubmission,
+  storedStateFromLookup,
+  type Submission,
+} from "@/lib/bookingSubmission";
 
 /**
  * A random UUID for rows the browser creates itself. crypto.randomUUID() is
@@ -41,7 +45,7 @@ export interface CreateBookingInput {
   guestEmail?: string;
   /** Total guest count across all rooms */
   totalGuests: number;
-  checkIn: string;  // "YYYY-MM-DD"
+  checkIn: string; // "YYYY-MM-DD"
   checkOut: string; // "YYYY-MM-DD"
   paymentMethod?: "UPI" | "Bank Transfer" | "Cash on Arrival";
   /** Property's check-in/check-out times, used to determine whether
@@ -96,7 +100,9 @@ export function useCreateBooking() {
       // (the dates now hold this very booking) or insert it again — carry on to the confirmation.
       let stored = { groupSaved: false, bookingsSaved: false };
       if (isRetry) {
-        const { data, error } = await supabase.rpc("lookup_booking_by_token", { p_token: submission.trackingToken });
+        const { data, error } = await supabase.rpc("lookup_booking_by_token", {
+          p_token: submission.trackingToken,
+        });
         if (!error) stored = storedStateFromLookup(data);
       }
 
@@ -126,7 +132,12 @@ export function useCreateBooking() {
         .eq("is_active", true);
 
       if (roomsErr || !roomDetails) {
-        logClientError({ source: "booking", error: roomsErr, message: "Could not load room details", context: { step: "load-rooms" } });
+        logClientError({
+          source: "booking",
+          error: roomsErr,
+          message: "Could not load room details",
+          context: { step: "load-rooms" },
+        });
         throw new Error("Could not load room details.");
       }
 
@@ -142,7 +153,9 @@ export function useCreateBooking() {
         if (!room) throw new Error("One or more selected rooms are no longer available.");
         const absoluteCap = maxGuestsFor(room.max_guests, room.max_occupancy);
         if (ri.guestCount > absoluteCap) {
-          throw new Error(`"${room.name}" can host a maximum of ${absoluteCap} guests (including extras).`);
+          throw new Error(
+            `"${room.name}" can host a maximum of ${absoluteCap} guests (including extras).`,
+          );
         }
       }
 
@@ -174,12 +187,16 @@ export function useCreateBooking() {
       const conflictsByRoom = stored.bookingsSaved
         ? input.rooms.map(() => [] as string[])
         : await Promise.all(
-            input.rooms.map((ri) => getConflictingDates(ri.roomId, input.checkIn, input.checkOut, turnoverProperty))
+            input.rooms.map((ri) =>
+              getConflictingDates(ri.roomId, input.checkIn, input.checkOut, turnoverProperty),
+            ),
           );
       for (let i = 0; i < input.rooms.length; i++) {
         const room = roomDetails.find((r) => r.id === input.rooms[i].roomId)!;
         if (conflictsByRoom[i].length > 0) {
-          throw new Error(`"${room.name}" is no longer available for the selected dates. Please choose different dates.`);
+          throw new Error(
+            `"${room.name}" is no longer available for the selected dates. Please choose different dates.`,
+          );
         }
       }
 
@@ -189,7 +206,12 @@ export function useCreateBooking() {
       const rates = await fetchRoomRates(input.propertyId).catch(() => []);
 
       // ── Step 3: Calculate price per room ──
-      const roomPrices: { roomId: string; roomPrice: number; extraGuestCharge: number; totalAmount: number }[] = [];
+      const roomPrices: {
+        roomId: string;
+        roomPrice: number;
+        extraGuestCharge: number;
+        totalAmount: number;
+      }[] = [];
 
       // One shared calculator (lib/quoteBuilder.priceRoomStay) so the guest
       // total, the owner-side AddBookingModal and the Quote Builder can never
@@ -246,32 +268,38 @@ export function useCreateBooking() {
       let displayRef: string | null = null;
       if (input.rooms.length > 1) {
         groupId = submission.groupId;
-        const groupRef = submission.groupRef ?? "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+        const groupRef =
+          submission.groupRef ?? "GRP-" + Math.random().toString(36).substring(2, 8).toUpperCase();
         displayRef = groupRef;
-        const { error: groupErr } = stored.groupSaved ? { error: null } : await supabase
-          .from("booking_groups")
-          .insert({
-            id: groupId,
-            tracking_token: trackingToken,
-            property_id: input.propertyId,
-            group_reference: groupRef,
-            guest_name: input.guestName,
-            guest_phone: input.guestPhone,
-            guest_email: input.guestEmail ?? null,
-            guest_count: input.totalGuests,
-            check_in: input.checkIn,
-            check_out: input.checkOut,
-            total_amount: grandTotal,
-            advance_amount: 0,
-            discount_amount: 0,
-            status: "pending",
-            payment_method: input.paymentMethod ?? "Cash on Arrival",
-            is_paid: false,
-            hold_expires_at: holdExpiresAt,
-          });
+        const { error: groupErr } = stored.groupSaved
+          ? { error: null }
+          : await supabase.from("booking_groups").insert({
+              id: groupId,
+              tracking_token: trackingToken,
+              property_id: input.propertyId,
+              group_reference: groupRef,
+              guest_name: input.guestName,
+              guest_phone: input.guestPhone,
+              guest_email: input.guestEmail ?? null,
+              guest_count: input.totalGuests,
+              check_in: input.checkIn,
+              check_out: input.checkOut,
+              total_amount: grandTotal,
+              advance_amount: 0,
+              discount_amount: 0,
+              status: "pending",
+              payment_method: input.paymentMethod ?? "Cash on Arrival",
+              is_paid: false,
+              hold_expires_at: holdExpiresAt,
+            });
 
         if (groupErr) {
-          logClientError({ source: "booking", error: groupErr, message: "Could not create group booking", context: { step: "create-group" } });
+          logClientError({
+            source: "booking",
+            error: groupErr,
+            message: "Could not create group booking",
+            context: { step: "create-group" },
+          });
           throw new Error("Could not create group booking. Please try again.");
         }
       }
@@ -313,7 +341,12 @@ export function useCreateBooking() {
         // A DB-level overlap (two guests booking the same room at the same
         // moment) is reported clearly instead of as a generic failure.
         if (isOverlapError(bookingErr)) throw new Error(OVERLAP_MESSAGE);
-        logClientError({ source: "booking", error: bookingErr, message: "Booking insert failed", context: { step: "create-booking" } });
+        logClientError({
+          source: "booking",
+          error: bookingErr,
+          message: "Booking insert failed",
+          context: { step: "create-booking" },
+        });
         throw new Error("Booking failed. Please try again.");
       }
 

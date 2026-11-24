@@ -1,4 +1,4 @@
-  type SubscriptionStatus = "trial" | "active" | "suspended";
+type SubscriptionStatus = "trial" | "active" | "suspended";
 export type SubscriptionTier = "small" | "large";
 
 export interface Property {

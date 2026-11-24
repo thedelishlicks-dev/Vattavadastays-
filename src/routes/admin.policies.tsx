@@ -19,10 +19,23 @@ const textareaCls =
 
 // Cancellation policy presets
 const CANCELLATION_PRESETS = [
-  { label: "Flexible", value: "Full refund if cancelled 24 hours before check-in. No refund for no-shows." },
-  { label: "Moderate", value: "Full refund if cancelled 5 days before check-in. 50% refund if cancelled within 5 days. No refund for no-shows." },
-  { label: "Strict", value: "50% refund if cancelled 7 days before check-in. No refund within 7 days of check-in." },
-  { label: "Non-refundable", value: "This booking is non-refundable. No cancellations or modifications accepted." },
+  {
+    label: "Flexible",
+    value: "Full refund if cancelled 24 hours before check-in. No refund for no-shows.",
+  },
+  {
+    label: "Moderate",
+    value:
+      "Full refund if cancelled 5 days before check-in. 50% refund if cancelled within 5 days. No refund for no-shows.",
+  },
+  {
+    label: "Strict",
+    value: "50% refund if cancelled 7 days before check-in. No refund within 7 days of check-in.",
+  },
+  {
+    label: "Non-refundable",
+    value: "This booking is non-refundable. No cancellations or modifications accepted.",
+  },
 ];
 
 // House rules presets
@@ -49,7 +62,7 @@ type PoliciesForm = {
 function parsePolicies(
   check_in_time: string | null,
   check_out_time: string | null,
-  shared_amenities: string[] | null
+  shared_amenities: string[] | null,
 ): PoliciesForm {
   const get = (prefix: string) => {
     const entry = (shared_amenities ?? []).find((a) => a.startsWith(prefix));
@@ -64,14 +77,11 @@ function parsePolicies(
 }
 
 function encodePolicies(form: PoliciesForm, existing: string[]): string[] {
-  const filtered = existing.filter(
-    (a) => !a.startsWith("__cancel:") && !a.startsWith("__rules:")
-  );
+  const filtered = existing.filter((a) => !a.startsWith("__cancel:") && !a.startsWith("__rules:"));
   const entries: string[] = [];
   if (form.cancellation_policy)
     entries.push(`__cancel:${encodeURIComponent(form.cancellation_policy)}`);
-  if (form.house_rules)
-    entries.push(`__rules:${encodeURIComponent(form.house_rules)}`);
+  if (form.house_rules) entries.push(`__rules:${encodeURIComponent(form.house_rules)}`);
   return [...filtered, ...entries];
 }
 
@@ -92,16 +102,17 @@ function AdminPolicies() {
 
   useEffect(() => {
     if (property) {
-      setForm(parsePolicies(
-        property.check_in_time,
-        property.check_out_time,
-        property.shared_amenities ?? []
-      ));
+      setForm(
+        parsePolicies(
+          property.check_in_time,
+          property.check_out_time,
+          property.shared_amenities ?? [],
+        ),
+      );
     }
   }, [property?.id]);
 
-  const set = <K extends keyof PoliciesForm>(k: K, v: string) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const set = <K extends keyof PoliciesForm>(k: K, v: string) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleRule = (rule: string) => {
     const lines = form.house_rules
@@ -109,9 +120,7 @@ function AdminPolicies() {
       .map((l) => l.trim())
       .filter(Boolean);
     const exists = lines.some((l) => l === rule);
-    const updated = exists
-      ? lines.filter((l) => l !== rule)
-      : [...lines, rule];
+    const updated = exists ? lines.filter((l) => l !== rule) : [...lines, rule];
     set("house_rules", updated.join("\n"));
   };
 
@@ -176,8 +185,8 @@ function AdminPolicies() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Used in the day-before WhatsApp reminder, and to figure out whether a room can be
-          turned over for a new guest the same day an old one checks out.
+          Used in the day-before WhatsApp reminder, and to figure out whether a room can be turned
+          over for a new guest the same day an old one checks out.
         </p>
       </div>
 
@@ -256,7 +265,9 @@ function AdminPolicies() {
           <div className="rounded-lg bg-muted/40 p-3 space-y-1">
             <p className="text-xs font-medium text-muted-foreground mb-2">Preview</p>
             {ruleLines.map((r, i) => (
-              <p key={i} className="text-sm text-foreground">• {r}</p>
+              <p key={i} className="text-sm text-foreground">
+                • {r}
+              </p>
             ))}
           </div>
         )}
@@ -264,7 +275,8 @@ function AdminPolicies() {
 
       <div className="flex items-center gap-3">
         <button
-          onClick={handleSave} disabled={saving}
+          onClick={handleSave}
+          disabled={saving}
           className="rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

@@ -7,19 +7,35 @@
 
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getBlockedDatesForRooms, isSameDayTurnoverSafe, eachDate, addOneDay } from "@/lib/bookingAvailability";
+import {
+  getBlockedDatesForRooms,
+  isSameDayTurnoverSafe,
+  eachDate,
+  addOneDay,
+} from "@/lib/bookingAvailability";
 import type { useProperty } from "@/hooks/useProperty";
 
 type Property = ReturnType<typeof useProperty>["data"];
 
-export function useUnavailableRoomIds(property: Property, checkInStr: string | null, checkOutStr: string | null) {
+export function useUnavailableRoomIds(
+  property: Property,
+  checkInStr: string | null,
+  checkOutStr: string | null,
+) {
   const roomIds = useMemo(
     () => (property?.rooms ?? []).filter((r) => r.is_active).map((r) => r.id),
     [property],
   );
   const turnoverSafe = useMemo(() => isSameDayTurnoverSafe(property), [property]);
   const q = useQuery({
-    queryKey: ["guest-bookings", "rooms-unavailable", roomIds.join(","), checkInStr, checkOutStr, turnoverSafe],
+    queryKey: [
+      "guest-bookings",
+      "rooms-unavailable",
+      roomIds.join(","),
+      checkInStr,
+      checkOutStr,
+      turnoverSafe,
+    ],
     queryFn: async () => {
       if (!checkInStr || !checkOutStr || roomIds.length === 0) return [] as string[];
       const blocked = await getBlockedDatesForRooms(roomIds, checkInStr, checkOutStr, turnoverSafe);

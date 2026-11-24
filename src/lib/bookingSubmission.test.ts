@@ -3,16 +3,38 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { reuseOrCreateSubmission, storedStateFromLookup, submissionFingerprint, type SubmissionInput } from "./bookingSubmission";
+import {
+  reuseOrCreateSubmission,
+  storedStateFromLookup,
+  submissionFingerprint,
+  type SubmissionInput,
+} from "./bookingSubmission";
 
 let n = 0;
-const gen = { newId: () => `id-${++n}`, newToken: () => `tok-${++n}`, newGroupRef: () => `GRP-${++n}` };
+const gen = {
+  newId: () => `id-${++n}`,
+  newToken: () => `tok-${++n}`,
+  newGroupRef: () => `GRP-${++n}`,
+};
 
 const one: SubmissionInput = {
-  propertyId: "p1", rooms: [{ roomId: "r1", guestCount: 2 }], guestName: "Asha", guestPhone: "+91 98765 43210",
-  totalGuests: 2, checkIn: "2026-11-10", checkOut: "2026-11-12", paymentMethod: "UPI",
+  propertyId: "p1",
+  rooms: [{ roomId: "r1", guestCount: 2 }],
+  guestName: "Asha",
+  guestPhone: "+91 98765 43210",
+  totalGuests: 2,
+  checkIn: "2026-11-10",
+  checkOut: "2026-11-12",
+  paymentMethod: "UPI",
 };
-const two: SubmissionInput = { ...one, rooms: [{ roomId: "r1", guestCount: 2 }, { roomId: "r2", guestCount: 2 }], totalGuests: 4 };
+const two: SubmissionInput = {
+  ...one,
+  rooms: [
+    { roomId: "r1", guestCount: 2 },
+    { roomId: "r2", guestCount: 2 },
+  ],
+  totalGuests: 4,
+};
 
 test("a first submission gets fresh ids and is not a retry", () => {
   const { submission, isRetry } = reuseOrCreateSubmission(null, one, gen);
@@ -54,8 +76,17 @@ test("stray spaces in the name do not make it a different request", () => {
 });
 
 test("the token lookup result says what is already saved", () => {
-  assert.deepEqual(storedStateFromLookup({ groups: [], bookings: [] }), { groupSaved: false, bookingsSaved: false });
-  assert.deepEqual(storedStateFromLookup({ groups: [{}], bookings: [] }), { groupSaved: true, bookingsSaved: false });
-  assert.deepEqual(storedStateFromLookup({ groups: [{}], bookings: [{}] }), { groupSaved: true, bookingsSaved: true });
+  assert.deepEqual(storedStateFromLookup({ groups: [], bookings: [] }), {
+    groupSaved: false,
+    bookingsSaved: false,
+  });
+  assert.deepEqual(storedStateFromLookup({ groups: [{}], bookings: [] }), {
+    groupSaved: true,
+    bookingsSaved: false,
+  });
+  assert.deepEqual(storedStateFromLookup({ groups: [{}], bookings: [{}] }), {
+    groupSaved: true,
+    bookingsSaved: true,
+  });
   assert.deepEqual(storedStateFromLookup(null), { groupSaved: false, bookingsSaved: false });
 });

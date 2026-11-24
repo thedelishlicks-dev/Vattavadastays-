@@ -17,20 +17,35 @@ import {
 
 // ── chargesSum ───────────────────────────────────────────────────────────────
 test("chargesSum adds qty × unit_price and handles empty/null", () => {
-  assert.equal(chargesSum([{ qty: 1, unit_price: 100 }, { qty: 2, unit_price: 175 }]), 450);
+  assert.equal(
+    chargesSum([
+      { qty: 1, unit_price: 100 },
+      { qty: 2, unit_price: 175 },
+    ]),
+    450,
+  );
   assert.equal(chargesSum([]), 0);
   assert.equal(chargesSum(null), 0);
   assert.equal(chargesSum(undefined), 0);
 });
 
 test("chargesSum treats numeric strings from the database as numbers", () => {
-  assert.equal(chargesSum([{ qty: "2" as unknown as number, unit_price: "50.5" as unknown as number }]), 101);
+  assert.equal(
+    chargesSum([{ qty: "2" as unknown as number, unit_price: "50.5" as unknown as number }]),
+    101,
+  );
 });
 
 // ── computeBalance: normal cases ────────────────────────────────────────────
 test("nothing paid yet: balance is the full net total", () => {
   const r = computeBalance({ roomTotal: 2500 });
-  assert.deepEqual(r, { netTotal: 2500, balance: 2500, refundDue: 0, isSettled: false, isPaid: false });
+  assert.deepEqual(r, {
+    netTotal: 2500,
+    balance: 2500,
+    refundDue: 0,
+    isSettled: false,
+    isPaid: false,
+  });
 });
 
 test("extra charges are added to the total", () => {

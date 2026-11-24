@@ -11,16 +11,16 @@ export const useOwnerProperty = () => {
   const isSuperAdmin = isSuperAdminEmail(user?.email);
 
   const paramFromUrl = isSuperAdmin
-    ? new URLSearchParams(window.location.search).get('property') ?? ''
-    : '';
+    ? (new URLSearchParams(window.location.search).get("property") ?? "")
+    : "";
 
   if (isSuperAdmin && paramFromUrl) {
-    sessionStorage.setItem('adminPropertySubdomain', paramFromUrl);
+    sessionStorage.setItem("adminPropertySubdomain", paramFromUrl);
   }
 
   const propertySubdomain = isSuperAdmin
-    ? paramFromUrl || sessionStorage.getItem('adminPropertySubdomain') || ''
-    : '';
+    ? paramFromUrl || sessionStorage.getItem("adminPropertySubdomain") || ""
+    : "";
 
   return useQuery<OwnerProperty>({
     queryKey: ["ownerProperty", user?.id, propertySubdomain],

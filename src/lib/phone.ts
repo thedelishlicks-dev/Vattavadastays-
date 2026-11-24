@@ -9,9 +9,10 @@
 export function nationalDigits(raw: string): string {
   const hasPlus = raw.trim().startsWith("+");
   let d = raw.replace(/\D/g, "");
-  if (d.startsWith("0091")) d = d.slice(4);                       // 0091 98765 43210
+  if (d.startsWith("0091"))
+    d = d.slice(4); // 0091 98765 43210
   else if (d.startsWith("91") && (hasPlus || d.length > 10)) d = d.slice(2); // +91… or 91 + 10 digits
-  if (d.startsWith("0")) d = d.slice(1);                          // trunk zero: 098765 43210
+  if (d.startsWith("0")) d = d.slice(1); // trunk zero: 098765 43210
   return d;
 }
 

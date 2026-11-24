@@ -33,10 +33,18 @@ const PROPERTY_AMENITY_OPTIONS = [
 ];
 
 const ROOM_AMENITY_LABELS: Record<string, string> = {
-  ac: "AC", tv: "TV", balcony: "Balcony", attach_bath: "Attach Bath",
-  heater: "Heater", hot_water: "Hot Water", kitchen: "Kitchenette",
-  view: "Valley View", wifi: "WiFi", wardrobe: "Wardrobe",
-  mini_fridge: "Mini Fridge", work_desk: "Work Desk",
+  ac: "AC",
+  tv: "TV",
+  balcony: "Balcony",
+  attach_bath: "Attach Bath",
+  heater: "Heater",
+  hot_water: "Hot Water",
+  kitchen: "Kitchenette",
+  view: "Valley View",
+  wifi: "WiFi",
+  wardrobe: "Wardrobe",
+  mini_fridge: "Mini Fridge",
+  work_desk: "Work Desk",
 };
 
 function AdminAmenities() {
@@ -55,17 +63,13 @@ function AdminAmenities() {
   // shared_amenities content changes).
   useEffect(() => {
     if (property) {
-      const real = (property.shared_amenities ?? []).filter(
-        (a) => !a.startsWith("__")
-      );
+      const real = (property.shared_amenities ?? []).filter((a) => !a.startsWith("__"));
       setSelected(real);
     }
   }, [property?.id, property?.shared_amenities]);
 
   const toggle = (key: string) =>
-    setSelected((s) =>
-      s.includes(key) ? s.filter((x) => x !== key) : [...s, key]
-    );
+    setSelected((s) => (s.includes(key) ? s.filter((x) => x !== key) : [...s, key]));
 
   const addCustom = () => {
     const t = custom.trim().toLowerCase();
@@ -76,7 +80,7 @@ function AdminAmenities() {
   const removeCustom = (key: string) => setSelected((s) => s.filter((x) => x !== key));
 
   const customAmenities = selected.filter(
-    (a) => !PROPERTY_AMENITY_OPTIONS.find((o) => o.key === a)
+    (a) => !PROPERTY_AMENITY_OPTIONS.find((o) => o.key === a),
   );
 
   const handleSave = async () => {
@@ -175,7 +179,8 @@ function AdminAmenities() {
 
       <div className="flex items-center gap-3">
         <button
-          onClick={handleSave} disabled={saving}
+          onClick={handleSave}
+          disabled={saving}
           className="rounded-full bg-primary text-primary-foreground px-6 py-2.5 text-sm font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
         >
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}

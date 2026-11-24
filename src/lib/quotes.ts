@@ -167,7 +167,8 @@ export function inSeason(date: string, s: SeasonWindow): boolean {
 export function seasonSpanDays(s: SeasonWindow): number {
   if (!s.recurs_yearly) return Math.round((toUTC(s.end_date) - toUTC(s.start_date)) / DAY_MS) + 1;
   // Recurring: measure inside leap year 2000 so Feb 29 is representable.
-  const at = (date: string) => Date.UTC(2000, Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+  const at = (date: string) =>
+    Date.UTC(2000, Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
   let span = Math.round((at(s.end_date) - at(s.start_date)) / DAY_MS) + 1;
   if (span <= 0) span += 366;
   return span;
@@ -212,7 +213,11 @@ export interface DayPrice {
   source: PriceSource;
 }
 
-export function priceForDate(variant: PriceVariant, date: string, seasons: PriceSeason[]): DayPrice {
+export function priceForDate(
+  variant: PriceVariant,
+  date: string,
+  seasons: PriceSeason[],
+): DayPrice {
   const season = resolveSeason(date, seasons);
   if (!season) return { date, price: variant.base_price, season: null, source: "base" };
   const p = variant.season_prices?.[season.id];
@@ -244,19 +249,27 @@ const isPerPerson = (u: AddonUnit) => u === "per_person_day" || u === "per_perso
 
 export function priceLine(input: PriceLineInput): QuoteLine {
   const { item, seasons } = input;
-  const variant =
-    item.variants.find((v) => v.key === input.variantKey) ?? item.variants[0];
+  const variant = item.variants.find((v) => v.key === input.variantKey) ?? item.variants[0];
   if (!variant) throw new Error(`"${item.name}" has no price set`);
 
   const guests = Math.max(1, Math.floor(input.guests || 1));
   const dates = isPerDay(item.unit) ? stayDates(input.checkIn, input.checkOut) : [input.checkIn];
   const multiplier =
-    input.quantityOverride !== undefined ? Math.max(0, input.quantityOverride) : isPerPerson(item.unit) ? guests : 1;
+    input.quantityOverride !== undefined
+      ? Math.max(0, input.quantityOverride)
+      : isPerPerson(item.unit)
+        ? guests
+        : 1;
 
   const hasOverride = input.unitPriceOverride !== undefined;
   const days: DayPrice[] = dates.map((date) =>
     hasOverride
-      ? { date, price: Math.max(0, input.unitPriceOverride!), season: null, source: "override" as const }
+      ? {
+          date,
+          price: Math.max(0, input.unitPriceOverride!),
+          season: null,
+          source: "override" as const,
+        }
       : priceForDate(variant, date, seasons),
   );
 
@@ -265,15 +278,29 @@ export function priceLine(input: PriceLineInput): QuoteLine {
   for (const d of days) {
     const last = breakdown[breakdown.length - 1];
     const seasonName = d.season?.name ?? null;
-    if (last && last.unit_price === d.price && last.season_name === seasonName && last.source === d.source) {
+    if (
+      last &&
+      last.unit_price === d.price &&
+      last.season_name === seasonName &&
+      last.source === d.source
+    ) {
       last.to = d.date;
       last.days += 1;
     } else {
-      breakdown.push({ from: d.date, to: d.date, days: 1, unit_price: d.price, season_name: seasonName, source: d.source });
+      breakdown.push({
+        from: d.date,
+        to: d.date,
+        days: 1,
+        unit_price: d.price,
+        season_name: seasonName,
+        source: d.source,
+      });
     }
   }
 
-  const subtotal = Math.round(breakdown.reduce((s, seg) => s + seg.unit_price * seg.days, 0) * multiplier);
+  const subtotal = Math.round(
+    breakdown.reduce((s, seg) => s + seg.unit_price * seg.days, 0) * multiplier,
+  );
 
   return {
     kind: input.kind,
@@ -295,14 +322,21 @@ export function priceLine(input: PriceLineInput): QuoteLine {
 // ── Packages ────────────────────────────────────────────────────────────────
 
 /** Which add-on variant a package's included item uses. */
-export function includedVariantKey(inc: PackageIncluded, addon: Addon, packageVariantKey: string | null): string | null {
+export function includedVariantKey(
+  inc: PackageIncluded,
+  addon: Addon,
+  packageVariantKey: string | null,
+): string | null {
   if (inc.variant_key) return inc.variant_key;
-  if (packageVariantKey && addon.variants.some((v) => v.key === packageVariantKey)) return packageVariantKey;
+  if (packageVariantKey && addon.variants.some((v) => v.key === packageVariantKey))
+    return packageVariantKey;
   return addon.variants[0]?.key ?? null;
 }
 
 export function packageIncludes(pkg: Package, addons: Addon[]): string[] {
-  return pkg.included.map((inc) => addons.find((a) => a.id === inc.addon_id)?.name).filter((n): n is string => !!n);
+  return pkg.included
+    .map((inc) => addons.find((a) => a.id === inc.addon_id)?.name)
+    .filter((n): n is string => !!n);
 }
 
 export interface PackageSaving {
@@ -316,7 +350,13 @@ export interface PackageSaving {
 export function packageSaving(
   pkg: Package,
   addons: Addon[],
-  opts: { variantKey: string | null; checkIn: string; checkOut: string; guests: number; seasons: PriceSeason[] },
+  opts: {
+    variantKey: string | null;
+    checkIn: string;
+    checkOut: string;
+    guests: number;
+    seasons: PriceSeason[];
+  },
 ): PackageSaving {
   let partsTotal = 0;
   for (const inc of pkg.included) {
@@ -353,7 +393,11 @@ export interface QuoteTotals {
   total: number;
 }
 
-export function sumQuote(input: { lines: QuoteLine[]; roomsTotal?: number; discount?: number }): QuoteTotals {
+export function sumQuote(input: {
+  lines: QuoteLine[];
+  roomsTotal?: number;
+  discount?: number;
+}): QuoteTotals {
   const roomsTotal = Math.max(0, input.roomsTotal ?? 0);
   const addonsTotal = input.lines.reduce((s, l) => s + l.subtotal, 0);
   const gross = roomsTotal + addonsTotal;
@@ -371,7 +415,9 @@ export function quoteWarnings(lines: QuoteLine[]): string[] {
     for (const seg of line.breakdown) {
       if (seg.source === "base_fallback" && seg.season_name) {
         const label = line.variant_label ? `${line.name} (${line.variant_label})` : line.name;
-        out.push(`${label} has no ${seg.season_name} price — using base ${formatINR(seg.unit_price)}.`);
+        out.push(
+          `${label} has no ${seg.season_name} price — using base ${formatINR(seg.unit_price)}.`,
+        );
       }
     }
   }
@@ -382,7 +428,9 @@ export function quoteWarnings(lines: QuoteLine[]): string[] {
 
 /** One booking_charges row per price segment, so mixed-season lines keep
  *  their exact prices (booking_charges only has description/qty/unit_price). */
-export function lineToCharges(line: QuoteLine): { description: string; qty: number; unit_price: number }[] {
+export function lineToCharges(
+  line: QuoteLine,
+): { description: string; qty: number; unit_price: number }[] {
   const variant = line.variant_label ? ` (${line.variant_label})` : "";
   const inc = line.includes.length ? ` — ${line.includes.join(", ")}` : "";
   return line.breakdown.map((seg) => ({
@@ -395,7 +443,10 @@ export function lineToCharges(line: QuoteLine): { description: string; qty: numb
 // ── Catalog maintenance helpers (Seasons editor) ────────────────────────────
 
 /** season id -> number of variants that have no explicit price for it. */
-export function coverageGaps(items: { variants: PriceVariant[] }[], seasons: PriceSeason[]): Record<string, number> {
+export function coverageGaps(
+  items: { variants: PriceVariant[] }[],
+  seasons: PriceSeason[],
+): Record<string, number> {
   const gaps: Record<string, number> = {};
   for (const s of seasons) {
     gaps[s.id] = 0;
@@ -427,13 +478,21 @@ export function bulkFillVariants(
     const existing = v.season_prices?.[seasonId];
     if (typeof existing === "number" && Number.isFinite(existing) && existing >= 0) return v;
     const raw = mode.type === "copy_base" ? v.base_price : v.base_price * (1 + mode.pct / 100);
-    const price = mode.type === "copy_base" || roundTo <= 0 ? Math.round(raw) : Math.round(raw / roundTo) * roundTo;
+    const price =
+      mode.type === "copy_base" || roundTo <= 0
+        ? Math.round(raw)
+        : Math.round(raw / roundTo) * roundTo;
     return { ...v, season_prices: { ...(v.season_prices ?? {}), [seasonId]: price } };
   });
 }
 
 /** A fresh variant with a URL-safe key. */
 export function newVariant(label = "Standard", base = 0): PriceVariant {
-  const key = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "standard";
+  const key =
+    label
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "") || "standard";
   return { key, label, base_price: base, season_prices: {} };
 }

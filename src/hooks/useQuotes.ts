@@ -13,7 +13,13 @@ function asError(err: { message?: string } | null): Error {
 /** What the owner selected — enough to re-open and edit a quote. */
 export interface QuoteInputs {
   rooms: { room_id: string; guests: number }[];
-  items: { kind: "addon" | "package"; item_id: string; variant_key: string | null; qty?: number; price?: number }[];
+  items: {
+    kind: "addon" | "package";
+    item_id: string;
+    variant_key: string | null;
+    qty?: number;
+    price?: number;
+  }[];
 }
 
 export interface Quote {
@@ -39,7 +45,7 @@ export interface Quote {
   created_at: string;
 }
 
-const normalize = (r: any): Quote => ({
+const normalize = (r: Quote): Quote => ({
   ...r,
   inputs: { rooms: r.inputs?.rooms ?? [], items: r.inputs?.items ?? [] },
   rooms: Array.isArray(r.rooms) ? r.rooms : [],
@@ -71,7 +77,11 @@ export const useQuotes = (propertyId: string) => {
 export function useSaveQuote() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { propertyId: string; id?: string; values: Record<string, unknown> }): Promise<string> => {
+    mutationFn: async (input: {
+      propertyId: string;
+      id?: string;
+      values: Record<string, unknown>;
+    }): Promise<string> => {
       const values = { ...input.values, updated_at: new Date().toISOString() };
       if (input.id) {
         const { error } = await supabase.from("quotes").update(values).eq("id", input.id);
@@ -93,8 +103,16 @@ export function useSaveQuote() {
 export function useSetQuoteStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { propertyId: string; id: string; status: QuoteStatus; markSent?: boolean }) => {
-      const values: Record<string, unknown> = { status: input.status, updated_at: new Date().toISOString() };
+    mutationFn: async (input: {
+      propertyId: string;
+      id: string;
+      status: QuoteStatus;
+      markSent?: boolean;
+    }) => {
+      const values: Record<string, unknown> = {
+        status: input.status,
+        updated_at: new Date().toISOString(),
+      };
       if (input.markSent) values.sent_at = new Date().toISOString();
       const { error } = await supabase.from("quotes").update(values).eq("id", input.id);
       if (error) throw asError(error);
@@ -110,7 +128,11 @@ export function useMarkQuoteConverted() {
     mutationFn: async (input: { propertyId: string; id: string; bookingId: string | null }) => {
       const { error } = await supabase
         .from("quotes")
-        .update({ status: "accepted", converted_booking_id: input.bookingId || null, updated_at: new Date().toISOString() })
+        .update({
+          status: "accepted",
+          converted_booking_id: input.bookingId || null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", input.id);
       if (error) throw asError(error);
     },

@@ -40,7 +40,8 @@ export const KEEP_OPEN_BOOKINGS =
 export const KEEP_OPEN_GROUPS =
   "and(is_paid.eq.false,status.neq.cancelled),and(status.eq.pending),and(status.eq.confirmed)";
 /** Agents: agent commission not yet paid out. */
-export const KEEP_OWED_COMMISSION_BOOKINGS = "and(source.eq.agent,commission_paid.eq.false,group_id.is.null)";
+export const KEEP_OWED_COMMISSION_BOOKINGS =
+  "and(source.eq.agent,commission_paid.eq.false,group_id.is.null)";
 export const KEEP_OWED_COMMISSION_GROUPS = "and(source.eq.agent,commission_paid.eq.false)";
 
 export const useBookings = (propertyId: string, filters?: BookingFilters) => {
@@ -53,6 +54,8 @@ export const useBookings = (propertyId: string, filters?: BookingFilters) => {
       const select = filters?.withCharges === false ? "*" : "*, booking_charges(*)";
       // Paginated: PostgREST caps one request at 1,000 rows (see lib/paginate.ts).
       // Secondary order on id keeps page boundaries stable when check_in ties.
+      // Typed `any`: supabase-js cannot type this dynamic select string, and consumers read joined fields.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return fetchAllRows<any>((from, to) => {
         let query = supabase
           .from("bookings")
@@ -107,7 +110,7 @@ export const useBookingGroups = (propertyId: string, options?: BookingGroupOptio
       const select = options?.slim
         ? "*, bookings(id), booking_charges(*)"
         : "*, bookings(*), booking_charges(*)";
-      const rows = await fetchAllRows<any>((from, to) => {
+      const rows = await fetchAllRows<BookingGroup>((from, to) => {
         let query = supabase
           .from("booking_groups")
           .select(select, { count: "exact" })

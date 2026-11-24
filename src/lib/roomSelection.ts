@@ -26,13 +26,25 @@ export function stayNights(checkIn: Date, checkOut: Date): number {
 }
 
 /** What the room itself costs for the stay (no extra guests), with the seasonal info. */
-export function roomStayPrice(room: Room, checkIn: Date | null, checkOut: Date | null, rates?: readonly RoomRate[]) {
-  if (!checkIn || !checkOut) return { nights: 0, roomCost: room.base_price, seasonalNights: 0, rateLabels: [] as string[] };
+export function roomStayPrice(
+  room: Room,
+  checkIn: Date | null,
+  checkOut: Date | null,
+  rates?: readonly RoomRate[],
+) {
+  if (!checkIn || !checkOut)
+    return { nights: 0, roomCost: room.base_price, seasonalNights: 0, rateLabels: [] as string[] };
   const nights = stayNights(checkIn, checkOut);
   let roomCost = room.base_price * nights;
   let seasonalNights = 0;
   let rateLabels: string[] = [];
-  const stay = priceRoomStay({ room, guests: 1, checkIn: format(checkIn, "yyyy-MM-dd"), checkOut: format(checkOut, "yyyy-MM-dd"), rates });
+  const stay = priceRoomStay({
+    room,
+    guests: 1,
+    checkIn: format(checkIn, "yyyy-MM-dd"),
+    checkOut: format(checkOut, "yyyy-MM-dd"),
+    rates,
+  });
   if (stay.nights > 0) {
     roomCost = stay.room_price;
     seasonalNights = stay.seasonal_nights ?? 0;
@@ -49,7 +61,10 @@ export function buildBookingDetails(
   rates?: readonly RoomRate[],
 ): BookingDetails {
   const { nights, roomCost } = roomStayPrice(room, checkIn, checkOut, rates);
-  const extraGuestCharge = extraGuestCount(party.adults + party.children, room.max_guests) * (room.extra_guest_price ?? 0) * nights;
+  const extraGuestCharge =
+    extraGuestCount(party.adults + party.children, room.max_guests) *
+    (room.extra_guest_price ?? 0) *
+    nights;
   return {
     room,
     adults: party.adults,

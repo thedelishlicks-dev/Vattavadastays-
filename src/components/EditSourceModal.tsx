@@ -47,9 +47,15 @@ export function EditSourceModal({
     setError("");
     try {
       if (kind === "group") {
-        const { error: groupErr } = await supabase.from("booking_groups").update(patch).eq("id", id);
+        const { error: groupErr } = await supabase
+          .from("booking_groups")
+          .update(patch)
+          .eq("id", id);
         if (groupErr) throw groupErr;
-        const { error: roomsErr } = await supabase.from("bookings").update(patch).eq("group_id", id);
+        const { error: roomsErr } = await supabase
+          .from("bookings")
+          .update(patch)
+          .eq("group_id", id);
         if (roomsErr) throw roomsErr;
       } else {
         const { error: err } = await supabase.from("bookings").update(patch).eq("id", id);
@@ -75,15 +81,26 @@ export function EditSourceModal({
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={handleSave} disabled={!patch} loading={saving}>Save</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={handleSave}
+              disabled={!patch}
+              loading={saving}
+            >
+              Save
+            </Button>
           </ModalActions>
         </>
       }
     >
       {isAgent ? (
         <p className="rounded-2xl bg-muted/60 px-4 py-3 text-sm">
-          This is an <strong>agent</strong> booking. The agent and commission stay as they are; you can still note how the guest found you below.
+          This is an <strong>agent</strong> booking. The agent and commission stay as they are; you
+          can still note how the guest found you below.
         </p>
       ) : (
         <div className="space-y-1.5">
@@ -98,7 +115,9 @@ export function EditSourceModal({
                 onClick={() => setNextSource(o.value)}
                 className={cn(
                   "rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-                  nextSource === o.value ? "bg-primary text-primary-foreground" : "bg-muted text-foreground/80 hover:bg-muted/70",
+                  nextSource === o.value
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-foreground/80 hover:bg-muted/70",
                 )}
               >
                 {o.label}
@@ -107,9 +126,16 @@ export function EditSourceModal({
           </div>
         </div>
       )}
-      <SourceDetailPicker value={nextDetail as BookingSourceDetail} onChange={(v) => setNextDetail(v)} />
+      <SourceDetailPicker
+        value={nextDetail as BookingSourceDetail}
+        onChange={(v) => setNextDetail(v)}
+      />
       {nextDetail !== "" && (
-        <button type="button" onClick={() => setNextDetail("")} className="text-xs font-medium text-primary">
+        <button
+          type="button"
+          onClick={() => setNextDetail("")}
+          className="text-xs font-medium text-primary"
+        >
           Clear source detail
         </button>
       )}

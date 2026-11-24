@@ -39,7 +39,9 @@ function renderInline(text: string): ReactNode[] {
 function Block({ block }: { block: GuideBlock }) {
   switch (block.type) {
     case "p":
-      return <p className="text-sm leading-relaxed text-muted-foreground">{renderInline(block.text)}</p>;
+      return (
+        <p className="text-sm leading-relaxed text-muted-foreground">{renderInline(block.text)}</p>
+      );
     case "steps":
       return (
         <ol className="space-y-2.5">
@@ -122,7 +124,10 @@ function Block({ block }: { block: GuideBlock }) {
 
 function Section({ section }: { section: GuideSection }) {
   return (
-    <details id={section.id} className="group scroll-mt-20 rounded-3xl border border-border/60 bg-card">
+    <details
+      id={section.id}
+      className="group scroll-mt-20 rounded-3xl border border-border/60 bg-card"
+    >
       <summary className="flex cursor-pointer list-none items-start gap-3 p-4 md:p-5 [&::-webkit-details-marker]:hidden">
         <div className="min-w-0 flex-1">
           <h3 className="text-base font-semibold leading-snug text-foreground">{section.title}</h3>
@@ -206,8 +211,8 @@ function HelpPage() {
               How to run your property
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Short answers, step by step. Tap a question to open it. Example prices use a room called Mud House; yours
-              will differ.
+              Short answers, step by step. Tap a question to open it. Example prices use a room
+              called Mud House; yours will differ.
             </p>
           </div>
         </div>
@@ -217,13 +222,19 @@ function HelpPage() {
           <ul className="flex flex-wrap gap-2 text-sm">
             {GUIDE_GROUPS.map((g) => (
               <li key={g.key}>
-                <a href={`#group-${g.key}`} className="inline-flex rounded-full bg-muted px-4 py-2 font-medium text-foreground transition-colors hover:bg-muted/70">
+                <a
+                  href={`#group-${g.key}`}
+                  className="inline-flex rounded-full bg-muted px-4 py-2 font-medium text-foreground transition-colors hover:bg-muted/70"
+                >
                   {g.title}
                 </a>
               </li>
             ))}
             <li>
-              <a href="#group-glossary" className="inline-flex rounded-full bg-muted px-4 py-2 font-medium text-foreground transition-colors hover:bg-muted/70">
+              <a
+                href="#group-glossary"
+                className="inline-flex rounded-full bg-muted px-4 py-2 font-medium text-foreground transition-colors hover:bg-muted/70"
+              >
                 Words explained
               </a>
             </li>
@@ -259,8 +270,8 @@ function HelpPage() {
             <div className="text-base font-semibold text-foreground">Still stuck?</div>
             <p className="mt-1">Contact support: {SUPPORT_CONTACT}</p>
             <p className="mt-1">
-              Please tell us the property name, the guest's name or phone number, the dates, and what happened. A
-              screenshot helps.
+              Please tell us the property name, the guest's name or phone number, the dates, and
+              what happened. A screenshot helps.
             </p>
           </section>
         )}

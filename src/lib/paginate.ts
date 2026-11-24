@@ -1,4 +1,4 @@
- // src/lib/paginate.ts
+// src/lib/paginate.ts
 //
 // Supabase/PostgREST silently returns at most 1,000 rows per request (the
 // project default). The admin screens used to fetch "all bookings" in one

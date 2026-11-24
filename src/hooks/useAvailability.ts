@@ -19,10 +19,17 @@ export const useAvailability = (
   roomId: string,
   checkIn: string,
   checkOut: string,
-  property?: TurnoverPolicyInput | null
+  property?: TurnoverPolicyInput | null,
 ) => {
   return useQuery({
-    queryKey: ["availability", roomId, checkIn, checkOut, property?.check_in_time, property?.check_out_time],
+    queryKey: [
+      "availability",
+      roomId,
+      checkIn,
+      checkOut,
+      property?.check_in_time,
+      property?.check_out_time,
+    ],
     queryFn: async () => {
       const unavailableDates = await getConflictingDates(roomId, checkIn, checkOut, property);
       return {

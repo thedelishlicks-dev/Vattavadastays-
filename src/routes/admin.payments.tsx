@@ -14,12 +14,26 @@ import {
   ChevronRight,
   Receipt,
 } from "lucide-react";
-import { Modal, ModalActions, Button, StatusChip, EmptyState, fieldCls, type Tone } from "@/components/ds";
+import {
+  Modal,
+  ModalActions,
+  Button,
+  StatusChip,
+  EmptyState,
+  fieldCls,
+  type Tone,
+} from "@/components/ds";
 import { MiniBarChart } from "@/components/MiniBarChart";
 import { PageHeader } from "@/admin/formKit";
 import { LoadFailed } from "@/components/LoadFailed";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
-import { useBookings, useBookingGroups, useBookingTotal, KEEP_UNPAID_BOOKINGS, KEEP_UNPAID_GROUPS } from "@/hooks/useBookings";
+import {
+  useBookings,
+  useBookingGroups,
+  useBookingTotal,
+  KEEP_UNPAID_BOOKINGS,
+  KEEP_UNPAID_GROUPS,
+} from "@/hooks/useBookings";
 import { useHistoryWindow } from "@/hooks/useHistoryWindow";
 import { HistoryWindowBar } from "@/components/HistoryWindowBar";
 import { inWindow, sinceLabel } from "@/lib/historyWindow";
@@ -107,7 +121,9 @@ const AVATAR_TONE: Record<Tone, string> = {
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  return ((parts[0]?.[0] ?? "?") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+  return (
+    (parts[0]?.[0] ?? "?") + (parts.length > 1 ? parts[parts.length - 1][0] : "")
+  ).toUpperCase();
 }
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -221,8 +237,14 @@ function PaymentActionModal({
       childPatch = { is_paid: true, status: newStatus, ...hold };
     } else {
       const value = Math.round(parseFloat(collected));
-      if (isNaN(value) || value < 0) { setError("Enter an amount of 0 or more"); return; }
-      if (value > gross) { setError(`Can't be more than the total of ${fmt(gross)}`); return; }
+      if (isNaN(value) || value < 0) {
+        setError("Enter an amount of 0 or more");
+        return;
+      }
+      if (value > gross) {
+        setError(`Can't be more than the total of ${fmt(gross)}`);
+        return;
+      }
       patch = { advance_amount: value, is_paid: value >= gross };
       childPatch = { is_paid: value >= gross };
     }
@@ -233,7 +255,10 @@ function PaymentActionModal({
       if (err) throw err;
       if (item.kind === "group") {
         // keep child bookings' flags in sync (same as the old toggle did)
-        const { error: childErr } = await supabase.from("bookings").update(childPatch).eq("group_id", item.id);
+        const { error: childErr } = await supabase
+          .from("bookings")
+          .update(childPatch)
+          .eq("group_id", item.id);
         if (childErr) throw childErr;
       }
       onDone(mode === "full" && item.status === "pending");
@@ -253,54 +278,79 @@ function PaymentActionModal({
         <>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <ModalActions>
-            <Button variant="soft" size="lg" onClick={onClose}>Cancel</Button>
-            <Button size="lg" className="flex-1" onClick={save} loading={saving}>{mode === "full" ? "Confirm payment" : "Save"}</Button>
+            <Button variant="soft" size="lg" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button size="lg" className="flex-1" onClick={save} loading={saving}>
+              {mode === "full" ? "Confirm payment" : "Save"}
+            </Button>
           </ModalActions>
         </>
       }
     >
-        <div className="rounded-2xl bg-muted/60 px-4 py-3 text-sm space-y-1">
-          <div className="flex justify-between"><span className="text-muted-foreground">Gross total</span><span className="font-medium">{fmt(gross)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Collected so far</span><span className="font-medium text-primary">{fmt(item.advance_amount)}</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Balance due</span><span className="font-semibold">{fmt(balance)}</span></div>
+      <div className="rounded-2xl bg-muted/60 px-4 py-3 text-sm space-y-1">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Gross total</span>
+          <span className="font-medium">{fmt(gross)}</span>
         </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Collected so far</span>
+          <span className="font-medium text-primary">{fmt(item.advance_amount)}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Balance due</span>
+          <span className="font-semibold">{fmt(balance)}</span>
+        </div>
+      </div>
 
-        {mode === "full" ? (
-          <>
-            <p className="text-sm">
-              {balance > 0
-                ? <>This records <strong>{fmt(balance)}</strong> as received and marks the booking fully paid.</>
-                : <>No balance is left — this will just mark the booking as settled.</>}
-            </p>
-            <div>
-              <label className={labelCls}>Payment method</label>
-              <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
-                {[...new Set([method, ...PAYMENT_METHODS])].map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Reference (optional)</label>
-              <input value={ref} onChange={(e) => setRef(e.target.value)} className={inputCls} placeholder="UPI ref / receipt no." />
-            </div>
-          </>
-        ) : (
+      {mode === "full" ? (
+        <>
+          <p className="text-sm">
+            {balance > 0 ? (
+              <>
+                This records <strong>{fmt(balance)}</strong> as received and marks the booking fully
+                paid.
+              </>
+            ) : (
+              <>No balance is left — this will just mark the booking as settled.</>
+            )}
+          </p>
           <div>
-            <label className={labelCls}>Total amount actually received (₹)</label>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={0}
-              value={collected}
-              onChange={(e) => setCollected(e.target.value)}
-              className={inputCls}
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use this to fix a mistaken entry. Set 0 to mark the booking unpaid.
-            </p>
+            <label className={labelCls}>Payment method</label>
+            <select value={method} onChange={(e) => setMethod(e.target.value)} className={inputCls}>
+              {[...new Set([method, ...PAYMENT_METHODS])].map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+          <div>
+            <label className={labelCls}>Reference (optional)</label>
+            <input
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+              className={inputCls}
+              placeholder="UPI ref / receipt no."
+            />
+          </div>
+        </>
+      ) : (
+        <div>
+          <label className={labelCls}>Total amount actually received (₹)</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={0}
+            value={collected}
+            onChange={(e) => setCollected(e.target.value)}
+            className={inputCls}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Use this to fix a mistaken entry. Set 0 to mark the booking unpaid.
+          </p>
+        </div>
+      )}
     </Modal>
   );
 }
@@ -310,16 +360,43 @@ function AdminPayments() {
   // Only the last 6 months of stays load at first (more on request), plus any older stay that still
   // has a balance, so money owed never drops out of view. See lib/historyWindow.ts.
   const win = useHistoryWindow();
-  const { data: bookings = [], isPending: bookPending, isFetching: bookFetching, isError: bookError, refetch: refetchBookings } = useBookings(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_BOOKINGS, keepPrevious: true });
-  const { data: groups = [], isPending: groupsPending, isFetching: groupsFetching, isError: groupsError, refetch: refetchGroups } = useBookingGroups(property?.id ?? "", { from: win.from, alsoKeep: KEEP_UNPAID_GROUPS, keepPrevious: true, slim: true });
+  const {
+    data: bookings = [],
+    isPending: bookPending,
+    isFetching: bookFetching,
+    isError: bookError,
+    refetch: refetchBookings,
+  } = useBookings(property?.id ?? "", {
+    from: win.from,
+    alsoKeep: KEEP_UNPAID_BOOKINGS,
+    keepPrevious: true,
+  });
+  const {
+    data: groups = [],
+    isPending: groupsPending,
+    isFetching: groupsFetching,
+    isError: groupsError,
+    refetch: refetchGroups,
+  } = useBookingGroups(property?.id ?? "", {
+    from: win.from,
+    alsoKeep: KEEP_UNPAID_GROUPS,
+    keepPrevious: true,
+    slim: true,
+  });
   const { data: bookingTotal } = useBookingTotal(property?.id ?? "");
   const hasMoreHistory = bookingTotal != null && bookingTotal > bookings.length;
   const queryClient = useQueryClient();
 
   const navigate = useNavigate();
-  const [payModal, setPayModal] = useState<{ item: LedgerItem; mode: "full" | "correct" } | null>(null);
+  const [payModal, setPayModal] = useState<{ item: LedgerItem; mode: "full" | "correct" } | null>(
+    null,
+  );
   // Set when "Mark fully paid" confirmed a pending booking, so the owner is reminded to send the guest their confirmation.
-  const [justConfirmed, setJustConfirmed] = useState<{ id: string; kind: "booking" | "group"; guest: string } | null>(null);
+  const [justConfirmed, setJustConfirmed] = useState<{
+    id: string;
+    kind: "booking" | "group";
+    guest: string;
+  } | null>(null);
 
   const [filterTab, setFilterTab] = useState<FilterTab>("outstanding");
   const [search, setSearch] = useState("");
@@ -361,7 +438,14 @@ function AdminPayments() {
         payment_reference: b.payment_reference ?? null,
         // Derived from the real numbers, not the stored flag: the flag goes stale
         // when extras/discount/dates change after the last payment was recorded.
-        is_paid: Math.max(0, Number(b.total_amount) + chargesSum(b.booking_charges) - Number(b.discount_amount ?? 0) - Number(b.advance_amount ?? 0)) === 0,
+        is_paid:
+          Math.max(
+            0,
+            Number(b.total_amount) +
+              chargesSum(b.booking_charges) -
+              Number(b.discount_amount ?? 0) -
+              Number(b.advance_amount ?? 0),
+          ) === 0,
         roomLabel: "",
       }));
 
@@ -382,7 +466,14 @@ function AdminPayments() {
         payment_reference: g.payment_reference ?? null,
         // Derived from the real numbers, not the stored flag: the flag goes stale
         // when extras/discount/dates change after the last payment was recorded.
-        is_paid: Math.max(0, Number(g.total_amount) + chargesSum(g.booking_charges) - Number(g.discount_amount ?? 0) - Number(g.advance_amount ?? 0)) === 0,
+        is_paid:
+          Math.max(
+            0,
+            Number(g.total_amount) +
+              chargesSum(g.booking_charges) -
+              Number(g.discount_amount ?? 0) -
+              Number(g.advance_amount ?? 0),
+          ) === 0,
         roomLabel: `${(g.bookings ?? []).length} rooms`,
       }));
 
@@ -393,7 +484,10 @@ function AdminPayments() {
   // change with the table's tab or search. With a limited history, Collected / Billed / the counts
   // cover stays inside the window (labelled "since ..."), while Outstanding and "not started" cover
   // everything loaded, including older stays that still have a balance.
-  const windowItems = useMemo(() => items.filter((i) => inWindow(i.check_in, win.from)), [items, win.from]);
+  const windowItems = useMemo(
+    () => items.filter((i) => inWindow(i.check_in, win.from)),
+    [items, win.from],
+  );
   const stats = useMemo(() => {
     const totalCollected = windowItems.reduce((s, i) => s + i.advance_amount, 0);
     const totalOutstanding = items.reduce((s, i) => s + balanceOf(i), 0);
@@ -583,12 +677,23 @@ function AdminPayments() {
   }
   // Without this the page showed ₹0 collected / ₹0 outstanding, which looks like the real answer.
   if (bookError || groupsError) {
-    return <LoadFailed title="Couldn't load your payments" onRetry={() => { void refetchBookings(); void refetchGroups(); }} />;
+    return (
+      <LoadFailed
+        title="Couldn't load your payments"
+        onRetry={() => {
+          void refetchBookings();
+          void refetchGroups();
+        }}
+      />
+    );
   }
 
   return (
     <div className="space-y-6 max-w-3xl">
-      <PageHeader title="Payments" subtitle="Track collections and outstanding balances across all bookings." />
+      <PageHeader
+        title="Payments"
+        subtitle="Track collections and outstanding balances across all bookings."
+      />
 
       <HistoryWindowBar
         from={win.from}
@@ -600,20 +705,38 @@ function AdminPayments() {
       />
 
       {justConfirmed && (
-        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-900">
-          <span>✅ {justConfirmed.guest}'s booking is now confirmed. Send them the confirmation and tracking link.</span>
+        <div
+          role="status"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-green-50 px-4 py-3 text-sm text-green-900"
+        >
+          <span>
+            ✅ {justConfirmed.guest}'s booking is now confirmed. Send them the confirmation and
+            tracking link.
+          </span>
           <span className="flex items-center gap-3">
             <Link
               to="/admin/bookings"
-              search={{
-                ...(new URLSearchParams(window.location.search).get("property") ? { property: new URLSearchParams(window.location.search).get("property") } : {}),
-                ...(justConfirmed.kind === "group" ? { groupId: justConfirmed.id } : { bookingId: justConfirmed.id }),
-              } as never}
+              search={
+                {
+                  ...(new URLSearchParams(window.location.search).get("property")
+                    ? { property: new URLSearchParams(window.location.search).get("property") }
+                    : {}),
+                  ...(justConfirmed.kind === "group"
+                    ? { groupId: justConfirmed.id }
+                    : { bookingId: justConfirmed.id }),
+                } as never
+              }
               className="rounded-full bg-green-700 px-4 py-2 text-xs font-semibold text-white hover:opacity-90"
             >
               Open booking
             </Link>
-            <button type="button" onClick={() => setJustConfirmed(null)} className="text-xs underline">Dismiss</button>
+            <button
+              type="button"
+              onClick={() => setJustConfirmed(null)}
+              className="text-xs underline"
+            >
+              Dismiss
+            </button>
           </span>
         </div>
       )}
@@ -622,18 +745,26 @@ function AdminPayments() {
       <div className="space-y-3">
         <div className="rounded-3xl bg-[var(--section-soft)] px-6 py-5">
           <p className="text-sm text-[var(--section-ink)]">Collected{sinceTag}</p>
-          <p className="text-4xl md:text-5xl font-bold tracking-tight tabular-nums text-[var(--section-ink)]">₹{stats.totalCollected.toLocaleString("en-IN")}</p>
-          <p className="mt-1 text-sm text-[var(--section-ink)]/80">{stats.fullyPaid} fully paid · {stats.partPaid} part paid</p>
+          <p className="text-4xl md:text-5xl font-bold tracking-tight tabular-nums text-[var(--section-ink)]">
+            ₹{stats.totalCollected.toLocaleString("en-IN")}
+          </p>
+          <p className="mt-1 text-sm text-[var(--section-ink)]/80">
+            {stats.fullyPaid} fully paid · {stats.partPaid} part paid
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-3xl bg-[#ffe4e6] px-5 py-4">
             <p className="text-sm text-[#9f1239]">Outstanding</p>
-            <p className="text-2xl font-semibold tabular-nums text-[#881337]">₹{stats.totalOutstanding.toLocaleString("en-IN")}</p>
+            <p className="text-2xl font-semibold tabular-nums text-[#881337]">
+              ₹{stats.totalOutstanding.toLocaleString("en-IN")}
+            </p>
             <p className="mt-0.5 text-xs text-[#9f1239]">{stats.unpaid} not started</p>
           </div>
           <div className="rounded-3xl bg-card border border-border/60 px-5 py-4">
             <p className="text-sm text-muted-foreground">Total billed{sinceTag}</p>
-            <p className="text-2xl font-semibold tabular-nums">₹{stats.totalBilled.toLocaleString("en-IN")}</p>
+            <p className="text-2xl font-semibold tabular-nums">
+              ₹{stats.totalBilled.toLocaleString("en-IN")}
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">Rooms + extras − discounts</p>
           </div>
         </div>
@@ -651,10 +782,24 @@ function AdminPayments() {
             {trendData.length > 1 && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-muted-foreground">Last {trendData.length} months</span>
+                  <span className="text-xs text-muted-foreground">
+                    Last {trendData.length} months
+                  </span>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--primary)" }} />Collected</span>
-                    <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: "var(--destructive)", opacity: 0.7 }} />Outstanding</span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: "var(--primary)" }}
+                      />
+                      Collected
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 rounded-full"
+                        style={{ background: "var(--destructive)", opacity: 0.7 }}
+                      />
+                      Outstanding
+                    </span>
                   </div>
                 </div>
                 <MiniBarChart data={trendData} />
@@ -675,10 +820,21 @@ function AdminPayments() {
                   <div className="text-base font-semibold">{monthLabel(scrubMonth.monthKey)}</div>
                   <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 mt-1 text-xs">
                     <span className="text-muted-foreground">{scrubMonth.count} bookings</span>
-                    <span className="text-muted-foreground">Billed ₹{scrubMonth.billed.toLocaleString("en-IN")}</span>
-                    <span className="text-primary font-medium">Collected ₹{scrubMonth.collected.toLocaleString("en-IN")}</span>
-                    <span className="text-destructive font-medium">Outstanding {scrubMonth.outstanding > 0 ? `₹${scrubMonth.outstanding.toLocaleString("en-IN")}` : "₹0"}</span>
-                    <span className={`font-semibold ${pctColorCls(collectedPct(scrubMonth))}`}>{collectedPct(scrubMonth)}% collected</span>
+                    <span className="text-muted-foreground">
+                      Billed ₹{scrubMonth.billed.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-primary font-medium">
+                      Collected ₹{scrubMonth.collected.toLocaleString("en-IN")}
+                    </span>
+                    <span className="text-destructive font-medium">
+                      Outstanding{" "}
+                      {scrubMonth.outstanding > 0
+                        ? `₹${scrubMonth.outstanding.toLocaleString("en-IN")}`
+                        : "₹0"}
+                    </span>
+                    <span className={`font-semibold ${pctColorCls(collectedPct(scrubMonth))}`}>
+                      {collectedPct(scrubMonth)}% collected
+                    </span>
                   </div>
                 </div>
                 <button
@@ -691,7 +847,10 @@ function AdminPayments() {
                 </button>
               </div>
               <div className="text-center mt-3">
-                <button onClick={() => setMonthFilter(scrubMonth.monthKey)} className="text-sm text-primary hover:underline font-semibold">
+                <button
+                  onClick={() => setMonthFilter(scrubMonth.monthKey)}
+                  className="text-sm text-primary hover:underline font-semibold"
+                >
                   View {monthLabel(scrubMonth.monthKey)} in the list →
                 </button>
               </div>
@@ -705,7 +864,11 @@ function AdminPayments() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-base font-semibold">
             Payments
-            {monthFilter && <span className="ml-2 font-normal text-sm text-muted-foreground">· {monthLabel(monthFilter)}</span>}
+            {monthFilter && (
+              <span className="ml-2 font-normal text-sm text-muted-foreground">
+                · {monthLabel(monthFilter)}
+              </span>
+            )}
           </h2>
           <Button variant="soft" size="sm" onClick={exportCsv} disabled={sortedItems.length === 0}>
             <Download className="h-4 w-4" /> Export CSV
@@ -714,15 +877,22 @@ function AdminPayments() {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex shrink-0 rounded-full bg-muted p-1 gap-1">
-            {([
-              { key: "outstanding", label: "Outstanding" },
-              { key: "paid", label: "Paid" },
-              { key: "all", label: "All" },
-            ] as { key: FilterTab; label: string }[]).map((tab) => (
+            {(
+              [
+                { key: "outstanding", label: "Outstanding" },
+                { key: "paid", label: "Paid" },
+                { key: "all", label: "All" },
+              ] as { key: FilterTab; label: string }[]
+            ).map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setFilterTab(tab.key)}
-                className={["rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors", filterTab === tab.key ? "bg-primary text-primary-foreground" : "text-foreground/80 hover:bg-card/60"].join(" ")}
+                className={[
+                  "rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors",
+                  filterTab === tab.key
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/80 hover:bg-card/60",
+                ].join(" ")}
               >
                 {tab.label}
               </button>
@@ -748,57 +918,110 @@ function AdminPayments() {
             }}
             className="rounded-full border-0 bg-muted px-4 py-2.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
           >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => <option key={k} value={k}>Sort: {SORT_LABELS[k]}</option>)}
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((k) => (
+              <option key={k} value={k}>
+                Sort: {SORT_LABELS[k]}
+              </option>
+            ))}
           </select>
           {monthFilter && (
-            <button onClick={() => setMonthFilter(null)} className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors">
+            <button
+              onClick={() => setMonthFilter(null)}
+              className="shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-3.5 py-2 text-sm font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+            >
               {monthLabel(monthFilter)} <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
 
         {sortedItems.length === 0 ? (
-          filterTab === "outstanding"
-            ? <EmptyState icon={IndianRupee} title="All caught up" hint="No outstanding payments." />
-            : <EmptyState icon={Receipt} title="Nothing here yet" />
+          filterTab === "outstanding" ? (
+            <EmptyState icon={IndianRupee} title="All caught up" hint="No outstanding payments." />
+          ) : (
+            <EmptyState icon={Receipt} title="Nothing here yet" />
+          )
         ) : (
           <ul className="space-y-1">
             {sortedItems.map((item) => {
               const balance = balanceOf(item);
               const status = paymentStatus(item);
               return (
-                <li key={`${item.kind}-${item.id}`} className="rounded-3xl px-2 py-3 hover:bg-muted/50 transition-colors">
+                <li
+                  key={`${item.kind}-${item.id}`}
+                  className="rounded-3xl px-2 py-3 hover:bg-muted/50 transition-colors"
+                >
                   <div className="flex items-center gap-3.5">
-                    <span aria-hidden="true" className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${AVATAR_TONE[status.tone]}`}>{initials(item.guest_name)}</span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${AVATAR_TONE[status.tone]}`}
+                    >
+                      {initials(item.guest_name)}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[15px] font-medium">
                         {item.guest_name}
-                        {item.roomLabel && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{item.roomLabel}</span>}
+                        {item.roomLabel && (
+                          <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            {item.roomLabel}
+                          </span>
+                        )}
                       </p>
                       <p className="truncate text-sm text-muted-foreground">
-                        {item.check_in}{item.payment_method ? ` · ${item.payment_method}` : ""}{item.payment_reference ? ` · ${item.payment_reference}` : ""}
+                        {item.check_in}
+                        {item.payment_method ? ` · ${item.payment_method}` : ""}
+                        {item.payment_reference ? ` · ${item.payment_reference}` : ""}
                       </p>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="text-[15px] font-semibold tabular-nums">₹{grossTotal(item).toLocaleString("en-IN")}</p>
+                      <p className="text-[15px] font-semibold tabular-nums">
+                        ₹{grossTotal(item).toLocaleString("en-IN")}
+                      </p>
                       <StatusChip tone={status.tone}>{status.label}</StatusChip>
                     </div>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 pl-[3.625rem]">
                     <span className="text-xs text-muted-foreground tabular-nums">
                       Collected ₹{item.advance_amount.toLocaleString("en-IN")}
-                      {balance > 0 && <> · <span className="font-semibold text-foreground">₹{balance.toLocaleString("en-IN")} due</span></>}
-                      {item.discount_amount > 0 && <> · −₹{item.discount_amount.toLocaleString("en-IN")} discount</>}
-                      {item.charges_total > 0 && <> · +₹{item.charges_total.toLocaleString("en-IN")} extras</>}
+                      {balance > 0 && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <span className="font-semibold text-foreground">
+                            ₹{balance.toLocaleString("en-IN")} due
+                          </span>
+                        </>
+                      )}
+                      {item.discount_amount > 0 && (
+                        <> · −₹{item.discount_amount.toLocaleString("en-IN")} discount</>
+                      )}
+                      {item.charges_total > 0 && (
+                        <> · +₹{item.charges_total.toLocaleString("en-IN")} extras</>
+                      )}
                     </span>
                     <span className="ml-auto inline-flex items-center gap-1.5">
                       {balance > 0 || !item.is_paid ? (
-                        <Button size="sm" onClick={() => setPayModal({ item, mode: "full" })}><Check className="h-3.5 w-3.5" /> Mark fully paid</Button>
+                        <Button size="sm" onClick={() => setPayModal({ item, mode: "full" })}>
+                          <Check className="h-3.5 w-3.5" /> Mark fully paid
+                        </Button>
                       ) : (
                         <span className="px-2 text-xs text-muted-foreground">Settled</span>
                       )}
-                      <button onClick={() => setPayModal({ item, mode: "correct" })} title="Correct collected amount" aria-label="Correct collected amount" className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => openBooking(item)} title="Open booking" aria-label="Open booking" className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"><ExternalLink className="h-4 w-4" /></button>
+                      <button
+                        onClick={() => setPayModal({ item, mode: "correct" })}
+                        title="Correct collected amount"
+                        aria-label="Correct collected amount"
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => openBooking(item)}
+                        title="Open booking"
+                        aria-label="Open booking"
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-muted text-foreground/80 hover:bg-muted/70"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
                     </span>
                   </div>
                 </li>
@@ -812,9 +1035,17 @@ function AdminPayments() {
       <div className="rounded-3xl bg-card border border-border/60 p-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <Wallet className="h-5 w-5 text-primary shrink-0" />
-          <p className="text-sm text-muted-foreground">UPI ID and accepted payment methods are in <strong className="text-foreground">Property → Settings → Payment setup</strong>.</p>
+          <p className="text-sm text-muted-foreground">
+            UPI ID and accepted payment methods are in{" "}
+            <strong className="text-foreground">Property → Settings → Payment setup</strong>.
+          </p>
         </div>
-        <Link to="/admin/settings" className="shrink-0 rounded-full bg-card px-4 py-2 text-sm font-semibold hover:bg-card/70">Open</Link>
+        <Link
+          to="/admin/settings"
+          className="shrink-0 rounded-full bg-card px-4 py-2 text-sm font-semibold hover:bg-card/70"
+        >
+          Open
+        </Link>
       </div>
 
       {payModal && (
@@ -824,7 +1055,12 @@ function AdminPayments() {
           onClose={() => setPayModal(null)}
           onDone={(confirmed) => {
             refreshAfterPayment();
-            if (confirmed) setJustConfirmed({ id: payModal.item.id, kind: payModal.item.kind, guest: payModal.item.guest_name });
+            if (confirmed)
+              setJustConfirmed({
+                id: payModal.item.id,
+                kind: payModal.item.kind,
+                guest: payModal.item.guest_name,
+              });
             setPayModal(null);
           }}
         />

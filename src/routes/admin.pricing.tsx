@@ -9,7 +9,10 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 // Rooms, keeping the ?property= param used by superadmin "manage property".
 export const Route = createFileRoute("/admin/pricing")({
   beforeLoad: () => {
-    const prop = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("property") : null;
+    const prop =
+      typeof window !== "undefined"
+        ? new URLSearchParams(window.location.search).get("property")
+        : null;
     throw redirect({ to: "/admin/rooms", search: (prop ? { property: prop } : {}) as never });
   },
 });

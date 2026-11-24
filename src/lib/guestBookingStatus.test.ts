@@ -34,7 +34,10 @@ test("confirmed, completed and cancelled each get their own wording", () => {
 });
 
 test("statusFromTokenLookup prefers the group row, then the first booking, else null", () => {
-  assert.equal(statusFromTokenLookup({ groups: [{ status: "confirmed" }], bookings: [{ status: "pending" }] }), "confirmed");
+  assert.equal(
+    statusFromTokenLookup({ groups: [{ status: "confirmed" }], bookings: [{ status: "pending" }] }),
+    "confirmed",
+  );
   assert.equal(statusFromTokenLookup({ groups: [], bookings: [{ status: "pending" }] }), "pending");
   assert.equal(statusFromTokenLookup({ groups: [], bookings: [] }), null);
   assert.equal(statusFromTokenLookup(null), null);

@@ -1,7 +1,12 @@
 import { MapPin, Navigation, Apple, Mountain, MessageSquare } from "lucide-react";
 import { useProperty } from "@/hooks/useProperty";
 import { waDigits } from "@/lib/phone";
-import { appleMapsUrl as buildAppleMapsUrl, directionsShortLink, directionsUrl, hasCoordinates } from "@/lib/location";
+import {
+  appleMapsUrl as buildAppleMapsUrl,
+  directionsShortLink,
+  directionsUrl,
+  hasCoordinates,
+} from "@/lib/location";
 import { smsLink } from "@/lib/sms";
 
 interface MapSectionProps {
@@ -23,7 +28,13 @@ export function MapSection({ subdomain }: MapSectionProps) {
   const hasCoords = hasCoordinates(lat, lng);
   // Buttons open Google Maps directly. The SMS carries the short link instead: it has no "&" or comma, which
   // some SMS apps cut the message (or the link) at. The short link redirects to the same directions.
-  const mapsLink = directionsUrl({ lat, lng, name: property?.name, area: property?.area, byName: property?.directions_by_name });
+  const mapsLink = directionsUrl({
+    lat,
+    lng,
+    name: property?.name,
+    area: property?.area,
+    byName: property?.directions_by_name,
+  });
   const shortLink = directionsShortLink(subdomain, window.location);
   const appleMapsUrl = buildAppleMapsUrl({ lat, lng, name: propertyName });
 
@@ -33,7 +44,9 @@ export function MapSection({ subdomain }: MapSectionProps) {
     landmark ? `Landmark: ${landmark}` : "",
     ownerPhone ? `Call ${ownerName}: +${waDigits(ownerPhone)}` : "",
     "See you soon!",
-  ].filter(Boolean).join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const smsUrl = smsLink(smsMessage);
 
@@ -48,7 +61,9 @@ export function MapSection({ subdomain }: MapSectionProps) {
             <MapPin className="h-5 w-5" />
             <span className="text-sm font-medium uppercase tracking-wider">Getting Here</span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-display font-semibold text-foreground">Find Your Way</h2>
+          <h2 className="text-2xl md:text-3xl font-display font-semibold text-foreground">
+            Find Your Way
+          </h2>
           {landmark && <p className="mt-2 text-muted-foreground">{landmark}</p>}
         </div>
 
@@ -56,21 +71,39 @@ export function MapSection({ subdomain }: MapSectionProps) {
           {/* Static Map or Fallback */}
           {staticMapUrl ? (
             <div className="relative rounded-2xl overflow-hidden border border-border">
-              <img src={staticMapUrl} alt={`Map showing location of ${propertyName}`} loading="lazy" decoding="async" className="w-full h-48 md:h-64 object-cover" />
+              <img
+                src={staticMapUrl}
+                alt={`Map showing location of ${propertyName}`}
+                loading="lazy"
+                decoding="async"
+                className="w-full h-48 md:h-64 object-cover"
+              />
               {hasCoords && (
-                <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur text-stone-900 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors">
+                <a
+                  href={mapsLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur text-stone-900 text-xs font-medium px-3 py-1.5 rounded-full shadow-sm hover:bg-white transition-colors"
+                >
                   <Navigation className="h-3.5 w-3.5" /> Open in Maps
                 </a>
               )}
             </div>
           ) : hasCoords ? (
-            <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors">
+            <a
+              href={mapsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors"
+            >
               <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                 <Mountain className="h-5 w-5 text-primary" />
               </div>
               <div>
                 <div className="text-sm font-medium text-foreground">Coordinates</div>
-                <div className="text-xs text-muted-foreground font-mono">{Number(lat).toFixed(4)}°N, {Number(lng).toFixed(4)}°E</div>
+                <div className="text-xs text-muted-foreground font-mono">
+                  {Number(lat).toFixed(4)}°N, {Number(lng).toFixed(4)}°E
+                </div>
               </div>
               <Navigation className="ml-auto h-4 w-4 text-muted-foreground shrink-0" />
             </a>
@@ -78,7 +111,12 @@ export function MapSection({ subdomain }: MapSectionProps) {
 
           {/* Google Maps Link */}
           {mapsLink && (
-            <a href={mapsLink} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors">
+            <a
+              href={mapsLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors"
+            >
               <div className="h-10 w-10 rounded-lg bg-[#4285F4]/10 flex items-center justify-center shrink-0">
                 <Navigation className="h-5 w-5 text-[#4285F4]" />
               </div>
@@ -92,7 +130,12 @@ export function MapSection({ subdomain }: MapSectionProps) {
 
           {/* Apple Maps Link */}
           {appleMapsUrl && (
-            <a href={appleMapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors">
+            <a
+              href={appleMapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors"
+            >
               <div className="h-10 w-10 rounded-lg bg-stone-900/10 flex items-center justify-center shrink-0">
                 <Apple className="h-5 w-5 text-stone-900" />
               </div>
@@ -105,7 +148,10 @@ export function MapSection({ subdomain }: MapSectionProps) {
           )}
 
           {/* SMS Directions */}
-          <a href={smsUrl} className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors">
+          <a
+            href={smsUrl}
+            className="flex items-center gap-4 rounded-xl border border-border bg-card hover:bg-muted/50 p-4 transition-colors"
+          >
             <div className="h-10 w-10 rounded-lg bg-[#25D366]/10 flex items-center justify-center shrink-0">
               <MessageSquare className="h-5 w-5 text-[#25D366]" />
             </div>

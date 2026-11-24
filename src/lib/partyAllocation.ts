@@ -46,7 +46,11 @@ const extraPrice = (r: AllocRoom) => Number(r.extra_guest_price ?? 0);
  * Each guest goes to the room with the most included places left; once every room is at its
  * included number, to the room with the cheapest extra-guest charge that still has space.
  */
-export function allocateGuests(rooms: AllocRoom[], party: Party, pinned: Record<string, Party> = {}): Allocation {
+export function allocateGuests(
+  rooms: AllocRoom[],
+  party: Party,
+  pinned: Record<string, Party> = {},
+): Allocation {
   const byRoom: Record<string, Party> = {};
   let adultsLeft = Math.max(0, party.adults);
   let childrenLeft = Math.max(0, party.children);
@@ -125,7 +129,11 @@ export type RoomOptions = {
  * for real. "Best value" is the cheapest; "More space" is the cheapest one with fewer extra guests than
  * Best value. Returns nulls when nobody can be housed, or when Best value already has no extra guests.
  */
-export function suggestOptions(rooms: AllocRoom[], party: Party, priceOf: (room: AllocRoom, guests: number) => number): RoomOptions {
+export function suggestOptions(
+  rooms: AllocRoom[],
+  party: Party,
+  priceOf: (room: AllocRoom, guests: number) => number,
+): RoomOptions {
   const none: RoomOptions = { bestValue: null, moreSpace: null };
   const total = partySize(party);
   if (total === 0 || rooms.length === 0) return none;
@@ -158,9 +166,14 @@ export function suggestOptions(rooms: AllocRoom[], party: Party, priceOf: (room:
   }
   if (feasible.length === 0) return none;
 
-  const strip = ({ ids, total, extraGuests }: RoomOption & { rooms: number }): RoomOption => ({ ids, total, extraGuests });
+  const strip = ({ ids, total, extraGuests }: RoomOption & { rooms: number }): RoomOption => ({
+    ids,
+    total,
+    extraGuests,
+  });
   // Cheapest first; on a tie fewer rooms, then fewer extra guests.
-  const byValue = (x: (typeof feasible)[number], y: (typeof feasible)[number]) => x.total - y.total || x.rooms - y.rooms || x.extraGuests - y.extraGuests;
+  const byValue = (x: (typeof feasible)[number], y: (typeof feasible)[number]) =>
+    x.total - y.total || x.rooms - y.rooms || x.extraGuests - y.extraGuests;
   const best = [...feasible].sort(byValue)[0];
   const roomier = feasible.filter((o) => o.extraGuests < best.extraGuests).sort(byValue)[0];
   return { bestValue: strip(best), moreSpace: roomier ? strip(roomier) : null };
