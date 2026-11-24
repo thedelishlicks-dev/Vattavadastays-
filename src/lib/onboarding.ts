@@ -1,4 +1,5 @@
 import { waDigits } from "./phone";
+import { isSuperAdminEmail } from "./superadmin";
 /**
  * Pure logic for the superadmin Properties screen: renewal state, setup
  * checklist, "needs attention" reasons and filters. No React / Supabase here
@@ -300,14 +301,12 @@ export function validateSubdomain(sub: string, existing: string[]): string {
   return "";
 }
 
-const SUPERADMIN_EMAIL = "thedelishlicks@gmail.com";
-
 /** Returns an error message, or '' if the owner email is fine. */
 export function validateOwnerEmail(email: string): string {
   const e = email.trim().toLowerCase();
   if (!e) return "Owner email is required";
   if (e.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return "Enter a valid email address";
-  if (e === SUPERADMIN_EMAIL)
+  if (isSuperAdminEmail(e))
     return "That is the platform admin login. Use a separate email for the owner.";
   return "";
 }
