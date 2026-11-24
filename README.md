@@ -46,7 +46,6 @@ npm run dev
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_PROPERTY_SUBDOMAIN=bleafmudhouse
-VITE_SUPERADMIN_EMAIL=your_superadmin_email
 ```
 
 Open `http://localhost:5173`. To test a property locally, add `?slug=bleafmudhouse`.
