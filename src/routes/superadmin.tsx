@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { isSuperAdminEmail } from "@/lib/subdomain";
+import { isSuperAdminEmail } from "@/lib/superadmin";
 import { Shield, LogOut } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 

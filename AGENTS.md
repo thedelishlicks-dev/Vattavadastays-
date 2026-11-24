@@ -213,8 +213,9 @@ The frontend UI was built on Lovable. Do not redesign, restyle, or restructure e
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_PROPERTY_SUBDOMAIN=        # dev fallback
-VITE_SUPERADMIN_EMAIL=          # must match the superadmin email in HANDOVER §10 item 6
 ```
+
+The superadmin email is not an env var. The UI reads it from `src/lib/superadmin.ts`; the database and `invite-owner` keep their own copies as the security boundary. See `docs/superadmin-authorization.md`.
 
 Set in Vercel project settings. Never hardcode. Never commit `.env` files (`.env.example` is the template).
 

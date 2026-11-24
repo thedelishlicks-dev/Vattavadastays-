@@ -19,12 +19,3 @@ export function getSubdomain(): string {
   // Final fallback to env var
   return import.meta.env.VITE_PROPERTY_SUBDOMAIN ?? "bleafmudhouse";
 }
-
-/**
- * Returns true if the current user is the superadmin.
- * Called after auth is confirmed.
- */
-export function isSuperAdminEmail(email: string | undefined): boolean {
-  if (!email) return false;
-  return email === import.meta.env.VITE_SUPERADMIN_EMAIL;
-}

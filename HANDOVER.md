@@ -42,9 +42,9 @@ Owners collect money directly (UPI / bank / cash). stayidom never touches paymen
 - No `createServerFn`, no SSR, no `@supabase/ssr`. Business logic still runs in the browser or in Postgres triggers/RPCs.
 
 **Env vars:**
-- Vercel / local `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PROPERTY_SUBDOMAIN` (dev fallback), `VITE_SUPERADMIN_EMAIL` (used by `src/lib/subdomain.ts`).
+- Vercel / local `.env`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_PROPERTY_SUBDOMAIN` (dev fallback). `VITE_SUPERADMIN_EMAIL` was removed; it is no longer read.
 - Edge functions only: `ICAL_CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (optional, for background iCal sync), `WEATHER_USER_AGENT` (optional; the contact sent to MET Norway, rule 33).
-- The superadmin email is **also hard-coded** as `thedelishlicks@gmail.com` in `src/lib/onboarding.ts`, `supabase/functions/invite-owner/index.ts` and the database policies/triggers. §10 item 6.
+- The superadmin email lives in `src/lib/superadmin.ts` (UI), `supabase/functions/invite-owner/index.ts` and the database policies/triggers (the last two are the security boundary). `src/lib/superadmin.test.ts` fails if they disagree. See `docs/superadmin-authorization.md`, §10 item 6.
 
 **Commands:** `npm run dev` · `npm run build` (= `vite build` + `post-build`) · `npm run typecheck` (run **after** build) · `npm test` · `npm run check` · `npm run lint`.
 
@@ -279,7 +279,7 @@ Items marked **[verified]** were checked in the code. The build and typecheck co
 3. **[DONE 25 Oct 2026] Dead code:** `src/hooks/useBookingStatus.ts` has no importers and reads `bookings` directly. Delete it.
 4. **[DONE 25 Oct 2026] Test route in production:** `src/routes/test-booking.tsx` runs test bookings against the live database. Remove it, or gate it to `import.meta.env.DEV`.
 5. **[PARTLY DONE 25 Oct 2026] Unused `/setup` route** removed. **Still open:** drop the unused DB functions `get_invite_by_token`, `create_owner_auth_user`, `consume_invite_token` in the live project, after confirming nothing calls them.
-6. **[verified] Superadmin email in three places:** `VITE_SUPERADMIN_EMAIL` (`subdomain.ts`), hard-coded `thedelishlicks@gmail.com` (`onboarding.ts`, `invite-owner`, DB policies/triggers). They must agree. Put it in one place (e.g. a `superadmins` table) and make the env var match. README's sample value `admin@stayidom.in` does not match.
+6. **[DONE 24 Nov 2026] Superadmin email duplication.** App code has one definition (`src/lib/superadmin.ts`); `VITE_SUPERADMIN_EMAIL` removed. DB policies/triggers and `invite-owner` intentionally keep their own copy (security boundary, see `docs/superadmin-authorization.md`); a test guards against drift. **Still open (optional):** a `superadmins` table + `is_superadmin()` function to make the DB the single source.
 7. **[DONE 25 Oct 2026] Two lockfiles:** `bun.lockb` deleted; `package-lock.json` is the only lockfile.
 8. **`recharts` in `package.json`: not removed, not bundled.** Unused by the app and not in the build. Removing it needs `npm uninstall recharts`, which the current workflow can't run; leave it until a terminal is available.
 9. **[DONE 25 Oct 2026] Invite function location:** moved to `supabase/functions/invite-owner/`; the old `src/` copy was deleted.
