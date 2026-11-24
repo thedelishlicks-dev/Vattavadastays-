@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "./useAuth";
-import { isSuperAdminEmail } from "@/lib/subdomain";
+import { isSuperAdminEmail, resolveManagedSubdomain } from "@/lib/superadmin";
 import type { Property, Room } from "@/types/database";
 
 export type OwnerProperty = Property & { rooms: Room[] };
@@ -18,9 +18,11 @@ export const useOwnerProperty = () => {
     sessionStorage.setItem("adminPropertySubdomain", paramFromUrl);
   }
 
-  const propertySubdomain = isSuperAdmin
-    ? paramFromUrl || sessionStorage.getItem("adminPropertySubdomain") || ""
-    : "";
+  const propertySubdomain = resolveManagedSubdomain(
+    user?.email,
+    paramFromUrl,
+    isSuperAdmin ? sessionStorage.getItem("adminPropertySubdomain") : "",
+  );
 
   return useQuery<OwnerProperty>({
     queryKey: ["ownerProperty", user?.id, propertySubdomain],
