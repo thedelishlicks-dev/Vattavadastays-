@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { isSuperAdminEmail } from "@/lib/subdomain";
+import { isSuperAdminEmail } from "@/lib/superadmin";
 import { AdminLayout } from "@/admin/AdminLayout";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { LoadFailed } from "@/components/LoadFailed";
