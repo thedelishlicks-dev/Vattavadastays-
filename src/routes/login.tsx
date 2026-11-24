@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router"
 import { useState, useEffect } from "react";
 import { Leaf } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isSuperAdminEmail } from "@/lib/subdomain";
+import { postLoginPath } from "@/lib/superadmin";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -24,12 +24,7 @@ function LoginPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) return;
-      const userEmail = data.session.user?.email;
-      if (isSuperAdminEmail(userEmail)) {
-        navigate({ to: "/superadmin" });
-      } else {
-        navigate({ to: "/admin/dashboard" });
-      }
+      navigate({ to: postLoginPath(data.session.user?.email) });
     });
   }, [navigate]);
 
@@ -49,12 +44,7 @@ function LoginPage() {
       return;
     }
 
-    const userEmail = data.user?.email;
-    if (isSuperAdminEmail(userEmail)) {
-      navigate({ to: "/superadmin" });
-    } else {
-      navigate({ to: "/admin/dashboard" });
-    }
+    navigate({ to: postLoginPath(data.user?.email) });
   }
 
   return (
