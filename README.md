@@ -8,7 +8,7 @@ Built for patchy rural connectivity. The pilot is in **Vattavada**, a mountain v
 
 - **Guest booking site.** Mobile-first, lightweight. Seasonal and weekend pricing, server-checked price, booking reference (`#XXXXXXXX`) shown on confirmation and sent to the owner on WhatsApp.
 - **Guest page details first.** Property story, amenities, photo gallery with an Instagram link and live date, time and temperature range, then three booking steps; groups get automatic room options with real prices. Packages and add-ons are shown with a WhatsApp enquiry. See [docs/GUEST_PAGE.md](docs/GUEST_PAGE.md).
-- **Owner dashboard (`/admin`).** Rooms and seasonal rates, bookings, owner calendar (all-rooms and per-room), block dates, quotes, payments (part-payments, refund due), agents and commissions, settings, payment setup (UPI), policies, meals, add-ons.
+- **Owner dashboard (`/admin`).** Rooms and seasonal rates, bookings, owner calendar (all-rooms and per-room), block dates, quotes, payments (part-payments, refund due), agents and commissions, expenses, settings, payment setup (UPI), policies, meals, add-ons. Business insight: **Money Intelligence** (revenue, collected, outstanding, expenses, estimated operating profit, by booking source), a **Monthly Business Report**, a **Property Score** with recommendations, rule-based **Revenue Opportunities**, **Guest identity** (returning guests, by phone, per property) and in-app **Education** lessons (Learn → Do → Measure). "Collected" is not cash received in a period: there is no payment-date ledger (HANDOVER §16–§17).
 - **Superadmin (`/superadmin`).** Add properties, invite owners by email, setup checklist, renewal and billing notes, client error log, leads.
 - **WhatsApp, no API needed.** Deep links for booking notices, payment and directions reminders, and payment screenshots.
 - **UPI payments.** Direct `upi://` links to the owner's UPI ID. Money goes straight to the owner.
@@ -59,23 +59,27 @@ npm run build       # must pass; regenerates src/routeTree.gen.ts
 npm run typecheck   # run after build; expects 0 errors
 npm test            # unit tests (src/lib) and API tests (tests/api)
 npm run check       # behaviour checks (scripts/*.check.ts)
+npm run lint        # 0 errors expected (15 known warnings)
+bash supabase/tests/run.sh   # database migration + RLS tests; needs a local Postgres (PGHOST, PGUSER, PGPASSWORD)
 ```
+
+The build needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` set (placeholders are fine for a local build).
 
 CI (`.github/workflows/ci.yml`) runs all of the above plus migration tests against a throw-away Postgres.
 
 ## Project layout
 
 ```
-api/              Vercel Edge Functions (og, seo, manifest, ical, ical-sync)
+api/              Vercel Edge Functions (og, seo, manifest, ical, ical-sync, weather, directions)
 src/
   routes/         TanStack Router file routes
   components/     UI
   hooks/          TanStack Query hooks
-  lib/            Business logic (balance, pricing, calendar state, onboarding …) — pure and tested
+  lib/            Business logic (balance, pricing, calendar state, onboarding, moneySummary, businessMetrics, propertyScore, revenueIntelligence, guestIdentity, monthlyReport, education …) — pure and tested
   admin/          Admin shell and navigation (navConfig.ts)
-  content/        Owner Help text (ownerGuide.ts) — plain data, rendered by routes/help.tsx
-  supabase/functions/   Supabase Edge Function (invite-owner)
+  content/        Owner Help text (ownerGuide.ts) and Education lessons (educationLessons.ts) — plain data
 supabase/
+  functions/      Supabase Edge Function (invite-owner)
   baseline/       Live database snapshot (16 Oct 2026)
   migrations/     Changes since the baseline
   tests/          Migration and RLS tests
@@ -90,7 +94,8 @@ public/help/      Owner Help screenshots (720 px WebP, numbered)
 - **No heavy SDKs on the guest page.** No Google Maps JS SDK, no analytics or chat widgets. Maps are deep links.
 - **Config in `shared_amenities`.** Meals, policies, UPI, payment methods and theme are stored with a `__prefix:` sentinel to avoid schema churn. Writes go through `src/lib/propertyConfig.ts`.
 - **Security in the database.** Row-level security on every table; triggers prevent guest-side price tampering and double bookings; billing columns are owner-protected.
-- **Money in one place.** All balance, refund and advance maths lives in `src/lib/balance.ts`.
+- **Money in one place.** Per-booking balance, refund and advance maths lives in `src/lib/balance.ts`; period reporting (revenue, collected, outstanding, expenses, profit, by source) lives in `moneySummary.ts` and `businessMetrics.ts`. Collected is the booking's running total split by nights, **not** cash received in a period.
+- **A failed load is never shown as "nothing here"** (HANDOVER rule 36): no ₹0, zero bookings or empty list from a failed query.
 - **Pinned router.** Don't upgrade `@tanstack/react-router` from 1.166.7.
 - **`?property=` is read from `window.location.search`**, not TanStack `useSearch`.
 
@@ -102,7 +107,7 @@ public/help/      Owner Help screenshots (720 px WebP, numbered)
 4. Owner sets a password from the email and signs in at `stayidom.in/login`.
 5. Press **Activate** once the setup fee is paid.
 
-Supabase Auth needs Site URL `https://stayidom.in`, redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`, and a customised "Invite user" email. Details in `HANDOVER.md` §9.
+Supabase Auth needs Site URL `https://stayidom.in`, redirect URLs `https://stayidom.in/reset-password` and `https://*.stayidom.in/**`, and a customised "Invite user" email. Details in `HANDOVER.md` §14.
 
 ## Owner Help
 
@@ -111,7 +116,7 @@ Owners have a public guide at `/help` (also linked as **Help** in the dashboard 
 ## Documentation
 
 - [AGENTS.md](AGENTS.md) — rules for anyone (or any AI assistant) changing the code
-- [HANDOVER.md](HANDOVER.md) — current state, rules, known issues and what's left
+- [HANDOVER.md](HANDOVER.md) — current state, rules, product modules, auth, data/RLS, money definitions, limitations, known issues and what's left (v11.0, 25 Nov 2026)
 - [docs/GUEST_PAGE.md](docs/GUEST_PAGE.md) — how the guest page and booking flow work, migrations to run, how to test
 - [docs/OWNER_HELP.md](docs/OWNER_HELP.md) — the owner Help page: content format, screenshots, how to keep them current
 - [docs/CALENDAR_UI.md](docs/CALENDAR_UI.md) — the owner calendar: dots, day panel, stay bars, many-room mode

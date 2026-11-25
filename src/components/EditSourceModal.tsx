@@ -4,6 +4,7 @@ import { Modal, ModalActions, Button } from "@/components/ds";
 import { SourceDetailPicker } from "@/components/SourceDetailPicker";
 import { supabase } from "@/lib/supabase";
 import { friendlyDbError } from "@/lib/dbErrors";
+import { NOT_SAVED_MESSAGE, NotSavedError } from "@/lib/bookingActions";
 import { bookingSourceDetailLabel } from "@/lib/bookingSourceDetail";
 import { EDITABLE_SOURCES, buildSourcePatch, canChangeSource } from "@/lib/bookingSourceEdit";
 import { cn } from "@/lib/utils";
@@ -47,25 +48,33 @@ export function EditSourceModal({
     setError("");
     try {
       if (kind === "group") {
-        const { error: groupErr } = await supabase
+        // .select("id"): an expired login updates ZERO rows without any error; an empty answer is a failure.
+        const { data: groupRows, error: groupErr } = await supabase
           .from("booking_groups")
           .update(patch)
-          .eq("id", id);
+          .eq("id", id)
+          .select("id");
         if (groupErr) throw groupErr;
+        if (!groupRows || groupRows.length === 0) throw new NotSavedError();
         const { error: roomsErr } = await supabase
           .from("bookings")
           .update(patch)
           .eq("group_id", id);
         if (roomsErr) throw roomsErr;
       } else {
-        const { error: err } = await supabase.from("bookings").update(patch).eq("id", id);
+        const { data: rows, error: err } = await supabase
+          .from("bookings")
+          .update(patch)
+          .eq("id", id)
+          .select("id");
         if (err) throw err;
+        if (!rows || rows.length === 0) throw new NotSavedError();
       }
       queryClient.invalidateQueries({ queryKey: ["bookings"], exact: false });
       queryClient.invalidateQueries({ queryKey: ["bookingGroups"], exact: false });
       onSaved();
     } catch (e: unknown) {
-      setError(friendlyDbError(e, "Save failed"));
+      setError(e instanceof NotSavedError ? NOT_SAVED_MESSAGE : friendlyDbError(e, "Save failed"));
     } finally {
       setSaving(false);
     }

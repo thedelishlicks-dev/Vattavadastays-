@@ -687,7 +687,10 @@ function DashboardPage() {
 
       <AttentionSection rows={attentionRows} />
 
-      <RevenueOpportunities opportunities={revenueIntel.opportunities} />
+      <RevenueOpportunities
+        opportunities={revenueIntel.opportunities}
+        loadFailed={revenueIntel.loadFailed}
+      />
 
       <div className="bg-card border border-border/60 rounded-3xl p-4">
         <div className="text-xs  text-muted-foreground mb-3">Quick actions</div>
