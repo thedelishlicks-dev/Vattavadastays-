@@ -124,3 +124,45 @@ select b.id as booking_id, b.guest_phone
   from public.bookings b
  where b.guest_id is null
    and public.normalize_phone_key(b.guest_phone) is not null;
+
+-- 13. Pilot check: are the Nov-2026 migrations applied on THIS database? Read-only. Run before a pilot (the repo
+--     cannot tell which hand-run migrations are live). Migrations: 20261119000000_expenses.sql,
+--     20261119000100_booking_source_detail.sql, 20261121000000_guests.sql.
+--     Expect: every row has applied = true. A false row means run that migration (they are idempotent).
+select * from (
+  values
+    ('expenses table',                       to_regclass('public.expenses') is not null),
+    ('guests table',                         to_regclass('public.guests') is not null),
+    ('bookings.booking_source_detail',       exists (select 1 from information_schema.columns
+                                                      where table_schema = 'public' and table_name = 'bookings'
+                                                        and column_name = 'booking_source_detail')),
+    ('booking_groups.booking_source_detail', exists (select 1 from information_schema.columns
+                                                      where table_schema = 'public' and table_name = 'booking_groups'
+                                                        and column_name = 'booking_source_detail')),
+    ('bookings.guest_id',                    exists (select 1 from information_schema.columns
+                                                      where table_schema = 'public' and table_name = 'bookings'
+                                                        and column_name = 'guest_id')),
+    ('normalize_phone_key()',                to_regprocedure('public.normalize_phone_key(text)') is not null),
+    ('expenses row level security on',       coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.expenses')), false)),
+    ('guests row level security on',         coalesce((select relrowsecurity from pg_class where oid = to_regclass('public.guests')), false)),
+    ('expenses: no anon access',             to_regclass('public.expenses') is not null
+                                              and not has_table_privilege('anon', 'public.expenses', 'select')),
+    ('guests: no anon access',               to_regclass('public.guests') is not null
+                                              and not has_table_privilege('anon', 'public.guests', 'select'))
+) as t(item, applied);
+
+-- 14. Security: SECURITY DEFINER functions that the public (anon) role can execute. Read-only.
+--     Run after any DB change that adds a function (HANDOVER rule 17). Trigger functions are left out (they
+--     cannot be called through the API). Every row here must be a function that
+--     validates its caller itself (the guest booking / tracking-token lookups are the intended ones). Anything
+--     else is a hole: `revoke execute on function ... from public, anon;`.
+select n.nspname as schema,
+       p.proname as function,
+       pg_get_function_identity_arguments(p.oid) as args
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.prosecdef
+   and p.prorettype <> 'trigger'::regtype   -- trigger functions cannot be called through the API
+   and has_function_privilege('anon', p.oid, 'execute')
+ order by p.proname;

@@ -112,6 +112,7 @@ function AdminReport() {
           <RevenueOpportunities
             opportunities={opportunities}
             heading={OPPORTUNITIES_HEADING}
+            loadFailed={intel.loadFailed}
             note={opportunitiesNote(r.report)}
           />
 

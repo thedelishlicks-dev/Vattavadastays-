@@ -111,11 +111,18 @@ RLS enforces all security. Owners only see their own data because `auth.uid()` i
 ## File structure (current)
 
 ```
-api/                    ← Vercel Edge Functions: og, seo, manifest, ical, ical-sync, weather (+ api/_lib/)
+api/                    ← Vercel Edge Functions: og, seo, manifest, ical, ical-sync, weather, directions (+ api/_lib/)
 src/
   lib/
     supabase.ts         ← single supabase client instance
-    balance.ts          ← ALL money maths (computeBalance, advanceAmount, …)
+    balance.ts          ← per-booking money maths (computeBalance, advanceAmount, refundDue, …)
+    businessMetrics.ts  ← period revenue / collected / outstanding, split by nights (countsAsStay, dedupeStays)
+    moneySummary.ts     ← Money Overview: source groups, comparisons, estimated operating profit
+    monthlyReport.ts    ← Monthly Business Report (composes the above)
+    propertyScore.ts    ← 0–100 readiness score;  revenueIntelligence.ts ← rule-based opportunities
+    guestIdentity.ts, guestHistory.ts ← guest identity by normalised phone, per property
+    education.ts, educationDestinations.ts ← Education helpers; lessons are data in content/educationLessons.ts
+    expenses.ts, bookingSourceEdit.ts ← expense categories; source edit patch
     quoteBuilder.ts     ← priceRoomStay() — the one owner-side price calculator
     roomRates.ts        ← room price rules (pickRate): legacy room_rates AND unified seasons; mirrors SQL stay_room_price()
     calendarState.ts    ← owner Calendar labels (pure, tested)
@@ -160,6 +167,8 @@ Key tables (short form):
   - Statuses: `pending`, `confirmed`, `cancelled`, `completed`.
   - Exclusion constraint `bookings_no_overlap` blocks overlapping active stays.
 - `guests`: `id, property_id, name, phone, phone_key (generated), email`. One row per normalized phone per property (unique `(property_id, phone_key)`); never a cross-property directory. `bookings.guest_id` / `booking_groups.guest_id` are set by the `link_booking_guest` trigger (no usable phone = null). Owners read it through RLS; anon has no access. Stats come from `src/lib/guestIdentity.ts` (canonical revenue rules).
+- `expenses`: property-scoped owner-entered costs (`expense_date`, `category`, `amount`, payment method); RLS owner + superadmin, no anon.
+- `bookings.booking_source_detail` / `booking_groups.booking_source_detail`: nullable, ≤ 40 chars; guest bookings never set it.
 - `booking_groups`, `booking_charges`, `agents`, `quotes`, `leads`, `client_errors`, `room_ical_feeds`, `invite_tokens`: see baseline.
 
 ---
@@ -169,7 +178,7 @@ Key tables (short form):
 - Public can read active properties and rooms (no auth). Guests **cannot** read `bookings` — they use `availability`, `room_booked_ranges()` and the phone-lookup RPCs.
 - Anyone (anon) can insert a booking, but BEFORE INSERT triggers **re-price it and force `pending`/unpaid** (see Booking flow below).
 - Public can insert `leads` (rate-limited by trigger).
-- Owners manage only their own property's data (`owner_id = auth.uid()`).
+- Owners manage only their own property's data (`owner_id = auth.uid()`), including `guests` and `expenses` (anon has no access to either). The superadmin email has `superadmin_manage_*` policies.
 - Only the superadmin email can read `client_errors`.
 - Owners cannot change billing columns; a trigger enforces it.
 - The superadmin email can never be set as a property's owner (trigger).
@@ -320,6 +329,14 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 
 ---
 
+## Money, reporting and failure rules
+
+- **Collected is not cash received in a period.** There is no payment-date ledger. Never label a figure "cash", "cash in hand" or "cash received" unless it is one. Revenue, Collected and Outstanding are split by nights (`businessMetrics.ts`; HANDOVER §16).
+- **Past-month occupancy uses today's rooms** (no room-history snapshots). **Property Score and Opportunities are current state**, even inside a past month's report. Say so wherever they appear.
+- **Guest identity is by normalised phone, inside one property.** Never match by name; never look up a guest across properties.
+- **A failed query must be visible.** Use `LoadFailed` (or a disclosed partial state). Never turn an error into ₹0, zero bookings, an empty report or "no history". A write must prove it changed a row: ask for it back (`.select("id")`) and throw `NotSavedError` on an empty answer (an expired login updates zero rows without an error).
+- **Education is not Help.** Education (`/admin/education`) = business-improvement lessons, Learn → Do → Measure, progress per browser. Help (`/help`) = how to use the app.
+
 ## Owner Help must stay true
 
 - The owner Help guide (`src/content/ownerGuide.ts`, `/help`) quotes button and field names exactly. If you rename a button, move a screen or change a rule an owner follows (the 25 % advance, the hold, rate maths), **update the guide in the same change** and flag any screenshot in `public/help/` that is now wrong (`docs/OWNER_HELP.md`).
@@ -339,7 +356,7 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 
 ---
 
-## What is already done (as of 25 Oct 2026)
+## What is already done (as of 25 Nov 2026)
 
 - [x] Supabase schema, RLS, baseline snapshot (16 Oct 2026)
 - [x] Vercel deployment (Vite SPA) with Edge Functions for link previews, SEO and iCal
@@ -358,6 +375,9 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - [x] Tracking-link token (replace phone-only lookup). Revoke legacy phone lookups after 30 days.
 - [x] Security headers in `vercel.json` (no CSP yet)
 - [x] Guest page (3 Nov 2026): three-step flow with automatic room options, per-room guest limit, photo gallery and Instagram link, several photos per room, packages shown with a WhatsApp enquiry, live date/time/temperature, directions fix. See HANDOVER §9 and `docs/GUEST_PAGE.md`
+- [x] Money Intelligence, Expenses, Monthly Business Report, Property Score, Revenue Intelligence, Guest identity, Source editing, Education (Nov 2026; HANDOVER §13)
+- [x] CI includes `npm run lint`; DB tests include guests
+- [ ] Live-project check of the Nov migrations (`docs/DB_CHECKS.sql` 13) before a pilot
 - [ ] Landing page rewrite on `main`
 - [ ] Edit Stay date picker matches the app calendar (HANDOVER §10 item 21)
 - [ ] Plan-tier enforcement decision

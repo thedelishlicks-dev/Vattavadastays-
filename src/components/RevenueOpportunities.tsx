@@ -27,6 +27,7 @@ export function RevenueOpportunities({
   max = DASHBOARD_MAX_OPPORTUNITIES,
   heading = "Opportunities",
   note,
+  loadFailed = false,
 }: {
   /** All of them, in display order (from useRevenueIntelligence). */
   opportunities: RevenueOpportunity[];
@@ -35,10 +36,24 @@ export function RevenueOpportunities({
   heading?: string;
   /** One quiet line under the title. */
   note?: string;
+  /** Some data the rules need could not be loaded: say so instead of showing a shorter (or empty) list as if complete. */
+  loadFailed?: boolean;
 }) {
   const navigate = useNavigate();
   const [showAll, setShowAll] = useState(false);
-  if (opportunities.length === 0) return null;
+  const failedNote = loadFailed ? (
+    <p role="status" className="text-xs text-muted-foreground">
+      Some data couldn&rsquo;t load, so this list may be incomplete. Refresh to try again.
+    </p>
+  ) : null;
+  if (opportunities.length === 0) {
+    return failedNote ? (
+      <section aria-label="Opportunities" className="space-y-2">
+        <h2 className="text-base font-semibold">{heading}</h2>
+        {failedNote}
+      </section>
+    ) : null;
+  }
 
   // Keep a superadmin's ?property= on the destination, like the other Home sections do.
   const prop = new URLSearchParams(window.location.search).get("property");
@@ -51,6 +66,7 @@ export function RevenueOpportunities({
     <section aria-label="Opportunities" className="space-y-2">
       <h2 className="text-base font-semibold">{heading}</h2>
       {note && <p className="text-xs text-muted-foreground">{note}</p>}
+      {failedNote}
       <ul className="space-y-3">
         {visible.map((o) => {
           const Icon = ICONS[o.type];

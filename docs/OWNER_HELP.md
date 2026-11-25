@@ -86,6 +86,16 @@ All are 720 px wide WebP (about 30–50 KB), phone screenshots of the **demo pro
 
 ## 5. Keeping the guide true
 
+> **25 Nov 2026 pilot review (screenshots last retaken 13 Nov; checked against the code and, for `01` and `07`, against the images).**
+> *Text:* the guide's quoted labels were checked against the current screens (Record part payment, New payment, Mark fully paid, Correct collected amount, View … in the list →, Block dates, Add booking, Change source) and every `/help#…` anchor used by the app (`setup-settings`, `seasonal-rates`, and the Education `relatedHelp` ids) exists. The guide already says Money has Overview, Monthly report, Payments, Agents & Commissions and Expenses, and explains Change source and the guest box. No instruction was found to be wrong.
+> *Stale screenshots (the picture no longer matches the screen):*
+> - `01-home-needs-attention`: Home now also has a Property Score card, up to three Opportunities and a Business Snapshot, and the stats card changed. The annotated "Needs your attention" box still holds, so the steps are not misleading. Retake when convenient.
+> - `02-booking-record-payment` and `28-checkout-summary`: a booking's Overview now starts with a Guest box and has a Source line with **Change source**. Steps still hold.
+> - `07-add-booking`: there is now an optional chip row "How did this guest find you? (optional)" under Direct / Agent / Walk-in. Annotations ❶–❹ still point at the right things.
+> - `11-money-payments-summary`: Money now opens on **Overview**, not Payments, so a reader following the picture lands on a different tab. **Retake first.**
+> - Probably only cosmetic (a "Load 6 more months" bar and load-failure screens were added on Payments, Agents and Quotes): `12`, `13`, `22`, `34`. Not re-checked visually.
+> *Content gaps (new, not wrong):* no section for recording an expense, walking through the Monthly report, or reading Property Score and Opportunities; Education is not mentioned (Education is in-app business advice, Help is how to use the app; do not merge them). Screenshot debt is intentionally not cleared in one go: retake `11`, then `02`/`28`/`01`/`07`, when the pilot owners are onboarded.
+
 > **11 Nov 2026: every screenshot is now out of date.** The owner side got a new look (soft flat cards, round buttons, one dialog style, avatar list on Payments, flat Calendar, pill navigation; see HANDOVER §10 item 50). Names and steps in the text are still right (the one wording change: Payments now says **View … in the list →**), but retake all screenshots in one session on the demo property so the guide looks consistent. Order of value: Home, Booking, Payments, Calendar, Block dates, Rooms editor, Settings.
 
 > **13 Nov 2026 (batch 4): the last 5 screenshots retaken. No screenshot is in the old look now.** `01` (a pending request on Home), `02` (Confirm and Record advance payment), `04` (room editor: weekend multiplier, price preview, **Season prices** note), `21` (Convert quote to booking, guest name and phone pixelated), `26` (Charges tab). Caption changes: `04` now shows Weekend multiplier, Price preview and Season prices (Base price and Extra guest charge are just above, described in the table); `26` shows the catalog dropdown unopened, so the Option / People / Add to extras boxes are described in the caption, not shown. Possible later improvement: a `26` with an item chosen so those boxes show.
@@ -133,6 +143,7 @@ Not screenshot-verified in the guide: that the booking shows **Refund due** afte
 ## 7. Backlog
 
 - Fill `SUPPORT_CONTACT`.
+- Retake `11`, then `02`, `28`, `01`, `07` (see the 25 Nov note in §5). Add short sections for "Record an expense", "Read your Monthly report" and "What is Property Score" when pilot owners ask; point to Education from Help only if you want owners to find it.
 - Screenshots: Settings (location pair and pending hold field), the "Send WhatsApp reminder" picker (the guide has **no section on reminders yet**; add "Remind a guest"), an agent opened showing **Mark paid**, the Edit Stay overpaid warning on a fully paid booking, the seasonal rate form's price section (after the label fix), the Invoice tab.
 - Malayalam copy: the text is plain and short; the data file can be duplicated with a language switch. Screenshots stay English.
 - If the **seasons are unified** (`docs/SEASONS_UNIFICATION_PLAN.md`), rewrite `seasonal-rates`, `setup-addons` and `raise-prices` and retake `05`, `17`, `20`, `23`.
