@@ -22,7 +22,7 @@ const C = {
 const serif: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
 const LOGO_URL =
   "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/logo-transparent.png";
-const LOGO_BOX = { w: 132, h: 44, img: 156 } as const;
+const LOGO_BOX = { w: 136, h: 44, img: 126 } as const;
 const WHATSAPP_URL =
   "https://wa.me/?text=Hi%2C%20I%27d%20like%20a%20free%20Stayidom%20Property%20Audit";
 const ROOT_DESCRIPTION =
@@ -484,7 +484,7 @@ function Navbar({ onCta }: { onCta: () => void }) {
               <span style={{ color: C.amber }}>.in</span>
             </span>
           ) : (
-            // The logo file has large transparent margins (the wordmark fills ~20% of its height),
+            // The logo file has large transparent margins (the wordmark fills ~20% of its height but nearly all of its width),
             // so scale it up inside a fixed, clipped box. Tweak LOGO_BOX (w, h, img) to resize.
             <span
               style={{
