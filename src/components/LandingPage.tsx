@@ -22,6 +22,7 @@ const C = {
 const serif: React.CSSProperties = { fontFamily: "'Playfair Display', Georgia, serif" };
 const LOGO_URL =
   "https://vzzfqgqxnodlrvnaxpbw.supabase.co/storage/v1/object/public/hero-images/logo-transparent.png";
+const LOGO_BOX = { w: 132, h: 44, img: 156 } as const;
 const WHATSAPP_URL =
   "https://wa.me/?text=Hi%2C%20I%27d%20like%20a%20free%20Stayidom%20Property%20Audit";
 const ROOT_DESCRIPTION =
@@ -483,12 +484,32 @@ function Navbar({ onCta }: { onCta: () => void }) {
               <span style={{ color: C.amber }}>.in</span>
             </span>
           ) : (
-            <img
-              src={LOGO_URL}
-              alt="stayidom.in"
-              style={{ height: 36, width: "auto", display: "block" }}
-              onError={() => setLogoFailed(true)}
-            />
+            // The logo file has large transparent margins (the wordmark fills ~20% of its height),
+            // so scale it up inside a fixed, clipped box. Tweak LOGO_BOX (w, h, img) to resize.
+            <span
+              style={{
+                position: "relative",
+                display: "block",
+                width: LOGO_BOX.w,
+                height: LOGO_BOX.h,
+                overflow: "hidden",
+              }}
+            >
+              <img
+                src={LOGO_URL}
+                alt="stayidom.in"
+                onError={() => setLogoFailed(true)}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  top: "50%",
+                  width: LOGO_BOX.img,
+                  maxWidth: "none",
+                  height: "auto",
+                  transform: "translate(-50%, -50%)",
+                }}
+              />
+            </span>
           )}
         </a>
         <div className="hidden md:flex" style={{ gap: "1.75rem", fontSize: "0.9375rem" }}>
