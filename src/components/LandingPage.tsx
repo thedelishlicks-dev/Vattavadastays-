@@ -441,6 +441,7 @@ function AuditModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void 
 /* ---------- sections ---------- */
 
 function Navbar({ onCta }: { onCta: () => void }) {
+  const [logoFailed, setLogoFailed] = useState(false);
   return (
     <nav
       style={{
@@ -465,28 +466,30 @@ function Navbar({ onCta }: { onCta: () => void }) {
       >
         <a
           href="#"
+          aria-label="stayidom.in"
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
             textDecoration: "none",
             ...serif,
             fontSize: "1.375rem",
             fontWeight: 700,
           }}
         >
-          <img
-            src={LOGO_URL}
-            alt=""
-            width={32}
-            height={32}
-            onError={(e) => ((e.currentTarget as HTMLImageElement).style.display = "none")}
-          />
-          <span>
-            <span style={{ color: C.green }}>stay</span>
-            <span style={{ color: C.text }}>idom</span>
-            <span style={{ color: C.amber }}>.in</span>
-          </span>
+          {logoFailed ? (
+            <span>
+              <span style={{ color: C.green }}>stay</span>
+              <span style={{ color: C.text }}>idom</span>
+              <span style={{ color: C.amber }}>.in</span>
+            </span>
+          ) : (
+            <img
+              src={LOGO_URL}
+              alt="stayidom.in"
+              style={{ height: 36, width: "auto", display: "block" }}
+              onError={() => setLogoFailed(true)}
+            />
+          )}
         </a>
         <div className="hidden md:flex" style={{ gap: "1.75rem", fontSize: "0.9375rem" }}>
           {[
