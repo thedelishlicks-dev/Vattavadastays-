@@ -145,6 +145,10 @@ function reset() {
     },
     { id: F2, property_id: P2, room_id: R2, name: "Airbnb", url: "https://cal.example.com/f2.ics" },
   ];
+  db.properties = [
+    { id: P1, channel_sync_enabled: true },
+    { id: P2, channel_sync_enabled: true },
+  ];
   db.availability = [];
   db.bookings = [];
   for (const k of Object.keys(feedHosts)) delete feedHosts[k];
@@ -227,12 +231,17 @@ test("a broken link, an HTML page or a timeout changes NOTHING and records an er
   assert.equal(db.room_ical_feeds[0].last_status, "error");
 });
 
-test("an empty but valid calendar frees the nights (guest cancelled everything)", async () => {
+test("an empty but valid calendar frees the nights once it is confirmed (guest cancelled everything)", async () => {
   reset();
   await post({ room_id: R1 });
   feedHosts["cal.example.com"] = { body: "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n" };
-  const j = await (await post({ room_id: R1 })).json();
-  assert.equal(j.results[0].ok, true);
+  // First empty read is held (a flaky response must not free every night) …
+  const first = await (await post({ room_id: R1 })).json();
+  assert.equal(first.results[0].ok, true);
+  assert.equal(blocked().length, 3);
+  // … the next empty read confirms it.
+  const second = await (await post({ room_id: R1 })).json();
+  assert.equal(second.results[0].ok, true);
   assert.deepEqual(blocked(), []);
 });
 
@@ -287,4 +296,71 @@ test("scheduler (cron secret) syncs every property's feeds", async () => {
 
 test.after(() => {
   globalThis.fetch = realFetch;
+});
+
+// ── Safeguards added with the per-property switch ──────────────────────────────────────
+
+test("a feed pointing at the room's OWN export link is refused, and its nights are released", async () => {
+  reset();
+  await post({ room_id: R1 }); // legitimate sync first: D(10..12) blocked by the feed
+  db.availability.push({ room_id: R1, date: D(40), is_available: false, note: "Maintenance" });
+  db.room_ical_feeds.find((f) => f.id === F1)!.url =
+    `https://bleaf.stayidom.in/api/ical?room=${R1.toUpperCase()}`;
+  const j = await (await post({ room_id: R1 })).json();
+  assert.equal(j.results[0].ok, false);
+  assert.match(j.results[0].message, /own calendar link/);
+  assert.deepEqual(blocked(), [D(40)]); // loop artefacts gone, manual block untouched
+  assert.equal(db.room_ical_feeds.find((f) => f.id === F1)!.last_status, "error");
+});
+
+test("another room's export link is NOT treated as the room's own", async () => {
+  reset();
+  db.room_ical_feeds.find((f) => f.id === F1)!.url = `https://cal.example.com/api/ical?room=${R2}`;
+  const j = await (await post({ room_id: R1 })).json();
+  assert.equal(j.results[0].ok, true);
+  assert.deepEqual(blocked(), [D(10), D(11), D(12)]);
+});
+
+test("property switched OFF: owner gets 403 and nothing changes", async () => {
+  reset();
+  db.properties.find((p) => p.id === P1)!.channel_sync_enabled = false;
+  const res = await post({ room_id: R1 });
+  assert.equal(res.status, 403);
+  assert.deepEqual(blocked(), []);
+  assert.equal(db.room_ical_feeds.find((f) => f.id === F1)!.last_status, undefined);
+});
+
+test("scheduler skips switched-off properties but still syncs the others", async () => {
+  reset();
+  db.properties.find((p) => p.id === P1)!.channel_sync_enabled = false;
+  const res = await post({ all: true }, "cron-secret-123");
+  const j = await res.json();
+  assert.equal(res.status, 200);
+  assert.equal(j.results.length, 1);
+  assert.deepEqual(blocked(R1), []);
+  assert.deepEqual(blocked(R2), [D(10), D(11), D(12)]);
+});
+
+test("a sudden EMPTY calendar keeps the blocks once; a second empty read releases them", async () => {
+  reset();
+  await post({ room_id: R1 });
+  assert.equal(blocked().length, 3);
+  feedHosts["cal.example.com"] = { body: ics() }; // valid but empty calendar
+  const first = (await (await post({ room_id: R1 })).json()).results[0];
+  assert.equal(first.ok, true);
+  assert.match(first.message, /kept/);
+  assert.equal(blocked().length, 3);
+  assert.equal(db.room_ical_feeds.find((f) => f.id === F1)!.last_nights, 0);
+  await post({ room_id: R1 }); // still empty -> it is the truth
+  assert.deepEqual(blocked(), []);
+});
+
+test("an empty read followed by a normal read changes nothing", async () => {
+  reset();
+  await post({ room_id: R1 });
+  feedHosts["cal.example.com"] = { body: ics() };
+  await post({ room_id: R1 });
+  feedHosts["cal.example.com"] = { body: ics([D(10), D(13)]) };
+  await post({ room_id: R1 });
+  assert.deepEqual(blocked(), [D(10), D(11), D(12)]);
 });
