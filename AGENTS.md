@@ -381,7 +381,7 @@ The superadmin login is never a property owner (trigger). The `/setup` route is 
 - [ ] Landing page rewrite on `main`
 - [ ] Edit Stay date picker matches the app calendar (HANDOVER §10 item 21)
 - [ ] Plan-tier enforcement decision
-- [ ] Channel sync (iCal import) — built, switched off (`CHANNEL_SYNC_ENABLED`)
+- [ ] Channel sync (iCal import) — built; off per property (`properties.channel_sync_enabled`, master `CHANNEL_SYNC_ENABLED`)
 - [ ] Agent self-service, WhatsApp Business API, billing, central listing
 
 ## UI building blocks (src/components/ds)
