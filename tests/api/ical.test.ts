@@ -7,6 +7,10 @@ import {
   normalizeFeedUrl,
   looksLikeIcs,
   unfold,
+  exportLinkRoomId,
+  isOwnExportUrl,
+  noteBelongsToFeed,
+  exportNights,
 } from "../../api/_lib/ical";
 
 const FROM = "2026-10-01",
@@ -128,4 +132,61 @@ test("normalizeFeedUrl: https/webcal only, no private or odd targets", () => {
   ]) {
     assert.equal(normalizeFeedUrl(bad).ok, false, bad);
   }
+});
+
+// ── Own-link guard and export filtering ─────────────────────────────────────────────────
+const ROOM = "11111111-1111-4111-8111-111111111111";
+const OTHER = "22222222-2222-4222-8222-222222222222";
+const FEED_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const FEED_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+
+test("isOwnExportUrl: the room's own link in every shape people paste it", () => {
+  for (const u of [
+    `https://stayidom.in/api/ical?room=${ROOM}`,
+    `https://bleaf.stayidom.in/api/ical?room=${ROOM}`,
+    `https://my-preview.vercel.app/api/ical?room=${ROOM}&x=1`,
+    `webcal://stayidom.in/api/ical?room=${ROOM}`,
+    `https://stayidom.in/api/ical?room=${ROOM.toUpperCase()}`,
+    `https://stayidom.in/api/ical?room=${ROOM}.ics`,
+    `https://stayidom.in/api/ical/?room=${ROOM}`,
+    `  https://stayidom.in/api/ical?room=${ROOM}  `,
+  ])
+    assert.equal(isOwnExportUrl(u, ROOM), true, u);
+});
+
+test("isOwnExportUrl: other rooms, other paths and junk are not 'own'", () => {
+  for (const u of [
+    `https://stayidom.in/api/ical?room=${OTHER}`,
+    `https://admin.booking.com/export.ics?room=${ROOM}`,
+    `https://stayidom.in/api/ical`,
+    `https://stayidom.in/api/ical-sync?room=${ROOM}`,
+    `not a link`,
+    ``,
+  ])
+    assert.equal(isOwnExportUrl(u, ROOM), false, u);
+  assert.equal(exportLinkRoomId(`https://x.example/api/ical?room=${OTHER}`), OTHER);
+  assert.equal(exportLinkRoomId(`https://x.example/other?room=${OTHER}`), null);
+});
+
+test("noteBelongsToFeed matches exactly one feed's notes", () => {
+  assert.equal(noteBelongsToFeed(`ical:${FEED_A}:Booking.com`, FEED_A), true);
+  assert.equal(noteBelongsToFeed(`ical:${FEED_A}`, FEED_A), true);
+  assert.equal(noteBelongsToFeed(`ical:${FEED_B}:Airbnb`, FEED_A), false);
+  assert.equal(noteBelongsToFeed(`ical:${FEED_A}x`, FEED_A), false);
+  assert.equal(noteBelongsToFeed("Maintenance", FEED_A), false);
+  assert.equal(noteBelongsToFeed(null, FEED_A), false);
+});
+
+test("exportNights: default link = only our own nights; per-site link = also the OTHER sites' nights", () => {
+  const rows = [
+    { date: "2026-12-01", note: null }, // our booking
+    { date: "2026-12-02", note: "Maintenance" }, // manual block
+    { date: "2026-12-03", note: `ical:${FEED_A}:Booking.com` },
+    { date: "2026-12-04", note: `ical:${FEED_B}:Airbnb` },
+  ];
+  assert.deepEqual(exportNights(rows), ["2026-12-01", "2026-12-02"]);
+  // The link for Booking.com (feed A): everything except Booking.com's own nights.
+  assert.deepEqual(exportNights(rows, FEED_A), ["2026-12-01", "2026-12-02", "2026-12-04"]);
+  // The link for Airbnb (feed B): everything except Airbnb's own nights.
+  assert.deepEqual(exportNights(rows, FEED_B), ["2026-12-01", "2026-12-02", "2026-12-03"]);
 });
