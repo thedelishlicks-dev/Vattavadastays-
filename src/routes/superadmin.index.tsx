@@ -931,6 +931,30 @@ function PropertyDetails({
             placeholder="Payment promises, special terms, follow-ups…"
           />
         </div>
+        <label className="flex items-start gap-2 rounded-xl border border-border p-2.5 text-xs cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={p.channel_sync_enabled === true}
+            disabled={isPending}
+            onChange={(e) =>
+              updateSubscription(
+                { propertyId: p.id, channel_sync_enabled: e.target.checked },
+                {
+                  onError: (err) =>
+                    setFormError(err instanceof Error ? err.message : "Could not save"),
+                },
+              )
+            }
+          />
+          <span>
+            <span className="font-medium">Sync with other sites (Booking.com, Airbnb…)</span>
+            <span className="block text-[11px] text-muted-foreground">
+              Turn on only when this owner also sells on those sites. Shows the “Sync with other
+              sites” button on their Calendar. Steps: docs/PARKED_FEATURES.md.
+            </span>
+          </span>
+        </label>
         {formError && <p className="text-xs text-destructive">{formError}</p>}
         <button
           onClick={saveBilling}
