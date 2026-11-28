@@ -120,7 +120,7 @@
 ### 4.6 Channel sync with other booking sites (iCal) — parked ⏸
 
 - ✅ Export: each room publishes its occupied nights as an iCal feed (`/api/ical?room=`), with no guest data.
-- ⏸ Import: owners paste Booking.com, Airbnb, Agoda or MakeMyTrip links; nights are blocked. Built and tested, switched off because owners currently take bookings by Instagram and phone.
+- ⏸ Import: owners paste Booking.com, Airbnb, Agoda or MakeMyTrip links; nights are blocked. Built and tested; off for every property by default because owners currently take bookings by Instagram and phone. The platform admin switches it on per property.
 - Turn on when owners in Munnar, Alleppey or Varkala also list on other sites. Steps in `docs/PARKED_FEATURES.md`.
 
 ### 4.7 Superadmin
@@ -267,7 +267,7 @@ All items done: `property_id` on every table, dynamic subdomain, superadmin invi
 - ✅ CI with build, typecheck, tests, migration tests
 - ✅ Guest page rebuilt details-first with a three-step booking flow, gallery and Instagram link, room photos, per-room guest limit, packages enquiry, live hero info (3 Nov 2026)
 - ⬜ Owner onboarding checklist for the guest page (photos, Instagram, location) — next suggested step
-- ⏸ Channel sync (iCal import) — built, switched off
+- ⏸ Channel sync (iCal import) — built; off per property until the platform admin switches it on
 
 ---
 
