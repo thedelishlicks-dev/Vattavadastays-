@@ -13,7 +13,7 @@ Built for patchy rural connectivity. The pilot is in **Vattavada**, a mountain v
 - **WhatsApp, no API needed.** Deep links for booking notices, payment and directions reminders, and payment screenshots.
 - **UPI payments.** Direct `upi://` links to the owner's UPI ID. Money goes straight to the owner.
 - **Link previews, SEO.** Per-property title, photo and JSON-LD for WhatsApp, Instagram and Google; per-host `robots.txt` and `sitemap.xml`.
-- **Channel sync (iCal)** — export works; import is built but switched off (`src/lib/features.ts`).
+- **Channel sync (iCal)** — built; off for every property until the platform admin ticks "Sync with other sites" in Superadmin → Manage (`docs/PARKED_FEATURES.md`).
 
 ## Tech stack
 
