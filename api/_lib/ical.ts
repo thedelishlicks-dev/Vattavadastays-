@@ -242,3 +242,74 @@ export function normalizeFeedUrl(
   if (blockedName || ipv4 || ipv6) return { ok: false, error: "That address can't be used." };
   return { ok: true, url: u.toString() };
 }
+
+// ── Own-link guard + export filtering (loop protection) ─────────────────────
+
+/** Calendar notes written by a sync read "ical:<feed id>:<name>" (keep in step with api/ical-sync.ts). */
+export const ICAL_NOTE_PREFIX = "ical:";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (s: string): boolean => UUID_RE.test(s);
+
+/**
+ * If `input` is one of OUR export links (`…/api/ical?room=<id>`, on ANY host — the
+ * main domain, a property subdomain, a Vercel preview, webcal://), return the room
+ * id it publishes, otherwise null. Never throws.
+ */
+export function exportLinkRoomId(input: string): string | null {
+  let raw = (input ?? "").trim();
+  if (/^webcal:\/\//i.test(raw)) raw = "https://" + raw.slice("webcal://".length);
+  let u: URL;
+  try {
+    u = new URL(raw);
+  } catch {
+    return null;
+  }
+  const path = u.pathname.toLowerCase().replace(/\/+$/, "");
+  if (!/^\/api\/ical(\.ics|\.ts)?$/.test(path)) return null;
+  const room = (u.searchParams.get("room") ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\.ics$/, "");
+  return isUuid(room) ? room : null;
+}
+
+/**
+ * True when `input` is the room's OWN export link. Importing it would make the
+ * room block itself and keep those nights blocked forever (a sync loop), so the
+ * app and the server both refuse it.
+ */
+export function isOwnExportUrl(input: string, roomId: string): boolean {
+  const room = exportLinkRoomId(input);
+  return !!room && room === (roomId ?? "").trim().toLowerCase();
+}
+
+/** Is this availability note one written by a channel sync (any feed)? */
+export const isSyncNote = (note: string | null | undefined): boolean =>
+  !!note && note.startsWith(ICAL_NOTE_PREFIX);
+
+/** Does this note belong to feed `feedId`? ("ical:<feedId>" or "ical:<feedId>:<name>") */
+export function noteBelongsToFeed(note: string | null | undefined, feedId: string): boolean {
+  if (!note) return false;
+  const marker = `${ICAL_NOTE_PREFIX}${feedId}`;
+  return note === marker || note.startsWith(marker + ":");
+}
+
+/**
+ * Which blocked nights an export publishes.
+ *  - default (no `forFeedId`): ONLY nights we own — our bookings and manual blocks.
+ *    Nights imported from other sites are left out, so no site is ever handed back
+ *    what it told us (some sites re-publish imported calendars; that would keep a
+ *    cancelled night blocked forever).
+ *  - `forFeedId`: our own nights PLUS nights imported from the room's OTHER sites,
+ *    minus the ones that came from that site itself. This is the link to give that
+ *    site: it closes nights sold anywhere else, without an echo of its own nights.
+ */
+export function exportNights(
+  rows: { date: string; note?: string | null }[],
+  forFeedId?: string,
+): string[] {
+  const keep = (n: string | null | undefined) =>
+    forFeedId ? !noteBelongsToFeed(n, forFeedId) : !isSyncNote(n);
+  return rows.filter((r) => keep(r.note)).map((r) => String(r.date).slice(0, 10));
+}
