@@ -32,7 +32,7 @@ commission, `source='direct'`, capped hold. Owner inserts, SQL editor, service r
 Migration pre-flight refuses to install if a column it writes is missing.
 
 ## 4. Calendar sync (iCal) — PARKED
-Built and tested, switched off with `CHANNEL_SYNC_ENABLED = false` in `src/lib/features.ts`. See `docs/PARKED_FEATURES.md`.
+Built and tested, off for every property until switched on per property in Superadmin (`properties.channel_sync_enabled`). See `docs/PARKED_FEATURES.md`.
 
 ## 5. CI and database baseline
 - `.github/workflows/ci.yml` runs on every pull request and push to `main` / `Dev`: build, type check, unit tests, behaviour
