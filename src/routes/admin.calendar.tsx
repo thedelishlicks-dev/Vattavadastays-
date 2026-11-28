@@ -20,7 +20,7 @@ import { BlockDatesModal } from "@/components/BlockDatesModal";
 import { ChannelSyncModal } from "@/components/ChannelSyncModal";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
 import { friendlyNote, isIcalNote } from "@/lib/icalClient";
-import { CHANNEL_SYNC_ENABLED } from "@/lib/features";
+import { channelSyncOn } from "@/lib/features";
 import {
   buildCalendarIndex,
   stateOf as stateOfIdx,
@@ -515,7 +515,7 @@ function AdminCalendar() {
   const [viewDate, setViewDate] = useState(new Date());
   const [showBlock, setShowBlock] = useState(false);
   const [showSync, setShowSync] = useState(false);
-  useIcalAutoSync(property?.id);
+  useIcalAutoSync(property?.id, channelSyncOn(property));
   const [reopen, setReopen] = useState<{
     roomId: string;
     roomName: string;
@@ -741,7 +741,7 @@ function AdminCalendar() {
           <h1 className="text-[28px] leading-tight font-bold tracking-tight">Calendar</h1>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          {CHANNEL_SYNC_ENABLED && (
+          {channelSyncOn(property) && (
             <Button
               variant="soft"
               size="sm"
@@ -1216,7 +1216,7 @@ function AdminCalendar() {
         />
       )}
 
-      {CHANNEL_SYNC_ENABLED && showSync && property && (
+      {channelSyncOn(property) && showSync && property && (
         <ChannelSyncModal
           propertyId={property.id}
           rooms={activeRooms}
