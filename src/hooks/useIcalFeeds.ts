@@ -20,10 +20,11 @@ export interface IcalFeed {
 export const icalFeedsKey = (propertyId: string | undefined) =>
   ["icalFeeds", propertyId ?? ""] as const;
 
-export function useIcalFeeds(propertyId: string | undefined) {
+/** `enabled` = this property has channel sync switched on (see channelSyncOn). Off = no queries at all. */
+export function useIcalFeeds(propertyId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: icalFeedsKey(propertyId),
-    enabled: !!propertyId && CHANNEL_SYNC_ENABLED,
+    enabled: !!propertyId && CHANNEL_SYNC_ENABLED && enabled,
     staleTime: 30_000,
     retry: 1,
     queryFn: async (): Promise<IcalFeed[]> => {
@@ -63,11 +64,11 @@ let lastAutoSyncAt = 0;
  * per browser tab. (A pg_cron job can do this in the background too — see
  * the comment at the bottom of the room_ical_feeds migration.)
  */
-export function useIcalAutoSync(propertyId: string | undefined) {
+export function useIcalAutoSync(propertyId: string | undefined, enabled = false) {
   const qc = useQueryClient();
-  const { data: feeds } = useIcalFeeds(propertyId);
+  const { data: feeds } = useIcalFeeds(propertyId, enabled);
   useEffect(() => {
-    if (!propertyId || !feeds || feeds.length === 0) return;
+    if (!enabled || !propertyId || !feeds || feeds.length === 0) return;
     const now = Date.now();
     if (now - lastAutoSyncAt < AUTO_SYNC_AFTER_MS) return;
     const stale = feeds.some(
@@ -83,5 +84,5 @@ export function useIcalAutoSync(propertyId: string | undefined) {
       .catch(() => {
         /* silent: the manual "Sync now" shows errors */
       });
-  }, [propertyId, feeds, qc]);
+  }, [enabled, propertyId, feeds, qc]);
 }
