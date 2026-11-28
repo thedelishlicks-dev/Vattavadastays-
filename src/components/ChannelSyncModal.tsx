@@ -18,7 +18,7 @@ import {
   useIcalFeeds,
   type IcalFeed,
 } from "@/hooks/useIcalFeeds";
-import { normalizeFeedUrl } from "../../api/_lib/ical";
+import { isOwnExportUrl, normalizeFeedUrl } from "../../api/_lib/ical";
 
 const SITES = [
   "Booking.com",
@@ -45,7 +45,7 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
   const [busy, setBusy] = useState<"add" | "sync" | string | null>(null);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState("");
 
   const roomFeeds = feeds.filter((f) => f.room_id === roomId);
   const exportUrl = roomId ? exportFeedUrl(window.location.origin, roomId) : "";
@@ -55,11 +55,11 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
     qc.invalidateQueries({ queryKey: icalFeedsKey(propertyId) });
   };
 
-  const copy = async () => {
+  const copy = async (text: string, key: string) => {
     try {
-      await navigator.clipboard.writeText(exportUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(""), 1500);
     } catch {
       setError("Couldn't copy automatically — long-press the link to copy it.");
     }
@@ -88,6 +88,13 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
     const check = normalizeFeedUrl(url);
     if (!check.ok) {
       setError(check.error);
+      return;
+    }
+    // Our own link pasted back in: the room would block itself and never free those nights.
+    if (isOwnExportUrl(check.url, roomId)) {
+      setError(
+        "That is this room’s own link (the one in step 1). Paste the calendar link from the OTHER site here — Booking.com, Airbnb…",
+      );
       return;
     }
     setBusy("add");
@@ -183,7 +190,9 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
         <h3 className="text-sm font-semibold">1 · Tell other sites what you’ve sold</h3>
         <p className="text-xs text-muted-foreground">
           Copy this link and paste it into <em>Import calendar</em> on Booking.com / Airbnb / Agoda
-          / MakeMyTrip for this room. It shows only “Reserved” dates — no guest details.
+          / MakeMyTrip for this room. It shows only “Reserved” dates — no guest details. Once you
+          add a site in step 2, use the link shown under it instead: it also closes nights sold on
+          your other sites.
         </p>
         <div className="flex gap-2">
           <input
@@ -194,15 +203,15 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
           />
           <button
             type="button"
-            onClick={copy}
+            onClick={() => copy(exportUrl, "room")}
             className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-muted px-4 text-sm font-medium hover:bg-muted/70"
           >
-            {copied ? (
+            {copied === "room" ? (
               <CheckCircle2 className="h-4 w-4 text-green-600" />
             ) : (
               <Copy className="h-4 w-4" />
             )}
-            {copied ? "Copied" : "Copy"}
+            {copied === "room" ? "Copied" : "Copy"}
           </button>
         </div>
       </section>
@@ -260,6 +269,32 @@ export function ChannelSyncModal({ propertyId, rooms, onClose }: Props) {
                 Last checked {formatDistanceToNow(new Date(f.last_synced_at), { addSuffix: true })}
               </p>
             )}
+            <div className="pt-1.5 space-y-1">
+              <p className="text-[11px] text-muted-foreground">
+                Give <strong>{f.name}</strong> this link (not the one in step 1) — it also closes
+                nights sold on your other sites:
+              </p>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={exportFeedUrl(window.location.origin, f.room_id, f.id)}
+                  className={`${fieldCls} text-[11px]`}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <button
+                  type="button"
+                  onClick={() => copy(exportFeedUrl(window.location.origin, f.room_id, f.id), f.id)}
+                  className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-background px-3 text-xs font-medium hover:bg-background/70"
+                >
+                  {copied === f.id ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5" />
+                  )}
+                  {copied === f.id ? "Copied" : "Copy"}
+                </button>
+              </div>
+            </div>
           </div>
         ))}
 
