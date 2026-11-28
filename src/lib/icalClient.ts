@@ -17,9 +17,14 @@ export function friendlyNote(note: string | null | undefined): string | null {
   return name ? `Synced from ${name}` : "Synced from another site";
 }
 
-/** The link a room shares with Booking.com / Airbnb / etc. to import its availability. */
-export function exportFeedUrl(origin: string, roomId: string): string {
-  return `${origin}/api/ical?room=${roomId}`;
+/**
+ * The link a room shares with Booking.com / Airbnb / etc. to import its availability.
+ * Without `forFeedId`: only what we sold ourselves. With the id of a saved calendar link of
+ * that site: also what the room's OTHER sites sold, but never that site's own nights back.
+ */
+export function exportFeedUrl(origin: string, roomId: string, forFeedId?: string): string {
+  const base = `${origin}/api/ical?room=${roomId}`;
+  return forFeedId ? `${base}&for=${forFeedId}` : base;
 }
 
 export interface SyncResult {
