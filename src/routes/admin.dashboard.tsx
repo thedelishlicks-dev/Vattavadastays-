@@ -20,6 +20,7 @@ import { StatusPill } from "@/admin/components";
 import { useOwnerProperty } from "@/hooks/useOwnerProperty";
 import { LoadFailed } from "@/components/LoadFailed";
 import { useIcalAutoSync } from "@/hooks/useIcalFeeds";
+import { channelSyncOn } from "@/lib/features";
 import { useBookings, useBookingGroups, useBookingTotal } from "@/hooks/useBookings";
 import { useMemo, useState } from "react";
 import { BlockDatesModal } from "@/components/BlockDatesModal";
@@ -492,7 +493,7 @@ const NO_EXPENSES: never[] = [];
 
 function DashboardPage() {
   const { data: property, isLoading: propLoading } = useOwnerProperty();
-  useIcalAutoSync(property?.id);
+  useIcalAutoSync(property?.id, channelSyncOn(property));
   // Every figure on this screen is "this month", "upcoming" or "today", so it
   // only needs bookings from the start of last month onward — not the whole
   // history. "Total bookings" comes from a count-only request instead.
