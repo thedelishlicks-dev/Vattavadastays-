@@ -137,6 +137,7 @@ do $$ begin
 end $$;
 
 -- 9. room_ical_feeds: owner-only, https only ----------------------------------------------
+update properties set channel_sync_enabled = true where id = :'A1';  -- feeds need the per-property switch (20261122000000)
 insert into room_ical_feeds (property_id, room_id, name, url) values (:'A1', :'C1', 'Booking.com', 'https://admin.booking.com/x.ics?s=secret');
 do $$ declare n int; begin
   perform set_config('request.jwt.claim.role', 'anon', true); perform set_config('request.jwt.claim.sub', '', true);
