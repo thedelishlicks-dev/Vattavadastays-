@@ -27,6 +27,8 @@ export type PropertyRow = {
   shared_amenities: string[] | null;
   hero_image: string | null;
   created_at: string;
+  /** Show "Sync with other sites" (iCal) for this property. Platform admin only. */
+  channel_sync_enabled?: boolean;
 };
 
 /** Fetch all properties — superadmin only */
@@ -95,6 +97,7 @@ export function useUpdateSubscription() {
       monthly_fee?: number;
       setup_fee_amount?: number;
       billing_notes?: string | null;
+      channel_sync_enabled?: boolean;
     }) => {
       // .select('id'): ask for the changed row back. If the login has expired the database changes
       // NOTHING and reports no error — an empty answer must count as a failure, not a success.
