@@ -17,12 +17,24 @@
  *    Bookings and manual blocks are never touched or overwritten.
  *  - A failed or non-iCal response is an ERROR, never "calendar is empty":
  *    existing blocks are kept so a flaky link can't suddenly free every night.
+ *  - A feed that points back at the room's OWN export link is refused (it would make
+ *    the room block itself forever); nights it already created are released.
+ *  - A feed that suddenly comes back EMPTY after having nights is not trusted at once:
+ *    blocks are kept and only released if the next check is empty too.
+ *  - Only runs for properties the platform admin has switched channel sync ON for
+ *    (properties.channel_sync_enabled) — the scheduler skips every other property.
  *  - Nights that overlap one of the owner's OWN bookings are reported
  *    (last_conflicts) — that is a real double-booking to resolve by hand.
  *  - URLs are checked (https only, no IPs/localhost), redirects are followed
  *    manually with the same check, size and time are capped.
  */
-import { parseIcsNights, looksLikeIcs, normalizeFeedUrl, addDays } from "./_lib/ical";
+import {
+  parseIcsNights,
+  looksLikeIcs,
+  normalizeFeedUrl,
+  isOwnExportUrl,
+  addDays,
+} from "./_lib/ical";
 
 export const config = { runtime: "edge" };
 
@@ -42,6 +54,7 @@ interface Feed {
   room_id: string;
   name: string;
   url: string;
+  last_nights: number | null;
 }
 interface Creds {
   apikey: string;
@@ -138,6 +151,17 @@ async function syncOne(feed: Feed, c: Creds): Promise<Result> {
     }).catch(() => null);
 
   try {
+    // 0. Our own export link? Refuse — and release any nights it already created.
+    if (isOwnExportUrl(feed.url, feed.room_id)) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/availability?room_id=eq.${feed.room_id}&note=like.${encodeURIComponent(marker + "*")}`,
+        { method: "DELETE", headers: rest(c, { Prefer: "return=minimal" }) },
+      ).catch(() => null);
+      throw new Error(
+        "That is this room's own calendar link. Paste the link from the OTHER site (Booking.com, Airbnb…) here instead — and give this room's link to them.",
+      );
+    }
+
     // 1. Fetch + parse. Any failure here changes NOTHING in availability.
     const body = await fetchFeedText(feed.url);
     if (!looksLikeIcs(body))
@@ -191,6 +215,22 @@ async function syncOne(feed: Feed, c: Creds): Promise<Result> {
       }
     }
     const conflicts = [...desired].filter((d) => ownBookingNights.has(d)).length;
+
+    // 2b. Sudden empty calendar: a flaky response must not free every night at once.
+    //     Keep the blocks; `last_nights = 0` records that the last read was empty, so a
+    //     second empty read (which then really is the truth) releases them.
+    if (desired.size === 0 && ownBlocked.size > 0 && (feed.last_nights ?? 0) > 0) {
+      const message =
+        "The other site sent an empty calendar. Your current blocks were kept; they are released at the next check if it is still empty.";
+      await patch({
+        last_synced_at: new Date().toISOString(),
+        last_status: "ok",
+        last_message: message,
+        last_nights: 0,
+        last_conflicts: 0,
+      });
+      return { ...base, ok: true, message, nights: 0, conflicts: 0, added: 0, removed: 0 };
+    }
 
     // 3. Reconcile.
     const toRemove = [...own].filter((d) => !desired.has(d));
@@ -295,13 +335,29 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/room_ical_feeds?${filters.join("&")}&select=id,property_id,room_id,name,url&order=created_at.asc&limit=${MAX_FEEDS_PER_CALL}`,
+      `${SUPABASE_URL}/rest/v1/room_ical_feeds?${filters.join("&")}&select=id,property_id,room_id,name,url,last_nights&order=created_at.asc&limit=${MAX_FEEDS_PER_CALL}`,
       { headers: rest(creds) },
     );
     if (res.status === 401 || res.status === 403)
       return json({ error: "Sign in again and retry." }, 401);
     if (!res.ok) return json({ error: "Could not load your calendar links." }, 502);
-    const feeds = (await res.json()) as Feed[];
+    const allFeeds = (await res.json()) as Feed[];
+
+    // Only properties the platform admin switched channel sync ON for.
+    const propertyIds = [...new Set(allFeeds.map((f) => f.property_id))];
+    const enabled = new Set<string>();
+    if (propertyIds.length > 0) {
+      const pr = await fetch(
+        `${SUPABASE_URL}/rest/v1/properties?id=in.(${propertyIds.join(",")})&select=id,channel_sync_enabled`,
+        { headers: rest(creds) },
+      );
+      if (!pr.ok) return json({ error: "Could not check your property settings." }, 502);
+      for (const p of (await pr.json()) as { id: string; channel_sync_enabled: boolean | null }[])
+        if (p.channel_sync_enabled === true) enabled.add(p.id);
+    }
+    const feeds = allFeeds.filter((f) => enabled.has(f.property_id));
+    if (!isCron && allFeeds.length > 0 && feeds.length === 0)
+      return json({ error: "Syncing with other sites isn't switched on for your property." }, 403);
 
     // Sequential: keeps memory/time bounded on the Edge runtime and is gentle on the other sites.
     const results: Result[] = [];
