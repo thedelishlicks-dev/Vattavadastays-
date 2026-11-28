@@ -1,5 +1,5 @@
 /**
- * /api/ical?room=<room id> — Vercel Edge Function
+ * /api/ical?room=<room id>[&for=<feed id>] — Vercel Edge Function
  *
  * Public iCal feed of ONE room's occupied nights, for Booking.com / Airbnb /
  * Agoda / MakeMyTrip / Google Calendar to import ("Import calendar" in those
@@ -7,16 +7,19 @@
  * database already keeps in step with every booking and manual block, so the
  * feed contains no guest names, phones or amounts — every event is "Reserved".
  *
+ * By default the feed carries only nights WE own (our bookings and manual blocks),
+ * never nights imported from other sites — see exportNights() in _lib/ical.ts for why,
+ * and for what `for=<feed id>` adds.
+ *
  * Works on the anon key (no service role needed). The room id is a random
  * UUID; it is already public in the guest page's room data.
  */
-import { buildIcs, addDays } from "./_lib/ical";
+import { buildIcs, addDays, exportNights, isUuid } from "./_lib/ical";
 
 export const config = { runtime: "edge" };
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY!;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const headers = {
   apikey: SUPABASE_ANON_KEY,
@@ -38,7 +41,9 @@ export default async function handler(req: Request): Promise<Response> {
       ?.trim()
       .toLowerCase()
       .replace(/\.ics$/, "") ?? "";
-  if (!UUID.test(room)) return text("Missing or invalid room id", 400);
+  if (!isUuid(room)) return text("Missing or invalid room id", 400);
+  const forRaw = new URL(req.url).searchParams.get("for")?.trim().toLowerCase() ?? "";
+  if (forRaw && !isUuid(forRaw)) return text("Invalid feed id", 400);
 
   try {
     const roomRes = await fetch(
@@ -53,16 +58,16 @@ export default async function handler(req: Request): Promise<Response> {
     const from = addDays(today, -1);
     const to = addDays(today, 730);
     const avRes = await fetch(
-      `${SUPABASE_URL}/rest/v1/availability?room_id=eq.${room}&is_available=eq.false&date=gte.${from}&date=lte.${to}&select=date&order=date.asc&limit=1000`,
+      `${SUPABASE_URL}/rest/v1/availability?room_id=eq.${room}&is_available=eq.false&date=gte.${from}&date=lte.${to}&select=date,note&order=date.asc&limit=1000`,
       { headers },
     );
     if (!avRes.ok) return text("Could not load calendar", 502);
-    const rows: { date: string }[] = await avRes.json();
+    const rows: { date: string; note: string | null }[] = await avRes.json();
 
     const ics = buildIcs({
       roomId: room,
       calName: String(rooms[0].name ?? "Room"),
-      blockedNights: rows.map((r) => String(r.date).slice(0, 10)),
+      blockedNights: exportNights(rows, forRaw || undefined),
     });
     return new Response(ics, {
       headers: {
