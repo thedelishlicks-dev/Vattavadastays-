@@ -45,6 +45,8 @@ export interface Property {
   subscription_end_date: string | null;
   /** Unified Seasons (rooms + add-ons). Off = the old per-room Seasonal rates. Only the platform admin changes it. */
   season_pricing_v2?: boolean;
+  /** Channel sync (iCal) for this property. Off by default; only the platform admin changes it. */
+  channel_sync_enabled?: boolean;
 }
 
 export interface Room {
